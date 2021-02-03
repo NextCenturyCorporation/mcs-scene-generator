@@ -60,9 +60,9 @@ You can generate scenes containing specific objects by passing the [object type]
 
 For information on what each passive intuitive physics scene should depict (and how each scene is labeled), please see [this documentation](https://github.com/NextCenturyCorporation/mcs-private/blob/master/scene_generator/docs/eval_3_design.pdf).
 
-#### Training Datasets
+#### Training Intuitive Physics Datasets
 
-Training scenes are not implausible and do not have any "untrained" objects.
+Training intuitive physics scenes are not implausible and do not have any "untrained" objects.
 
 ```
 python generate_public_scenes.py -p <prefix> -t GravitySupportTraining
@@ -76,7 +76,9 @@ python generate_public_scenes.py -p <prefix> -t SpatioTemporalContinuityTraining
 - Each shape constancy training hypercube contains 2 scenes.
 - Each spatio-temporal continuity training hypercube contains 9 scenes.
 
-#### Evaluation Datasets
+#### Evaluation Intuitive Physics Datasets
+
+Evaluation intuitive physics scenes are either plausible or implausible and can have "untrained" objects.
 
 ```
 python generate_public_scenes.py -p <prefix> -t GravitySupportEvaluation
@@ -94,9 +96,19 @@ python generate_public_scenes.py -p <prefix> -t SpatioTemporalContinuityEvaluati
 
 For information on what each interaction scene should depict (and how each scene is labeled), please see [this documentation](https://github.com/NextCenturyCorporation/mcs-private/blob/master/scene_generator/docs/eval_3_design.pdf).
 
-#### Training Datasets
+#### Generic Interactive Scenes
 
-Training scenes do not have any "untrained" objects.
+To generate an interactive scene that's just a random collection of objects in a room with a random starting location (and doesn't follow a hypercube design):
+
+```
+python generate_public_scenes.py -p <prefix> -t Retrieval
+```
+
+- Each retrieval scene contains the trophy as the target object.
+
+#### Training Interactive Datasets
+
+Training interactive scenes do not have any "untrained" objects.
 
 ```
 python generate_public_scenes.py -p <prefix> -t ContainerRetrievalTraining
@@ -108,7 +120,9 @@ python generate_public_scenes.py -p <prefix> -t OccluderRetrievalTraining
 - Each obstacle training hypercube contains 4 scenes.
 - Each occluder training hypercube contains 12 scenes.
 
-#### Evaluation Datasets
+#### Evaluation Interactive Datasets
+
+Evaluation interactive scenes can have "untrained" objects.
 
 ```
 python generate_public_scenes.py -p <prefix> -t ContainerRetrievalEvaluation
@@ -135,14 +149,18 @@ Unzipping each bundle should extract a corresponding folder (containing the JSON
 
 Now you can generate the MCS agent scene JSON files, converted from the NYU JSON files.
 
-#### Training Datasets
+#### Training Agent Datasets
+
+Training agent scenes are not unexpected and do not have any "untrained" objects.
 
 ```
 python generate_public_scenes.py -p <prefix> -t AgentSingleObjectTraining
 python generate_public_scenes.py -p <prefix> -t AgentObjectPreferenceTraining
 ```
 
-#### Evaluation Datasets
+#### Evaluation Agent Datasets
+
+Evaluation agent scenes are either expected or unexpected and can have "untrained" objects.
 
 ```
 python generate_public_scenes.py -p <prefix> -t AgentEfficientActionAEvaluation

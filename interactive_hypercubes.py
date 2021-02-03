@@ -2081,6 +2081,7 @@ class InteractiveOccluderEvaluationHypercubeFactory(
 
 
 INTERACTIVE_TRAINING_HYPERCUBE_LIST = [
+    InteractiveSingleSceneFactory(RetrievalGoal('retrieval')),
     InteractiveContainerTrainingHypercubeFactory(RetrievalGoal('container')),
     InteractiveObstacleTrainingHypercubeFactory(RetrievalGoal('obstacle')),
     InteractiveOccluderTrainingHypercubeFactory(RetrievalGoal('occluder'))
