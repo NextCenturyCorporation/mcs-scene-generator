@@ -2,12 +2,14 @@
 
 ## Setup
 
+Please use Python 3.8
+
 ### Create a Virtual Environment
 
 From this folder, create a virtual environment and activate it.
 
 ```
-python3.6 -m venv --prompt scene_gen venv
+python3 -m venv --prompt scene_gen venv
 source venv/bin/activate
 python -m pip install --upgrade pip setuptools wheel
 ```
