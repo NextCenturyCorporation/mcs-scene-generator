@@ -58,7 +58,7 @@ You can generate scenes containing specific objects by passing the [object type]
 
 ### Intuitive Physics Scenes
 
-For information on what each passive intuitive physics scene should depict (and how each scene is labeled), please see [this documentation](https://github.com/NextCenturyCorporation/mcs-private/blob/master/scene_generator/docs/eval_3_design.pdf).
+For information on what each passive intuitive physics scene should depict (and how each scene is labeled), please see [this documentation](https://github.com/NextCenturyCorporation/mcs-private/blob/master/scene_generator/docs/).
 
 #### Training Intuitive Physics Datasets
 
@@ -94,7 +94,7 @@ python generate_public_scenes.py -p <prefix> -t SpatioTemporalContinuityEvaluati
 
 ### Interactive Scenes
 
-For information on what each interaction scene should depict (and how each scene is labeled), please see [this documentation](https://github.com/NextCenturyCorporation/mcs-private/blob/master/scene_generator/docs/eval_3_design.pdf).
+For information on what each interaction scene should depict (and how each scene is labeled), please see [this documentation](https://github.com/NextCenturyCorporation/mcs-private/blob/master/scene_generator/docs/).
 
 #### Generic Interactive Scenes
 
