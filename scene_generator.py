@@ -317,6 +317,16 @@ class SceneGenerator():
             type=str,
             default=None,
             help='Specific agent type (agent scenes)')
+        parser.add_argument(
+            '--symmetric',
+            type=str,
+            default=None,
+            help='Specific symmetric target type (gravity support scenes)')
+        parser.add_argument(
+            '--asymmetric',
+            type=str,
+            default=None,
+            help='Specific asymmetric target type (gravity support scenes)')
 
         args = parser.parse_args(argv[1:])
         random.seed(args.seed)
@@ -332,6 +342,8 @@ class SceneGenerator():
         role_to_type[tags.ROLES.OBSTACLE] = args.obstacle
         role_to_type[tags.ROLES.OCCLUDER] = args.occluder
         role_to_type[tags.ROLES.TARGET] = args.target
+        role_to_type['symmetric'] = args.symmetric
+        role_to_type['asymmetric'] = args.asymmetric
 
         self.generate_scenes(
             args.prefix,

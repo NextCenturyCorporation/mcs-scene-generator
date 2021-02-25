@@ -1321,6 +1321,18 @@ class GravitySupportHypercube(IntuitivePhysicsHypercube):
             [gravity_support_objects.get_asymmetric_target_definition_list()]
         )[0]
 
+        # Restrict object to a specific type, if type was given as input.
+        symmetric_object_type = self._role_to_type.get('symmetric')
+        asymmetric_object_type = self._role_to_type.get('asymmetric')
+        base_symmetric_list = self._filter_definition_list_on_type(
+            base_symmetric_list,
+            symmetric_object_type
+        )
+        base_asymmetric_list = self._filter_definition_list_on_type(
+            base_asymmetric_list,
+            asymmetric_object_type
+        )
+
         # Choose symmetric target object definition.
         definitions = {}
         definitions[VARIATIONS.SYMMETRIC] = random.choice(base_symmetric_list)
