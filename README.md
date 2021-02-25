@@ -49,16 +49,71 @@ Common arguments:
 You can generate scenes containing specific objects by passing the [object type](https://github.com/NextCenturyCorporation/MCS/blob/master/machine_common_sense/scenes/SCHEMA.md#object-list) to the scene generator using the following arguments (please note that the color and size of the object is currently chosen randomly, within the usual range):
 
 - `--agent <type>` (optional): Force the agent object to be a specific type (shape). Used in agent scenes.
+- `--asymmetric <type>` (optional): Force the asymmetric target object to be a specific type (shape). Used in gravity support scenes.
 - `--container <type>` (optional): Force the primary container object (that contains the target) to be a specific type (shape). Used in interactive container scenes.
 - `--context <type>` (optional): Force one context object to be a specific type (shape). Used in interactive scenes.
-- `--non-target <type>` (optional): Force the non-target object to be a specific type (shape). Used in intuitive physics and agent scenes.
+- `--non-target <type>` (optional): Force the non-target object to be a specific type (shape). Used in intuitive physics (but not gravity support) and agent scenes.
 - `--obstacle <type>` (optional): Force the obstacle object to be a specific type (shape). Used in interactive obstacle scenes.
 - `--occluder <type>` (optional): Force the primary occluder object (that occludes the target) to be a specific type (shape). Used in interactive occluder scenes.
-- `--target <type>` (optional): Force the target object to be a specific type (shape). Used in intuitive physics and agent scenes. Please note that the target object in interactive scenes is currently always a trophy.
+- `--target <type>` (optional): Force the target object to be a specific type (shape). Used in intuitive physics (but not gravity support) and agent scenes. Please note that the target object in interactive scenes is currently always a trophy.
+- `--symmetric <type>` (optional): Force the symmetric target object to be a specific type (shape). Used in gravity support scenes.
 
 ### Intuitive Physics Scenes
 
 For information on what each passive intuitive physics scene should depict (and how each scene is labeled), please see [this documentation](https://github.com/NextCenturyCorporation/mcs-private/blob/master/scene_generator/docs/).
+
+#### Intuitive Physics Objects
+
+The Eval 3.5 Gravity Support scenes only use the following object types:
+
+- Symmetric target (set with the `--symmetric` flag):
+  - `circle_frustum`
+  - `cone`
+  - `cube`
+  - `cylinder`
+  - `pyramid`
+  - `square_frustum`
+- Asymmetric target (set with the `--asymmetric` flag):
+  - `letter_l_narrow`
+  - `letter_l_wide`
+  - `triangle`
+- Support (hard-coded):
+  - `cube`
+
+The Eval 3 Object Permanence and Shape Constancy scenes only use the following target and non-target object types:
+
+- `car_1`
+- `circle_frustum`
+- `cone`
+- `cube`
+- `cylinder`
+- `dog_on_wheels`
+- `duck_on_wheels`
+- `pyramid`
+- `racecar_red`
+- `sphere`
+- `square_frustum`
+- `train_1`
+- `trolley_1`
+- `truck_1`
+- `tube_narrow`
+- `tube_wide`
+- `turtle_on_wheels`
+
+The Eval 3 Spatio-Temporal Continuity scenes only use the following target and non-target object types:
+
+- `car_1`
+- `cylinder`
+- `dog_on_wheels`
+- `duck_on_wheels`
+- `racecar_red`
+- `sphere`
+- `train_1`
+- `trolley_1`
+- `truck_1`
+- `tube_narrow`
+- `tube_wide`
+- `turtle_on_wheels`
 
 #### Training Intuitive Physics Datasets
 
@@ -148,6 +203,32 @@ First, download and unzip the bundles containing the NYU agent scene JSON files 
 Unzipping each bundle should extract a corresponding folder (containing the JSON files) nested within this folder, with a name like "agents_background_object_preference".
 
 Now you can generate the MCS agent scene JSON files, converted from the NYU JSON files.
+
+#### Agent and Goal Objects
+
+The Eval 3.5 Gravity Support scenes only use the following object types:
+
+- Agent (set with the `--agent` flag):
+  - `circle_frustum`
+  - `cone`
+  - `cube`
+  - `cylinder`
+  - `pyramid`
+  - `square_frustum`
+  - `tube_narrow`
+  - `tube_wide`
+- Goal Objects (set with the `--target` and `--non-target` flags):
+  - `cube_hollow_narrow`
+  - `cube_hollow_wide`
+  - `cube`
+  - `cylinder`
+  - `hash`
+  - `letter_x`
+  - `semi_sphere`
+  - `sphere`
+  - `square_frustum`
+  - `tube_narrow`
+  - `tube_wide`
 
 #### Training Agent Datasets
 
