@@ -54,7 +54,7 @@ class SceneGenerator():
     def strip_debug_misleading_data(self, body: Dict[str, Any]) -> None:
         """Remove misleading internal debug data not needed in debug files."""
         for obj in body['objects']:
-            obj.pop('speed', None)
+            obj.pop('movement', None)
 
     def strip_debug_data(self, body: Dict[str, Any]) -> None:
         """Remove internal debug data that should only be in debug files."""
@@ -79,7 +79,7 @@ class SceneGenerator():
         obj.pop('closedOffset', None)
         obj.pop('enclosedAreas', None)
         obj.pop('openAreas', None)
-        obj.pop('speed', None)
+        obj.pop('movement', None)
         obj.pop('isParentOf', None)
         obj.pop('parentArea', None)
         obj.pop('materialCategory', None)
@@ -163,7 +163,7 @@ class SceneGenerator():
         prefix: str,
         total: int,
         type_name: str,
-        eval_number: int,
+        eval_name: str,
         sort_hypercube: bool,
         stop_on_error: bool,
         role_to_type: Dict[str, str]
@@ -216,15 +216,16 @@ class SceneGenerator():
                 scene_filename = f'{file_name}_{(scene_index + 1):02}'
 
                 # The debug scene filename has the scene ID for debugging.
-                debug_filename = f'{scene_filename}_{scene_id}'
+                debug_filename = (
+                    scene_filename if eval_name else
+                    f'{scene_filename}_{scene_id}'
+                )
 
                 # Assign additional hypercube and scene tags.
                 scene_copy['name'] = scene_filename
                 scene_copy['hypercubeNumber'] = hypercube_index
                 scene_copy['sceneNumber'] = (scene_index + 1)
-                scene_copy['evaluation'] = (
-                    eval_number if eval_number > 0 else None
-                )
+                scene_copy['evaluation'] = eval_name
                 scene_copy['training'] = hypercube_factory.training
 
                 # Save the scene as both normal and debug JSON files.
@@ -240,9 +241,8 @@ class SceneGenerator():
         parser.add_argument(
             '-e',
             '--eval',
-            type=int,
-            default=0,
-            help='MCS evaluation number [default=None]')
+            default=None,
+            help='MCS evaluation name [default=None]')
         parser.add_argument(
             '-p',
             '--prefix',

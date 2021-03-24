@@ -1005,3 +1005,258 @@ def test_GravitySupportHypercube_scenes_fall_down():
                 assert instance['shows'][0]['position']['z'] == z_position
 
             verify_object_tags(scene_dict[j], [target], 'target', 'target')
+
+
+def test_ObjectPermanenceHypercubeEval4_default_objects_move_across():
+    hypercube = intuitive_physics_hypercubes.ObjectPermanenceHypercubeEval4(  # noqa: E501
+        BODY_TEMPLATE,
+        {'target': None, 'non target': None},
+        is_move_across=True
+    )
+    assert hypercube.is_move_across()
+    wall_material_tuple = random.choice(materials.CEILING_AND_WALL_MATERIALS)
+    object_dict = hypercube._create_default_objects(
+        wall_material_tuple[0],
+        wall_material_tuple[1]
+    )
+    assert verify_hypercube_variations(
+        hypercube._variations_list,
+        hypercube._target_list,
+        hypercube._distractor_list,
+        object_dict['target'],
+        object_dict['non target'],
+        1,
+        0
+    )
+    assert verify_hypercube_ObjectPermanence(
+        hypercube.is_move_across(),
+        object_dict,
+        hypercube._last_step,
+        wall_material_tuple[0],
+        eval_4=True
+    )
+
+
+def test_ObjectPermanenceHypercubeEval4_default_scene_move_across():
+    hypercube = intuitive_physics_hypercubes.ObjectPermanenceHypercubeEval4(  # noqa: E501
+        BODY_TEMPLATE,
+        {'target': None, 'non target': None},
+        is_move_across=True
+    )
+    assert hypercube.is_move_across()
+    goal_template = hypercubes.initialize_goal(
+        intuitive_physics_hypercubes.ObjectPermanenceHypercube.GOAL_TEMPLATE
+    )
+    scene = hypercube._create_default_scene(BODY_TEMPLATE, goal_template)
+    verify_scene(scene, hypercube.is_move_across())
+    assert 'object permanence' == scene['goal']['sceneInfo']['tertiaryType']
+
+
+def test_ObjectPermanenceHypercubeEval4_scenes_move_across():
+    hypercube = intuitive_physics_hypercubes.ObjectPermanenceHypercubeEval4(  # noqa: E501
+        BODY_TEMPLATE,
+        {'target': None, 'non target': None},
+        is_move_across=True
+    )
+    assert hypercube.is_move_across()
+
+    scene_list = hypercube.get_scenes()
+    scene_dict = {}
+    target_dict = {}
+    assert len(scene_list) == 2
+
+    print(f'TARGET={hypercube._target_list[0]}')
+
+    for scene in scene_list:
+        scene_id = scene['goal']['sceneInfo']['id'][0].lower()
+        scene_dict[scene_id] = scene
+        target_dict[scene_id] = get_object_list(hypercube, scene, 'target')
+        scene_name = scene['goal']['sceneInfo']['name']
+        assert scene_name.startswith('OBJP_')
+
+    for i in ['j']:
+        for j in [i + '1', i + '2']:
+            print(f'SCENE_ID={j}')
+            target_list = target_dict[j]
+            assert len(target_list) == 1
+
+            implausible = False
+            eval_only = False
+
+            # Verify target not switched.
+            assert verify_same_object(
+                target_list[0],
+                hypercube._variations_list[0].get('trained')
+            )
+
+            # Verify no change in target.
+            assert 'hides' not in target_list[0]
+            assert (
+                target_list[0]['shows'][0]['stepBegin'] ==
+                hypercube._target_list[0]['shows'][0]['stepBegin']
+            )
+
+            is_left = target_list[0]['shows'][0]['position']['x'] < 0
+
+            # Verify normal exit/stop movement.
+            target_movement = target_list[0]['movement']
+            move_property = 'moveStop' if j.endswith('1') else 'moveExit'
+            assert target_movement['active'] == move_property
+            assert target_list[0]['forces'][0]['vector']['x'] == (
+                target_movement[move_property]['forceX'] *
+                target_list[0]['mass'] * (1 if is_left else -1)
+            )
+
+            verify_scene(
+                scene_dict[j],
+                hypercube.is_move_across(),
+                implausible,
+                eval_only
+            )
+
+            verify_hypercube_ObjectPermanence(
+                hypercube.is_move_across(),
+                {
+                    'target': target_list,
+                    'non target': hypercube._distractor_list,
+                    'intuitive physics occluder': hypercube._occluder_list,
+                    'context': hypercube._background_list
+                },
+                hypercube._last_step,
+                scene_dict[j]['wallMaterial'],
+                eval_4=True
+            )
+
+            verify_object_tags(scene_dict[j], target_list, 'target', 'target')
+
+
+def test_SpatioTemporalContinuityHypercubeEval4_default_objects_move_across():
+    hypercube = intuitive_physics_hypercubes.SpatioTemporalContinuityHypercubeEval4(  # noqa: E501
+        BODY_TEMPLATE,
+        {'target': None, 'non target': None},
+        is_move_across=True
+    )
+    assert hypercube.is_move_across()
+    wall_material_tuple = random.choice(materials.CEILING_AND_WALL_MATERIALS)
+    object_dict = hypercube._create_default_objects(
+        wall_material_tuple[0],
+        wall_material_tuple[1]
+    )
+    assert verify_hypercube_variations(
+        hypercube._variations_list,
+        hypercube._target_list,
+        hypercube._distractor_list,
+        object_dict['target'],
+        object_dict['non target'],
+        1,
+        0
+    )
+    assert verify_hypercube_SpatioTemporalContinuity(
+        hypercube.is_move_across(),
+        object_dict,
+        hypercube._last_step,
+        wall_material_tuple[0],
+        hypercube._target_list[0],
+        eval_4=True
+    )
+
+
+def test_SpatioTemporalContinuityHypercubeEval4_default_scene_move_across():
+    hypercube = intuitive_physics_hypercubes.SpatioTemporalContinuityHypercubeEval4(  # noqa: E501
+        BODY_TEMPLATE,
+        {'target': None, 'non target': None},
+        is_move_across=True
+    )
+    assert hypercube.is_move_across()
+    goal_template = hypercubes.initialize_goal(
+        intuitive_physics_hypercubes.SpatioTemporalContinuityHypercube.GOAL_TEMPLATE  # noqa: E501
+    )
+    scene = hypercube._create_default_scene(BODY_TEMPLATE, goal_template)
+    verify_scene(scene, hypercube.is_move_across())
+    assert (
+        'spatio temporal continuity' ==
+        scene['goal']['sceneInfo']['tertiaryType']
+    )
+
+
+def test_SpatioTemporalContinuityHypercubeEval4_scenes_move_across():
+    hypercube = intuitive_physics_hypercubes.SpatioTemporalContinuityHypercubeEval4(  # noqa: E501
+        BODY_TEMPLATE,
+        {'target': None, 'non target': None},
+        is_move_across=True
+    )
+    assert hypercube.is_move_across()
+
+    scene_list = hypercube.get_scenes()
+    scene_dict = {}
+    target_dict = {}
+    non_target_dict = {}
+    occluder_dict = {}
+    assert len(scene_list) == 2
+
+    print(f'TARGET={hypercube._target_list[0]}')
+
+    for scene in scene_list:
+        scene_id = scene['goal']['sceneInfo']['id'][0].lower()
+        scene_dict[scene_id] = scene
+        target_dict[scene_id] = get_object_list(hypercube, scene, 'target')
+        non_target_dict[scene_id] = get_object_list(hypercube, scene,
+                                                    'non target')
+        occluder_dict[scene_id] = get_object_list(hypercube, scene,
+                                                  'intuitive physics occluder')
+        scene_name = scene['goal']['sceneInfo']['name']
+        assert scene_name.startswith('STC_')
+
+    for i in ['a', 'e']:
+        for j in [i + '1']:
+            print(f'SCENE_ID={j}')
+            target_list = target_dict[j]
+            non_target_list = non_target_dict[j]
+            occluder_list = occluder_dict[j]
+
+            implausible = False
+            eval_only = False
+
+            assert len(target_list) == 1
+            assert len(non_target_list) == 0
+
+            # Verify target not switched.
+            assert verify_same_object(
+                target_list[0],
+                hypercube._variations_list[0].get('trained')
+            )
+
+            # Verify no change in target object.
+            if i in ['a']:
+                assert 'shrouds' not in target_list[0]
+
+            # Verify occluders are or are not in scene.
+            if i in ['a']:
+                assert len(occluder_list) == 4
+            else:
+                assert len(occluder_list) == 0
+
+            verify_scene(
+                scene_dict[j],
+                hypercube.is_move_across(),
+                implausible,
+                eval_only
+            )
+
+            verify_hypercube_SpatioTemporalContinuity(
+                hypercube.is_move_across(),
+                {
+                    'target': target_list,
+                    'non target': non_target_list,
+                    'intuitive physics occluder': hypercube._occluder_list,
+                    'context': hypercube._background_list
+                },
+                hypercube._last_step,
+                scene_dict[j]['wallMaterial'],
+                hypercube._target_list[0],
+                eval_4=True
+            )
+
+            verify_object_tags(scene_dict[j], target_list, 'target', 'target')
+            verify_object_tags(scene_dict[j], non_target_list, 'non target',
+                               'non_target')

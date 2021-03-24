@@ -2,6 +2,31 @@ import copy
 from enum import Enum
 from typing import Any, Dict, List, Union
 
+
+def _create_size_option(
+    size_multiplier: float,
+    size_text: str,
+    base_dict: Dict[str, float],
+    is_untrained: bool = False
+) -> Dict[str, Any]:
+    return {
+        'dimensions': {
+            'x': base_dict['dimensions']['x'] * size_multiplier,
+            'y': base_dict['dimensions']['y'] * size_multiplier,
+            'z': base_dict['dimensions']['z'] * size_multiplier
+        },
+        'mass': base_dict['mass'] * size_multiplier,
+        'positionY': base_dict['positionY'] * size_multiplier,
+        'scale': {
+            'x': base_dict['scale']['x'] * size_multiplier,
+            'y': base_dict['scale']['y'] * size_multiplier,
+            'z': base_dict['scale']['z'] * size_multiplier
+        },
+        'size': size_text,
+        'untrainedSize': is_untrained
+    }
+
+
 _TROPHY = {
     "type": "trophy",
     "color": ["grey"],
@@ -9010,82 +9035,86 @@ _POTTED_PLANT_LARGE = {
 }
 
 
+INTUITIVE_PHYSICS_OBJECT_CHOOSE_MATERIAL_LIST = [{
+    "materialCategory": ["intuitive_physics_block"],
+    "salientMaterials": ["wood"],
+}, {
+    "materialCategory": ["intuitive_physics_plastic"],
+    "salientMaterials": ["plastic"],
+}, {
+    "materialCategory": ["intuitive_physics_wood"],
+    "salientMaterials": ["wood"]
+}]
+
+
+# Size data for non-cylinder primitive objects (cones, cubes, spheres, etc.)
+_STANDARD_BASE_SIZE = {
+    "dimensions": {
+        "x": 1.0,
+        "y": 1.0,
+        "z": 1.0
+    },
+    "mass": 1.0,
+    "positionY": 0.5,
+    "scale": {
+        "x": 1.0,
+        "y": 1.0,
+        "z": 1.0
+    }
+}
+
+
+# Size data for cylinder primitive objects.
+_CYLINDER_BASE_SIZE = {
+    "dimensions": {
+        "x": 1.0,
+        "y": 1.0,
+        "z": 1.0
+    },
+    "mass": 1.0,
+    "positionY": 0.5,
+    "scale": {
+        "x": 1.0,
+        # Unity cylinders always double their height (I don't know why).
+        "y": 0.5,
+        "z": 1.0
+    }
+}
+
+
+# Size data for rectangular primitive objects.
+_RECT_BASE_SIZE = {
+    "dimensions": {
+        "x": 1.0,
+        "y": 0.5,
+        "z": 1.0
+    },
+    "mass": 1.0,
+    "positionY": 0.25,
+    "scale": {
+        "x": 1.0,
+        "y": 0.5,
+        "z": 1.0
+    }
+}
+
+
 _INTUITIVE_PHYSICS_CIRCLE_FRUSTUM = {
     "untrainedShape": True,
     "type": "circle_frustum",
     "shape": ["circle frustum"],
-    "chooseSize": [{
-        "untrainedSize": True,
-        "mass": 0.2,
-        "size": "tiny",
-        "dimensions": {
-            "x": 0.2,
-            "y": 0.2,
-            "z": 0.2
-        },
-        "positionY": 0.1,
-        "scale": {
-            "x": 0.2,
-            "y": 0.2,
-            "z": 0.2
-        }
-    }, {
-        "mass": 0.4,
-        "size": "small",
-        "dimensions": {
-            "x": 0.4,
-            "y": 0.4,
-            "z": 0.4
-        },
-        "positionY": 0.2,
-        "scale": {
-            "x": 0.4,
-            "y": 0.4,
-            "z": 0.4
-        }
-    }, {
-        "mass": 0.5,
-        "size": "small",
-        "dimensions": {
-            "x": 0.5,
-            "y": 0.5,
-            "z": 0.5
-        },
-        "positionY": 0.25,
-        "scale": {
-            "x": 0.5,
-            "y": 0.5,
-            "z": 0.5
-        }
-    }, {
-        "untrainedSize": True,
-        "mass": 0.7,
-        "size": "medium",
-        "dimensions": {
-            "x": 0.7,
-            "y": 0.7,
-            "z": 0.7
-        },
-        "positionY": 0.35,
-        "scale": {
-            "x": 0.7,
-            "y": 0.7,
-            "z": 0.7
-        }
-    }],
-    "chooseMaterial": [{
-        "materialCategory": ["intuitive_physics_block"],
-        "salientMaterials": ["wood"],
-    }, {
-        "materialCategory": ["intuitive_physics_plastic"],
-        "salientMaterials": ["plastic"],
-    }, {
-        "materialCategory": ["intuitive_physics_wood"],
-        "salientMaterials": ["wood"]
-    }, {
-        "materialCategory": ["intuitive_physics_metal"],
-        "salientMaterials": ["metal"]
-    }],
+    "chooseSize": [
+        _create_size_option(0.4, 'small', _STANDARD_BASE_SIZE, True),
+        _create_size_option(0.5, 'medium', _STANDARD_BASE_SIZE, False),
+        _create_size_option(0.55, 'medium', _STANDARD_BASE_SIZE, False),
+        _create_size_option(0.6, 'medium', _STANDARD_BASE_SIZE, False),
+        _create_size_option(0.65, 'medium', _STANDARD_BASE_SIZE, False),
+        _create_size_option(0.7, 'medium', _STANDARD_BASE_SIZE, False),
+        _create_size_option(0.75, 'medium', _STANDARD_BASE_SIZE, False),
+        _create_size_option(0.8, 'medium', _STANDARD_BASE_SIZE, False),
+        _create_size_option(0.9, 'large', _STANDARD_BASE_SIZE, True)
+    ],
+    "chooseMaterial": INTUITIVE_PHYSICS_OBJECT_CHOOSE_MATERIAL_LIST,
     "attributes": ["moveable"]
 }
 
@@ -9093,78 +9122,18 @@ _INTUITIVE_PHYSICS_CIRCLE_FRUSTUM = {
 _INTUITIVE_PHYSICS_CONE = {
     "type": "cone",
     "shape": ["cone"],
-    "chooseSize": [{
-        "untrainedSize": True,
-        "mass": 0.2,
-        "size": "tiny",
-        "dimensions": {
-            "x": 0.2,
-            "y": 0.2,
-            "z": 0.2
-        },
-        "positionY": 0.1,
-        "scale": {
-            "x": 0.2,
-            "y": 0.2,
-            "z": 0.2
-        }
-    }, {
-        "mass": 0.4,
-        "size": "small",
-        "dimensions": {
-            "x": 0.4,
-            "y": 0.4,
-            "z": 0.4
-        },
-        "positionY": 0.2,
-        "scale": {
-            "x": 0.4,
-            "y": 0.4,
-            "z": 0.4
-        }
-    }, {
-        "mass": 0.5,
-        "size": "small",
-        "dimensions": {
-            "x": 0.5,
-            "y": 0.5,
-            "z": 0.5
-        },
-        "positionY": 0.25,
-        "scale": {
-            "x": 0.5,
-            "y": 0.5,
-            "z": 0.5
-        }
-    }, {
-        "untrainedSize": True,
-        "mass": 0.7,
-        "size": "medium",
-        "dimensions": {
-            "x": 0.7,
-            "y": 0.7,
-            "z": 0.7
-        },
-        "positionY": 0.35,
-        "scale": {
-            "x": 0.7,
-            "y": 0.7,
-            "z": 0.7
-        }
-    }],
-    "chooseMaterial": [{
-        "materialCategory": ["intuitive_physics_block"],
-        "salientMaterials": ["wood"],
-    }, {
-        "materialCategory": ["intuitive_physics_plastic"],
-        "salientMaterials": ["plastic"],
-    }, {
-        "materialCategory": ["intuitive_physics_wood"],
-        "salientMaterials": ["wood"]
-    }, {
-        "materialCategory": ["intuitive_physics_metal"],
-        "salientMaterials": ["metal"]
-    }],
+    "chooseSize": [
+        _create_size_option(0.4, 'small', _STANDARD_BASE_SIZE, True),
+        _create_size_option(0.5, 'medium', _STANDARD_BASE_SIZE, False),
+        _create_size_option(0.55, 'medium', _STANDARD_BASE_SIZE, False),
+        _create_size_option(0.6, 'medium', _STANDARD_BASE_SIZE, False),
+        _create_size_option(0.65, 'medium', _STANDARD_BASE_SIZE, False),
+        _create_size_option(0.7, 'medium', _STANDARD_BASE_SIZE, False),
+        _create_size_option(0.75, 'medium', _STANDARD_BASE_SIZE, False),
+        _create_size_option(0.8, 'medium', _STANDARD_BASE_SIZE, False),
+        _create_size_option(0.9, 'large', _STANDARD_BASE_SIZE, True)
+    ],
+    "chooseMaterial": INTUITIVE_PHYSICS_OBJECT_CHOOSE_MATERIAL_LIST,
     "attributes": ["moveable"]
 }
 
@@ -9172,78 +9141,18 @@ _INTUITIVE_PHYSICS_CONE = {
 _INTUITIVE_PHYSICS_CUBE = {
     "type": "cube",
     "shape": ["cube"],
-    "chooseSize": [{
-        "untrainedSize": True,
-        "mass": 0.2,
-        "size": "tiny",
-        "dimensions": {
-            "x": 0.2,
-            "y": 0.2,
-            "z": 0.2
-        },
-        "positionY": 0.1,
-        "scale": {
-            "x": 0.2,
-            "y": 0.2,
-            "z": 0.2
-        }
-    }, {
-        "mass": 0.4,
-        "size": "small",
-        "dimensions": {
-            "x": 0.4,
-            "y": 0.4,
-            "z": 0.4
-        },
-        "positionY": 0.2,
-        "scale": {
-            "x": 0.4,
-            "y": 0.4,
-            "z": 0.4
-        }
-    }, {
-        "mass": 0.5,
-        "size": "small",
-        "dimensions": {
-            "x": 0.5,
-            "y": 0.5,
-            "z": 0.5
-        },
-        "positionY": 0.25,
-        "scale": {
-            "x": 0.5,
-            "y": 0.5,
-            "z": 0.5
-        }
-    }, {
-        "untrainedSize": True,
-        "mass": 0.7,
-        "size": "medium",
-        "dimensions": {
-            "x": 0.7,
-            "y": 0.7,
-            "z": 0.7
-        },
-        "positionY": 0.35,
-        "scale": {
-            "x": 0.7,
-            "y": 0.7,
-            "z": 0.7
-        }
-    }],
-    "chooseMaterial": [{
-        "materialCategory": ["intuitive_physics_block"],
-        "salientMaterials": ["wood"],
-    }, {
-        "materialCategory": ["intuitive_physics_plastic"],
-        "salientMaterials": ["plastic"],
-    }, {
-        "materialCategory": ["intuitive_physics_wood"],
-        "salientMaterials": ["wood"]
-    }, {
-        "materialCategory": ["intuitive_physics_metal"],
-        "salientMaterials": ["metal"]
-    }],
+    "chooseSize": [
+        _create_size_option(0.4, 'small', _STANDARD_BASE_SIZE, True),
+        _create_size_option(0.5, 'medium', _STANDARD_BASE_SIZE, False),
+        _create_size_option(0.55, 'medium', _STANDARD_BASE_SIZE, False),
+        _create_size_option(0.6, 'medium', _STANDARD_BASE_SIZE, False),
+        _create_size_option(0.65, 'medium', _STANDARD_BASE_SIZE, False),
+        _create_size_option(0.7, 'medium', _STANDARD_BASE_SIZE, False),
+        _create_size_option(0.75, 'medium', _STANDARD_BASE_SIZE, False),
+        _create_size_option(0.8, 'medium', _STANDARD_BASE_SIZE, False),
+        _create_size_option(0.9, 'large', _STANDARD_BASE_SIZE, True)
+    ],
+    "chooseMaterial": INTUITIVE_PHYSICS_OBJECT_CHOOSE_MATERIAL_LIST,
     "attributes": ["moveable"]
 }
 
@@ -9251,102 +9160,24 @@ _INTUITIVE_PHYSICS_CUBE = {
 _INTUITIVE_PHYSICS_CYLINDER = {
     "type": "cylinder",
     "shape": ["cylinder"],
-    "chooseSize": [{
-        "untrainedSize": True,
-        "mass": 0.2,
-        "size": "tiny",
-        "dimensions": {
-            "x": 0.2,
-            "y": 0.2,
-            "z": 0.2
-        },
-        "positionY": 0.1,
-        "rotation": {
-            "x": 90,
-            "y": 0,
-            "z": 0
-        },
-        "scale": {
-            "x": 0.2,
-            # Unity cylinders always double their height (I don't know why).
-            "y": 0.1,
-            "z": 0.2
-        }
-    }, {
-        "mass": 0.4,
-        "size": "small",
-        "dimensions": {
-            "x": 0.4,
-            "y": 0.4,
-            "z": 0.4
-        },
-        "positionY": 0.2,
-        "rotation": {
-            "x": 90,
-            "y": 0,
-            "z": 0
-        },
-        "scale": {
-            "x": 0.4,
-            # Unity cylinders always double their height (I don't know why).
-            "y": 0.2,
-            "z": 0.4
-        }
-    }, {
-        "mass": 0.5,
-        "size": "small",
-        "dimensions": {
-            "x": 0.5,
-            "y": 0.5,
-            "z": 0.5
-        },
-        "positionY": 0.25,
-        "rotation": {
-            "x": 90,
-            "y": 0,
-            "z": 0
-        },
-        "scale": {
-            "x": 0.5,
-            # Unity cylinders always double their height (I don't know why).
-            "y": 0.25,
-            "z": 0.5
-        }
-    }, {
-        "untrainedSize": True,
-        "mass": 0.7,
-        "size": "medium",
-        "dimensions": {
-            "x": 0.7,
-            "y": 0.7,
-            "z": 0.7
-        },
-        "positionY": 0.35,
-        "rotation": {
-            "x": 90,
-            "y": 0,
-            "z": 0
-        },
-        "scale": {
-            "x": 0.7,
-            # Unity cylinders always double their height (I don't know why).
-            "y": 0.35,
-            "z": 0.7
-        }
-    }],
-    "chooseMaterial": [{
-        "materialCategory": ["intuitive_physics_block"],
-        "salientMaterials": ["wood"],
-    }, {
-        "materialCategory": ["intuitive_physics_plastic"],
-        "salientMaterials": ["plastic"],
-    }, {
-        "materialCategory": ["intuitive_physics_wood"],
-        "salientMaterials": ["wood"]
-    }, {
-        "materialCategory": ["intuitive_physics_metal"],
-        "salientMaterials": ["metal"]
-    }],
+    "rotation": {
+        # Rotate the cylinder onto its curved side so it can roll sideways.
+        "x": 90,
+        "y": 0,
+        "z": 0
+    },
+    "chooseSize": [
+        _create_size_option(0.4, 'small', _CYLINDER_BASE_SIZE, True),
+        _create_size_option(0.5, 'medium', _CYLINDER_BASE_SIZE, False),
+        _create_size_option(0.55, 'medium', _CYLINDER_BASE_SIZE, False),
+        _create_size_option(0.6, 'medium', _CYLINDER_BASE_SIZE, False),
+        _create_size_option(0.65, 'medium', _CYLINDER_BASE_SIZE, False),
+        _create_size_option(0.7, 'medium', _CYLINDER_BASE_SIZE, False),
+        _create_size_option(0.75, 'medium', _CYLINDER_BASE_SIZE, False),
+        _create_size_option(0.8, 'medium', _CYLINDER_BASE_SIZE, False),
+        _create_size_option(0.9, 'large', _CYLINDER_BASE_SIZE, True)
+    ],
+    "chooseMaterial": INTUITIVE_PHYSICS_OBJECT_CHOOSE_MATERIAL_LIST,
     "attributes": ["moveable"]
 }
 
@@ -9355,78 +9186,18 @@ _INTUITIVE_PHYSICS_PYRAMID = {
     "untrainedShape": True,
     "type": "pyramid",
     "shape": ["pyramid"],
-    "chooseSize": [{
-        "untrainedSize": True,
-        "mass": 0.2,
-        "size": "tiny",
-        "dimensions": {
-            "x": 0.2,
-            "y": 0.2,
-            "z": 0.2
-        },
-        "positionY": 0.1,
-        "scale": {
-            "x": 0.2,
-            "y": 0.2,
-            "z": 0.2
-        }
-    }, {
-        "mass": 0.4,
-        "size": "small",
-        "dimensions": {
-            "x": 0.4,
-            "y": 0.4,
-            "z": 0.4
-        },
-        "positionY": 0.2,
-        "scale": {
-            "x": 0.4,
-            "y": 0.4,
-            "z": 0.4
-        }
-    }, {
-        "mass": 0.5,
-        "size": "small",
-        "dimensions": {
-            "x": 0.5,
-            "y": 0.5,
-            "z": 0.5
-        },
-        "positionY": 0.25,
-        "scale": {
-            "x": 0.5,
-            "y": 0.5,
-            "z": 0.5
-        }
-    }, {
-        "untrainedSize": True,
-        "mass": 0.7,
-        "size": "medium",
-        "dimensions": {
-            "x": 0.7,
-            "y": 0.7,
-            "z": 0.7
-        },
-        "positionY": 0.35,
-        "scale": {
-            "x": 0.7,
-            "y": 0.7,
-            "z": 0.7
-        }
-    }],
-    "chooseMaterial": [{
-        "materialCategory": ["intuitive_physics_block"],
-        "salientMaterials": ["wood"],
-    }, {
-        "materialCategory": ["intuitive_physics_plastic"],
-        "salientMaterials": ["plastic"],
-    }, {
-        "materialCategory": ["intuitive_physics_wood"],
-        "salientMaterials": ["wood"]
-    }, {
-        "materialCategory": ["intuitive_physics_metal"],
-        "salientMaterials": ["metal"]
-    }],
+    "chooseSize": [
+        _create_size_option(0.4, 'small', _STANDARD_BASE_SIZE, True),
+        _create_size_option(0.5, 'medium', _STANDARD_BASE_SIZE, False),
+        _create_size_option(0.55, 'medium', _STANDARD_BASE_SIZE, False),
+        _create_size_option(0.6, 'medium', _STANDARD_BASE_SIZE, False),
+        _create_size_option(0.65, 'medium', _STANDARD_BASE_SIZE, False),
+        _create_size_option(0.7, 'medium', _STANDARD_BASE_SIZE, False),
+        _create_size_option(0.75, 'medium', _STANDARD_BASE_SIZE, False),
+        _create_size_option(0.8, 'medium', _STANDARD_BASE_SIZE, False),
+        _create_size_option(0.9, 'large', _STANDARD_BASE_SIZE, True)
+    ],
+    "chooseMaterial": INTUITIVE_PHYSICS_OBJECT_CHOOSE_MATERIAL_LIST,
     "attributes": ["moveable"]
 }
 
@@ -9434,78 +9205,18 @@ _INTUITIVE_PHYSICS_PYRAMID = {
 _INTUITIVE_PHYSICS_RECTANGULAR_PRISM = {
     "type": "cube",
     "shape": ["rectangle"],
-    "chooseSize": [{
-        "untrainedSize": True,
-        "mass": 0.2,
-        "size": "tiny",
-        "dimensions": {
-            "x": 0.2,
-            "y": 0.1,
-            "z": 0.1
-        },
-        "positionY": 0.05,
-        "scale": {
-            "x": 0.2,
-            "y": 0.1,
-            "z": 0.1
-        }
-    }, {
-        "mass": 0.4,
-        "size": "small",
-        "dimensions": {
-            "x": 0.4,
-            "y": 0.2,
-            "z": 0.2
-        },
-        "positionY": 0.1,
-        "scale": {
-            "x": 0.4,
-            "y": 0.2,
-            "z": 0.2
-        }
-    }, {
-        "mass": 0.5,
-        "size": "small",
-        "dimensions": {
-            "x": 0.5,
-            "y": 0.25,
-            "z": 0.25
-        },
-        "positionY": 0.125,
-        "scale": {
-            "x": 0.5,
-            "y": 0.25,
-            "z": 0.25
-        }
-    }, {
-        "untrainedSize": True,
-        "mass": 0.7,
-        "size": "medium",
-        "dimensions": {
-            "x": 0.7,
-            "y": 0.35,
-            "z": 0.35
-        },
-        "positionY": 0.175,
-        "scale": {
-            "x": 0.7,
-            "y": 0.35,
-            "z": 0.35
-        }
-    }],
-    "chooseMaterial": [{
-        "materialCategory": ["intuitive_physics_block"],
-        "salientMaterials": ["wood"],
-    }, {
-        "materialCategory": ["intuitive_physics_plastic"],
-        "salientMaterials": ["plastic"],
-    }, {
-        "materialCategory": ["intuitive_physics_wood"],
-        "salientMaterials": ["wood"]
-    }, {
-        "materialCategory": ["intuitive_physics_metal"],
-        "salientMaterials": ["metal"]
-    }],
+    "chooseSize": [
+        _create_size_option(0.4, 'small', _RECT_BASE_SIZE, True),
+        _create_size_option(0.5, 'medium', _RECT_BASE_SIZE, False),
+        _create_size_option(0.55, 'medium', _RECT_BASE_SIZE, False),
+        _create_size_option(0.6, 'medium', _RECT_BASE_SIZE, False),
+        _create_size_option(0.65, 'medium', _RECT_BASE_SIZE, False),
+        _create_size_option(0.7, 'medium', _RECT_BASE_SIZE, False),
+        _create_size_option(0.75, 'medium', _RECT_BASE_SIZE, False),
+        _create_size_option(0.8, 'medium', _RECT_BASE_SIZE, False),
+        _create_size_option(0.9, 'large', _RECT_BASE_SIZE, True)
+    ],
+    "chooseMaterial": INTUITIVE_PHYSICS_OBJECT_CHOOSE_MATERIAL_LIST,
     "attributes": ["moveable"]
 }
 
@@ -9513,78 +9224,18 @@ _INTUITIVE_PHYSICS_RECTANGULAR_PRISM = {
 _INTUITIVE_PHYSICS_SPHERE = {
     "type": "sphere",
     "shape": ["sphere"],
-    "chooseSize": [{
-        "untrainedSize": True,
-        "mass": 0.2,
-        "size": "tiny",
-        "dimensions": {
-            "x": 0.2,
-            "y": 0.2,
-            "z": 0.2
-        },
-        "positionY": 0.1,
-        "scale": {
-            "x": 0.2,
-            "y": 0.2,
-            "z": 0.2
-        }
-    }, {
-        "mass": 0.4,
-        "size": "small",
-        "dimensions": {
-            "x": 0.4,
-            "y": 0.4,
-            "z": 0.4
-        },
-        "positionY": 0.2,
-        "scale": {
-            "x": 0.4,
-            "y": 0.4,
-            "z": 0.4
-        }
-    }, {
-        "mass": 0.5,
-        "size": "small",
-        "dimensions": {
-            "x": 0.5,
-            "y": 0.5,
-            "z": 0.5
-        },
-        "positionY": 0.25,
-        "scale": {
-            "x": 0.5,
-            "y": 0.5,
-            "z": 0.5
-        }
-    }, {
-        "untrainedSize": True,
-        "mass": 0.7,
-        "size": "medium",
-        "dimensions": {
-            "x": 0.7,
-            "y": 0.7,
-            "z": 0.7
-        },
-        "positionY": 0.35,
-        "scale": {
-            "x": 0.7,
-            "y": 0.7,
-            "z": 0.7
-        }
-    }],
-    "chooseMaterial": [{
-        "materialCategory": ["intuitive_physics_block"],
-        "salientMaterials": ["wood"],
-    }, {
-        "materialCategory": ["intuitive_physics_plastic"],
-        "salientMaterials": ["plastic"],
-    }, {
-        "materialCategory": ["intuitive_physics_wood"],
-        "salientMaterials": ["wood"]
-    }, {
-        "materialCategory": ["intuitive_physics_metal"],
-        "salientMaterials": ["metal"]
-    }],
+    "chooseSize": [
+        _create_size_option(0.4, 'small', _STANDARD_BASE_SIZE, True),
+        _create_size_option(0.5, 'medium', _STANDARD_BASE_SIZE, False),
+        _create_size_option(0.55, 'medium', _STANDARD_BASE_SIZE, False),
+        _create_size_option(0.6, 'medium', _STANDARD_BASE_SIZE, False),
+        _create_size_option(0.65, 'medium', _STANDARD_BASE_SIZE, False),
+        _create_size_option(0.7, 'medium', _STANDARD_BASE_SIZE, False),
+        _create_size_option(0.75, 'medium', _STANDARD_BASE_SIZE, False),
+        _create_size_option(0.8, 'medium', _STANDARD_BASE_SIZE, False),
+        _create_size_option(0.9, 'large', _STANDARD_BASE_SIZE, True)
+    ],
+    "chooseMaterial": INTUITIVE_PHYSICS_OBJECT_CHOOSE_MATERIAL_LIST,
     "attributes": ["moveable"]
 }
 
@@ -9592,78 +9243,18 @@ _INTUITIVE_PHYSICS_SPHERE = {
 _INTUITIVE_PHYSICS_SQUARE_FRUSTUM = {
     "type": "square_frustum",
     "shape": ["square frustum"],
-    "chooseSize": [{
-        "untrainedSize": True,
-        "mass": 0.2,
-        "size": "tiny",
-        "dimensions": {
-            "x": 0.2,
-            "y": 0.2,
-            "z": 0.2
-        },
-        "positionY": 0.1,
-        "scale": {
-            "x": 0.2,
-            "y": 0.2,
-            "z": 0.2
-        }
-    }, {
-        "mass": 0.4,
-        "size": "small",
-        "dimensions": {
-            "x": 0.4,
-            "y": 0.4,
-            "z": 0.4
-        },
-        "positionY": 0.2,
-        "scale": {
-            "x": 0.4,
-            "y": 0.4,
-            "z": 0.4
-        }
-    }, {
-        "mass": 0.5,
-        "size": "small",
-        "dimensions": {
-            "x": 0.5,
-            "y": 0.5,
-            "z": 0.5
-        },
-        "positionY": 0.25,
-        "scale": {
-            "x": 0.5,
-            "y": 0.5,
-            "z": 0.5
-        }
-    }, {
-        "untrainedSize": True,
-        "mass": 0.7,
-        "size": "medium",
-        "dimensions": {
-            "x": 0.7,
-            "y": 0.7,
-            "z": 0.7
-        },
-        "positionY": 0.35,
-        "scale": {
-            "x": 0.7,
-            "y": 0.7,
-            "z": 0.7
-        }
-    }],
-    "chooseMaterial": [{
-        "materialCategory": ["intuitive_physics_block"],
-        "salientMaterials": ["wood"],
-    }, {
-        "materialCategory": ["intuitive_physics_plastic"],
-        "salientMaterials": ["plastic"],
-    }, {
-        "materialCategory": ["intuitive_physics_wood"],
-        "salientMaterials": ["wood"]
-    }, {
-        "materialCategory": ["intuitive_physics_metal"],
-        "salientMaterials": ["metal"]
-    }],
+    "chooseSize": [
+        _create_size_option(0.4, 'small', _STANDARD_BASE_SIZE, True),
+        _create_size_option(0.5, 'medium', _STANDARD_BASE_SIZE, False),
+        _create_size_option(0.55, 'medium', _STANDARD_BASE_SIZE, False),
+        _create_size_option(0.6, 'medium', _STANDARD_BASE_SIZE, False),
+        _create_size_option(0.65, 'medium', _STANDARD_BASE_SIZE, False),
+        _create_size_option(0.7, 'medium', _STANDARD_BASE_SIZE, False),
+        _create_size_option(0.75, 'medium', _STANDARD_BASE_SIZE, False),
+        _create_size_option(0.8, 'medium', _STANDARD_BASE_SIZE, False),
+        _create_size_option(0.9, 'large', _STANDARD_BASE_SIZE, True)
+    ],
+    "chooseMaterial": INTUITIVE_PHYSICS_OBJECT_CHOOSE_MATERIAL_LIST,
     "attributes": ["moveable"]
 }
 
@@ -9672,98 +9263,24 @@ _INTUITIVE_PHYSICS_TUBE_NARROW = {
     "untrainedShape": True,
     "type": "tube_narrow",
     "shape": ["narrow tube"],
-    "chooseSize": [{
-        "untrainedSize": True,
-        "mass": 0.2,
-        "size": "tiny",
-        "dimensions": {
-            "x": 0.2,
-            "y": 0.2,
-            "z": 0.2
-        },
-        "positionY": 0.1,
-        "rotation": {
-            "x": 90,
-            "y": 0,
-            "z": 0
-        },
-        "scale": {
-            "x": 0.2,
-            "y": 0.2,
-            "z": 0.2
-        }
-    }, {
-        "mass": 0.4,
-        "size": "small",
-        "dimensions": {
-            "x": 0.4,
-            "y": 0.4,
-            "z": 0.4
-        },
-        "positionY": 0.2,
-        "rotation": {
-            "x": 90,
-            "y": 0,
-            "z": 0
-        },
-        "scale": {
-            "x": 0.4,
-            "y": 0.4,
-            "z": 0.4
-        }
-    }, {
-        "mass": 0.5,
-        "size": "small",
-        "dimensions": {
-            "x": 0.5,
-            "y": 0.5,
-            "z": 0.5
-        },
-        "positionY": 0.25,
-        "rotation": {
-            "x": 90,
-            "y": 0,
-            "z": 0
-        },
-        "scale": {
-            "x": 0.5,
-            "y": 0.5,
-            "z": 0.5
-        }
-    }, {
-        "untrainedSize": True,
-        "mass": 0.7,
-        "size": "medium",
-        "dimensions": {
-            "x": 0.7,
-            "y": 0.7,
-            "z": 0.7
-        },
-        "positionY": 0.35,
-        "rotation": {
-            "x": 90,
-            "y": 0,
-            "z": 0
-        },
-        "scale": {
-            "x": 0.7,
-            "y": 0.7,
-            "z": 0.7
-        }
-    }],
-    "chooseMaterial": [{
-        "materialCategory": ["intuitive_physics_block"],
-        "salientMaterials": ["wood"],
-    }, {
-        "materialCategory": ["intuitive_physics_plastic"],
-        "salientMaterials": ["plastic"],
-    }, {
-        "materialCategory": ["intuitive_physics_wood"],
-        "salientMaterials": ["wood"]
-    }, {
-        "materialCategory": ["intuitive_physics_metal"],
-        "salientMaterials": ["metal"]
-    }],
+    "rotation": {
+        # Rotate the tube onto its curved side so it can roll sideways.
+        "x": 90,
+        "y": 0,
+        "z": 0
+    },
+    "chooseSize": [
+        _create_size_option(0.4, 'small', _STANDARD_BASE_SIZE, True),
+        _create_size_option(0.5, 'medium', _STANDARD_BASE_SIZE, False),
+        _create_size_option(0.55, 'medium', _STANDARD_BASE_SIZE, False),
+        _create_size_option(0.6, 'medium', _STANDARD_BASE_SIZE, False),
+        _create_size_option(0.65, 'medium', _STANDARD_BASE_SIZE, False),
+        _create_size_option(0.7, 'medium', _STANDARD_BASE_SIZE, False),
+        _create_size_option(0.75, 'medium', _STANDARD_BASE_SIZE, False),
+        _create_size_option(0.8, 'medium', _STANDARD_BASE_SIZE, False),
+        _create_size_option(0.9, 'large', _STANDARD_BASE_SIZE, True)
+    ],
+    "chooseMaterial": INTUITIVE_PHYSICS_OBJECT_CHOOSE_MATERIAL_LIST,
     "attributes": ["moveable"]
 }
 
@@ -9772,257 +9289,115 @@ _INTUITIVE_PHYSICS_TUBE_WIDE = {
     "untrainedShape": True,
     "type": "tube_wide",
     "shape": ["wide tube"],
-    "chooseSize": [{
-        "untrainedSize": True,
-        "mass": 0.2,
-        "size": "tiny",
-        "dimensions": {
-            "x": 0.2,
-            "y": 0.2,
-            "z": 0.2
-        },
-        "positionY": 0.1,
-        "rotation": {
-            "x": 90,
-            "y": 0,
-            "z": 0
-        },
-        "scale": {
-            "x": 0.2,
-            "y": 0.2,
-            "z": 0.2
-        }
-    }, {
-        "mass": 0.4,
-        "size": "small",
-        "dimensions": {
-            "x": 0.4,
-            "y": 0.4,
-            "z": 0.4
-        },
-        "positionY": 0.2,
-        "rotation": {
-            "x": 90,
-            "y": 0,
-            "z": 0
-        },
-        "scale": {
-            "x": 0.4,
-            "y": 0.4,
-            "z": 0.4
-        }
-    }, {
-        "mass": 0.5,
-        "size": "small",
-        "dimensions": {
-            "x": 0.5,
-            "y": 0.5,
-            "z": 0.5
-        },
-        "positionY": 0.25,
-        "rotation": {
-            "x": 90,
-            "y": 0,
-            "z": 0
-        },
-        "scale": {
-            "x": 0.5,
-            "y": 0.5,
-            "z": 0.5
-        }
-    }, {
-        "untrainedSize": True,
-        "mass": 0.7,
-        "size": "medium",
-        "dimensions": {
-            "x": 0.7,
-            "y": 0.7,
-            "z": 0.7
-        },
-        "positionY": 0.35,
-        "rotation": {
-            "x": 90,
-            "y": 0,
-            "z": 0
-        },
-        "scale": {
-            "x": 0.7,
-            "y": 0.7,
-            "z": 0.7
-        }
-    }],
-    "chooseMaterial": [{
-        "materialCategory": ["intuitive_physics_block"],
-        "salientMaterials": ["wood"],
-    }, {
-        "materialCategory": ["intuitive_physics_plastic"],
-        "salientMaterials": ["plastic"],
-    }, {
-        "materialCategory": ["intuitive_physics_wood"],
-        "salientMaterials": ["wood"]
-    }, {
-        "materialCategory": ["intuitive_physics_metal"],
-        "salientMaterials": ["metal"]
-    }],
+    "rotation": {
+        # Rotate the tube onto its curved side so it can roll sideways.
+        "x": 90,
+        "y": 0,
+        "z": 0
+    },
+    "chooseSize": [
+        _create_size_option(0.4, 'small', _STANDARD_BASE_SIZE, True),
+        _create_size_option(0.5, 'medium', _STANDARD_BASE_SIZE, False),
+        _create_size_option(0.55, 'medium', _STANDARD_BASE_SIZE, False),
+        _create_size_option(0.6, 'medium', _STANDARD_BASE_SIZE, False),
+        _create_size_option(0.65, 'medium', _STANDARD_BASE_SIZE, False),
+        _create_size_option(0.7, 'medium', _STANDARD_BASE_SIZE, False),
+        _create_size_option(0.75, 'medium', _STANDARD_BASE_SIZE, False),
+        _create_size_option(0.8, 'medium', _STANDARD_BASE_SIZE, False),
+        _create_size_option(0.9, 'large', _STANDARD_BASE_SIZE, True)
+    ],
+    "chooseMaterial": INTUITIVE_PHYSICS_OBJECT_CHOOSE_MATERIAL_LIST,
     "attributes": ["moveable"]
+}
+
+
+_DUCK_BASE_SIZE = {
+    "dimensions": {
+        "x": 0.21,
+        "y": 0.17,
+        "z": 0.065
+    },
+    "positionY": 0,
+    "mass": 0.25,
+    "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+    }
 }
 
 
 _INTUITIVE_PHYSICS_DUCK = {
     "type": "duck_on_wheels",
     "shape": ["duck"],
-    "chooseSize": [{
-        "untrainedSize": True,
-        "mass": 0.2,
-        "size": "tiny",
-        "dimensions": {
-            "x": 0.21 * 1,
-            "y": 0.17 * 1,
-            "z": 0.065 * 1
-        },
-        "positionY": 0,
-        "scale": {
-            "x": 1,
-            "y": 1,
-            "z": 1
-        }
-    }, {
-        "mass": 0.4,
-        "size": "small",
-        "dimensions": {
-            "x": 0.21 * 2,
-            "y": 0.17 * 2,
-            "z": 0.065 * 2
-        },
-        "positionY": 0,
-        "scale": {
-            "x": 2,
-            "y": 2,
-            "z": 2
-        }
-    }, {
-        "mass": 0.5,
-        "size": "small",
-        "dimensions": {
-            "x": 0.21 * 2.5,
-            "y": 0.17 * 2.5,
-            "z": 0.065 * 2.5
-        },
-        "positionY": 0,
-        "scale": {
-            "x": 2.5,
-            "y": 2.5,
-            "z": 2.5
-        }
-    }, {
-        "untrainedSize": True,
-        "mass": 0.7,
-        "size": "medium",
-        "dimensions": {
-            "x": 0.21 * 3.25,
-            "y": 0.17 * 3.25,
-            "z": 0.065 * 3.25
-        },
-        "positionY": 0,
-        "scale": {
-            "x": 3.25,
-            "y": 3.25,
-            "z": 3.25
-        }
-    }],
-    "chooseMaterial": [{
-        "materialCategory": ["intuitive_physics_block"],
-        "salientMaterials": ["wood"],
-    }, {
-        "materialCategory": ["intuitive_physics_plastic"],
-        "salientMaterials": ["plastic"],
-    }, {
-        "materialCategory": ["intuitive_physics_wood"],
-        "salientMaterials": ["wood"]
-    }, {
-        "materialCategory": ["intuitive_physics_metal"],
-        "salientMaterials": ["metal"]
-    }],
+    "chooseSize": [
+        _create_size_option(2.5, 'small', _DUCK_BASE_SIZE, True),
+        _create_size_option(3.25, 'medium', _DUCK_BASE_SIZE, False),
+        _create_size_option(3.5, 'medium', _DUCK_BASE_SIZE, False),
+        _create_size_option(3.75, 'medium', _DUCK_BASE_SIZE, False),
+        _create_size_option(4, 'medium', _DUCK_BASE_SIZE, False),
+        _create_size_option(4.25, 'medium', _DUCK_BASE_SIZE, False),
+        _create_size_option(4.5, 'medium', _DUCK_BASE_SIZE, False),
+        _create_size_option(4.75, 'medium', _DUCK_BASE_SIZE, False),
+        _create_size_option(5, 'medium', _DUCK_BASE_SIZE, False),
+        _create_size_option(5.25, 'medium', _DUCK_BASE_SIZE, False),
+        _create_size_option(5.75, 'large', _DUCK_BASE_SIZE, True)
+    ],
+    "chooseMaterial": INTUITIVE_PHYSICS_OBJECT_CHOOSE_MATERIAL_LIST,
     "attributes": ["moveable"]
+}
+
+
+_TURTLE_BASE_SIZE = {
+    "dimensions": {
+        "x": 0.24,
+        "y": 0.14,
+        "z": 0.085
+    },
+    "mass": 0.25,
+    "positionY": 0,
+    "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+    }
 }
 
 
 _INTUITIVE_PHYSICS_TURTLE = {
     "type": "turtle_on_wheels",
     "shape": ["turtle"],
-    "chooseSize": [{
-        "untrainedSize": True,
-        "mass": 0.2,
-        "size": "tiny",
-        "dimensions": {
-            "x": 0.24 * 0.75,
-            "y": 0.14 * 0.75,
-            "z": 0.085 * 0.75
-        },
-        "positionY": 0,
-        "scale": {
-            "x": 0.75,
-            "y": 0.75,
-            "z": 0.75
-        }
-    }, {
-        "mass": 0.4,
-        "size": "small",
-        "dimensions": {
-            "x": 0.24 * 1.75,
-            "y": 0.14 * 1.75,
-            "z": 0.085 * 1.75
-        },
-        "positionY": 0,
-        "scale": {
-            "x": 1.75,
-            "y": 1.75,
-            "z": 1.75
-        }
-    }, {
-        "mass": 0.5,
-        "size": "small",
-        "dimensions": {
-            "x": 0.24 * 2,
-            "y": 0.14 * 2,
-            "z": 0.085 * 2
-        },
-        "positionY": 0,
-        "scale": {
-            "x": 2,
-            "y": 2,
-            "z": 2
-        }
-    }, {
-        "untrainedSize": True,
-        "mass": 0.7,
-        "size": "medium",
-        "dimensions": {
-            "x": 0.24 * 2.75,
-            "y": 0.14 * 2.75,
-            "z": 0.085 * 2.75
-        },
-        "positionY": 0,
-        "scale": {
-            "x": 2.75,
-            "y": 2.75,
-            "z": 2.75
-        }
-    }],
-    "chooseMaterial": [{
-        "materialCategory": ["intuitive_physics_block"],
-        "salientMaterials": ["wood"],
-    }, {
-        "materialCategory": ["intuitive_physics_plastic"],
-        "salientMaterials": ["plastic"],
-    }, {
-        "materialCategory": ["intuitive_physics_wood"],
-        "salientMaterials": ["wood"]
-    }, {
-        "materialCategory": ["intuitive_physics_metal"],
-        "salientMaterials": ["metal"]
-    }],
+    "chooseSize": [
+        _create_size_option(2.25, 'small', _TURTLE_BASE_SIZE, True),
+        _create_size_option(2.75, 'medium', _TURTLE_BASE_SIZE, False),
+        _create_size_option(3, 'medium', _TURTLE_BASE_SIZE, False),
+        _create_size_option(3.25, 'medium', _TURTLE_BASE_SIZE, False),
+        _create_size_option(3.5, 'medium', _TURTLE_BASE_SIZE, False),
+        _create_size_option(3.75, 'medium', _TURTLE_BASE_SIZE, False),
+        _create_size_option(4, 'medium', _TURTLE_BASE_SIZE, False),
+        _create_size_option(4.25, 'medium', _TURTLE_BASE_SIZE, False),
+        _create_size_option(4.5, 'medium', _TURTLE_BASE_SIZE, False),
+        _create_size_option(5, 'large', _TURTLE_BASE_SIZE, True)
+    ],
+    "chooseMaterial": INTUITIVE_PHYSICS_OBJECT_CHOOSE_MATERIAL_LIST,
     "attributes": ["moveable"]
+}
+
+
+_CAR_1_BASE_SIZE = {
+    "dimensions": {
+        # The X and Z dimensions are switched due to the Y rotation.
+        "x": 0.14,
+        "y": 0.065,
+        "z": 0.075
+    },
+    "mass": 0.25,
+    "positionY": 0,
+    "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+    }
 }
 
 
@@ -10035,83 +9410,35 @@ _INTUITIVE_PHYSICS_CAR = {
         "y": 90,
         "z": 0
     },
-    "chooseSize": [{
-        "untrainedSize": True,
-        "mass": 0.2,
-        "size": "tiny",
-        "dimensions": {
-            # The X and Z dimensions are switched due to the Y rotation.
-            "x": 0.14 * 1.5,
-            "y": 0.065 * 1.5,
-            "z": 0.075 * 1.5
-        },
-        "positionY": 0.01,
-        "scale": {
-            "x": 1.5,
-            "y": 1.5,
-            "z": 1.5
-        }
-    }, {
-        "mass": 0.4,
-        "size": "small",
-        "dimensions": {
-            # The X and Z dimensions are switched due to the Y rotation.
-            "x": 0.14 * 3,
-            "y": 0.065 * 3,
-            "z": 0.075 * 3
-        },
-        "positionY": 0.01,
-        "scale": {
-            "x": 3,
-            "y": 3,
-            "z": 3
-        }
-    }, {
-        "mass": 0.5,
-        "size": "small",
-        "dimensions": {
-            # The X and Z dimensions are switched due to the Y rotation.
-            "x": 0.14 * 3.5,
-            "y": 0.065 * 3.5,
-            "z": 0.075 * 3.5
-        },
-        "positionY": 0.01,
-        "scale": {
-            "x": 3.5,
-            "y": 3.5,
-            "z": 3.5
-        }
-    }, {
-        "untrainedSize": True,
-        "mass": 0.7,
-        "size": "medium",
-        "dimensions": {
-            # The X and Z dimensions are switched due to the Y rotation.
-            "x": 0.14 * 5,
-            "y": 0.065 * 5,
-            "z": 0.075 * 5
-        },
-        "positionY": 0.01,
-        "scale": {
-            "x": 5,
-            "y": 5,
-            "z": 5
-        }
-    }],
-    "chooseMaterial": [{
-        "materialCategory": ["intuitive_physics_block"],
-        "salientMaterials": ["wood"],
-    }, {
-        "materialCategory": ["intuitive_physics_plastic"],
-        "salientMaterials": ["plastic"],
-    }, {
-        "materialCategory": ["intuitive_physics_wood"],
-        "salientMaterials": ["wood"]
-    }, {
-        "materialCategory": ["intuitive_physics_metal"],
-        "salientMaterials": ["metal"]
-    }],
+    "chooseSize": [
+        _create_size_option(3.5, 'small', _CAR_1_BASE_SIZE, True),
+        _create_size_option(4.5, 'medium', _CAR_1_BASE_SIZE, False),
+        _create_size_option(5, 'medium', _CAR_1_BASE_SIZE, False),
+        _create_size_option(5.5, 'medium', _CAR_1_BASE_SIZE, False),
+        _create_size_option(6, 'medium', _CAR_1_BASE_SIZE, False),
+        _create_size_option(6.5, 'medium', _CAR_1_BASE_SIZE, False),
+        _create_size_option(7, 'medium', _CAR_1_BASE_SIZE, False),
+        _create_size_option(8, 'large', _CAR_1_BASE_SIZE, True)
+    ],
+    "chooseMaterial": INTUITIVE_PHYSICS_OBJECT_CHOOSE_MATERIAL_LIST,
     "attributes": ["moveable"]
+}
+
+
+_RACECAR_BASE_SIZE = {
+    "dimensions": {
+        # The X and Z dimensions are switched due to the Y rotation.
+        "x": 0.15,
+        "y": 0.06,
+        "z": 0.07
+    },
+    "mass": 0.25,
+    "positionY": 0,
+    "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+    }
 }
 
 
@@ -10124,83 +9451,35 @@ _INTUITIVE_PHYSICS_RACECAR = {
         "y": 90,
         "z": 0
     },
-    "chooseSize": [{
-        "untrainedSize": True,
-        "mass": 0.2,
-        "size": "tiny",
-        "dimensions": {
-            # The X and Z dimensions are switched due to the Y rotation.
-            "x": 0.15 * 1.25,
-            "y": 0.06 * 1.25,
-            "z": 0.07 * 1.25
-        },
-        "positionY": 0.01,
-        "scale": {
-            "x": 1.25,
-            "y": 1.25,
-            "z": 1.25
-        }
-    }, {
-        "mass": 0.4,
-        "size": "small",
-        "dimensions": {
-            # The X and Z dimensions are switched due to the Y rotation.
-            "x": 0.15 * 2.75,
-            "y": 0.06 * 2.75,
-            "z": 0.07 * 2.75
-        },
-        "positionY": 0.01,
-        "scale": {
-            "x": 2.75,
-            "y": 2.75,
-            "z": 2.75
-        }
-    }, {
-        "mass": 0.5,
-        "size": "small",
-        "dimensions": {
-            # The X and Z dimensions are switched due to the Y rotation.
-            "x": 0.15 * 3.25,
-            "y": 0.06 * 3.25,
-            "z": 0.07 * 3.25
-        },
-        "positionY": 0.01,
-        "scale": {
-            "x": 3.25,
-            "y": 3.25,
-            "z": 3.25
-        }
-    }, {
-        "untrainedSize": True,
-        "mass": 0.7,
-        "size": "medium",
-        "dimensions": {
-            # The X and Z dimensions are switched due to the Y rotation.
-            "x": 0.15 * 4.5,
-            "y": 0.06 * 4.5,
-            "z": 0.07 * 4.5
-        },
-        "positionY": 0.01,
-        "scale": {
-            "x": 4.5,
-            "y": 4.5,
-            "z": 4.5
-        }
-    }],
-    "chooseMaterial": [{
-        "materialCategory": ["intuitive_physics_block"],
-        "salientMaterials": ["wood"],
-    }, {
-        "materialCategory": ["intuitive_physics_plastic"],
-        "salientMaterials": ["plastic"],
-    }, {
-        "materialCategory": ["intuitive_physics_wood"],
-        "salientMaterials": ["wood"]
-    }, {
-        "materialCategory": ["intuitive_physics_metal"],
-        "salientMaterials": ["metal"]
-    }],
+    "chooseSize": [
+        _create_size_option(3.5, 'small', _RACECAR_BASE_SIZE, True),
+        _create_size_option(4.25, 'medium', _RACECAR_BASE_SIZE, False),
+        _create_size_option(4.75, 'medium', _RACECAR_BASE_SIZE, False),
+        _create_size_option(5.25, 'medium', _RACECAR_BASE_SIZE, False),
+        _create_size_option(5.75, 'medium', _RACECAR_BASE_SIZE, False),
+        _create_size_option(6.25, 'medium', _RACECAR_BASE_SIZE, False),
+        _create_size_option(6.75, 'medium', _RACECAR_BASE_SIZE, False),
+        _create_size_option(7.75, 'large', _RACECAR_BASE_SIZE, True)
+    ],
+    "chooseMaterial": INTUITIVE_PHYSICS_OBJECT_CHOOSE_MATERIAL_LIST,
     "attributes": ["moveable"]
+}
+
+
+_DOG_BASE_SIZE = {
+    "dimensions": {
+        # The X and Z dimensions are switched due to the Y rotation.
+        "x": 0.355,
+        "y": 0.134,
+        "z": 0.071
+    },
+    "mass": 0.5,
+    "positionY": 0,
+    "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+    }
 }
 
 
@@ -10214,95 +9493,37 @@ _INTUITIVE_PHYSICS_DOG = {
         "y": 90,
         "z": 0
     },
-    "chooseSize": [{
-        "untrainedSize": True,
-        "mass": 0.2,
-        "size": "tiny",
-        "dimensions": {
-            # The X and Z dimensions are switched due to the Y rotation.
-            "x": 0.355 * 0.5,
-            "y": 0.134 * 0.5,
-            "z": 0.071 * 0.5
-        },
-        "positionY": 0.01,
-        "scale": {
-            "x": 0.5,
-            "y": 0.5,
-            "z": 0.5
-        }
-    }, {
-        "mass": 0.4,
-        "size": "small",
-        "dimensions": {
-            # The X and Z dimensions are switched due to the Y rotation.
-            "x": 0.355 * 1.25,
-            "y": 0.134 * 1.25,
-            "z": 0.071 * 1.25
-        },
-        "positionY": 0.01,
-        "scale": {
-            "x": 1.25,
-            "y": 1.25,
-            "z": 1.25
-        }
-    }, {
-        "mass": 0.5,
-        "size": "small",
-        "dimensions": {
-            # The X and Z dimensions are switched due to the Y rotation.
-            "x": 0.355 * 1.5,
-            "y": 0.134 * 1.5,
-            "z": 0.071 * 1.5
-        },
-        "positionY": 0.01,
-        "scale": {
-            "x": 1.5,
-            "y": 1.5,
-            "z": 1.5
-        }
-    }, {
-        "untrainedSize": True,
-        "mass": 0.7,
-        "size": "medium",
-        "dimensions": {
-            # The X and Z dimensions are switched due to the Y rotation.
-            "x": 0.355 * 2,
-            "y": 0.134 * 2,
-            "z": 0.071 * 2
-        },
-        "positionY": 0.01,
-        "scale": {
-            "x": 2,
-            "y": 2,
-            "z": 2
-        }
-    }],
+    "chooseSize": [
+        _create_size_option(1.5, 'small', _DOG_BASE_SIZE, True),
+        _create_size_option(2, 'medium', _DOG_BASE_SIZE, False),
+        _create_size_option(2.25, 'medium', _DOG_BASE_SIZE, False),
+        _create_size_option(2.5, 'medium', _DOG_BASE_SIZE, False),
+        _create_size_option(2.75, 'medium', _DOG_BASE_SIZE, False),
+        _create_size_option(3, 'medium', _DOG_BASE_SIZE, False),
+        _create_size_option(3.5, 'large', _DOG_BASE_SIZE, True)
+    ],
     "chooseMaterial": [{
-        "materialCategory": [
-            "intuitive_physics_block",
-            "intuitive_physics_block"
-        ],
-        "salientMaterials": ["wood"],
-    }, {
-        "materialCategory": [
-            "intuitive_physics_plastic",
-            "intuitive_physics_plastic"
-        ],
-        "salientMaterials": ["plastic"],
-    }, {
-        "materialCategory": [
-            "intuitive_physics_wood",
-            "intuitive_physics_wood"
-        ],
-        "salientMaterials": ["wood"]
-    }, {
-        "materialCategory": [
-            "intuitive_physics_metal",
-            "intuitive_physics_metal"
-        ],
-        "salientMaterials": ["metal"]
-    }],
+        'materialCategory': item['materialCategory'] * 2,
+        'salientMaterials': item['salientMaterials']
+    } for item in INTUITIVE_PHYSICS_OBJECT_CHOOSE_MATERIAL_LIST],
     "attributes": ["moveable"]
+}
+
+
+_TRAIN_BASE_SIZE = {
+    "dimensions": {
+        # The X and Z dimensions are switched due to the Y rotation.
+        "x": 0.23,
+        "y": 0.2,
+        "z": 0.16
+    },
+    "mass": 0.25,
+    "positionY": 0,
+    "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+    }
 }
 
 
@@ -10316,83 +9537,36 @@ _INTUITIVE_PHYSICS_TRAIN = {
         "y": 90,
         "z": 0
     },
-    "chooseSize": [{
-        "untrainedSize": True,
-        "mass": 0.2,
-        "size": "tiny",
-        "dimensions": {
-            # The X and Z dimensions are switched due to the Y rotation.
-            "x": 0.23,
-            "y": 0.2,
-            "z": 0.16
-        },
-        "positionY": 0.01,
-        "scale": {
-            "x": 1,
-            "y": 1,
-            "z": 1
-        }
-    }, {
-        "mass": 0.4,
-        "size": "small",
-        "dimensions": {
-            # The X and Z dimensions are switched due to the Y rotation.
-            "x": 0.23 * 1.75,
-            "y": 0.2 * 1.75,
-            "z": 0.16 * 1.75
-        },
-        "positionY": 0.01,
-        "scale": {
-            "x": 1.75,
-            "y": 1.75,
-            "z": 1.75
-        }
-    }, {
-        "mass": 0.5,
-        "size": "small",
-        "dimensions": {
-            # The X and Z dimensions are switched due to the Y rotation.
-            "x": 0.23 * 2.25,
-            "y": 0.2 * 2.25,
-            "z": 0.16 * 2.25
-        },
-        "positionY": 0.01,
-        "scale": {
-            "x": 2.25,
-            "y": 2.25,
-            "z": 2.25
-        }
-    }, {
-        "untrainedSize": True,
-        "mass": 0.7,
-        "size": "medium",
-        "dimensions": {
-            # The X and Z dimensions are switched due to the Y rotation.
-            "x": 0.23 * 3,
-            "y": 0.2 * 3,
-            "z": 0.16 * 3
-        },
-        "positionY": 0.01,
-        "scale": {
-            "x": 3,
-            "y": 3,
-            "z": 3
-        }
-    }],
-    "chooseMaterial": [{
-        "materialCategory": ["intuitive_physics_block"],
-        "salientMaterials": ["wood"],
-    }, {
-        "materialCategory": ["intuitive_physics_plastic"],
-        "salientMaterials": ["plastic"],
-    }, {
-        "materialCategory": ["intuitive_physics_wood"],
-        "salientMaterials": ["wood"]
-    }, {
-        "materialCategory": ["intuitive_physics_metal"],
-        "salientMaterials": ["metal"]
-    }],
+    "chooseSize": [
+        _create_size_option(2, 'small', _TRAIN_BASE_SIZE, True),
+        _create_size_option(2.5, 'medium', _TRAIN_BASE_SIZE, False),
+        _create_size_option(2.75, 'medium', _TRAIN_BASE_SIZE, False),
+        _create_size_option(3, 'medium', _TRAIN_BASE_SIZE, False),
+        _create_size_option(3.25, 'medium', _TRAIN_BASE_SIZE, False),
+        _create_size_option(3.5, 'medium', _TRAIN_BASE_SIZE, False),
+        _create_size_option(3.75, 'medium', _TRAIN_BASE_SIZE, False),
+        _create_size_option(4, 'medium', _TRAIN_BASE_SIZE, False),
+        _create_size_option(4.5, 'large', _TRAIN_BASE_SIZE, True)
+    ],
+    "chooseMaterial": INTUITIVE_PHYSICS_OBJECT_CHOOSE_MATERIAL_LIST,
     "attributes": ["moveable"]
+}
+
+
+_TROLLEY_BASE_SIZE = {
+    "dimensions": {
+        # The X and Z dimensions are switched due to the Y rotation.
+        "x": 0.23,
+        "y": 0.2,
+        "z": 0.16
+    },
+    "mass": 0.25,
+    "positionY": 0,
+    "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+    }
 }
 
 
@@ -10406,83 +9580,36 @@ _INTUITIVE_PHYSICS_TROLLEY = {
         "y": 90,
         "z": 0
     },
-    "chooseSize": [{
-        "untrainedSize": True,
-        "mass": 0.2,
-        "size": "tiny",
-        "dimensions": {
-            # The X and Z dimensions are switched due to the Y rotation.
-            "x": 0.23,
-            "y": 0.2,
-            "z": 0.16
-        },
-        "positionY": 0.01,
-        "scale": {
-            "x": 1,
-            "y": 1,
-            "z": 1
-        }
-    }, {
-        "mass": 0.4,
-        "size": "small",
-        "dimensions": {
-            # The X and Z dimensions are switched due to the Y rotation.
-            "x": 0.23 * 1.75,
-            "y": 0.2 * 1.75,
-            "z": 0.16 * 1.75
-        },
-        "positionY": 0.01,
-        "scale": {
-            "x": 1.75,
-            "y": 1.75,
-            "z": 1.75
-        }
-    }, {
-        "mass": 0.5,
-        "size": "small",
-        "dimensions": {
-            # The X and Z dimensions are switched due to the Y rotation.
-            "x": 0.23 * 2.25,
-            "y": 0.2 * 2.25,
-            "z": 0.16 * 2.25
-        },
-        "positionY": 0.01,
-        "scale": {
-            "x": 2.25,
-            "y": 2.25,
-            "z": 2.25
-        }
-    }, {
-        "untrainedSize": True,
-        "mass": 0.7,
-        "size": "medium",
-        "dimensions": {
-            # The X and Z dimensions are switched due to the Y rotation.
-            "x": 0.23 * 3,
-            "y": 0.2 * 3,
-            "z": 0.16 * 3
-        },
-        "positionY": 0.01,
-        "scale": {
-            "x": 3,
-            "y": 3,
-            "z": 3
-        }
-    }],
-    "chooseMaterial": [{
-        "materialCategory": ["intuitive_physics_block"],
-        "salientMaterials": ["wood"],
-    }, {
-        "materialCategory": ["intuitive_physics_plastic"],
-        "salientMaterials": ["plastic"],
-    }, {
-        "materialCategory": ["intuitive_physics_wood"],
-        "salientMaterials": ["wood"]
-    }, {
-        "materialCategory": ["intuitive_physics_metal"],
-        "salientMaterials": ["metal"]
-    }],
+    "chooseSize": [
+        _create_size_option(2, 'small', _TROLLEY_BASE_SIZE, True),
+        _create_size_option(2.5, 'medium', _TROLLEY_BASE_SIZE, False),
+        _create_size_option(2.75, 'medium', _TROLLEY_BASE_SIZE, False),
+        _create_size_option(3, 'medium', _TROLLEY_BASE_SIZE, False),
+        _create_size_option(3.25, 'medium', _TROLLEY_BASE_SIZE, False),
+        _create_size_option(3.5, 'medium', _TROLLEY_BASE_SIZE, False),
+        _create_size_option(3.75, 'medium', _TROLLEY_BASE_SIZE, False),
+        _create_size_option(4, 'medium', _TROLLEY_BASE_SIZE, False),
+        _create_size_option(4.5, 'large', _TROLLEY_BASE_SIZE, True)
+    ],
+    "chooseMaterial": INTUITIVE_PHYSICS_OBJECT_CHOOSE_MATERIAL_LIST,
     "attributes": ["moveable"]
+}
+
+
+_TRUCK_BASE_SIZE = {
+    "dimensions": {
+        # The X and Z dimensions are switched due to the Y rotation.
+        "x": 0.25,
+        "y": 0.18,
+        "z": 0.2
+    },
+    "mass": 0.25,
+    "positionY": 0,
+    "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+    }
 }
 
 
@@ -10496,94 +9623,20 @@ _INTUITIVE_PHYSICS_TRUCK = {
         "y": 90,
         "z": 0
     },
-    "chooseSize": [{
-        "untrainedSize": True,
-        "mass": 0.2,
-        "size": "tiny",
-        "dimensions": {
-            # The X and Z dimensions are switched due to the Y rotation.
-            "x": 0.25 * 0.75,
-            "y": 0.18 * 0.75,
-            "z": 0.2 * 0.75
-        },
-        "positionY": 0.01,
-        "scale": {
-            "x": 0.75,
-            "y": 0.75,
-            "z": 0.75
-        }
-    }, {
-        "mass": 0.4,
-        "size": "small",
-        "dimensions": {
-            # The X and Z dimensions are switched due to the Y rotation.
-            "x": 0.25 * 1.5,
-            "y": 0.18 * 1.5,
-            "z": 0.2 * 1.5
-        },
-        "positionY": 0.01,
-        "scale": {
-            "x": 1.5,
-            "y": 1.5,
-            "z": 1.5
-        }
-    }, {
-        "mass": 0.5,
-        "size": "small",
-        "dimensions": {
-            # The X and Z dimensions are switched due to the Y rotation.
-            "x": 0.25 * 2,
-            "y": 0.18 * 2,
-            "z": 0.2 * 2
-        },
-        "positionY": 0.01,
-        "scale": {
-            "x": 2,
-            "y": 2,
-            "z": 2
-        }
-    }, {
-        "untrainedSize": True,
-        "mass": 0.7,
-        "size": "medium",
-        "dimensions": {
-            # The X and Z dimensions are switched due to the Y rotation.
-            "x": 0.25 * 2.75,
-            "y": 0.18 * 2.75,
-            "z": 0.2 * 2.75
-        },
-        "positionY": 0.01,
-        "scale": {
-            "x": 2.75,
-            "y": 2.75,
-            "z": 2.75
-        }
-    }],
+    "chooseSize": [
+        _create_size_option(1.75, 'small', _TRUCK_BASE_SIZE, True),
+        _create_size_option(2.25, 'medium', _TRUCK_BASE_SIZE, False),
+        _create_size_option(2.5, 'medium', _TRUCK_BASE_SIZE, False),
+        _create_size_option(2.75, 'medium', _TRUCK_BASE_SIZE, False),
+        _create_size_option(3, 'medium', _TRUCK_BASE_SIZE, False),
+        _create_size_option(3.25, 'medium', _TRUCK_BASE_SIZE, False),
+        _create_size_option(3.5, 'medium', _TRUCK_BASE_SIZE, False),
+        _create_size_option(4, 'large', _TRUCK_BASE_SIZE, True)
+    ],
     "chooseMaterial": [{
-        "materialCategory": [
-            "intuitive_physics_block",
-            "intuitive_physics_block"
-        ],
-        "salientMaterials": ["wood"],
-    }, {
-        "materialCategory": [
-            "intuitive_physics_plastic",
-            "intuitive_physics_plastic"
-        ],
-        "salientMaterials": ["plastic"],
-    }, {
-        "materialCategory": [
-            "intuitive_physics_wood",
-            "intuitive_physics_wood"
-        ],
-        "salientMaterials": ["wood"]
-    }, {
-        "materialCategory": [
-            "intuitive_physics_metal",
-            "intuitive_physics_metal"
-        ],
-        "salientMaterials": ["metal"]
-    }],
+        'materialCategory': item['materialCategory'] * 2,
+        'salientMaterials': item['salientMaterials']
+    } for item in INTUITIVE_PHYSICS_OBJECT_CHOOSE_MATERIAL_LIST],
     "attributes": ["moveable"]
 }
 

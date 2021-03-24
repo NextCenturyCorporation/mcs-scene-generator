@@ -41,7 +41,7 @@ Common arguments:
 - `-p <prefix>` (required): Filename prefix for the output JSON scene files.
 - `-t <type>` (required): Type of hypercubes to generate.
 - `-c <count>` (optional): Number of hypercubes to generate. Default: 1
-- `-e <eval>` (optional): Evaluation number to save in the scene tags. Default: None
+- `-e <eval>` (optional): Evaluation name to save in the scene tags. Default: None
 - `-s <seed>` (optional): Random seed.
 - `--sort-hypercube` (optional): Sort the hypercube scenes alphabetically by cell name, so A1 is always scene 1, A2 is always scene 2, etc.
 - `--stop-on-error` (optional): Stop scene generation on any error.
@@ -55,8 +55,8 @@ You can generate scenes containing specific objects by passing the [object type]
 - `--non-target <type>` (optional): Force the non-target object to be a specific type (shape). Used in intuitive physics (but not gravity support) and agent scenes.
 - `--obstacle <type>` (optional): Force the obstacle object to be a specific type (shape). Used in interactive obstacle scenes.
 - `--occluder <type>` (optional): Force the primary occluder object (that occludes the target) to be a specific type (shape). Used in interactive occluder scenes.
-- `--target <type>` (optional): Force the target object to be a specific type (shape). Used in intuitive physics (but not gravity support) and agent scenes. Please note that the target object in interactive scenes is currently always a trophy.
 - `--symmetric <type>` (optional): Force the symmetric target object to be a specific type (shape). Used in gravity support scenes.
+- `--target <type>` (optional): Force the target object to be a specific type (shape). Used in intuitive physics (but not gravity support) and agent scenes. Please note that the target object in interactive scenes is currently always a trophy.
 
 ### Intuitive Physics Scenes
 
@@ -121,15 +121,18 @@ Training intuitive physics scenes are not implausible and do not have any "untra
 
 ```
 python generate_public_scenes.py -p <prefix> -t GravitySupportTraining
-python generate_public_scenes.py -p <prefix> -t ObjectPermanenceTraining
+python generate_public_scenes.py -p <prefix> -t ObjectPermanenceTraining3
+python generate_public_scenes.py -p <prefix> -t ObjectPermanenceTraining4
 python generate_public_scenes.py -p <prefix> -t ShapeConstancyTraining
-python generate_public_scenes.py -p <prefix> -t SpatioTemporalContinuityTraining
+python generate_public_scenes.py -p <prefix> -t SpatioTemporalContinuityTraining3
+python generate_public_scenes.py -p <prefix> -t SpatioTemporalContinuityTraining4
 ```
 
-- Each gravity support training hypercube contains 8 scenes.
-- Each object permanence training hypercube contains 2 scenes.
-- Each shape constancy training hypercube contains 2 scenes.
-- Each spatio-temporal continuity training hypercube contains 9 scenes.
+- Each Gravity Support training hypercube contains 8 scenes.
+- Each Eval 3 or 4 Object Permanence training hypercube contains 2 scenes.
+- Each Shape Constancy training hypercube contains 2 scenes.
+- Each Eval 3 Spatio-Temporal Continuity training hypercube contains 9 scenes.
+- Each Eval 4 Spatio-Temporal Continuity training hypercube contains 2 scenes.
 
 #### Evaluation Intuitive Physics Datasets
 
@@ -137,15 +140,15 @@ Evaluation intuitive physics scenes are either plausible or implausible and can 
 
 ```
 python generate_public_scenes.py -p <prefix> -t GravitySupportEvaluation
-python generate_public_scenes.py -p <prefix> -t ObjectPermanenceEvaluation
+python generate_public_scenes.py -p <prefix> -t ObjectPermanenceEvaluation3
 python generate_public_scenes.py -p <prefix> -t ShapeConstancyEvaluation
-python generate_public_scenes.py -p <prefix> -t SpatioTemporalContinuityEvaluation
+python generate_public_scenes.py -p <prefix> -t SpatioTemporalContinuityEvaluation3
 ```
 
-- Each gravity support training hypercube contains 16 scenes.
-- Each object permanence evaluation hypercube contains 90 scenes.
-- Each shape constancy evaluation hypercube contains 42 scenes.
-- Each spatio-temporal continuity evaluation hypercube contains 42 scenes.
+- Each Gravity Support evaluation hypercube contains 16 scenes.
+- Each Eval 3 Object Permanence evaluation hypercube contains 90 scenes.
+- Each Shape Constancy evaluation hypercube contains 42 scenes.
+- Each Eval 3 Spatio-Temporal Continuity evaluation hypercube contains 42 scenes.
 
 ### Interactive Scenes
 

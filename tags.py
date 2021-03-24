@@ -107,6 +107,8 @@ TYPES = SimpleNamespace(
     GRAVITY_SUPPORT_TARGET_POSITION='targetPosition',
     GRAVITY_SUPPORT_TARGET_TYPE='targetType',
 
+    OBJECT_PERMANENCE_SETUP='setup',
+    OBJECT_PERMANENCE_MOVEMENT='movement',
     OBJECT_PERMANENCE_OBJECT_ONE='objectOne',
     OBJECT_PERMANENCE_OBJECT_TWO='objectTwo',
     OBJECT_PERMANENCE_NOVELTY_ONE='objectOneNovelty',
@@ -117,6 +119,7 @@ TYPES = SimpleNamespace(
     SHAPE_CONSTANCY_TRAINED_ONE='objectOneBeginsTrained',
     SHAPE_CONSTANCY_TRAINED_TWO='objectTwoBeginsTrained',
 
+    SPATIO_TEMPORAL_CONTINUITY_MOVEMENT='movement',
     SPATIO_TEMPORAL_CONTINUITY_OBJECTS='objects',
     SPATIO_TEMPORAL_CONTINUITY_OCCLUDERS='occluders',
     SPATIO_TEMPORAL_CONTINUITY_PLAUSIBLE='plausible',
@@ -158,6 +161,15 @@ CELLS = SimpleNamespace(
         SYMMETRIC='symmetric'
     ),
 
+    OBJECT_PERMANENCE_SETUP=SimpleNamespace(
+        EXIT='move across whole scene',
+        STOP='stop behind an occluder'
+    ),
+    OBJECT_PERMANENCE_MOVEMENT=SimpleNamespace(
+        LINEAR='linear movement constant depth',
+        LINEAR_IN_DEPTH='linear movement in depth',
+        TOSSED='tossed movement'
+    ),
     OBJECT_PERMANENCE_OBJECT_ONE=SimpleNamespace(
         NO_CHANGE='no change',
         APPEAR='appears',
@@ -200,6 +212,11 @@ CELLS = SimpleNamespace(
         NO='no'
     ),
 
+    SPATIO_TEMPORAL_CONTINUITY_MOVEMENT=SimpleNamespace(
+        LINEAR='linear movement constant depth',
+        LINEAR_IN_DEPTH='linear movement in depth',
+        TOSSED='tossed movement'
+    ),
     SPATIO_TEMPORAL_CONTINUITY_OBJECTS=SimpleNamespace(
         ZERO=0,
         ONE=1,

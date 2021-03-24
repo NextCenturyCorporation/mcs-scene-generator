@@ -11,7 +11,6 @@ from interactive_goals import InteractiveGoal, RetrievalGoal
 from interactive_plans import InteractivePlan, ObjectLocationPlan, \
     ObjectPlan, create_container_hypercube_plan_list, \
     create_obstacle_hypercube_plan_list, create_occluder_hypercube_plan_list
-import materials
 import objects
 from object_data import ObjectData, ReceptacleData, TargetData, \
     identify_larger_definition
@@ -52,6 +51,10 @@ def retrieve_definition_lists(
         tags.SCENE.UNTRAINED_SHAPE
     )
     return trained_definition_list, untrained_definition_list
+
+
+def retrieve_template_list(object_data: ObjectData) -> List[Dict[str, Any]]:
+    return [object_data.trained_template, object_data.untrained_template]
 
 
 class InteractiveHypercube(hypercubes.Hypercube):
@@ -227,7 +230,12 @@ class InteractiveHypercube(hypercubes.Hypercube):
                 logging.debug(
                     f'\n\n{self.get_name()} initialize scenes is done\n ')
 
-                scenes = self._update_floor(body_template, scenes)
+                scenes = hypercubes.update_floor_and_walls(
+                    body_template,
+                    self._data,
+                    retrieve_template_list,
+                    scenes
+                )
 
                 break
 
@@ -1810,44 +1818,6 @@ class InteractiveHypercube(hypercubes.Hypercube):
         the new receptacle. Changes the bounds_list."""
         # TODO MCS-146 Position objects on top of receptacles.
         return None
-
-    def _update_floor(
-        self,
-        body_template: Dict[str, Any],
-        scenes: List[Dict[str, Any]]
-    ) -> List[Dict[str, Any]]:
-        """Change the floor material if it is the same color as one of the
-        non-context objects in the hypercube."""
-
-        floor_colors = body_template['floorColors']
-        floor_material = body_template['floorMaterial']
-        object_colors = []
-        for role in [
-            'target', 'confusor', 'large_container', 'small_container',
-            'obstacle', 'occluder'
-        ]:
-            for object_data in self._data[role]:
-                for template in [
-                    object_data.trained_template,
-                    object_data.untrained_template
-                ]:
-                    if template:
-                        object_colors.extend(template['color'])
-        tries = 0
-        while (len(floor_colors) > 1) or (floor_colors[0] in object_colors):
-            tries += 1
-            floor_choice = random.choice(materials.FLOOR_MATERIALS)
-            floor_material = floor_choice[0]
-            floor_colors = floor_choice[1]
-            if tries >= util.MAX_TRIES:
-                raise exceptions.SceneException(
-                    f'{self.get_name()} cannot find floor material without '
-                    f'colors {object_colors}')
-        if floor_material != body_template['floorMaterial']:
-            for scene in scenes:
-                scene['floorMaterial'] = floor_material
-                scene['floorColors'] = floor_colors
-        return scenes
 
     def _update_scene_at_index(
         self,

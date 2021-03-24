@@ -1,11 +1,14 @@
 import copy
 import logging
+import random
 import uuid
 from abc import ABC, abstractmethod
 from typing import Any, Callable, Dict, List
 
 import exceptions
+import materials
 import tags
+import util
 
 
 def initialize_goal(goal: Dict[str, Any]) -> Dict[str, Any]:
@@ -43,6 +46,49 @@ def initialize_goal(goal: Dict[str, Any]) -> Dict[str, Any]:
         goal_copy['objectsInfo'][tags.role_to_key(role)] = []
 
     return goal_copy
+
+
+def update_floor_and_walls(
+    body_template: Dict[str, Any],
+    role_to_object_data_list: Dict[str, Any],
+    retrieve_object_list_from_data: Callable[[], List[Dict[str, Any]]],
+    scenes: List[Dict[str, Any]],
+    floor_material_list=materials.FLOOR_MATERIALS,
+    wall_material_list=materials.WALL_MATERIALS
+) -> List[Dict[str, Any]]:
+    """Change the floor and/or wall materials in each of the given scenes if
+    the material is the same color as a non-context object."""
+
+    for prefix, material_list in [
+        ('floor', floor_material_list),
+        ('wall', wall_material_list)
+    ]:
+        room_colors = body_template[prefix + 'Colors']
+        room_material = body_template[prefix + 'Material']
+        object_colors = []
+        for role in [
+            'target', 'confusor', 'large_container', 'small_container',
+            'obstacle', 'occluder', 'non_target'
+        ]:
+            for object_data in role_to_object_data_list.get(role, []):
+                for template in retrieve_object_list_from_data(object_data):
+                    if template:
+                        object_colors.extend(template['color'])
+        tries = 0
+        while (len(room_colors) > 1) or (room_colors[0] in object_colors):
+            tries += 1
+            room_choice = random.choice(material_list)
+            room_material = room_choice[0]
+            room_colors = room_choice[1]
+            if tries >= util.MAX_TRIES:
+                raise exceptions.SceneException(
+                    f'Cannot find {prefix} material without colors '
+                    f'{object_colors}')
+        if room_material != body_template[prefix + 'Material']:
+            for scene in scenes:
+                scene[prefix + 'Material'] = room_material
+                scene[prefix + 'Colors'] = room_colors
+    return scenes
 
 
 def update_scene_objects(

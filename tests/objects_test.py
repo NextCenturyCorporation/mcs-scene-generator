@@ -76,10 +76,9 @@ def test_intuitive_physics_all_objects_diagonal_size():
         [objects.get_intuitive_physics(True)]
     )[0]:
         print(f'{definition}\n========================================')
-        assert (
-            (definition['dimensions']['x'] * math.sqrt(2)) <=
-            (occluders.OCCLUDER_MAX_SCALE_X + util.MAX_SIZE_DIFFERENCE)
-        )
+        assert math.sqrt(
+            definition['dimensions']['x']**2 + definition['dimensions']['z']**2
+        ) <= (occluders.OCCLUDER_MAX_SCALE_X + util.MAX_SIZE_DIFFERENCE)
 
 
 def test_intuitive_physics_move_across_all_objects_untrained_shapes():
@@ -117,6 +116,7 @@ def test_intuitive_physics_fall_down_all_objects_untrained_shapes():
             if util.is_similar_except_in_shape(definition_1, definition_2,
                                                True)
         ]
+        print(f'{definition_1["type"]} {definition_1["scale"]}')
         assert len(option_list) >= 2
 
 
@@ -136,6 +136,7 @@ def test_intuitive_physics_move_across_basic_objects_untrained_shapes():
             if util.is_similar_except_in_shape(definition_1, definition_2,
                                                True)
         ]
+        print(f'{definition_1["type"]} {definition_1["scale"]}')
         # TODO: We want at least two possible untrained objects.
         # assert len(option_list) >= 2
         assert len(option_list) >= 1
@@ -157,6 +158,7 @@ def test_intuitive_physics_fall_down_basic_objects_untrained_shapes():
             if util.is_similar_except_in_shape(definition_1, definition_2,
                                                True)
         ]
+        print(f'{definition_1["type"]} {definition_1["scale"]}')
         # TODO: We want at least two possible untrained objects.
         # assert len(option_list) >= 2
         assert len(option_list) >= 1
@@ -178,6 +180,7 @@ def test_intuitive_physics_move_across_complex_objects_untrained_shapes():
             if util.is_similar_except_in_shape(definition_1, definition_2,
                                                True)
         ]
+        print(f'{definition_1["type"]} {definition_1["scale"]}')
         assert len(option_list) >= 2
 
 
@@ -197,6 +200,7 @@ def test_intuitive_physics_fall_down_complex_objects_untrained_shapes():
             if util.is_similar_except_in_shape(definition_1, definition_2,
                                                True)
         ]
+        print(f'{definition_1["type"]} {definition_1["scale"]}')
         # We want at least two possible untrained objects.
         assert len(option_list) >= 2
 
@@ -217,6 +221,7 @@ def test_intuitive_physics_move_across_all_objects_untrained_sizes():
             if util.is_similar_except_in_size(definition_1, definition_2,
                                               True)
         ]
+        print(f'{definition_1["type"]} {definition_1["scale"]}')
         # We want at least two possible untrained objects.
         assert len(option_list) >= 2
 
@@ -237,6 +242,7 @@ def test_intuitive_physics_fall_down_all_objects_untrained_sizes():
             if util.is_similar_except_in_size(definition_1, definition_2,
                                               True)
         ]
+        print(f'{definition_1["type"]} {definition_1["scale"]}')
         # We want at least two possible untrained objects.
         assert len(option_list) >= 2
 
@@ -257,6 +263,7 @@ def test_intuitive_physics_move_across_basic_objects_untrained_sizes():
             if util.is_similar_except_in_size(definition_1, definition_2,
                                               True)
         ]
+        print(f'{definition_1["type"]} {definition_1["scale"]}')
         # We want at least two possible untrained objects.
         assert len(option_list) >= 2
 
@@ -277,6 +284,7 @@ def test_intuitive_physics_fall_down_basic_objects_untrained_sizes():
             if util.is_similar_except_in_size(definition_1, definition_2,
                                               True)
         ]
+        print(f'{definition_1["type"]} {definition_1["scale"]}')
         # We want at least two possible untrained objects.
         assert len(option_list) >= 2
 
@@ -297,6 +305,7 @@ def test_intuitive_physics_move_across_complex_objects_untrained_sizes():
             if util.is_similar_except_in_size(definition_1, definition_2,
                                               True)
         ]
+        print(f'{definition_1["type"]} {definition_1["scale"]}')
         # We want at least two possible untrained objects.
         assert len(option_list) >= 2
 
@@ -317,5 +326,6 @@ def test_intuitive_physics_fall_down_complex_objects_untrained_sizes():
             if util.is_similar_except_in_size(definition_1, definition_2,
                                               True)
         ]
+        print(f'{definition_1["type"]} {definition_1["scale"]}')
         # We want at least two possible untrained objects.
         assert len(option_list) >= 2

@@ -1,4 +1,5 @@
 import copy
+import math
 import random
 import uuid
 from typing import Dict, Any, Optional, List, Tuple
@@ -462,7 +463,7 @@ def retrieve_untrained_definition_list(
 def _create_size_list(
     definition_or_instance_1: Dict[str, Any],
     definition_or_instance_2: Dict[str, Any],
-    only_x_dimension: bool
+    only_diagonal_size: bool
 ) -> List[Tuple[float, float]]:
     x_size_1 = definition_or_instance_1['dimensions']['x']
     x_size_2 = definition_or_instance_2['dimensions']['x']
@@ -470,23 +471,30 @@ def _create_size_list(
     y_size_2 = definition_or_instance_2['dimensions']['y']
     z_size_1 = definition_or_instance_1['dimensions']['z']
     z_size_2 = definition_or_instance_2['dimensions']['z']
-    size_list = [(x_size_1, x_size_2)]
-    if not only_x_dimension:
-        size_list.extend([(y_size_1, y_size_2), (z_size_1, z_size_2)])
+    size_list = [
+        (x_size_1, x_size_2),
+        (y_size_1, y_size_2),
+        (z_size_1, z_size_2)
+    ]
+    if only_diagonal_size:
+        size_list = [(
+            math.sqrt(x_size_1**2 + z_size_1**2),
+            math.sqrt(x_size_2**2 + z_size_2**2)
+        )]
     return size_list
 
 
 def is_similar_except_in_color(
     definition_or_instance_1: Dict[str, Any],
     definition_or_instance_2: Dict[str, Any],
-    only_x_dimension: bool = False
+    only_diagonal_size: bool = False
 ) -> bool:
     """Return whether the two given objects are similar in shape
     (type) and size (dimensions) but not color (material category)."""
     size_list = _create_size_list(
         definition_or_instance_1,
         definition_or_instance_2,
-        only_x_dimension
+        only_diagonal_size
     )
     return (
         definition_or_instance_1 != definition_or_instance_2 and
@@ -506,14 +514,14 @@ def is_similar_except_in_color(
 def is_similar_except_in_shape(
     definition_or_instance_1: Dict[str, Any],
     definition_or_instance_2: Dict[str, Any],
-    only_x_dimension: bool = False
+    only_diagonal_size: bool = False
 ) -> bool:
     """Return whether the two given objects are similar in color
     (material category) and size (dimensions) but not shape (type)."""
     size_list = _create_size_list(
         definition_or_instance_1,
         definition_or_instance_2,
-        only_x_dimension
+        only_diagonal_size
     )
     return (
         definition_or_instance_1 != definition_or_instance_2 and
@@ -533,14 +541,14 @@ def is_similar_except_in_shape(
 def is_similar_except_in_size(
     definition_or_instance_1: Dict[str, Any],
     definition_or_instance_2: Dict[str, Any],
-    only_x_dimension: bool = False
+    only_diagonal_size: bool = False
 ) -> bool:
     """Return whether the two given objects are similar in color
     (material category) and shape (type) but not size (dimensions)."""
     size_list = _create_size_list(
         definition_or_instance_1,
         definition_or_instance_2,
-        only_x_dimension
+        only_diagonal_size
     )
     return (
         definition_or_instance_1 != definition_or_instance_2 and

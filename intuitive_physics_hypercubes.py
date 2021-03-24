@@ -3,17 +3,18 @@ import math
 import random
 from abc import ABC, abstractmethod
 from types import SimpleNamespace
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import exceptions
 import geometry
 import gravity_support_objects
+import itertools
+import json
 import materials
 import objects
 import occluders
 import hypercubes
 from shapely import affinity
-import speeds
 import tags
 import util
 
@@ -28,10 +29,7 @@ LAST_STEP_MOVE_ACROSS = 90
 LAST_STEP_FALL_DOWN = 60
 
 EARLIEST_ACTION_STEP = occluders.OCCLUDER_MOVEMENT_TIME * 2 + 1
-LATEST_ACTION_STEP_MOVE_ACROSS = LAST_STEP_MOVE_ACROSS - \
-    occluders.OCCLUDER_MOVEMENT_TIME
-LATEST_ACTION_STEP_FALL_DOWN = LAST_STEP_FALL_DOWN - \
-    occluders.OCCLUDER_MOVEMENT_TIME - OBJECT_FALL_TIME
+LATEST_ACTION_STEP_MOVE_ACROSS = 50 - (occluders.OCCLUDER_MOVEMENT_TIME * 3)
 
 BACKGROUND_MAX_X = 6.5
 BACKGROUND_MIN_Z = 3.25
@@ -78,16 +76,86 @@ GRAVITY_SUPPORT_MOVEMENT = {
 POLE_ACTIVE = ['active']
 POLE_INACTIVE = ['inactive']
 
+MOVEMENT_JSON_FILENAME = 'movements.json'
+
+
+def load_movement_from_json_file():
+    """Load all of the movement data from its JSON file."""
+    data = None
+    with open(MOVEMENT_JSON_FILENAME) as movement_file:
+        data = json.load(movement_file)
+    if data is None:
+        raise exceptions.SceneException(
+            f'Cannot load passive intuitive physics movement data from '
+            f'{MOVEMENT_JSON_FILENAME}')
+    # Convert the position and step keys in each option list to numbers.
+    for option_list_property in ['exitOnlyOptionList', 'exitStopOptionList']:
+        for movement in data['moveExit']:
+            old_position_dict = movement[option_list_property]
+            new_position_dict = {}
+            for str_position in old_position_dict.keys():
+                old_step_dict = old_position_dict[str_position]
+                new_step_dict = {}
+                for str_step in old_position_dict[str_position].keys():
+                    int_step = int(str_step)
+                    new_step_dict[int_step] = old_step_dict[str_step]
+                float_position = round(float(str_position), 2)
+                new_position_dict[float_position] = new_step_dict
+
+            movement[option_list_property] = new_position_dict
+    return SimpleNamespace(
+        MOVE_EXIT_LIST=data['moveExit'],
+        DEEP_EXIT_LIST=data['deepExit'],
+        TOSS_EXIT_LIST=data['tossExit'],
+        MOVE_STOP_LIST=data['moveStop'],
+        DEEP_STOP_LIST=data['deepStop'],
+        TOSS_STOP_LIST=data['tossStop']
+    )
+
+
+MOVEMENT = load_movement_from_json_file()
+
+
+def adjust_movement_to_position(
+    movement: Optional[Dict[str, Any]],
+    position: Dict[str, float],
+    left_side: bool
+) -> Optional[Dict[str, Any]]:
+    """Adjust each X and Z distance in the distance-by-step lists in the given
+    movement using the given starting position."""
+    if not movement:
+        return None
+    end_x = 2 * abs(position['x'])
+    # Add/subtract the object's starting position to/from its X/Z move
+    # distance in each X/Z distance-by-step list.
+    movement['xDistanceByStep'] = [
+        round(
+            ((1 if left_side else -1) * distance) +
+            movement.get('startX', position['x']),
+            4
+        ) for distance in movement['xDistanceByStep']
+        # Remove each X distance from the distance-by-step list after the
+        # object moves off-screen.
+        if (abs(distance) <= end_x)
+    ]
+    if 'zDistanceByStep' in movement:
+        movement['zDistanceByStep'] = [
+            round(distance + movement.get('startZ', position['z']), 4)
+            for distance in movement['zDistanceByStep']
+        ][0:len(movement['xDistanceByStep'])]
+    return movement
+
 
 def choose_move_across_object_position(
     left_side: bool,
-    position_y: float,
-    object_list: List[Dict[str, Any]]
+    object_list: List[Dict[str, Any]],
+    min_z: float = MIN_TARGET_Z,
+    max_z: float = MAX_TARGET_Z
 ) -> float:
     """Return a new X/Y/Z position for a move-across object with the given
     side and Y position that is not too close to an existing object."""
     while True:
-        position_z = choose_position_z()
+        position_z = choose_position_z(min_z, max_z)
         # Don't be too close to any existing object.
         for instance in object_list:
             object_z = instance['shows'][0]['position']['z']
@@ -104,15 +172,18 @@ def choose_move_across_object_position(
 
     return {
         'x': (-1 * position_x) if left_side else position_x,
-        'y': position_y,
+        'y': 0,
         'z': position_z
     }
 
 
-def choose_position_z() -> float:
+def choose_position_z(
+    min_z: float = MIN_TARGET_Z,
+    max_z: float = MAX_TARGET_Z
+) -> float:
     """Return a pseudo-random Z position for a target/non-target object."""
-    max_steps = (MAX_TARGET_Z - MIN_TARGET_Z) / STEP_Z
-    return MIN_TARGET_Z + (random.randint(0, max_steps) * STEP_Z)
+    max_steps = (max_z - min_z) / STEP_Z
+    return min_z + (random.randint(0, max_steps) * STEP_Z)
 
 
 def object_x_to_occluder_x(object_x: float, object_z: float):
@@ -122,7 +193,10 @@ def object_x_to_occluder_x(object_x: float, object_z: float):
     occluder_distance_z = (
         occluders.OCCLUDER_POSITION_Z - PERFORMER_START['position']['z']
     )
-    camera_angle = math.asin(object_x / object_distance_z)
+    try:
+        camera_angle = math.asin(object_x / object_distance_z)
+    except ValueError:
+        return None
     return math.sin(camera_angle) * occluder_distance_z
 
 
@@ -149,6 +223,14 @@ def retrieve_off_screen_position_y(position_z: float) -> float:
     return MIN_OFFSCREEN_Y + (
         ((position_z - MIN_TARGET_Z) / STEP_Z) * STEP_OFFSCREEN_Y
     )
+
+
+def validate_in_view(occluder_x: float) -> bool:
+    """Return whether the given X position is within view of the camera."""
+    max_position_x = occluders.OCCLUDER_MAX_X - (
+        occluders.OCCLUDER_MAX_SCALE_X / 2.0
+    )
+    return occluder_x >= -max_position_x and occluder_x <= max_position_x
 
 
 VARIATIONS = SimpleNamespace(
@@ -183,9 +265,10 @@ class ObjectVariations():
     def get_max_size_x(self):
         """Return the max size X of instances across all variations."""
         # For a non-occluder, the size is its dimensions, NOT its scale!
-        return max([
-            instance['dimensions']['x'] for instance in self.all()
-        ])
+        # Object may be seen at an angle, so use its diagonal distance.
+        return max([math.sqrt(
+            instance['dimensions']['x']**2 + instance['dimensions']['z']**2
+        ) for instance in self.all()])
 
 
 class TargetVariations(ObjectVariations):
@@ -254,6 +337,10 @@ class TargetVariations(ObjectVariations):
         return location_copy
 
 
+def retrieve_as_list(data: Dict[str, Any]) -> List[Dict[str, Any]]:
+    return [data]
+
+
 class IntuitivePhysicsHypercube(hypercubes.Hypercube, ABC):
     def __init__(
         self,
@@ -265,7 +352,8 @@ class IntuitivePhysicsHypercube(hypercubes.Hypercube, ABC):
         is_move_across=False,
         only_basic_shapes=False,
         only_complex_shapes=False,
-        training=False
+        training=False,
+        last_step=None
     ) -> None:
         self._role_to_type = role_to_type
 
@@ -277,12 +365,12 @@ class IntuitivePhysicsHypercube(hypercubes.Hypercube, ABC):
         self._init_each_object_definition_list(is_fall_down)
 
         if is_fall_down:
-            self._last_step = LAST_STEP_FALL_DOWN
+            self._last_step = last_step if last_step else LAST_STEP_FALL_DOWN
             self._scene_setup_function = (
                 IntuitivePhysicsHypercube._generate_fall_down
             )
         elif is_move_across:
-            self._last_step = LAST_STEP_MOVE_ACROSS
+            self._last_step = last_step if last_step else LAST_STEP_MOVE_ACROSS
             self._scene_setup_function = (
                 IntuitivePhysicsHypercube._generate_move_across
             )
@@ -303,10 +391,13 @@ class IntuitivePhysicsHypercube(hypercubes.Hypercube, ABC):
         body_template: Dict[str, Any],
         goal_template: Dict[str, Any]
     ) -> List[Dict[str, Any]]:
-        default_scene = self._create_default_scene(body_template,
-                                                   goal_template)
+        default_scene = self._create_default_scene(
+            body_template,
+            goal_template
+        )
         scenes = self._create_intuitive_physics_scenes(default_scene)
         for scene in scenes.values():
+            # Update the scene info tags for the evaluation UI.
             scene['goal']['sceneInfo'][tags.SCENE.ID] = [
                 scene_id.upper() for scene_id
                 in scene['goal']['sceneInfo'][tags.SCENE.ID]
@@ -324,29 +415,312 @@ class IntuitivePhysicsHypercube(hypercubes.Hypercube, ABC):
             (not scene['evaluationOnly'])
         )]
 
-    def _choose_fall_down_object_count(self) -> int:
+    def _get_fall_down_object_count(self) -> int:
         """Return the number of objects for the fall-down scene."""
         # Always generate two objects for all fall-down scenes in Eval 3.
         # We may remove one or more of them later for specific scenes.
         return 2
 
-    def _choose_fall_down_occluder_count(self) -> int:
+    def _get_fall_down_occluder_count(self) -> int:
         """Return the number of occluders for the fall-down scene."""
         # Always generate two occluders for all fall-down scenes in Eval 3.
         # We may remove one or more of them later for specific scenes.
         return 2
 
-    def _choose_move_across_object_count(self) -> int:
+    def _get_move_across_object_count(self) -> int:
         """Return the number of objects for the move-across scene."""
         # Always generate two objects for all move-across scenes in Eval 3.
         # We may remove one or more of them later for specific scenes.
         return 2
 
-    def _choose_move_across_occluder_count(self) -> int:
+    def _get_move_across_occluder_count(self) -> int:
         """Return the number of occluders for the move-across scene."""
         # Always generate three occluders for all move-across scenes in Eval 3.
         # We may remove one or more of them later for specific scenes.
         return 3
+
+    def _choose_all_movements(
+        self,
+        position: Dict[str, float],
+        left_side: bool
+    ) -> Optional[Dict[str, Any]]:
+        """Choose and return the movement data."""
+
+        # Whether to generate more than just move-and-exit-the-screen movement.
+        option_list_property = (
+            'exitStopOptionList' if self._does_have_stop_move()
+            else 'exitOnlyOptionList' if (
+                self._does_have_deep_move() or self._does_have_toss_move()
+            ) else None
+        )
+        # Round the Z position because we're using it as a dict key.
+        position_z = round(position['z'], 2)
+
+        # Randomly try each available move-and-exit-the-screen movement.
+        move_exit_index_list = list(range(len(MOVEMENT.MOVE_EXIT_LIST)))
+        random.shuffle(move_exit_index_list)
+        for index in move_exit_index_list:
+            # Copy the movement one-at-a-time for better performance.
+            move_exit = copy.deepcopy(MOVEMENT.MOVE_EXIT_LIST[index])
+            # If more than one movement is needed, and the Z position isn't in
+            # the option list, then this movement won't work, so skip it.
+            if (
+                option_list_property and
+                position_z not in move_exit[option_list_property]
+            ):
+                continue
+
+            occluder_data = self._choose_all_paired_occluder_lists(
+                position['x'],
+                position_z,
+                move_exit,
+                option_list_property,
+                left_side
+            )
+
+            if not occluder_data:
+                continue
+
+            step_list, position_list, option = occluder_data
+
+            # Ensure that both roll-across-linearly-in-depth movements have the
+            # same direction as in the original movement.
+            deep_exit = copy.deepcopy(
+                MOVEMENT.DEEP_EXIT_LIST[option['deepExit']]
+            ) if self._does_have_deep_move() else None
+            deep_stop = copy.deepcopy(
+                MOVEMENT.DEEP_STOP_LIST[option['deepStop']]
+            ) if (
+                self._does_have_stop_move() and
+                self._does_have_deep_move()
+            ) else None
+            if deep_exit:
+                deep_exit['startX'] *= (1 if left_side else -1)
+                deep_exit = adjust_movement_to_position(
+                    deep_exit,
+                    position,
+                    left_side
+                )
+            if deep_stop:
+                deep_stop['startX'] *= (1 if left_side else -1)
+                deep_stop = adjust_movement_to_position(
+                    deep_stop,
+                    position,
+                    left_side
+                ) if deep_stop else None
+
+            # Validate that both roll-across-linearly-in-depth movements have
+            # the same starting positions (This should already be done in the
+            # generate_movement.py script but check again just in case!)
+            if deep_exit and deep_stop and (
+                deep_exit['startX'] != deep_stop['startX'] or
+                deep_exit['startZ'] != deep_stop['startZ']
+            ):
+                continue
+
+            # Validate that the toss-and-stop-on-screen movement is in the
+            # camera's view. (This should already be done in the
+            # generate_movement.py script but check again just in case!)
+            toss_stop = adjust_movement_to_position(
+                copy.deepcopy(MOVEMENT.TOSS_STOP_LIST[option['tossStop']]),
+                position,
+                left_side
+            ) if (
+                self._does_have_stop_move() and
+                self._does_have_toss_move()
+            ) else None
+            if toss_stop:
+                skip = False
+                for step in (step_list + [toss_stop['landStep']]):
+                    occluder_x = object_x_to_occluder_x(
+                        toss_stop['xDistanceByStep'][step],
+                        position_z
+                    )
+                    if occluder_x is None or not validate_in_view(occluder_x):
+                        skip = True
+                        break
+                if skip:
+                    continue
+
+            # Delete each option list from the copy now for better performance
+            # and easier debugging (we shouldn't need them any more).
+            del move_exit['exitOnlyOptionList']
+            del move_exit['exitStopOptionList']
+
+            # Return the occluders' step list, occluders' position list, and
+            # each movement with adjusted X and Z distances for the specific
+            # starting position.
+            return {
+                'active': 'moveExit',
+                'stepList': step_list,
+                'positionList': position_list,
+                'moveExit': adjust_movement_to_position(
+                    move_exit,
+                    position,
+                    left_side
+                ),
+                'deepExit': deep_exit,
+                'tossExit': adjust_movement_to_position(
+                    copy.deepcopy(MOVEMENT.TOSS_EXIT_LIST[option['tossExit']]),
+                    position,
+                    left_side
+                ) if self._does_have_toss_move() else None,
+                'moveStop': adjust_movement_to_position(
+                    copy.deepcopy(MOVEMENT.MOVE_STOP_LIST[option['moveStop']]),
+                    position,
+                    left_side
+                ) if self._does_have_stop_move() else None,
+                'deepStop': deep_stop,
+                'tossStop': toss_stop
+            }
+        return None
+
+    def _choose_all_paired_occluder_lists(
+        self,
+        starting_x: float,
+        position_z: float,
+        move_exit: Dict[str, Any],
+        option_list_property: str,
+        left_side: bool
+    ) -> Optional[Tuple[List[int], List[float], Dict[str, int]]]:
+        """Choose and return the implausible event step and X position lists
+        for paired occluders using the given object movement and starting
+        position. Return None if impossible using the given movement."""
+        occluder_count = len(self._find_move_across_paired_list(None))
+
+        # Each step will correspond to the X position of a moving object.
+        step_option_list = list(
+            move_exit[option_list_property][position_z].items()
+            if option_list_property else [
+                (step, None) for step in
+                range(len(move_exit['xDistanceByStep']))
+            ]
+        )
+
+        # Filter the step list depending on if an occluder at that step's
+        # corresponding X position is within the camera's view.
+        step_position_option_list = []
+        for step, option_list in step_option_list:
+            position_x = starting_x + (
+                (1 if left_side else -1) * move_exit['xDistanceByStep'][step]
+            )
+
+            # Adjust the X position for the occluder using the sight angle
+            # from the camera so the occluder will properly hide the object
+            # positioned at the given depth (Z).
+            occluder_x = object_x_to_occluder_x(position_x, position_z)
+
+            # If OK, add this step and corresponding X position to the list.
+            if occluder_x is not None and validate_in_view(occluder_x):
+                step_position_option_list.append((
+                    step,
+                    round(position_x, 4),
+                    round(occluder_x, 4),
+                    option_list
+                ))
+
+        if len(step_position_option_list) < occluder_count:
+            return None
+
+        # Nest the list and copy if for each paired occluder.
+        product_input_list = [
+            step_position_option_list for _ in range(occluder_count)
+        ]
+
+        # Generate and randomly order each possible combination of occluder
+        # step (and corresponding X position) for each paired occluder.
+        cartesian_product_list = list(itertools.product(*product_input_list))
+        random.shuffle(cartesian_product_list)
+
+        # Find a set of occluder steps/positions for each paired occluder that
+        # aren't too close to one another.
+        for data_list in cartesian_product_list:
+            failed = False
+            occluder_step_list = []
+            occluder_position_list = []
+            filtered_option_list = []
+
+            for step, position_x, occluder_x, option_list in data_list:
+                # Ensure new occluder won't be too close to existing occluder.
+                too_close = False
+                for _, previous_occluder_position_x in occluder_position_list:
+                    too_close = occluders.calculate_separation_distance(
+                        previous_occluder_position_x,
+                        occluders.OCCLUDER_MAX_SCALE_X,
+                        occluder_x,
+                        occluders.OCCLUDER_MAX_SCALE_X
+                    ) < 0
+                    if too_close:
+                        break
+                if too_close:
+                    failed = True
+                    break
+
+                if option_list:
+                    previous_option_list = filtered_option_list.copy()
+                    filtered_option_list = []
+                    for option in option_list:
+                        keep = (len(previous_option_list) == 0)
+                        for previous_option in previous_option_list:
+                            if previous_option == option:
+                                keep = True
+                                break
+                        if keep:
+                            filtered_option_list.append(option)
+                    if len(filtered_option_list) == 0:
+                        failed = True
+                        break
+
+                occluder_step_list.append(step)
+                occluder_position_list.append((position_x, occluder_x))
+
+            # If successful, this movement will work!
+            if not failed and (
+                not option_list_property or len(filtered_option_list) > 0
+            ):
+                # Randomly choose an available option from the list.
+                random.shuffle(filtered_option_list)
+                return occluder_step_list, [
+                    position_x for position_x, _ in occluder_position_list
+                ], (
+                    filtered_option_list[0] if len(filtered_option_list)
+                    else None
+                )
+
+        # If unsuccessful, this movement won't work.
+        return None
+
+    def _choose_move_across_occluder_data(
+        self,
+        paired_variations: TargetVariations,
+        index: int
+    ) -> Tuple[float, float]:
+        """Return the X position and size for a paired move-across occluder."""
+        paired_object = paired_variations.get(VARIATIONS.TRAINED)
+        paired_size_x = paired_variations.get_max_size_x()
+
+        occluder_min_size_x = min(
+            # Add a buffer to the occluder's minimum scale to handle minor
+            # changes in size or distance-by-step with switched objects.
+            paired_size_x + occluders.OCCLUDER_BUFFER,
+            occluders.OCCLUDER_MAX_SCALE_X
+        )
+
+        # Use an X position so that the object will be hidden behind the
+        # occluder (set in _choose_all_movements).
+        occluder_position_x = object_x_to_occluder_x(
+            paired_object['movement']['positionList'][index],
+            paired_object['shows'][0]['position']['z']
+        )
+
+        # Choose a random size.
+        occluder_size_x = util.random_real(
+            occluder_min_size_x,
+            occluders.OCCLUDER_MAX_SCALE_X,
+            util.MIN_RANDOM_INTERVAL
+        )
+
+        return occluder_position_x, occluder_size_x
 
     def _choose_object_definition(
         self,
@@ -379,7 +753,7 @@ class IntuitivePhysicsHypercube(hypercubes.Hypercube, ABC):
             if util.is_similar_except_in_shape(
                 trained_definition,
                 definition,
-                only_x_dimension=True
+                only_diagonal_size=True
             )
         ]
         if len(different_shape_list) == 0:
@@ -395,7 +769,7 @@ class IntuitivePhysicsHypercube(hypercubes.Hypercube, ABC):
             if util.is_similar_except_in_shape(
                 trained_definition,
                 definition,
-                only_x_dimension=True
+                only_diagonal_size=True
             )
         ]
         if len(untrained_shape_list) == 0:
@@ -410,7 +784,7 @@ class IntuitivePhysicsHypercube(hypercubes.Hypercube, ABC):
             if util.is_similar_except_in_shape(
                 untrained_shape_definition,
                 definition,
-                only_x_dimension=True
+                only_diagonal_size=True
             )
         ]
         if len(different_untrained_shape_list) == 0:
@@ -427,7 +801,7 @@ class IntuitivePhysicsHypercube(hypercubes.Hypercube, ABC):
             if util.is_similar_except_in_size(
                 trained_definition,
                 definition,
-                only_x_dimension=True
+                only_diagonal_size=True
             )
         ]
         if len(untrained_size_list) == 0:
@@ -483,6 +857,13 @@ class IntuitivePhysicsHypercube(hypercubes.Hypercube, ABC):
             scene['wallColors']
         )
         scene = hypercubes.update_scene_objects(scene, role_to_object_list)
+        scene = hypercubes.update_floor_and_walls(
+            body_template,
+            role_to_object_list,
+            retrieve_as_list,
+            [scene],
+            wall_material_list=materials.INTUITIVE_PHYSICS_WALL_MATERIALS
+        )[0]
 
         return scene
 
@@ -519,6 +900,18 @@ class IntuitivePhysicsHypercube(hypercubes.Hypercube, ABC):
         role_to_object_list[tags.ROLES.CONTEXT] = self._background_list
         return role_to_object_list
 
+    def _does_have_deep_move(self) -> bool:
+        """Return whether this hypercube must generate deep movement."""
+        return False
+
+    def _does_have_stop_move(self) -> bool:
+        """Return whether this hypercube must generate stop movement."""
+        return False
+
+    def _does_have_toss_move(self) -> bool:
+        """Return whether this hypercube must generate toss movement."""
+        return False
+
     def _filter_definition_list_on_type(
         self,
         definition_list: List[Dict[str, Any]],
@@ -541,10 +934,13 @@ class IntuitivePhysicsHypercube(hypercubes.Hypercube, ABC):
         scenes."""
         return self._variations_list
 
-    def _find_move_across_paired_list(self) -> List[TargetVariations]:
+    def _find_move_across_paired_list(
+        self,
+        target_variation: TargetVariations
+    ) -> List[TargetVariations]:
         """Return objects that must be paired with occluders in move-across
         scenes."""
-        return [self._variations_list[0]]
+        return [target_variation]
 
     def _find_structural_object_material_list(
         self,
@@ -623,7 +1019,7 @@ class IntuitivePhysicsHypercube(hypercubes.Hypercube, ABC):
             occluder_wall_material_list
         )
         self._generate_occluder_list(
-            self._choose_fall_down_occluder_count() -
+            self._get_fall_down_occluder_count() -
             int(len(occluder_list) / 2),
             occluder_list,
             occluder_wall_material_list,
@@ -637,12 +1033,13 @@ class IntuitivePhysicsHypercube(hypercubes.Hypercube, ABC):
         self._variations_list = []
 
         # Use roughly the same show step-begin on each fall-down object.
-        show_step = random.randint(
-            EARLIEST_ACTION_STEP,
-            LATEST_ACTION_STEP_FALL_DOWN
+        latest_action_step = (
+            self._last_step - occluders.OCCLUDER_MOVEMENT_TIME -
+            OBJECT_FALL_TIME
         )
+        show_step = random.randint(EARLIEST_ACTION_STEP, latest_action_step)
 
-        for i in range(self._choose_fall_down_object_count()):
+        for i in range(self._get_fall_down_object_count()):
             successful = False
             for _ in range(util.MAX_TRIES):
                 # Ensure the random X position is within the camera's view.
@@ -658,18 +1055,14 @@ class IntuitivePhysicsHypercube(hypercubes.Hypercube, ABC):
                 # positioned far enough away from one another.
                 too_close = False
                 for instance in object_list:
-                    occluder_max_scale_x = (
-                        occluders.OCCLUDER_MAX_SCALE_X +
-                        occluders.OCCLUDER_SCALE_X_BUFFER
-                    )
                     too_close = occluders.calculate_separation_distance(
                         object_x_to_occluder_x(x_position, z_position),
-                        occluder_max_scale_x,
+                        occluders.OCCLUDER_MAX_SCALE_X,
                         object_x_to_occluder_x(
                             instance['shows'][0]['position']['x'],
                             instance['shows'][0]['position']['z']
                         ),
-                        occluder_max_scale_x
+                        occluders.OCCLUDER_MAX_SCALE_X
                     ) < 0
                     if too_close:
                         break
@@ -692,7 +1085,7 @@ class IntuitivePhysicsHypercube(hypercubes.Hypercube, ABC):
             # Add minor variation to this object's show step.
             object_show_step = random.randint(
                 max(EARLIEST_ACTION_STEP, show_step - 1),
-                min(LATEST_ACTION_STEP_FALL_DOWN, show_step + 1)
+                min(latest_action_step, show_step + 1)
             )
 
             variations = self._choose_object_definition(object_location, i)
@@ -715,12 +1108,10 @@ class IntuitivePhysicsHypercube(hypercubes.Hypercube, ABC):
         paired_object = paired_variations.get(VARIATIONS.TRAINED)
         paired_x = paired_object['shows'][0]['position']['x']
         paired_size = paired_variations.get_max_size_x()
-        # Object may be a cylinder at an angle, so use diagonal distance.
-        paired_size = math.sqrt(2) * paired_size
         min_scale = min(
             # Add a buffer to the occluder's minimum scale to handle minor
             # changes in size or position-by-step with switched objects.
-            paired_size + occluders.OCCLUDER_SCALE_X_BUFFER,
+            paired_size + occluders.OCCLUDER_BUFFER,
             occluders.OCCLUDER_MAX_SCALE_X
         )
         max_scale = occluders.OCCLUDER_MAX_SCALE_X
@@ -797,7 +1188,9 @@ class IntuitivePhysicsHypercube(hypercubes.Hypercube, ABC):
             x_position,
             x_scale,
             sideways_left=sideways_left,
-            sideways_right=(not sideways_left)
+            sideways_right=(not sideways_left),
+            occluder_height=self._get_occluder_height(),
+            last_step=self._last_step
         )
 
     def _generate_fall_down_paired_occluder_list(
@@ -832,7 +1225,7 @@ class IntuitivePhysicsHypercube(hypercubes.Hypercube, ABC):
         occluder_list = self._generate_move_across_paired_occluder_list(
             object_list, occluder_wall_material_list)
         self._generate_occluder_list(
-            self._choose_move_across_occluder_count() -
+            self._get_move_across_occluder_count() -
             int(len(occluder_list) / 2),
             occluder_list,
             occluder_wall_material_list,
@@ -845,53 +1238,56 @@ class IntuitivePhysicsHypercube(hypercubes.Hypercube, ABC):
         last_action_step: int
     ) -> List[Dict[str, Any]]:
         """Generate and return move-across objects."""
-        object_count = self._choose_move_across_object_count()
+        object_count = self._get_move_across_object_count()
         object_list = []
-        speed_list = []
+        max_movement = 0
         self._variations_list = []
 
         # Each move-across object enters from the same side in Eval 3.
         left_side = random.choice([True, False])
 
         for i in range(object_count):
-            # Choose the object's speed to set its forces and start Y position.
-            speed_list.append(
-                copy.deepcopy(random.choice(speeds.MOVE_ACROSS_SPEEDS))
-            )
+            move_dict = None
+            for _ in range(util.MAX_TRIES):
+                # Choose the object's position and define its location.
+                object_position = choose_move_across_object_position(
+                    left_side,
+                    object_list
+                )
+                object_location = {
+                    'position': object_position
+                }
 
-            # Choose the object's position and define its location.
-            object_position = choose_move_across_object_position(
-                left_side,
-                speed_list[i]['y'],
-                object_list
+                # Choose the object's movement to set its default variation's
+                # forces and starting Y position.
+                move_dict = self._choose_all_movements(
+                    object_position,
+                    left_side
+                )
+                if move_dict:
+                    break
+            if not move_dict:
+                raise exceptions.SceneException(
+                    'Cannot find a valid moveExit option after max tries')
+
+            max_movement = max(
+                max_movement,
+                len(move_dict['moveExit']['xDistanceByStep'])
             )
-            object_location = {
-                'position': object_position
-            }
 
             # Create the object and its variations.
             variations = self._choose_object_definition(object_location, i)
 
-            # Remove each X distance after the object moves off-screen from
-            # its distance-by-step list.
-            end_x = 2 * abs(object_position['x'])
-            speed_list[i]['distanceByStep'] = [
-                # Add/subtract the object's starting X position to/from its
-                # X-move-distance in the distance-by-step list of its speed.
-                object_position['x'] + (
-                    distance if left_side else (-1 * distance)
-                )
-                for distance in speed_list[i]['distanceByStep'] if (
-                    abs(distance) <= end_x
-                )
-            ]
+            for instance in variations.all():
+                instance['movement'] = move_dict
 
             object_list.append(variations.get(VARIATIONS.TRAINED))
             self._variations_list.append(variations)
 
-        # Adjust the latest action step by the slowest chosen speed.
-        latest_action_step = LATEST_ACTION_STEP_MOVE_ACROSS - max(
-            [len(speed['distanceByStep']) for speed in speed_list]
+        # Adjust the latest action step by the slowest chosen movement.
+        latest_action_step = min(
+            LATEST_ACTION_STEP_MOVE_ACROSS,
+            (self._last_step - occluders.OCCLUDER_MOVEMENT_TIME - max_movement)
         )
 
         step_separation = (5 * (object_count - 1))
@@ -923,11 +1319,12 @@ class IntuitivePhysicsHypercube(hypercubes.Hypercube, ABC):
             # Assign the needed properties to each of the object's variations.
             for instance in self._variations_list[i].all():
                 instance['shows'][0]['stepBegin'] = show_step_list[i]
+                move_across = instance['movement']['moveExit']
                 instance['forces'] = [{
                     'stepBegin': show_step_list[i],
                     'stepEnd': show_step_list[i],
                     'vector': {
-                        'x': speed_list[i]['force'] * instance['mass'],
+                        'x': move_across['forceX'] * instance['mass'],
                         'y': 0,
                         'z': 0
                     }
@@ -939,83 +1336,31 @@ class IntuitivePhysicsHypercube(hypercubes.Hypercube, ABC):
                     # Assume all objects start facing left-to-right.
                     instance['shows'][0]['rotation']['y'] += 180
 
-                instance['speed'] = speed_list[i]
-
         return object_list
 
     def _generate_move_across_paired_occluder(
         self,
         paired_variations: TargetVariations,
         occluder_list: List[Dict[str, Any]],
-        occluder_wall_material_list: List[List[Tuple]]
+        occluder_wall_material_list: List[List[Tuple]],
+        index: int
     ) -> List[Dict[str, Any]]:
         """Generate and return one move-across paired occluder that must be
         positioned at one of the paired object's distance_by_step so that it
         will properly hide the paired object during the implausible event."""
-        successful = False
-        for _ in range(util.MAX_TRIES):
-            paired_object = paired_variations.get(VARIATIONS.TRAINED)
-            paired_size = paired_variations.get_max_size_x()
-            # Object may be a cube on its corner, so use diagonal distance.
-            paired_size = math.sqrt(2) * paired_size
-            min_scale = min(
-                # Add a buffer to the occluder's minimum scale to handle minor
-                # changes in size or distance-by-step with switched objects.
-                paired_size + occluders.OCCLUDER_SCALE_X_BUFFER,
-                occluders.OCCLUDER_MAX_SCALE_X
-            )
+        x_position, x_scale = self._choose_move_across_occluder_data(
+            paired_variations,
+            index
+        )
 
-            # Choose a random size.
-            x_scale = util.random_real(
-                min_scale,
-                occluders.OCCLUDER_MAX_SCALE_X,
-                util.MIN_RANDOM_INTERVAL
-            )
-
-            # Choose a random position.
-            # The position must correspond with one of the object's positions.
-            distance_by_step_list = paired_object['speed']['distanceByStep']
-            max_x_position = occluders.OCCLUDER_MAX_X - x_scale / 2
-            while True:
-                position_index = random.randrange(len(distance_by_step_list))
-                paired_x = distance_by_step_list[position_index]
-                if -max_x_position <= paired_x <= max_x_position:
-                    break
-
-            # Adjust the X position using the sight angle from the camera
-            # to the object so an occluder will properly hide the object.
-            paired_z = paired_object['shows'][0]['position']['z']
-            x_position = object_x_to_occluder_x(paired_x, paired_z)
-
-            # Ensure the new occluder isn't too close to an existing occluder.
-            too_close = False
-            for occluder in occluder_list:
-                too_close = occluders.calculate_separation_distance(
-                    occluder['shows'][0]['position']['x'],
-                    occluder['shows'][0]['scale']['x'],
-                    x_position,
-                    x_scale
-                ) < 0
-                if too_close:
-                    break
-            if not too_close:
-                # Save the occluderIndices needed by specific hypercubes.
-                occluder_indices = paired_object['speed'].get(
-                    'occluderIndices',
-                    []
-                )
-                occluder_indices.append(position_index)
-                paired_object['speed']['occluderIndices'] = occluder_indices
-                successful = True
-                break
-        if successful:
-            return occluders.create_occluder(
-                random.choice(random.choice(occluder_wall_material_list)),
-                random.choice(materials.METAL_MATERIALS),
-                x_position,
-                x_scale
-            )
-        return None
+        return occluders.create_occluder(
+            random.choice(random.choice(occluder_wall_material_list)),
+            random.choice(materials.METAL_MATERIALS),
+            x_position,
+            x_scale,
+            occluder_height=self._get_occluder_height(),
+            last_step=self._last_step
+        )
 
     def _generate_move_across_paired_occluder_list(
         self,
@@ -1023,13 +1368,16 @@ class IntuitivePhysicsHypercube(hypercubes.Hypercube, ABC):
         occluder_wall_material_list: List[List[Tuple]]
     ) -> List[Dict[str, Any]]:
         """Generate and return needed move-across paired occluders."""
-        paired_list = self._find_move_across_paired_list()
+        paired_list = self._find_move_across_paired_list(
+            self._variations_list[0]
+        )
         occluder_list = []
-        for paired_variations in paired_list:
+        for index, paired_variations in enumerate(paired_list):
             occluder = self._generate_move_across_paired_occluder(
                 paired_variations,
                 occluder_list,
-                occluder_wall_material_list
+                occluder_wall_material_list,
+                index
             )
             if not occluder:
                 raise exceptions.SceneException(
@@ -1071,7 +1419,9 @@ class IntuitivePhysicsHypercube(hypercubes.Hypercube, ABC):
                 x_position,
                 x_scale,
                 sideways_left=sideways_left,
-                sideways_right=sideways_right
+                sideways_right=sideways_right,
+                occluder_height=self._get_occluder_height(),
+                last_step=self._last_step
             )
         return None
 
@@ -1116,6 +1466,10 @@ class IntuitivePhysicsHypercube(hypercubes.Hypercube, ABC):
                 tags.SCENE.UNTRAINED_SIZE
             )
         )[0]
+
+    def _get_occluder_height(self) -> int:
+        """Return the occluder height to use."""
+        return occluders.OCCLUDER_HEIGHT
 
     def _separate_targets_and_non_targets(
         self,
@@ -1343,7 +1697,7 @@ class GravitySupportHypercube(IntuitivePhysicsHypercube):
             if util.is_similar_except_in_shape(
                 definitions[VARIATIONS.SYMMETRIC],
                 definition,
-                only_x_dimension=True
+                only_diagonal_size=True
             )
         ]
         if len(modified_asymmetric_list) == 0:
@@ -1539,7 +1893,7 @@ class GravitySupportHypercube(IntuitivePhysicsHypercube):
             )
         return instance
 
-    def _get_scene_ids(self) -> List[int]:
+    def _get_scene_ids(self) -> List[str]:
         return [
             'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm',
             'n', 'o', 'p'
@@ -1892,17 +2246,18 @@ class ObjectPermanenceHypercube(IntuitivePhysicsHypercube):
         role_to_type: Dict[str, str],
         training=False,
         is_fall_down=False,
-        is_move_across=False
+        is_move_across=False,
+        last_step=None
     ):
         super().__init__(
             tags.ABBREV.OBJECT_PERMANENCE.upper(),
             body_template,
             ObjectPermanenceHypercube.GOAL_TEMPLATE,
             role_to_type,
-            # All object permanence scenes are fall-down in Eval 3.
-            is_fall_down=True,
-            is_move_across=False,
-            training=training
+            is_fall_down=is_fall_down,
+            is_move_across=is_move_across,
+            training=training,
+            last_step=last_step
         )
 
     def _appear_behind_occluder(
@@ -1916,30 +2271,34 @@ class ObjectPermanenceHypercube(IntuitivePhysicsHypercube):
         ][0]
 
         if self.is_move_across():
-            # Implausible event happens after target moves behind occluder.
-            occluder_index = target['speed']['occluderIndices'][0]
-            implausible_event_step = occluder_index + \
-                target['forces'][0]['stepBegin']
-            # Set target's X position behind occluder.
-            target_appear_x = target['speed']['distanceByStep'][occluder_index]
-            target['shows'][0]['position']['x'] = target_appear_x
-
+            self._appear_behind_occluder_move_across(target)
         elif self.is_fall_down():
-            # Implausible event happens after target falls behind occluder.
-            implausible_event_step = (
-                OBJECT_FALL_TIME + target['shows'][0]['stepBegin']
-            )
-            # Set target's Y position stationary on the ground.
-            y_position = retrieve_off_screen_position_y(
-                target['shows'][0]['position']['z']
-            )
-            target['shows'][0]['position']['y'] -= y_position
-
+            self._appear_behind_occluder_fall_down(target)
         else:
             raise exceptions.SceneException('Unknown scene setup function!')
 
+    def _appear_behind_occluder_fall_down(
+        self,
+        target: Dict[str, Any]
+    ) -> None:
+        # Implausible event happens after target falls behind occluder.
+        implausible_event_step = (
+            OBJECT_FALL_TIME + target['shows'][0]['stepBegin']
+        )
+        # Set target's Y position stationary on the ground.
+        y_position = retrieve_off_screen_position_y(
+            target['shows'][0]['position']['z']
+        )
+        target['shows'][0]['position']['y'] -= y_position
         # Set target to appear at implausible event step.
         target['shows'][0]['stepBegin'] = implausible_event_step
+
+    def _appear_behind_occluder_move_across(
+        self,
+        target: Dict[str, Any]
+    ) -> None:
+        # Held back in Eval 4 (see override in secret file).
+        pass
 
     def _disappear_behind_occluder(
         self,
@@ -1952,24 +2311,31 @@ class ObjectPermanenceHypercube(IntuitivePhysicsHypercube):
         ][0]
 
         if self.is_move_across():
-            # Implausible event happens after target moves behind occluder.
-            occluder_index = target['speed']['occluderIndices'][0]
-            implausible_event_step = occluder_index + \
-                target['forces'][0]['stepBegin']
-
+            self._disappear_behind_occluder_move_across(target)
         elif self.is_fall_down():
-            # Implausible event happens after target falls behind occluder.
-            implausible_event_step = (
-                OBJECT_FALL_TIME + target['shows'][0]['stepBegin']
-            )
-
+            self._disappear_behind_occluder_fall_down(target)
         else:
             raise exceptions.SceneException('Unknown scene setup function!')
 
+    def _disappear_behind_occluder_fall_down(
+        self,
+        target: Dict[str, Any]
+    ) -> None:
+        # Implausible event happens after target falls behind occluder.
+        implausible_event_step = (
+            OBJECT_FALL_TIME + target['shows'][0]['stepBegin']
+        )
         # Set target to disappear at implausible event step.
         target['hides'] = [{
             'stepBegin': implausible_event_step
         }]
+
+    def _disappear_behind_occluder_move_across(
+        self,
+        target: Dict[str, Any]
+    ) -> None:
+        # Held back in Eval 4 (see override in secret file).
+        pass
 
     # Override
     def _create_intuitive_physics_scenes(
@@ -2152,6 +2518,257 @@ class ObjectPermanenceHypercube(IntuitivePhysicsHypercube):
         return scenes
 
 
+class ShapeConstancyHypercube(IntuitivePhysicsHypercube):
+    GOAL_TEMPLATE = {
+        'category': tags.tag_to_label(tags.SCENE.INTUITIVE_PHYSICS),
+        'domainsInfo': {
+            'objects': [
+                # Intentionally nothing
+            ],
+            'places': [],
+            'agents': []
+        },
+        'sceneInfo': {}
+    }
+
+    GOAL_TEMPLATE['sceneInfo'][tags.SCENE.PRIMARY] = (
+        tags.tag_to_label(tags.SCENE.PASSIVE)
+    )
+    GOAL_TEMPLATE['sceneInfo'][tags.SCENE.SECONDARY] = (
+        tags.tag_to_label(tags.SCENE.INTUITIVE_PHYSICS)
+    )
+    GOAL_TEMPLATE['sceneInfo'][tags.SCENE.TERTIARY] = (
+        tags.tag_to_label(tags.SCENE.SHAPE_CONSTANCY)
+    )
+    GOAL_TEMPLATE['sceneInfo'][tags.SCENE.QUATERNARY] = (
+        tags.tag_to_label(tags.SCENE.ACTION_NONE)
+    )
+
+    def __init__(
+        self,
+        body_template: Dict[str, Any],
+        role_to_type: Dict[str, str],
+        training=False,
+        is_fall_down=False,
+        is_move_across=False,
+        last_step=None
+    ):
+        super().__init__(
+            tags.ABBREV.SHAPE_CONSTANCY.upper(),
+            body_template,
+            ShapeConstancyHypercube.GOAL_TEMPLATE,
+            role_to_type,
+            is_fall_down=is_fall_down,
+            is_move_across=is_move_across,
+            training=training,
+            last_step=last_step
+        )
+
+    def _turn_a_into_b(
+        self,
+        scene: Dict[str, Any],
+        target_id: str,
+        template_b: Dict[str, Any]
+    ) -> None:
+        target_a = [
+            instance for instance in scene['objects']
+            if instance['id'] == target_id
+        ][0]
+        target_b = copy.deepcopy(template_b)
+
+        if self.is_move_across():
+            # Implausible event happens after target moves behind occluder.
+            target_hidden_step = target_a['movement']['stepList'][0]
+            implausible_event_step = target_hidden_step + \
+                target_a['forces'][0]['stepBegin']
+            implausible_event_x = target_a['movement']['positionList'][0]
+            # Give object B the movement of object A.
+            target_b['forces'] = copy.deepcopy(target_a['forces'])
+            target_b['movement'] = target_a['movement']
+
+        elif self.is_fall_down():
+            # Implausible event happens after target falls behind occluder.
+            implausible_event_step = (
+                OBJECT_FALL_TIME + target_a['shows'][0]['stepBegin']
+            )
+            implausible_event_x = target_a['shows'][0]['position']['x']
+            # Set target's Y position stationary on the ground.
+            y_position = retrieve_off_screen_position_y(
+                target_b['shows'][0]['position']['z']
+            )
+            target_b['shows'][0]['position']['y'] -= y_position
+
+        else:
+            raise exceptions.SceneException('Unknown scene setup function!')
+
+        # Hide object A at the implausible event step and show object B in
+        # object A's old position behind the occluder.
+        target_a['hides'] = [{
+            'stepBegin': implausible_event_step
+        }]
+        target_b['shows'][0]['stepBegin'] = implausible_event_step
+        target_b['shows'][0]['position']['x'] = implausible_event_x
+
+        # Add object B to the scene.
+        scene['objects'].append(target_b)
+
+    # Override
+    def _create_intuitive_physics_scenes(
+        self,
+        default_scene: Dict[str, Any]
+    ) -> Dict[str, Dict[str, Any]]:
+        target_id_1 = self._target_list[0]['id']
+        target_id_2 = self._target_list[1]['id']
+
+        # Variations on object one.
+        variations_1 = self._variations_list[0]
+        trained_variation_1_b = variations_1.get(VARIATIONS.DIFFERENT_SHAPE)
+        untrained_variation_1_a = variations_1.get(VARIATIONS.UNTRAINED_SHAPE)
+        untrained_variation_1_b = variations_1.get(
+            VARIATIONS.UNTRAINED_DIFFERENT_SHAPE
+        )
+
+        # Variations on object two.
+        variations_2 = self._variations_list[1]
+        trained_variation_2_b = variations_2.get(VARIATIONS.DIFFERENT_SHAPE)
+        untrained_variation_2_a = variations_2.get(VARIATIONS.UNTRAINED_SHAPE)
+        untrained_variation_2_b = variations_2.get(
+            VARIATIONS.UNTRAINED_DIFFERENT_SHAPE
+        )
+
+        # Initialize scenes.
+        scenes = {}
+        for i in ['a', 'b', 'e', 'f', 'i', 'j']:
+            scenes[i + '1'] = copy.deepcopy(default_scene)
+        for i in ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l']:
+            for j in [i + '2', i + '3', i + '4']:
+                scenes[j] = copy.deepcopy(default_scene)
+
+        # Initialize shape constancy tags in scenes.
+        for scene in scenes.values():
+            scene['goal']['sceneInfo'][tags.SCENE.SLICES] = []
+            scene['goal']['sceneInfo'][
+                tags.TYPES.SHAPE_CONSTANCY_OBJECT_ONE
+            ] = tags.CELLS.SHAPE_CONSTANCY_OBJECT_ONE.NO_CHANGE
+            scene['goal']['sceneInfo'][
+                tags.TYPES.SHAPE_CONSTANCY_OBJECT_TWO
+            ] = tags.CELLS.SHAPE_CONSTANCY_OBJECT_TWO.NO_CHANGE
+            scene['goal']['sceneInfo'][
+                tags.TYPES.SHAPE_CONSTANCY_TRAINED_ONE
+            ] = tags.CELLS.SHAPE_CONSTANCY_TRAINED_ONE.YES
+            scene['goal']['sceneInfo'][
+                tags.TYPES.SHAPE_CONSTANCY_TRAINED_TWO
+            ] = tags.CELLS.SHAPE_CONSTANCY_TRAINED_TWO.YES
+
+        # Remove object two completely.
+        for i in ['a', 'b', 'e', 'f', 'i', 'j']:
+            scene = scenes[i + '1']
+            scene['goal']['sceneInfo'][
+                tags.TYPES.SHAPE_CONSTANCY_OBJECT_TWO
+            ] = tags.CELLS.SHAPE_CONSTANCY_OBJECT_TWO.NONE
+            for index in range(len(scene['objects'])):
+                if scene['objects'][index]['id'] == target_id_2:
+                    del scene['objects'][index]
+                    break
+
+        # Switch object one with its untrained variation.
+        for i in ['b', 'd', 'f', 'h', 'j', 'l']:
+            for j in [i + '1', i + '2', i + '3', i + '4']:
+                if j not in scenes:
+                    continue
+                scene = scenes[j]
+                scene['evaluationOnly'] = True
+                scene['goal']['sceneInfo'][
+                    tags.TYPES.SHAPE_CONSTANCY_TRAINED_ONE
+                ] = tags.CELLS.SHAPE_CONSTANCY_TRAINED_ONE.NO
+                for index in range(len(scene['objects'])):
+                    if scene['objects'][index]['id'] == target_id_1:
+                        scene['objects'][index] = (
+                            copy.deepcopy(untrained_variation_1_a)
+                        )
+                        break
+
+        # Switch object two with its untrained variation.
+        for i in ['c', 'd', 'g', 'h', 'k', 'l']:
+            for j in [i + '2', i + '3', i + '4']:
+                if j not in scenes:
+                    continue
+                scene = scenes[j]
+                scene['evaluationOnly'] = True
+                scene['goal']['sceneInfo'][
+                    tags.TYPES.SHAPE_CONSTANCY_TRAINED_TWO
+                ] = tags.CELLS.SHAPE_CONSTANCY_TRAINED_TWO.NO
+                for index in range(len(scene['objects'])):
+                    if scene['objects'][index]['id'] == target_id_2:
+                        scene['objects'][index] = (
+                            copy.deepcopy(untrained_variation_2_a)
+                        )
+                        break
+
+        # Object one transforms into a different trained shape.
+        for i in ['e', 'f', 'g', 'h']:
+            for j in [i + '1', i + '2', i + '3', i + '4']:
+                if j not in scenes:
+                    continue
+                scene = scenes[j]
+                scene['evaluationOnly'] = True
+                scene['goal']['answer']['choice'] = IMPLAUSIBLE
+                scene['goal']['sceneInfo'][
+                    tags.TYPES.SHAPE_CONSTANCY_OBJECT_ONE
+                ] = tags.CELLS.SHAPE_CONSTANCY_OBJECT_ONE.TRAINED_SHAPE
+                self._turn_a_into_b(scene, target_id_1, trained_variation_1_b)
+
+        # Object one transforms into a different untrained shape.
+        for i in ['i', 'j', 'k', 'l']:
+            for j in [i + '1', i + '2', i + '3', i + '4']:
+                if j not in scenes:
+                    continue
+                scene = scenes[j]
+                scene['evaluationOnly'] = True
+                scene['goal']['answer']['choice'] = IMPLAUSIBLE
+                scene['goal']['sceneInfo'][
+                    tags.TYPES.SHAPE_CONSTANCY_OBJECT_ONE
+                ] = tags.CELLS.SHAPE_CONSTANCY_OBJECT_ONE.UNTRAINED_SHAPE
+                self._turn_a_into_b(
+                    scene,
+                    target_id_1,
+                    untrained_variation_1_b
+                )
+
+        for i in ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l']:
+            # Object two transforms into a different trained shape.
+            scene = scenes[i + '3']
+            scene['evaluationOnly'] = True
+            scene['goal']['answer']['choice'] = IMPLAUSIBLE
+            scene['goal']['sceneInfo'][
+                tags.TYPES.SHAPE_CONSTANCY_OBJECT_TWO
+            ] = tags.CELLS.SHAPE_CONSTANCY_OBJECT_TWO.TRAINED_SHAPE
+            self._turn_a_into_b(scene, target_id_2, trained_variation_2_b)
+
+            # Object two transforms into a different untrained shape.
+            scene = scenes[i + '4']
+            scene['evaluationOnly'] = True
+            scene['goal']['answer']['choice'] = IMPLAUSIBLE
+            scene['goal']['sceneInfo'][
+                tags.TYPES.SHAPE_CONSTANCY_OBJECT_TWO
+            ] = tags.CELLS.SHAPE_CONSTANCY_OBJECT_TWO.UNTRAINED_SHAPE
+            self._turn_a_into_b(
+                scene,
+                target_id_2,
+                untrained_variation_2_b
+            )
+
+        # Finalize scenes.
+        self._update_hypercube_scene_info_tags(scenes, [
+            tags.TYPES.SHAPE_CONSTANCY_OBJECT_ONE,
+            tags.TYPES.SHAPE_CONSTANCY_OBJECT_TWO,
+            tags.TYPES.SHAPE_CONSTANCY_TRAINED_ONE,
+            tags.TYPES.SHAPE_CONSTANCY_TRAINED_TWO
+        ])
+
+        return scenes
+
+
 class SpatioTemporalContinuityHypercube(IntuitivePhysicsHypercube):
     GOAL_TEMPLATE = {
         'category': tags.tag_to_label(tags.SCENE.INTUITIVE_PHYSICS),
@@ -2184,17 +2801,18 @@ class SpatioTemporalContinuityHypercube(IntuitivePhysicsHypercube):
         role_to_type: Dict[str, str],
         training=False,
         is_fall_down=False,
-        is_move_across=False
+        is_move_across=False,
+        last_step=None
     ):
         super().__init__(
             tags.ABBREV.SPATIO_TEMPORAL_CONTINUITY.upper(),
             body_template,
             SpatioTemporalContinuityHypercube.GOAL_TEMPLATE,
             role_to_type,
-            # All spatio-temporal continuity scenes are move-across in Eval 3.
-            is_fall_down=False,
-            is_move_across=True,
-            training=training
+            is_fall_down=is_fall_down,
+            is_move_across=is_move_across,
+            training=training,
+            last_step=last_step
         )
 
     def _shroud_object(self, scene: Dict[str, Any], target_id: str) -> None:
@@ -2206,14 +2824,14 @@ class SpatioTemporalContinuityHypercube(IntuitivePhysicsHypercube):
         if self.is_move_across():
             # Implausible event happens after target moves behind occluder.
             # Shroud target until it moves behind second occluder.
-            occluder_index_1 = target['speed']['occluderIndices'][0]
-            occluder_index_2 = target['speed']['occluderIndices'][1]
-            if occluder_index_1 < occluder_index_2:
-                occluder_start_index = occluder_index_1
-                occluder_end_index = occluder_index_2
+            target_hidden_step_1 = target['movement']['stepList'][0]
+            target_hidden_step_2 = target['movement']['stepList'][1]
+            if target_hidden_step_1 < target_hidden_step_2:
+                occluder_start_index = target_hidden_step_1
+                occluder_end_index = target_hidden_step_2
             else:
-                occluder_start_index = occluder_index_2
-                occluder_end_index = occluder_index_1
+                occluder_start_index = target_hidden_step_2
+                occluder_end_index = target_hidden_step_1
 
             target['shrouds'] = [{
                 'stepBegin': (
@@ -2408,9 +3026,12 @@ class SpatioTemporalContinuityHypercube(IntuitivePhysicsHypercube):
         return scenes
 
     # Override
-    def _find_move_across_paired_list(self) -> List[TargetVariations]:
+    def _find_move_across_paired_list(
+        self,
+        target_variation: TargetVariations
+    ) -> List[TargetVariations]:
         # Generate two occluders paired with the target object.
-        return [self._variations_list[0], self._variations_list[0]]
+        return [target_variation, target_variation]
 
     # Override
     def _separate_targets_and_non_targets(
@@ -2423,31 +3044,223 @@ class SpatioTemporalContinuityHypercube(IntuitivePhysicsHypercube):
         return moving_object_list[:1], moving_object_list[1:]
 
 
-class ShapeConstancyHypercube(IntuitivePhysicsHypercube):
-    GOAL_TEMPLATE = {
-        'category': tags.tag_to_label(tags.SCENE.INTUITIVE_PHYSICS),
-        'domainsInfo': {
-            'objects': [
-                # Intentionally nothing
-            ],
-            'places': [],
-            'agents': []
-        },
-        'sceneInfo': {}
-    }
+class ObjectPermanenceHypercubeEval4(ObjectPermanenceHypercube):
+    def __init__(
+        self,
+        body_template: Dict[str, Any],
+        role_to_type: Dict[str, str],
+        training=False,
+        is_fall_down=False,
+        is_move_across=False
+    ):
+        super().__init__(
+            body_template,
+            role_to_type,
+            # All object permanence scenes are move-across in Eval 4.
+            is_fall_down=False,
+            is_move_across=True,
+            training=training,
+            # All object permanence scenes must be longer in Eval 4.
+            last_step=150
+        )
 
-    GOAL_TEMPLATE['sceneInfo'][tags.SCENE.PRIMARY] = (
-        tags.tag_to_label(tags.SCENE.PASSIVE)
-    )
-    GOAL_TEMPLATE['sceneInfo'][tags.SCENE.SECONDARY] = (
-        tags.tag_to_label(tags.SCENE.INTUITIVE_PHYSICS)
-    )
-    GOAL_TEMPLATE['sceneInfo'][tags.SCENE.TERTIARY] = (
-        tags.tag_to_label(tags.SCENE.SHAPE_CONSTANCY)
-    )
-    GOAL_TEMPLATE['sceneInfo'][tags.SCENE.QUATERNARY] = (
-        tags.tag_to_label(tags.SCENE.ACTION_NONE)
-    )
+    # Override
+    def _choose_move_across_occluder_data(
+        self,
+        paired_variations: TargetVariations,
+        index: int
+    ) -> Tuple[float, float]:
+        """Return the X position and size for a paired move-across occluder."""
+        paired_object = paired_variations.get(VARIATIONS.TRAINED)
+        paired_object_position_z = paired_object['shows'][0]['position']['z']
+        paired_size_x = paired_variations.get_max_size_x()
+
+        toss_stop = paired_object['movement']['tossStop']
+        step = paired_object['movement']['stepList'][index]
+
+        # Retrieve the occluder X position of both the implausible event step
+        # and the land step for the toss-and-stop-on-screen movement.
+        x_list = [
+            object_x_to_occluder_x(
+                paired_object['movement']['positionList'][index],
+                paired_object_position_z
+            ),
+            object_x_to_occluder_x(
+                toss_stop['xDistanceByStep'][toss_stop['landStep']],
+                paired_object_position_z
+            )
+        ]
+
+        # Then retrieve the occluder X position of the stop step for each
+        # stop-on-screen movement.
+        for move_name in ['moveStop', 'deepStop', 'tossStop']:
+            movement = paired_object['movement'][move_name]
+            occluder_x = object_x_to_occluder_x(
+                movement['xDistanceByStep'][step],
+                movement['zDistanceByStep'][step]
+                if 'zDistanceByStep' in movement else paired_object_position_z
+            )
+            if occluder_x is not None:
+                x_list.append(occluder_x)
+
+        # Sort the list to identify the bounds of the occluder so that it hides
+        # the implausible event step, land step, and all stop steps.
+        x_list = sorted(x_list)
+        x_1 = x_list[0] - (paired_size_x / 2.0) - occluders.OCCLUDER_BUFFER
+        x_2 = x_list[-1] + (paired_size_x / 2.0) + occluders.OCCLUDER_BUFFER
+
+        occluder_size_x = x_2 - x_1
+        occluder_position_x = x_2 - (occluder_size_x / 2.0)
+
+        # Ensure the occluder is within the camera view.
+        if not validate_in_view(x_list[0]) or not validate_in_view(x_list[-1]):
+            raise exceptions.SceneException(
+                f'Occluder from {x_list[0]} to {x_list[-1]} out of bounds at '
+                f'step {step} with original occluder X '
+                f'{paired_object["movement"]["positionList"][index]}\n'
+                f'moveStop {paired_object["movement"]["moveStop"]}\n'
+                f'deepStop {paired_object["movement"]["deepStop"]}\n'
+                f'tossStop {paired_object["movement"]["tossStop"]}\n'
+            )
+
+        return occluder_position_x, occluder_size_x
+
+    # Override
+    def _does_have_deep_move(self) -> bool:
+        """Return whether this hypercube must generate deep movement."""
+        return True
+
+    # Override
+    def _does_have_stop_move(self) -> bool:
+        """Return whether this hypercube must generate stop movement."""
+        return True
+
+    # Override
+    def _does_have_toss_move(self) -> bool:
+        """Return whether this hypercube must generate toss movement."""
+        return True
+
+    # Override
+    def _get_move_across_object_count(self) -> int:
+        """Return the number of objects for the move-across scene."""
+        return 1
+
+    # Override
+    def _get_move_across_occluder_count(self) -> int:
+        """Return the number of occluders for the move-across scene."""
+        return 1
+
+    # Override
+    def _get_occluder_height(self) -> int:
+        """Return the occluder height to use."""
+        return occluders.OCCLUDER_HEIGHT * 2
+
+    # Override
+    def _init_each_object_definition_list(self, is_fall_down: bool) -> None:
+        """Set each object definition list needed by this hypercube, used in
+        _choose_object_definition."""
+
+        super()._init_each_object_definition_list(is_fall_down)
+
+        # Don't use balls/spheres in Eval 4 OP/STC hypercubes.
+        self._trained_definition_list = [
+            definition for definition in self._trained_definition_list
+            if definition['type'] != 'ball' and definition['type'] != 'sphere'
+        ]
+        self._untrained_shape_definition_list = [
+            definition for definition in self._untrained_shape_definition_list
+            if definition['type'] != 'ball' and definition['type'] != 'sphere'
+        ]
+        self._untrained_size_definition_list = [
+            definition for definition in self._untrained_size_definition_list
+            if definition['type'] != 'ball' and definition['type'] != 'sphere'
+        ]
+
+    # Override
+    def _create_intuitive_physics_scenes(
+        self,
+        default_scene: Dict[str, Any]
+    ) -> Dict[str, Dict[str, Any]]:
+        # Initialize scenes.
+        scenes = {}
+        for j in self._get_scene_ids():
+            scenes[j] = copy.deepcopy(default_scene)
+
+        # Initialize object permanence tags in scenes.
+        for scene in scenes.values():
+            scene['goal']['sceneInfo'][tags.SCENE.SLICES] = []
+            scene['goal']['sceneInfo'][
+                tags.TYPES.OBJECT_PERMANENCE_SETUP
+            ] = tags.CELLS.OBJECT_PERMANENCE_SETUP.EXIT
+            scene['goal']['sceneInfo'][
+                tags.TYPES.OBJECT_PERMANENCE_MOVEMENT
+            ] = tags.CELLS.OBJECT_PERMANENCE_MOVEMENT.LINEAR
+            scene['goal']['sceneInfo'][
+                tags.TYPES.OBJECT_PERMANENCE_OBJECT_ONE
+            ] = tags.CELLS.OBJECT_PERMANENCE_OBJECT_ONE.NO_CHANGE
+            scene['goal']['sceneInfo'][
+                tags.TYPES.OBJECT_PERMANENCE_NOVELTY_ONE
+            ] = tags.CELLS.OBJECT_PERMANENCE_NOVELTY_ONE.NONE
+
+        scenes = self._design_object_permanence_eval_4_scenes(scenes)
+
+        # Finalize scenes.
+        self._update_hypercube_scene_info_tags(scenes, [
+            tags.TYPES.OBJECT_PERMANENCE_SETUP,
+            tags.TYPES.OBJECT_PERMANENCE_MOVEMENT,
+            tags.TYPES.OBJECT_PERMANENCE_OBJECT_ONE,
+            tags.TYPES.OBJECT_PERMANENCE_NOVELTY_ONE
+        ])
+
+        return scenes
+
+    def _design_object_permanence_eval_4_scenes(
+        self,
+        scenes: Dict[str, Dict[str, Any]]
+    ) -> Dict[str, Dict[str, Any]]:
+        target_id = self._target_list[0]['id']
+
+        # Variations on the object.
+        variations = self._variations_list[0]
+        trained_variation = variations.get(VARIATIONS.TRAINED)
+        move_stop = trained_variation['movement']['moveStop']
+
+        # Switch the "exit" movement with the "stop" movement.
+        scene = scenes['j1']
+        scene['goal']['sceneInfo'][
+            tags.TYPES.OBJECT_PERMANENCE_SETUP
+        ] = tags.CELLS.OBJECT_PERMANENCE_SETUP.STOP
+        for instance in scene['objects']:
+            if instance['id'] == target_id:
+                is_positive = instance['forces'][0]['vector']['x'] > 0
+                instance['forces'][0]['vector'] = {
+                    'x': (
+                        move_stop['forceX'] * instance['mass'] *
+                        (1 if is_positive else -1)
+                    ),
+                    'y': 0,
+                    'z': 0
+                }
+                # Remove any lingering momentum.
+                instance['togglePhysics'] = [{
+                    'stepBegin': (
+                        instance['shows'][0]['stepBegin'] +
+                        move_stop['stopStep'] + 1
+                    )
+                }]
+                # Mark active movement name for testing and debugging.
+                instance['movement']['active'] = 'moveStop'
+
+        return scenes
+
+    def _get_scene_ids(self) -> List[str]:
+        # Only J1 and J2 are available for training.
+        return ['j1', 'j2']
+
+
+class SpatioTemporalContinuityHypercubeEval4(
+    SpatioTemporalContinuityHypercube
+):
 
     def __init__(
         self,
@@ -2458,221 +3271,123 @@ class ShapeConstancyHypercube(IntuitivePhysicsHypercube):
         is_move_across=False
     ):
         super().__init__(
-            tags.ABBREV.SHAPE_CONSTANCY.upper(),
             body_template,
-            ShapeConstancyHypercube.GOAL_TEMPLATE,
             role_to_type,
-            # All shape constancy scenes are fall-down in Eval 3.
-            is_fall_down=True,
-            is_move_across=False,
+            is_fall_down=False,
+            # All spatio-temporal continuity scenes are move-across in Eval 4.
+            is_move_across=True,
             training=training
         )
 
-    def _turn_a_into_b(
-        self,
-        scene: Dict[str, Any],
-        target_id: str,
-        template_b: Dict[str, Any]
-    ) -> None:
-        target_a = [
-            instance for instance in scene['objects']
-            if instance['id'] == target_id
-        ][0]
-        target_b = copy.deepcopy(template_b)
+    # Override
+    def _does_have_deep_move(self) -> bool:
+        """Return whether this hypercube must generate deep movement."""
+        return True
 
-        if self.is_move_across():
-            # Implausible event happens after target moves behind occluder.
-            occluder_index = target_a['speed']['occluderIndices'][0]
-            implausible_event_step = occluder_index + \
-                target_a['forces'][0]['stepBegin']
-            implausible_event_x = target_a['speed']['distanceByStep'][
-                occluder_index
-            ]
-            # Give object B the movement of object A.
-            target_b['forces'] = copy.deepcopy(target_a['forces'])
-            target_b['speed'] = target_a['speed']
+    # Override
+    def _does_have_toss_move(self) -> bool:
+        """Return whether this hypercube must generate toss movement."""
+        return True
 
-        elif self.is_fall_down():
-            # Implausible event happens after target falls behind occluder.
-            implausible_event_step = (
-                OBJECT_FALL_TIME + target_a['shows'][0]['stepBegin']
-            )
-            implausible_event_x = target_a['shows'][0]['position']['x']
-            # Set target's Y position stationary on the ground.
-            y_position = retrieve_off_screen_position_y(
-                target_b['shows'][0]['position']['z']
-            )
-            target_b['shows'][0]['position']['y'] -= y_position
+    # Override
+    def _get_move_across_object_count(self) -> int:
+        """Return the number of objects for the move-across scene."""
+        return 1
 
-        else:
-            raise exceptions.SceneException('Unknown scene setup function!')
+    # Override
+    def _get_move_across_occluder_count(self) -> int:
+        """Return the number of occluders for the move-across scene."""
+        return 1
 
-        # Hide object A at the implausible event step and show object B in
-        # object A's old position behind the occluder.
-        target_a['hides'] = [{
-            'stepBegin': implausible_event_step
-        }]
-        target_b['shows'][0]['stepBegin'] = implausible_event_step
-        target_b['shows'][0]['position']['x'] = implausible_event_x
+    # Override
+    def _get_occluder_height(self) -> int:
+        """Return the occluder height to use."""
+        return occluders.OCCLUDER_HEIGHT * 2
 
-        # Add object B to the scene.
-        scene['objects'].append(target_b)
+    # Override
+    def _init_each_object_definition_list(self, is_fall_down: bool) -> None:
+        """Set each object definition list needed by this hypercube, used in
+        _choose_object_definition."""
+
+        super()._init_each_object_definition_list(is_fall_down)
+
+        # Don't use balls/spheres in Eval 4 OP/STC hypercubes.
+        self._trained_definition_list = [
+            definition for definition in self._trained_definition_list
+            if definition['type'] != 'ball' and definition['type'] != 'sphere'
+        ]
+        self._untrained_shape_definition_list = [
+            definition for definition in self._untrained_shape_definition_list
+            if definition['type'] != 'ball' and definition['type'] != 'sphere'
+        ]
+        self._untrained_size_definition_list = [
+            definition for definition in self._untrained_size_definition_list
+            if definition['type'] != 'ball' and definition['type'] != 'sphere'
+        ]
 
     # Override
     def _create_intuitive_physics_scenes(
         self,
         default_scene: Dict[str, Any]
-    ) -> Dict[str, Dict[str, Any]]:
-        target_id_1 = self._target_list[0]['id']
-        target_id_2 = self._target_list[1]['id']
-
-        # Variations on object one.
-        variations_1 = self._variations_list[0]
-        trained_variation_1_b = variations_1.get(VARIATIONS.DIFFERENT_SHAPE)
-        untrained_variation_1_a = variations_1.get(VARIATIONS.UNTRAINED_SHAPE)
-        untrained_variation_1_b = variations_1.get(
-            VARIATIONS.UNTRAINED_DIFFERENT_SHAPE
-        )
-
-        # Variations on object two.
-        variations_2 = self._variations_list[1]
-        trained_variation_2_b = variations_2.get(VARIATIONS.DIFFERENT_SHAPE)
-        untrained_variation_2_a = variations_2.get(VARIATIONS.UNTRAINED_SHAPE)
-        untrained_variation_2_b = variations_2.get(
-            VARIATIONS.UNTRAINED_DIFFERENT_SHAPE
-        )
-
+    ) -> List[Dict[str, Any]]:
         # Initialize scenes.
         scenes = {}
-        for i in ['a', 'b', 'e', 'f', 'i', 'j']:
-            scenes[i + '1'] = copy.deepcopy(default_scene)
-        for i in ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l']:
-            for j in [i + '2', i + '3', i + '4']:
-                scenes[j] = copy.deepcopy(default_scene)
+        for j in self._get_scene_ids():
+            scenes[j] = copy.deepcopy(default_scene)
 
-        # Initialize shape constancy tags in scenes.
+        # Initialize spatio temporal continuity tags in scenes.
         for scene in scenes.values():
             scene['goal']['sceneInfo'][tags.SCENE.SLICES] = []
             scene['goal']['sceneInfo'][
-                tags.TYPES.SHAPE_CONSTANCY_OBJECT_ONE
-            ] = tags.CELLS.SHAPE_CONSTANCY_OBJECT_ONE.NO_CHANGE
+                tags.TYPES.SPATIO_TEMPORAL_CONTINUITY_MOVEMENT
+            ] = tags.CELLS.SPATIO_TEMPORAL_CONTINUITY_MOVEMENT.LINEAR
             scene['goal']['sceneInfo'][
-                tags.TYPES.SHAPE_CONSTANCY_OBJECT_TWO
-            ] = tags.CELLS.SHAPE_CONSTANCY_OBJECT_TWO.NO_CHANGE
+                tags.TYPES.SPATIO_TEMPORAL_CONTINUITY_OBJECTS
+            ] = tags.CELLS.SPATIO_TEMPORAL_CONTINUITY_OBJECTS.ONE
             scene['goal']['sceneInfo'][
-                tags.TYPES.SHAPE_CONSTANCY_TRAINED_ONE
-            ] = tags.CELLS.SHAPE_CONSTANCY_TRAINED_ONE.YES
+                tags.TYPES.SPATIO_TEMPORAL_CONTINUITY_OCCLUDERS
+            ] = tags.CELLS.SPATIO_TEMPORAL_CONTINUITY_OCCLUDERS.TWO
             scene['goal']['sceneInfo'][
-                tags.TYPES.SHAPE_CONSTANCY_TRAINED_TWO
-            ] = tags.CELLS.SHAPE_CONSTANCY_TRAINED_TWO.YES
-
-        # Remove object two completely.
-        for i in ['a', 'b', 'e', 'f', 'i', 'j']:
-            scene = scenes[i + '1']
+                tags.TYPES.SPATIO_TEMPORAL_CONTINUITY_PLAUSIBLE
+            ] = tags.CELLS.SPATIO_TEMPORAL_CONTINUITY_PLAUSIBLE.YES
             scene['goal']['sceneInfo'][
-                tags.TYPES.SHAPE_CONSTANCY_OBJECT_TWO
-            ] = tags.CELLS.SHAPE_CONSTANCY_OBJECT_TWO.NONE
-            for index in range(len(scene['objects'])):
-                if scene['objects'][index]['id'] == target_id_2:
-                    del scene['objects'][index]
-                    break
+                tags.TYPES.SPATIO_TEMPORAL_CONTINUITY_TARGET_TRAINED
+            ] = tags.CELLS.SPATIO_TEMPORAL_CONTINUITY_TARGET_TRAINED.YES
 
-        # Switch object one with its untrained variation.
-        for i in ['b', 'd', 'f', 'h', 'j', 'l']:
-            for j in [i + '1', i + '2', i + '3', i + '4']:
-                if j not in scenes:
-                    continue
-                scene = scenes[j]
-                scene['evaluationOnly'] = True
-                scene['goal']['sceneInfo'][
-                    tags.TYPES.SHAPE_CONSTANCY_TRAINED_ONE
-                ] = tags.CELLS.SHAPE_CONSTANCY_TRAINED_ONE.NO
-                for index in range(len(scene['objects'])):
-                    if scene['objects'][index]['id'] == target_id_1:
-                        scene['objects'][index] = (
-                            copy.deepcopy(untrained_variation_1_a)
-                        )
-                        break
-
-        # Switch object two with its untrained variation.
-        for i in ['c', 'd', 'g', 'h', 'k', 'l']:
-            for j in [i + '2', i + '3', i + '4']:
-                if j not in scenes:
-                    continue
-                scene = scenes[j]
-                scene['evaluationOnly'] = True
-                scene['goal']['sceneInfo'][
-                    tags.TYPES.SHAPE_CONSTANCY_TRAINED_TWO
-                ] = tags.CELLS.SHAPE_CONSTANCY_TRAINED_TWO.NO
-                for index in range(len(scene['objects'])):
-                    if scene['objects'][index]['id'] == target_id_2:
-                        scene['objects'][index] = (
-                            copy.deepcopy(untrained_variation_2_a)
-                        )
-                        break
-
-        # Object one transforms into a different trained shape.
-        for i in ['e', 'f', 'g', 'h']:
-            for j in [i + '1', i + '2', i + '3', i + '4']:
-                if j not in scenes:
-                    continue
-                scene = scenes[j]
-                scene['evaluationOnly'] = True
-                scene['goal']['answer']['choice'] = IMPLAUSIBLE
-                scene['goal']['sceneInfo'][
-                    tags.TYPES.SHAPE_CONSTANCY_OBJECT_ONE
-                ] = tags.CELLS.SHAPE_CONSTANCY_OBJECT_ONE.TRAINED_SHAPE
-                self._turn_a_into_b(scene, target_id_1, trained_variation_1_b)
-
-        # Object one transforms into a different untrained shape.
-        for i in ['i', 'j', 'k', 'l']:
-            for j in [i + '1', i + '2', i + '3', i + '4']:
-                if j not in scenes:
-                    continue
-                scene = scenes[j]
-                scene['evaluationOnly'] = True
-                scene['goal']['answer']['choice'] = IMPLAUSIBLE
-                scene['goal']['sceneInfo'][
-                    tags.TYPES.SHAPE_CONSTANCY_OBJECT_ONE
-                ] = tags.CELLS.SHAPE_CONSTANCY_OBJECT_ONE.UNTRAINED_SHAPE
-                self._turn_a_into_b(
-                    scene,
-                    target_id_1,
-                    untrained_variation_1_b
-                )
-
-        for i in ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l']:
-            # Object two transforms into a different trained shape.
-            scene = scenes[i + '3']
-            scene['evaluationOnly'] = True
-            scene['goal']['answer']['choice'] = IMPLAUSIBLE
-            scene['goal']['sceneInfo'][
-                tags.TYPES.SHAPE_CONSTANCY_OBJECT_TWO
-            ] = tags.CELLS.SHAPE_CONSTANCY_OBJECT_TWO.TRAINED_SHAPE
-            self._turn_a_into_b(scene, target_id_2, trained_variation_2_b)
-
-            # Object two transforms into a different untrained shape.
-            scene = scenes[i + '4']
-            scene['evaluationOnly'] = True
-            scene['goal']['answer']['choice'] = IMPLAUSIBLE
-            scene['goal']['sceneInfo'][
-                tags.TYPES.SHAPE_CONSTANCY_OBJECT_TWO
-            ] = tags.CELLS.SHAPE_CONSTANCY_OBJECT_TWO.UNTRAINED_SHAPE
-            self._turn_a_into_b(
-                scene,
-                target_id_2,
-                untrained_variation_2_b
-            )
+        scenes = self._design_spatio_temporal_continuity_eval_4_scenes(scenes)
 
         # Finalize scenes.
         self._update_hypercube_scene_info_tags(scenes, [
-            tags.TYPES.SHAPE_CONSTANCY_OBJECT_ONE,
-            tags.TYPES.SHAPE_CONSTANCY_OBJECT_TWO,
-            tags.TYPES.SHAPE_CONSTANCY_TRAINED_ONE,
-            tags.TYPES.SHAPE_CONSTANCY_TRAINED_TWO
+            tags.TYPES.SPATIO_TEMPORAL_CONTINUITY_MOVEMENT,
+            tags.TYPES.SPATIO_TEMPORAL_CONTINUITY_OBJECTS,
+            tags.TYPES.SPATIO_TEMPORAL_CONTINUITY_OCCLUDERS,
+            tags.TYPES.SPATIO_TEMPORAL_CONTINUITY_PLAUSIBLE,
+            tags.TYPES.SPATIO_TEMPORAL_CONTINUITY_TARGET_TRAINED
         ])
 
         return scenes
+
+    def _design_spatio_temporal_continuity_eval_4_scenes(
+        self,
+        scenes: Dict[str, Dict[str, Any]]
+    ) -> Dict[str, Dict[str, Any]]:
+        # Remove every occluder.
+        scene = scenes['e1']
+        scene['goal']['sceneInfo'][
+            tags.TYPES.SPATIO_TEMPORAL_CONTINUITY_OCCLUDERS
+        ] = tags.CELLS.SPATIO_TEMPORAL_CONTINUITY_OCCLUDERS.ZERO
+        remove_id_list = [
+            occluder['id'] for occluder in self._occluder_list
+        ]
+        scene['objects'] = [
+            instance for instance in scene['objects']
+            if instance['id'] not in remove_id_list
+        ]
+        return scenes
+
+    def _get_scene_ids(self) -> List[str]:
+        # Only A1 and E1 are available for training.
+        return ['a1', 'e1']
 
 
 class GravitySupportTrainingHypercubeFactory(hypercubes.HypercubeFactory):
@@ -2691,9 +3406,9 @@ class GravitySupportTrainingHypercubeFactory(hypercubes.HypercubeFactory):
         )
 
 
-class ObjectPermanenceTrainingHypercubeFactory(hypercubes.HypercubeFactory):
+class ObjectPermanenceTraining3HypercubeFactory(hypercubes.HypercubeFactory):
     def __init__(self) -> None:
-        super().__init__('ObjectPermanenceTraining', training=True)
+        super().__init__('ObjectPermanenceTraining3', training=True)
 
     def _build(
         self,
@@ -2701,6 +3416,24 @@ class ObjectPermanenceTrainingHypercubeFactory(hypercubes.HypercubeFactory):
         role_to_type: Dict[str, str]
     ) -> hypercubes.Hypercube:
         return ObjectPermanenceHypercube(
+            body_template,
+            role_to_type,
+            self.training,
+            # All object permanence scenes are fall-down in Eval 3.
+            is_fall_down=True
+        )
+
+
+class ObjectPermanenceTraining4HypercubeFactory(hypercubes.HypercubeFactory):
+    def __init__(self) -> None:
+        super().__init__('ObjectPermanenceTraining4', training=True)
+
+    def _build(
+        self,
+        body_template: Dict[str, Any],
+        role_to_type: Dict[str, str]
+    ) -> hypercubes.Hypercube:
+        return ObjectPermanenceHypercubeEval4(
             body_template,
             role_to_type,
             self.training
@@ -2719,15 +3452,17 @@ class ShapeConstancyTrainingHypercubeFactory(hypercubes.HypercubeFactory):
         return ShapeConstancyHypercube(
             body_template,
             role_to_type,
-            self.training
+            self.training,
+            # All shape constancy scenes are fall-down in Eval 3.
+            is_fall_down=True
         )
 
 
-class SpatioTemporalContinuityTrainingHypercubeFactory(
+class SpatioTemporalContinuityTraining3HypercubeFactory(
     hypercubes.HypercubeFactory
 ):
     def __init__(self) -> None:
-        super().__init__('SpatioTemporalContinuityTraining', training=True)
+        super().__init__('SpatioTemporalContinuityTraining3', training=True)
 
     def _build(
         self,
@@ -2735,6 +3470,26 @@ class SpatioTemporalContinuityTrainingHypercubeFactory(
         role_to_type: Dict[str, str]
     ) -> hypercubes.Hypercube:
         return SpatioTemporalContinuityHypercube(
+            body_template,
+            role_to_type,
+            self.training,
+            # All spatio-temporal continuity scenes are move-across in Eval 3.
+            is_move_across=True
+        )
+
+
+class SpatioTemporalContinuityTraining4HypercubeFactory(
+    hypercubes.HypercubeFactory
+):
+    def __init__(self) -> None:
+        super().__init__('SpatioTemporalContinuityTraining4', training=True)
+
+    def _build(
+        self,
+        body_template: Dict[str, Any],
+        role_to_type: Dict[str, str]
+    ) -> hypercubes.Hypercube:
+        return SpatioTemporalContinuityHypercubeEval4(
             body_template,
             role_to_type,
             self.training
@@ -2757,9 +3512,9 @@ class GravitySupportEvaluationHypercubeFactory(hypercubes.HypercubeFactory):
         )
 
 
-class ObjectPermanenceEvaluationHypercubeFactory(hypercubes.HypercubeFactory):
+class ObjectPermanenceEvaluation3HypercubeFactory(hypercubes.HypercubeFactory):
     def __init__(self) -> None:
-        super().__init__('ObjectPermanenceEvaluation', training=False)
+        super().__init__('ObjectPermanenceEvaluation3', training=False)
 
     def _build(
         self,
@@ -2769,7 +3524,9 @@ class ObjectPermanenceEvaluationHypercubeFactory(hypercubes.HypercubeFactory):
         return ObjectPermanenceHypercube(
             body_template,
             role_to_type,
-            self.training
+            self.training,
+            # All object permanence scenes are fall-down in Eval 3.
+            is_fall_down=True
         )
 
 
@@ -2785,15 +3542,17 @@ class ShapeConstancyEvaluationHypercubeFactory(hypercubes.HypercubeFactory):
         return ShapeConstancyHypercube(
             body_template,
             role_to_type,
-            self.training
+            self.training,
+            # All shape constancy scenes are fall-down in Eval 3.
+            is_fall_down=True
         )
 
 
-class SpatioTemporalContinuityEvaluationHypercubeFactory(
+class SpatioTemporalContinuityEvaluation3HypercubeFactory(
     hypercubes.HypercubeFactory
 ):
     def __init__(self) -> None:
-        super().__init__('SpatioTemporalContinuityEvaluation', training=False)
+        super().__init__('SpatioTemporalContinuityEvaluation3', training=False)
 
     def _build(
         self,
@@ -2803,21 +3562,25 @@ class SpatioTemporalContinuityEvaluationHypercubeFactory(
         return SpatioTemporalContinuityHypercube(
             body_template,
             role_to_type,
-            self.training
+            self.training,
+            # All spatio-temporal continuity scenes are move-across in Eval 3.
+            is_move_across=True
         )
 
 
 INTUITIVE_PHYSICS_TRAINING_HYPERCUBE_LIST = [
     GravitySupportTrainingHypercubeFactory(),
-    ObjectPermanenceTrainingHypercubeFactory(),
+    ObjectPermanenceTraining3HypercubeFactory(),
+    ObjectPermanenceTraining4HypercubeFactory(),
     ShapeConstancyTrainingHypercubeFactory(),
-    SpatioTemporalContinuityTrainingHypercubeFactory()
+    SpatioTemporalContinuityTraining3HypercubeFactory(),
+    SpatioTemporalContinuityTraining4HypercubeFactory()
 ]
 
 
 INTUITIVE_PHYSICS_EVALUATION_HYPERCUBE_LIST = [
     GravitySupportEvaluationHypercubeFactory(),
-    ObjectPermanenceEvaluationHypercubeFactory(),
+    ObjectPermanenceEvaluation3HypercubeFactory(),
     ShapeConstancyEvaluationHypercubeFactory(),
-    SpatioTemporalContinuityEvaluationHypercubeFactory()
+    SpatioTemporalContinuityEvaluation3HypercubeFactory()
 ]

@@ -1,13 +1,15 @@
-import intuitive_physics_hypercubes
 import math
-import occluders
 import pytest
+
+import intuitive_physics_hypercubes
+import occluders
 import util
 
 
 BODY_TEMPLATE = {
     'name': '',
     'ceilingMaterial': 'AI2-THOR/Materials/Walls/Drywall',
+    'floorColors': ['white'],
     'floorMaterial': 'AI2-THOR/Materials/Fabrics/CarpetWhite 3',
     'wallMaterial': 'AI2-THOR/Materials/Walls/DrywallBeige',
     'wallColors': ['white'],
@@ -35,9 +37,16 @@ def verify_scene(scene, is_move_across, implausible=False, eval_only=False):
     )
     assert scene['goal']['metadata']['choose'] == ['plausible', 'implausible']
 
-    last_step = (90 if is_move_across else 60)
-    assert scene['goal']['last_step'] == last_step
-    assert scene['goal']['action_list'] == [['Pass']] * last_step
+    if is_move_across:
+        assert (
+            scene['goal']['last_step'] == 90 or
+            scene['goal']['last_step'] == 150
+        )
+    else:
+        assert scene['goal']['last_step'] == 60
+    assert scene['goal']['action_list'] == (
+        [['Pass']] * scene['goal']['last_step']
+    )
     assert scene['goal']['category'] == 'intuitive physics'
     assert scene['goal']['sceneInfo']['primaryType'] == 'passive'
     assert scene['goal']['sceneInfo']['secondaryType'] == 'intuitive physics'
@@ -150,22 +159,22 @@ def verify_hypercube_variations(
         assert util.is_similar_except_in_shape(
             trained_default,
             different_shape,
-            only_x_dimension=True
+            only_diagonal_size=True
         )
         assert util.is_similar_except_in_shape(
             trained_default,
             untrained_shape,
-            only_x_dimension=True
+            only_diagonal_size=True
         )
         assert util.is_similar_except_in_shape(
             untrained_shape,
             untrained_different_shape,
-            only_x_dimension=True
+            only_diagonal_size=True
         )
         assert util.is_similar_except_in_size(
             trained_default,
             untrained_size,
-            only_x_dimension=True
+            only_diagonal_size=True
         )
 
         assert trained_default['materials'] == different_shape['materials']
@@ -183,7 +192,8 @@ def verify_hypercube_ObjectPermanence(
     is_move_across,
     object_dict,
     last_step,
-    room_wall_material_name
+    room_wall_material_name,
+    eval_4=False
 ):
     assert verify_hypercube(object_dict, room_wall_material_name)
 
@@ -194,12 +204,15 @@ def verify_hypercube_ObjectPermanence(
             object_dict['target'],
             object_dict['non target']
         )
-        assert len(object_dict['intuitive physics occluder']) == 6
+        assert len(object_dict['intuitive physics occluder']) == (
+            2 if eval_4 else 4
+        )
         assert verify_occluder_list_move_across(
             object_dict['intuitive physics occluder'],
-            object_dict['target']
+            object_dict['target'],
+            eval_4
         )
-        assert last_step == 90
+        assert last_step == (150 if eval_4 else 90)
 
     else:
         assert verify_object_list_fall_down(
@@ -258,7 +271,8 @@ def verify_hypercube_SpatioTemporalContinuity(
     object_dict,
     last_step,
     room_wall_material_name,
-    hypercube_target
+    hypercube_target,
+    eval_4=False
 ):
     assert verify_hypercube(object_dict, room_wall_material_name)
 
@@ -267,11 +281,14 @@ def verify_hypercube_SpatioTemporalContinuity(
             object_dict['target'],
             object_dict['non target']
         )
-        assert len(object_dict['intuitive physics occluder']) == 6
+        assert len(object_dict['intuitive physics occluder']) == (
+            4 if eval_4 else 6
+        )
         # Pass the target here twice to verify both of its paired occluders.
         assert verify_occluder_list_move_across(
             object_dict['intuitive physics occluder'],
-            [hypercube_target, hypercube_target]
+            [hypercube_target, hypercube_target],
+            eval_4
         )
         assert last_step == 90
 
@@ -296,7 +313,11 @@ def verify_object_fall_down(instance, name):
     if not (name == 'TARGET' and instance.get('ignoreShowStep', False)):
         # Verify object show step.
         min_begin = intuitive_physics_hypercubes.EARLIEST_ACTION_STEP
-        max_begin = intuitive_physics_hypercubes.LATEST_ACTION_STEP_FALL_DOWN
+        max_begin = (
+            intuitive_physics_hypercubes.LAST_STEP_FALL_DOWN -
+            occluders.OCCLUDER_MOVEMENT_TIME -
+            intuitive_physics_hypercubes.OBJECT_FALL_TIME
+        )
         if min_begin > instance['shows'][0]['stepBegin'] > max_begin:
             print(f'[ERROR] {name} SHOW STEP BEGIN SHOULD BE BETWEEN '
                   f'{min_begin} AND {max_begin}\n{name}={instance}')
@@ -396,9 +417,10 @@ def verify_object_move_across(instance, name):
             return False
 
         # Verify object distance-by-step list.
-        for i in range(len(instance['speed']['distanceByStep']) - 1):
-            position = instance['speed']['distanceByStep'][i]
-            position_next = instance['speed']['distanceByStep'][i + 1]
+        distance_by_step = instance['movement']['moveExit']['xDistanceByStep']
+        for i in range(len(distance_by_step) - 1):
+            position = distance_by_step[i]
+            position_next = distance_by_step[i + 1]
             if left_to_right:
                 if position >= position_next:
                     print(f'[ERROR] LEFT-TO-RIGHT {name} DISTANCE BY STEP '
@@ -428,16 +450,19 @@ def verify_object_move_across(instance, name):
                       f'POSITIVE\n{name}={instance}')
                 return False
         else:
-            if instance['forces'][0]['vector']['x'] > 0:
-                print(f'[ERROR] RIGHT-TO-LEFT {name} FORCE VECTOR X SHOULD BE '
-                      f'NEGATIVE\n{name}={instance}')
+            if (
+                instance['forces'][0]['vector']['x'] > 0 and
+                not instance['forces'][0].get('relative')
+            ):
+                print(f'[ERROR] RIGHT-TO-LEFT {name} NON-RELATIVE FORCE '
+                      f'VECTOR X SHOULD BE NEGATIVE\n{name}={instance}')
                 return False
 
     if (not name == 'TARGET' and not instance.get('ignoreShowStep', False)):
         # Verify object show step.
         min_begin = intuitive_physics_hypercubes.EARLIEST_ACTION_STEP
         max_begin = last_action_step - \
-            len(instance['speed']['distanceByStep']) - 1
+            len(instance['movement']['moveExit']['xDistanceByStep']) - 1
         if min_begin > instance['shows'][0]['stepBegin'] > max_begin:
             print(f'[ERROR] {name} SHOW STEP BEGIN SHOULD BE BETWEEN '
                   f'{min_begin} AND {max_begin}\n{name}={instance}')
@@ -493,8 +518,14 @@ def verify_object_list_move_across(target_list, distractor_list):
                               f'OBJECT SHOULD HAVE SMALLER SHOW STEP BEGIN\n'
                               f'OBJECT_1={object_1}\nOBJECT_2={object_2}')
                         return False
-                    force_1 = object_1['speed']['force'] * object_1['mass']
-                    force_2 = object_2['speed']['force'] * object_2['mass']
+                    force_1 = (
+                        object_1['movement']['moveExit']['force'] *
+                        object_1['mass']
+                    )
+                    force_2 = (
+                        object_2['movement']['moveExit']['force'] *
+                        object_2['mass']
+                    )
                     if abs(force_2) > abs(force_1):
                         print(f'[ERROR] MOVE ACROSS OBJECT IN FRONT OF SECOND '
                               f'OBJECT SHOULD HAVE GREATER FORCE\n'
@@ -560,7 +591,9 @@ def verify_occluder_list(occluder_list, target_list, sideways=False):
     for i in range(len(target_list)):
         target = target_list[i]
         occluder_wall = occluder_list[i * 2]
-        target_size = math.sqrt(2) * target['dimensions']['x']
+        target_size = math.sqrt(
+            target['dimensions']['x']**2 + target['dimensions']['z']**2
+        )
         if occluder_wall['shows'][0]['scale']['x'] < target_size:
             print(f'[ERROR] PAIRED OCCLUDER WALL X SCALE SHOULD BE GREATER '
                   f'THAN TARGET DIAGONAL X\nOCCLUDER_WALL={occluder_wall}\n'
@@ -590,7 +623,11 @@ def verify_occluder_list_fall_down(occluder_list, target_list):
     return True
 
 
-def verify_occluder_list_move_across(occluder_list, target_list):
+def verify_occluder_list_move_across(
+    occluder_list,
+    target_list,
+    eval_4=False
+):
     assert verify_occluder_list(occluder_list, target_list)
 
     for i in range(len(target_list)):
@@ -601,11 +638,11 @@ def verify_occluder_list_move_across(occluder_list, target_list):
             target['shows'][0]['position']['z']
         )
         x_position_verified = False
-        for position in target['speed']['distanceByStep']:
+        for position in target['movement']['moveExit']['xDistanceByStep']:
             if position == pytest.approx(adjusted_x):
                 x_position_verified = True
                 break
-        if not x_position_verified:
+        if not eval_4 and not x_position_verified:
             print(f'[ERROR] PAIRED MOVE ACROSS OCCLUDER WALL X POSITION '
                   f'SHOULD BE CALCULATED FROM TARGET DISTANCE BY STEP LIST\n'
                   f'OCCLUDER_WALL={occluder_wall}\nTARGET={target}\n'
@@ -615,29 +652,24 @@ def verify_occluder_list_move_across(occluder_list, target_list):
     return True
 
 
-def find_implausible_event_step_offset(target, occluder):
-    """Return the list of implausible event step offsets for the given
-    move-across target."""
-    adjusted_x = intuitive_physics_hypercubes.occluder_x_to_object_x(
-        occluder['shows'][0]['position']['x'],
-        target['shows'][0]['position']['z']
-    )
-    for i in range(len(target['speed']['distanceByStep'])):
-        target_x = target['speed']['distanceByStep'][i]
-        if math.isclose(adjusted_x, target_x):
-            print(f'RETURN {i}\nTARGET_X={target_x}\nADJUSTED_X={adjusted_x}')
-            return i
-    print(f'OCCLUDER={occluder}')
-    pytest.fail()
-
-
 def verify_target_implausible_hide_step(is_move_across, occluder, target):
     if is_move_across:
-        step_offset = find_implausible_event_step_offset(target, occluder)
-        assert step_offset > 0
-        assert target['hides'][0]['stepBegin'] == (
-            target['shows'][0]['stepBegin'] + step_offset
+        verified = False
+        movement = target['movement'][target['movement']['active']]
+        possible_step_offset_list = (
+            target['movement']['stepList'] +
+            ([movement['stopStep']] if 'stopStep' in movement else [])
         )
+        for possible_step_offset in possible_step_offset_list:
+            if possible_step_offset == 0:
+                continue
+            if target['hides'][0]['stepBegin'] != (
+                target['shows'][0]['stepBegin'] + possible_step_offset
+            ):
+                continue
+            verified = True
+            break
+        assert verified
     else:
         assert target['hides'][0]['stepBegin'] == (
             target['shows'][0]['stepBegin'] +
@@ -647,19 +679,58 @@ def verify_target_implausible_hide_step(is_move_across, occluder, target):
 
 
 def verify_target_implausible_show_step(is_move_across, occluder, target,
-                                        original_show_action):
+                                        original_show_action, shows_index=0):
     if is_move_across:
-        step_offset = find_implausible_event_step_offset(target, occluder)
-        assert step_offset > 0
-        assert target['shows'][0]['stepBegin'] == (
-            original_show_action['stepBegin'] + step_offset
+        verified = False
+        movement = target['movement'][target['movement']['active']]
+        possible_step_offset_list = (
+            target['movement']['stepList'] +
+            ([movement['stopStep']] if 'stopStep' in movement else [])
         )
-        assert target['shows'][0]['position']['x'] == (
-            target['speed']['distanceByStep'][step_offset]
-        )
-        assert target['shows'][0]['position']['z'] == (
-            original_show_action['position']['z']
-        )
+        for possible_step_offset in possible_step_offset_list:
+            if possible_step_offset == 0:
+                continue
+            if target['shows'][shows_index]['stepBegin'] != (
+                original_show_action['stepBegin'] + possible_step_offset
+            ) and shows_index == 0:
+                continue
+            actual_x = intuitive_physics_hypercubes.object_x_to_occluder_x(
+                target['shows'][shows_index]['position']['x'],
+                movement['zDistanceByStep'][possible_step_offset]
+                if 'zDistanceByStep' in movement
+                else target['shows'][shows_index]['position']['z']
+            )
+            expected_x = intuitive_physics_hypercubes.object_x_to_occluder_x(
+                movement['xDistanceByStep'][possible_step_offset],
+                movement['zDistanceByStep'][possible_step_offset]
+                if 'zDistanceByStep' in movement
+                else original_show_action['position']['z']
+            )
+            if not (
+                actual_x >= (expected_x - 0.15) and
+                actual_x <= (expected_x + 0.15)
+            ):
+                continue
+            actual_z = target['shows'][shows_index]['position']['z']
+            expected_z = (
+                movement['zDistanceByStep'][possible_step_offset]
+                if 'zDistanceByStep' in movement
+                else original_show_action['position']['z']
+            )
+            if actual_z != expected_z:
+                print(f'BAD Z {actual_z} VS {expected_z}')
+                continue
+            verified = True
+            break
+        if not verified:
+            print(
+                f'TARGET POSITION {target["shows"][shows_index]["position"]} '
+                f'STEP LIST {possible_step_offset_list} '
+                f'MOVEMENT X POSITION AT STEP LIST INDEX 0 '
+                f'{movement["xDistanceByStep"][possible_step_offset_list[0]]} '
+                f'ACTIVE {target["movement"]["active"]} MOVEMENT {movement}'
+            )
+        assert verified
     else:
         assert target['shows'][0]['stepBegin'] == (
             original_show_action['stepBegin'] +
@@ -677,18 +748,35 @@ def verify_target_implausible_show_step(is_move_across, occluder, target,
 def verify_target_implausible_shroud_step(is_move_across, occluder_1,
                                           occluder_2, target):
     if is_move_across:
-        step_offset_1 = find_implausible_event_step_offset(target, occluder_1)
-        step_offset_2 = find_implausible_event_step_offset(target, occluder_2)
-        assert step_offset_1 > 0
-        assert step_offset_2 > 0
-        assert target['shrouds'][0]['stepBegin'] == (
-            target['shows'][0]['stepBegin'] +
-            min(step_offset_1, step_offset_2) + 1
+        verified = False
+        movement = target['movement'][target['movement']['active']]
+        possible_step_offset_list = (
+            target['movement']['stepList'] +
+            ([movement['stopStep']] if 'stopStep' in movement else [])
         )
-        assert target['shrouds'][0]['stepEnd'] == (
-            target['shows'][0]['stepBegin'] +
-            max(step_offset_1, step_offset_2) + 1
-        )
+        for possible_step_offset_1 in possible_step_offset_list:
+            if possible_step_offset_1 == 0:
+                continue
+            for possible_step_offset_2 in possible_step_offset_list:
+                if possible_step_offset_1 == possible_step_offset_2:
+                    continue
+                if possible_step_offset_2 == 0:
+                    continue
+                if target['shrouds'][0]['stepBegin'] != (
+                    target['shows'][0]['stepBegin'] +
+                    min(possible_step_offset_1, possible_step_offset_2) + 1
+                ):
+                    continue
+                if target['shrouds'][0]['stepEnd'] != (
+                    target['shows'][0]['stepBegin'] +
+                    max(possible_step_offset_1, possible_step_offset_2) + 1
+                ):
+                    continue
+                verified = True
+                break
+            if verified:
+                break
+        assert verified
     else:
         # TODO If we ever need STC fall-down scenes in a future eval.
         pass

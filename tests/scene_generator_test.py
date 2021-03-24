@@ -20,7 +20,7 @@ def create_test_object():
         'closedOffset': {'x': 13, 'z': 42},
         'enclosedAreas': [{}],
         'openAreas': [{}],
-        'speed': {},
+        'movement': {},
         'isParentOf': [],
         'untrainedCategory': True,
         'untrainedColor': True,

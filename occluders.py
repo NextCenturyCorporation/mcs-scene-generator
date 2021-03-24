@@ -4,12 +4,13 @@ import util
 import uuid
 
 
+OCCLUDER_HEIGHT = 1.5
 OCCLUDER_POSITION_Z = 1
 
 OCCLUDER_MIN_SCALE_X = 0.5
-OCCLUDER_MAX_SCALE_X = 1.0
+OCCLUDER_MAX_SCALE_X = 1.4
 OCCLUDER_SEPARATION_X = 0.5
-OCCLUDER_SCALE_X_BUFFER = util.MAX_SIZE_DIFFERENCE + 0.05
+OCCLUDER_BUFFER = 0.1
 
 # The max X position so an occluder is seen within the camera's view.
 OCCLUDER_MAX_X = 3
@@ -32,12 +33,12 @@ _OCCLUDER_INSTANCE_NORMAL = [{
         "stepBegin": 0,
         "position": {
             "x": 0,
-            "y": 0.75,
+            "y": OCCLUDER_HEIGHT / 2.0,
             "z": OCCLUDER_POSITION_Z
         },
         "scale": {
             "x": 1,
-            "y": 1.5,
+            "y": OCCLUDER_HEIGHT,
             "z": 0.1
         }
     }],
@@ -83,8 +84,8 @@ _OCCLUDER_INSTANCE_NORMAL = [{
             "z": 0
         }
     }, {
-        "stepBegin": 85,
-        "stepEnd": 86,
+        "stepBegin": 89,
+        "stepEnd": 90,
         "vector": {
             "x": 0,
             "y": 45,
@@ -154,12 +155,12 @@ _OCCLUDER_INSTANCE_SIDEWAYS = [{
         "stepBegin": 0,
         "position": {
             "x": 0,
-            "y": 0.75,
+            "y": OCCLUDER_HEIGHT / 2.0,
             "z": OCCLUDER_POSITION_Z
         },
         "scale": {
             "x": 1,
-            "y": 1.5,
+            "y": OCCLUDER_HEIGHT,
             "z": 0.1
         }
     }],
@@ -226,7 +227,7 @@ _OCCLUDER_INSTANCE_SIDEWAYS = [{
         "stepBegin": 0,
         "position": {
             "x": 0,
-            "y": 0.75,
+            "y": OCCLUDER_HEIGHT / 2.0,
             "z": OCCLUDER_POSITION_Z
         },
         "rotation": {
@@ -288,14 +289,21 @@ def create_occluder(
     x_position: float,
     x_scale: float,
     sideways_left: bool = False,
-    sideways_right: bool = False
+    sideways_right: bool = False,
+    occluder_height: float = OCCLUDER_HEIGHT,
+    last_step: int = None
 ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
     """Create an occluder as a pair of separate wall and pole objects."""
 
     if sideways_left or sideways_right:
         occluder = copy.deepcopy(_OCCLUDER_INSTANCE_SIDEWAYS)
+        occluder[0]['shows'][0]['position']['y'] = occluder_height / 2.0
+        occluder[0]['shows'][0]['scale']['y'] = occluder_height
+        occluder[1]['shows'][0]['position']['y'] = occluder_height / 2.0
     else:
         occluder = copy.deepcopy(_OCCLUDER_INSTANCE_NORMAL)
+        occluder[0]['shows'][0]['position']['y'] = occluder_height / 2.0
+        occluder[0]['shows'][0]['scale']['y'] = occluder_height
 
     WALL = 0
     POLE = 1
@@ -330,6 +338,22 @@ def create_occluder(
     elif x_position > 0:
         for rot in occluder[WALL]['rotates']:
             rot['vector']['y'] *= -1
+
+    if last_step:
+        if sideways_left or sideways_right:
+            occluder[POLE]['moves'][-1]['stepBegin'] = last_step - 5
+            occluder[POLE]['moves'][-1]['stepEnd'] = last_step - 2
+            occluder[WALL]['moves'][-1]['stepBegin'] = last_step - 5
+            occluder[WALL]['moves'][-1]['stepEnd'] = last_step - 2
+            occluder[WALL]['rotates'][-1]['stepBegin'] = last_step - 1
+            occluder[WALL]['rotates'][-1]['stepEnd'] = last_step
+        else:
+            occluder[POLE]['moves'][-1]['stepBegin'] = last_step - 5
+            occluder[POLE]['moves'][-1]['stepEnd'] = last_step
+            occluder[WALL]['moves'][-1]['stepBegin'] = last_step - 5
+            occluder[WALL]['moves'][-1]['stepEnd'] = last_step
+            occluder[WALL]['rotates'][-1]['stepBegin'] = last_step - 1
+            occluder[WALL]['rotates'][-1]['stepEnd'] = last_step
 
     return occluder
 
