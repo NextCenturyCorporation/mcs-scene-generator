@@ -212,6 +212,7 @@ def instantiate_object(
             finalize_object_materials_and_colors(definition, materials_list)
         )
 
+    definition['color'] = sorted(list(set(definition['color'])))
     instance['materialCategory'] = definition.get('materialCategory', [])
     instance['materials'] = definition['materials']
     instance['color'] = definition['color']
@@ -484,6 +485,16 @@ def _create_size_list(
     return size_list
 
 
+def are_materials_equivalent(
+    material_list_1: List[str],
+    material_list_2: List[str]
+) -> bool:
+    """Returns whether the two given material string lists are equivalent."""
+    material_set_1 = set(material_list_1)
+    material_set_2 = set(material_list_2)
+    return material_set_1 == material_set_2
+
+
 def is_similar_except_in_color(
     definition_or_instance_1: Dict[str, Any],
     definition_or_instance_2: Dict[str, Any],
@@ -500,10 +511,14 @@ def is_similar_except_in_color(
         definition_or_instance_1 != definition_or_instance_2 and
         definition_or_instance_1['type'] ==
         definition_or_instance_2['type'] and
-        'materialCategory' in definition_or_instance_1 and
-        'materialCategory' in definition_or_instance_2 and
-        definition_or_instance_1['materialCategory'] !=
-        definition_or_instance_2['materialCategory'] and
+        'materials' in definition_or_instance_1 and
+        'materials' in definition_or_instance_2 and
+        not are_materials_equivalent(
+            definition_or_instance_1['materials'],
+            definition_or_instance_2['materials']
+        ) and
+        definition_or_instance_1['color'] !=
+        definition_or_instance_2['color'] and
         all([(
             (size_1 + MAX_SIZE_DIFFERENCE) >= size_2 and
             (size_1 - MAX_SIZE_DIFFERENCE) <= size_2
@@ -527,10 +542,12 @@ def is_similar_except_in_shape(
         definition_or_instance_1 != definition_or_instance_2 and
         definition_or_instance_1['type'] !=
         definition_or_instance_2['type'] and
-        'materialCategory' in definition_or_instance_1 and
-        'materialCategory' in definition_or_instance_2 and
-        definition_or_instance_1['materialCategory'] ==
-        definition_or_instance_2['materialCategory'] and
+        'materials' in definition_or_instance_1 and
+        'materials' in definition_or_instance_2 and
+        are_materials_equivalent(
+            definition_or_instance_1['materials'],
+            definition_or_instance_2['materials']
+        ) and
         all([(
             (size_1 + MAX_SIZE_DIFFERENCE) >= size_2 and
             (size_1 - MAX_SIZE_DIFFERENCE) <= size_2
@@ -554,10 +571,12 @@ def is_similar_except_in_size(
         definition_or_instance_1 != definition_or_instance_2 and
         definition_or_instance_1['type'] ==
         definition_or_instance_2['type'] and
-        'materialCategory' in definition_or_instance_1 and
-        'materialCategory' in definition_or_instance_2 and
-        definition_or_instance_1['materialCategory'] ==
-        definition_or_instance_2['materialCategory'] and
+        'materials' in definition_or_instance_1 and
+        'materials' in definition_or_instance_2 and
+        are_materials_equivalent(
+            definition_or_instance_1['materials'],
+            definition_or_instance_2['materials']
+        ) and
         any([(
             (size_1 + MAX_SIZE_DIFFERENCE) < size_2 or
             (size_1 - MAX_SIZE_DIFFERENCE) > size_2

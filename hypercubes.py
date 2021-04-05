@@ -8,7 +8,6 @@ from typing import Any, Callable, Dict, List
 import exceptions
 import materials
 import tags
-import util
 
 
 def initialize_goal(goal: Dict[str, Any]) -> Dict[str, Any]:
@@ -74,16 +73,18 @@ def update_floor_and_walls(
                 for template in retrieve_object_list_from_data(object_data):
                     if template:
                         object_colors.extend(template['color'])
-        tries = 0
-        while (len(room_colors) > 1) or (room_colors[0] in object_colors):
-            tries += 1
-            room_choice = random.choice(material_list)
-            room_material = room_choice[0]
-            room_colors = room_choice[1]
-            if tries >= util.MAX_TRIES:
-                raise exceptions.SceneException(
-                    f'Cannot find {prefix} material without colors '
-                    f'{object_colors}')
+        choice_list = copy.deepcopy(material_list)
+        random.shuffle(choice_list)
+        successful = False
+        for choice in choice_list:
+            if room_colors[0] not in object_colors:
+                successful = True
+                break
+            room_material = choice[0]
+            room_colors = choice[1]
+        if not successful:
+            raise exceptions.SceneException(
+                f'Cannot find {prefix} material without color {object_colors}')
         if room_material != body_template[prefix + 'Material']:
             for scene in scenes:
                 scene[prefix + 'Material'] = room_material

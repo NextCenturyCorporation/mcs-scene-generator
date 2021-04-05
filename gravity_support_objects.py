@@ -2164,13 +2164,13 @@ _RECTANGULAR_PRISM_THIN = {
         "dimensions": {
             "x": 0.5,
             "y": 0.25,
-            "z": 0.25
+            "z": 0.5
         },
         "positionY": 0.125,
         "scale": {
             "x": 0.5,
             "y": 0.25,
-            "z": 0.25
+            "z": 0.5
         }
     }, {
         "mass": 3,
@@ -2178,13 +2178,13 @@ _RECTANGULAR_PRISM_THIN = {
         "dimensions": {
             "x": 0.6,
             "y": 0.25,
-            "z": 0.25
+            "z": 0.6
         },
         "positionY": 0.125,
         "scale": {
             "x": 0.6,
             "y": 0.25,
-            "z": 0.25
+            "z": 0.6
         }
     }, {
         "mass": 3.5,
@@ -2192,13 +2192,13 @@ _RECTANGULAR_PRISM_THIN = {
         "dimensions": {
             "x": 0.7,
             "y": 0.25,
-            "z": 0.25
+            "z": 0.7
         },
         "positionY": 0.125,
         "scale": {
             "x": 0.7,
             "y": 0.25,
-            "z": 0.25
+            "z": 0.7
         }
     }, {
         "mass": 4,
@@ -2206,13 +2206,13 @@ _RECTANGULAR_PRISM_THIN = {
         "dimensions": {
             "x": 0.8,
             "y": 0.25,
-            "z": 0.25
+            "z": 0.8
         },
         "positionY": 0.125,
         "scale": {
             "x": 0.8,
             "y": 0.25,
-            "z": 0.25
+            "z": 0.8
         }
     }, {
         "mass": 4.5,
@@ -2220,13 +2220,13 @@ _RECTANGULAR_PRISM_THIN = {
         "dimensions": {
             "x": 0.9,
             "y": 0.25,
-            "z": 0.25
+            "z": 0.9
         },
         "positionY": 0.125,
         "scale": {
             "x": 0.9,
             "y": 0.25,
-            "z": 0.25
+            "z": 0.9
         }
     }, {
         "mass": 5,
@@ -2234,13 +2234,13 @@ _RECTANGULAR_PRISM_THIN = {
         "dimensions": {
             "x": 1.0,
             "y": 0.25,
-            "z": 0.25
+            "z": 1.0
         },
         "positionY": 0.125,
         "scale": {
             "x": 1.0,
             "y": 0.25,
-            "z": 0.25
+            "z": 1.0
         }
     }, {
         "mass": 3,
@@ -2248,13 +2248,13 @@ _RECTANGULAR_PRISM_THIN = {
         "dimensions": {
             "x": 0.6,
             "y": 0.3,
-            "z": 0.3
+            "z": 0.6
         },
         "positionY": 0.15,
         "scale": {
             "x": 0.6,
             "y": 0.3,
-            "z": 0.3
+            "z": 0.6
         }
     }, {
         "mass": 3.5,
@@ -2262,13 +2262,13 @@ _RECTANGULAR_PRISM_THIN = {
         "dimensions": {
             "x": 0.7,
             "y": 0.3,
-            "z": 0.3
+            "z": 0.7
         },
         "positionY": 0.15,
         "scale": {
             "x": 0.7,
             "y": 0.3,
-            "z": 0.3
+            "z": 0.7
         }
     }, {
         "mass": 4,
@@ -2276,13 +2276,13 @@ _RECTANGULAR_PRISM_THIN = {
         "dimensions": {
             "x": 0.8,
             "y": 0.3,
-            "z": 0.3
+            "z": 0.8
         },
         "positionY": 0.15,
         "scale": {
             "x": 0.8,
             "y": 0.3,
-            "z": 0.3
+            "z": 0.8
         }
     }, {
         "mass": 4.5,
@@ -2290,13 +2290,13 @@ _RECTANGULAR_PRISM_THIN = {
         "dimensions": {
             "x": 0.9,
             "y": 0.3,
-            "z": 0.3
+            "z": 0.9
         },
         "positionY": 0.15,
         "scale": {
             "x": 0.9,
             "y": 0.3,
-            "z": 0.3
+            "z": 0.9
         }
     }, {
         "mass": 5,
@@ -2304,13 +2304,13 @@ _RECTANGULAR_PRISM_THIN = {
         "dimensions": {
             "x": 1.0,
             "y": 0.3,
-            "z": 0.3
+            "z": 1.0
         },
         "positionY": 0.15,
         "scale": {
             "x": 1.0,
             "y": 0.3,
-            "z": 0.3
+            "z": 1.0
         }
     }, {
         "mass": 3.5,
@@ -2318,13 +2318,13 @@ _RECTANGULAR_PRISM_THIN = {
         "dimensions": {
             "x": 0.7,
             "y": 0.35,
-            "z": 0.35
+            "z": 0.7
         },
         "positionY": 0.175,
         "scale": {
             "x": 0.7,
             "y": 0.35,
-            "z": 0.35
+            "z": 0.7
         }
     }, {
         "mass": 4,
@@ -2332,13 +2332,13 @@ _RECTANGULAR_PRISM_THIN = {
         "dimensions": {
             "x": 0.8,
             "y": 0.35,
-            "z": 0.35
+            "z": 0.8
         },
         "positionY": 0.175,
         "scale": {
             "x": 0.8,
             "y": 0.35,
-            "z": 0.35
+            "z": 0.8
         }
     }, {
         "mass": 4.5,
@@ -2346,13 +2346,13 @@ _RECTANGULAR_PRISM_THIN = {
         "dimensions": {
             "x": 0.9,
             "y": 0.35,
-            "z": 0.35
+            "z": 0.9
         },
         "positionY": 0.175,
         "scale": {
             "x": 0.9,
             "y": 0.35,
-            "z": 0.35
+            "z": 0.9
         }
     }, {
         "mass": 5,
@@ -2360,13 +2360,13 @@ _RECTANGULAR_PRISM_THIN = {
         "dimensions": {
             "x": 1.0,
             "y": 0.35,
-            "z": 0.35
+            "z": 1.0
         },
         "positionY": 0.175,
         "scale": {
             "x": 1.0,
             "y": 0.35,
-            "z": 0.35
+            "z": 1.0
         }
     }, {
         "mass": 4,
@@ -2374,13 +2374,13 @@ _RECTANGULAR_PRISM_THIN = {
         "dimensions": {
             "x": 0.8,
             "y": 0.4,
-            "z": 0.4
+            "z": 0.8
         },
         "positionY": 0.2,
         "scale": {
             "x": 0.8,
             "y": 0.4,
-            "z": 0.4
+            "z": 0.8
         }
     }, {
         "mass": 4.5,
@@ -2388,13 +2388,13 @@ _RECTANGULAR_PRISM_THIN = {
         "dimensions": {
             "x": 0.9,
             "y": 0.4,
-            "z": 0.4
+            "z": 0.9
         },
         "positionY": 0.2,
         "scale": {
             "x": 0.9,
             "y": 0.4,
-            "z": 0.4
+            "z": 0.9
         }
     }, {
         "mass": 5,
@@ -2402,13 +2402,13 @@ _RECTANGULAR_PRISM_THIN = {
         "dimensions": {
             "x": 1.0,
             "y": 0.4,
-            "z": 0.4
+            "z": 1.0
         },
         "positionY": 0.2,
         "scale": {
             "x": 1.0,
             "y": 0.4,
-            "z": 0.4
+            "z": 1.0
         }
     }, {
         "mass": 4.5,
@@ -2416,13 +2416,13 @@ _RECTANGULAR_PRISM_THIN = {
         "dimensions": {
             "x": 0.9,
             "y": 0.45,
-            "z": 0.45
+            "z": 0.9
         },
         "positionY": 0.225,
         "scale": {
             "x": 0.9,
             "y": 0.45,
-            "z": 0.45
+            "z": 0.9
         }
     }, {
         "mass": 5,
@@ -2430,13 +2430,13 @@ _RECTANGULAR_PRISM_THIN = {
         "dimensions": {
             "x": 1.0,
             "y": 0.45,
-            "z": 0.45
+            "z": 1.0
         },
         "positionY": 0.225,
         "scale": {
             "x": 1.0,
             "y": 0.45,
-            "z": 0.45
+            "z": 1.0
         }
     }, {
         "mass": 5,
@@ -2444,13 +2444,13 @@ _RECTANGULAR_PRISM_THIN = {
         "dimensions": {
             "x": 1.0,
             "y": 0.5,
-            "z": 0.5
+            "z": 1.0
         },
         "positionY": 0.25,
         "scale": {
             "x": 1.0,
             "y": 0.5,
-            "z": 0.5
+            "z": 1.0
         }
     }],
     "chooseMaterial": [{
@@ -2479,13 +2479,13 @@ _RECTANGULAR_PRISM_WIDE = {
         "dimensions": {
             "x": 0.5,
             "y": 0.25,
-            "z": 0.25
+            "z": 0.5
         },
         "positionY": 0.125,
         "scale": {
             "x": 0.5,
             "y": 0.25,
-            "z": 0.25
+            "z": 0.5
         }
     }, {
         "mass": 3,
@@ -2493,13 +2493,13 @@ _RECTANGULAR_PRISM_WIDE = {
         "dimensions": {
             "x": 0.5,
             "y": 0.3,
-            "z": 0.3
+            "z": 0.5
         },
         "positionY": 0.15,
         "scale": {
             "x": 0.5,
             "y": 0.3,
-            "z": 0.3
+            "z": 0.5
         }
     }, {
         "mass": 3.5,
@@ -2507,13 +2507,13 @@ _RECTANGULAR_PRISM_WIDE = {
         "dimensions": {
             "x": 0.5,
             "y": 0.35,
-            "z": 0.35
+            "z": 0.5
         },
         "positionY": 0.175,
         "scale": {
             "x": 0.5,
             "y": 0.35,
-            "z": 0.35
+            "z": 0.5
         }
     }, {
         "mass": 4,
@@ -2521,13 +2521,13 @@ _RECTANGULAR_PRISM_WIDE = {
         "dimensions": {
             "x": 0.5,
             "y": 0.4,
-            "z": 0.4
+            "z": 0.5
         },
         "positionY": 0.2,
         "scale": {
             "x": 0.5,
             "y": 0.4,
-            "z": 0.4
+            "z": 0.5
         }
     }, {
         "mass": 4.5,
@@ -2535,13 +2535,13 @@ _RECTANGULAR_PRISM_WIDE = {
         "dimensions": {
             "x": 0.5,
             "y": 0.45,
-            "z": 0.45
+            "z": 0.5
         },
         "positionY": 0.225,
         "scale": {
             "x": 0.5,
             "y": 0.45,
-            "z": 0.45
+            "z": 0.5
         }
     }, {
         "mass": 3,
@@ -2549,13 +2549,13 @@ _RECTANGULAR_PRISM_WIDE = {
         "dimensions": {
             "x": 0.6,
             "y": 0.3,
-            "z": 0.3
+            "z": 0.6
         },
         "positionY": 0.15,
         "scale": {
             "x": 0.6,
             "y": 0.3,
-            "z": 0.3
+            "z": 0.6
         }
     }, {
         "mass": 3.5,
@@ -2563,13 +2563,13 @@ _RECTANGULAR_PRISM_WIDE = {
         "dimensions": {
             "x": 0.6,
             "y": 0.35,
-            "z": 0.35
+            "z": 0.6
         },
         "positionY": 0.175,
         "scale": {
             "x": 0.6,
             "y": 0.35,
-            "z": 0.35
+            "z": 0.6
         }
     }, {
         "mass": 4,
@@ -2577,13 +2577,13 @@ _RECTANGULAR_PRISM_WIDE = {
         "dimensions": {
             "x": 0.6,
             "y": 0.4,
-            "z": 0.4
+            "z": 0.6
         },
         "positionY": 0.2,
         "scale": {
             "x": 0.6,
             "y": 0.4,
-            "z": 0.4
+            "z": 0.6
         }
     }, {
         "mass": 4.5,
@@ -2591,13 +2591,13 @@ _RECTANGULAR_PRISM_WIDE = {
         "dimensions": {
             "x": 0.6,
             "y": 0.45,
-            "z": 0.45
+            "z": 0.6
         },
         "positionY": 0.225,
         "scale": {
             "x": 0.6,
             "y": 0.45,
-            "z": 0.45
+            "z": 0.6
         }
     }, {
         "mass": 5,
@@ -2605,13 +2605,13 @@ _RECTANGULAR_PRISM_WIDE = {
         "dimensions": {
             "x": 0.6,
             "y": 0.5,
-            "z": 0.5
+            "z": 0.6
         },
         "positionY": 0.25,
         "scale": {
             "x": 0.6,
             "y": 0.5,
-            "z": 0.5
+            "z": 0.6
         }
     }, {
         "mass": 5.5,
@@ -2619,13 +2619,13 @@ _RECTANGULAR_PRISM_WIDE = {
         "dimensions": {
             "x": 0.6,
             "y": 0.55,
-            "z": 0.55
+            "z": 0.6
         },
         "positionY": 0.275,
         "scale": {
             "x": 0.6,
             "y": 0.55,
-            "z": 0.55
+            "z": 0.6
         }
     }, {
         "mass": 3.5,
@@ -2633,13 +2633,13 @@ _RECTANGULAR_PRISM_WIDE = {
         "dimensions": {
             "x": 0.7,
             "y": 0.35,
-            "z": 0.35
+            "z": 0.7
         },
         "positionY": 0.175,
         "scale": {
             "x": 0.7,
             "y": 0.35,
-            "z": 0.35
+            "z": 0.7
         }
     }, {
         "mass": 4,
@@ -2647,13 +2647,13 @@ _RECTANGULAR_PRISM_WIDE = {
         "dimensions": {
             "x": 0.7,
             "y": 0.4,
-            "z": 0.4
+            "z": 0.7
         },
         "positionY": 0.2,
         "scale": {
             "x": 0.7,
             "y": 0.4,
-            "z": 0.4
+            "z": 0.7
         }
     }, {
         "mass": 4.5,
@@ -2661,13 +2661,13 @@ _RECTANGULAR_PRISM_WIDE = {
         "dimensions": {
             "x": 0.7,
             "y": 0.45,
-            "z": 0.45
+            "z": 0.7
         },
         "positionY": 0.225,
         "scale": {
             "x": 0.7,
             "y": 0.45,
-            "z": 0.45
+            "z": 0.7
         }
     }, {
         "mass": 5,
@@ -2675,13 +2675,13 @@ _RECTANGULAR_PRISM_WIDE = {
         "dimensions": {
             "x": 0.7,
             "y": 0.5,
-            "z": 0.5
+            "z": 0.7
         },
         "positionY": 0.25,
         "scale": {
             "x": 0.7,
             "y": 0.5,
-            "z": 0.5
+            "z": 0.7
         }
     }, {
         "mass": 5.5,
@@ -2689,13 +2689,13 @@ _RECTANGULAR_PRISM_WIDE = {
         "dimensions": {
             "x": 0.7,
             "y": 0.55,
-            "z": 0.55
+            "z": 0.7
         },
         "positionY": 0.275,
         "scale": {
             "x": 0.7,
             "y": 0.55,
-            "z": 0.55
+            "z": 0.7
         }
     }, {
         "mass": 6,
@@ -2703,13 +2703,13 @@ _RECTANGULAR_PRISM_WIDE = {
         "dimensions": {
             "x": 0.7,
             "y": 0.6,
-            "z": 0.6
+            "z": 0.7
         },
         "positionY": 0.3,
         "scale": {
             "x": 0.7,
             "y": 0.6,
-            "z": 0.6
+            "z": 0.7
         }
     }, {
         "mass": 6.5,
@@ -2717,13 +2717,13 @@ _RECTANGULAR_PRISM_WIDE = {
         "dimensions": {
             "x": 0.7,
             "y": 0.65,
-            "z": 0.65
+            "z": 0.7
         },
         "positionY": 0.325,
         "scale": {
             "x": 0.7,
             "y": 0.65,
-            "z": 0.65
+            "z": 0.7
         }
     }, {
         "mass": 4,
@@ -2731,13 +2731,13 @@ _RECTANGULAR_PRISM_WIDE = {
         "dimensions": {
             "x": 0.8,
             "y": 0.4,
-            "z": 0.4
+            "z": 0.8
         },
         "positionY": 0.2,
         "scale": {
             "x": 0.8,
             "y": 0.4,
-            "z": 0.4
+            "z": 0.8
         }
     }, {
         "mass": 4.5,
@@ -2745,13 +2745,13 @@ _RECTANGULAR_PRISM_WIDE = {
         "dimensions": {
             "x": 0.8,
             "y": 0.45,
-            "z": 0.45
+            "z": 0.8
         },
         "positionY": 0.225,
         "scale": {
             "x": 0.8,
             "y": 0.45,
-            "z": 0.45
+            "z": 0.8
         }
     }, {
         "mass": 5,
@@ -2759,13 +2759,13 @@ _RECTANGULAR_PRISM_WIDE = {
         "dimensions": {
             "x": 0.8,
             "y": 0.5,
-            "z": 0.5
+            "z": 0.8
         },
         "positionY": 0.25,
         "scale": {
             "x": 0.8,
             "y": 0.5,
-            "z": 0.5
+            "z": 0.8
         }
     }, {
         "mass": 5.5,
@@ -2773,13 +2773,13 @@ _RECTANGULAR_PRISM_WIDE = {
         "dimensions": {
             "x": 0.8,
             "y": 0.55,
-            "z": 0.55
+            "z": 0.8
         },
         "positionY": 0.275,
         "scale": {
             "x": 0.8,
             "y": 0.55,
-            "z": 0.55
+            "z": 0.8
         }
     }, {
         "mass": 6,
@@ -2787,13 +2787,13 @@ _RECTANGULAR_PRISM_WIDE = {
         "dimensions": {
             "x": 0.8,
             "y": 0.6,
-            "z": 0.6
+            "z": 0.8
         },
         "positionY": 0.3,
         "scale": {
             "x": 0.8,
             "y": 0.6,
-            "z": 0.6
+            "z": 0.8
         }
     }, {
         "mass": 6.5,
@@ -2801,13 +2801,13 @@ _RECTANGULAR_PRISM_WIDE = {
         "dimensions": {
             "x": 0.8,
             "y": 0.65,
-            "z": 0.65
+            "z": 0.8
         },
         "positionY": 0.325,
         "scale": {
             "x": 0.8,
             "y": 0.65,
-            "z": 0.65
+            "z": 0.8
         }
     }, {
         "mass": 7,
@@ -2815,13 +2815,13 @@ _RECTANGULAR_PRISM_WIDE = {
         "dimensions": {
             "x": 0.8,
             "y": 0.7,
-            "z": 0.7
+            "z": 0.8
         },
         "positionY": 0.35,
         "scale": {
             "x": 0.8,
             "y": 0.7,
-            "z": 0.7
+            "z": 0.8
         }
     }, {
         "mass": 7.5,
@@ -2829,13 +2829,13 @@ _RECTANGULAR_PRISM_WIDE = {
         "dimensions": {
             "x": 0.8,
             "y": 0.75,
-            "z": 0.75
+            "z": 0.8
         },
         "positionY": 0.375,
         "scale": {
             "x": 0.8,
             "y": 0.75,
-            "z": 0.75
+            "z": 0.8
         }
     }, {
         "mass": 4.5,
@@ -2843,13 +2843,13 @@ _RECTANGULAR_PRISM_WIDE = {
         "dimensions": {
             "x": 0.9,
             "y": 0.45,
-            "z": 0.45
+            "z": 0.9
         },
         "positionY": 0.225,
         "scale": {
             "x": 0.9,
             "y": 0.45,
-            "z": 0.45
+            "z": 0.9
         }
     }, {
         "mass": 5,
@@ -2857,13 +2857,13 @@ _RECTANGULAR_PRISM_WIDE = {
         "dimensions": {
             "x": 0.9,
             "y": 0.5,
-            "z": 0.5
+            "z": 0.9
         },
         "positionY": 0.25,
         "scale": {
             "x": 0.9,
             "y": 0.5,
-            "z": 0.5
+            "z": 0.9
         }
     }, {
         "mass": 5.5,
@@ -2871,13 +2871,13 @@ _RECTANGULAR_PRISM_WIDE = {
         "dimensions": {
             "x": 0.9,
             "y": 0.55,
-            "z": 0.55
+            "z": 0.9
         },
         "positionY": 0.275,
         "scale": {
             "x": 0.9,
             "y": 0.55,
-            "z": 0.55
+            "z": 0.9
         }
     }, {
         "mass": 6,
@@ -2885,13 +2885,13 @@ _RECTANGULAR_PRISM_WIDE = {
         "dimensions": {
             "x": 0.9,
             "y": 0.6,
-            "z": 0.6
+            "z": 0.9
         },
         "positionY": 0.3,
         "scale": {
             "x": 0.9,
             "y": 0.6,
-            "z": 0.6
+            "z": 0.9
         }
     }, {
         "mass": 6.5,
@@ -2899,13 +2899,13 @@ _RECTANGULAR_PRISM_WIDE = {
         "dimensions": {
             "x": 0.9,
             "y": 0.65,
-            "z": 0.65
+            "z": 0.9
         },
         "positionY": 0.325,
         "scale": {
             "x": 0.9,
             "y": 0.65,
-            "z": 0.65
+            "z": 0.9
         }
     }, {
         "mass": 7,
@@ -2913,13 +2913,13 @@ _RECTANGULAR_PRISM_WIDE = {
         "dimensions": {
             "x": 0.9,
             "y": 0.7,
-            "z": 0.7
+            "z": 0.9
         },
         "positionY": 0.35,
         "scale": {
             "x": 0.9,
             "y": 0.7,
-            "z": 0.7
+            "z": 0.9
         }
     }, {
         "mass": 7.5,
@@ -2927,13 +2927,13 @@ _RECTANGULAR_PRISM_WIDE = {
         "dimensions": {
             "x": 0.9,
             "y": 0.75,
-            "z": 0.75
+            "z": 0.9
         },
         "positionY": 0.375,
         "scale": {
             "x": 0.9,
             "y": 0.75,
-            "z": 0.75
+            "z": 0.9
         }
     }, {
         "mass": 8,
@@ -2941,13 +2941,13 @@ _RECTANGULAR_PRISM_WIDE = {
         "dimensions": {
             "x": 0.9,
             "y": 0.8,
-            "z": 0.8
+            "z": 0.9
         },
         "positionY": 0.4,
         "scale": {
             "x": 0.9,
             "y": 0.8,
-            "z": 0.8
+            "z": 0.9
         }
     }, {
         "mass": 8.5,
@@ -2955,13 +2955,13 @@ _RECTANGULAR_PRISM_WIDE = {
         "dimensions": {
             "x": 0.9,
             "y": 0.85,
-            "z": 0.85
+            "z": 0.9
         },
         "positionY": 0.425,
         "scale": {
             "x": 0.9,
             "y": 0.85,
-            "z": 0.85
+            "z": 0.9
         }
     }, {
         "mass": 5,
@@ -2969,13 +2969,13 @@ _RECTANGULAR_PRISM_WIDE = {
         "dimensions": {
             "x": 1.0,
             "y": 0.5,
-            "z": 0.5
+            "z": 1.0
         },
         "positionY": 0.25,
         "scale": {
             "x": 1.0,
             "y": 0.5,
-            "z": 0.5
+            "z": 1.0
         }
     }, {
         "mass": 5.5,
@@ -2983,13 +2983,13 @@ _RECTANGULAR_PRISM_WIDE = {
         "dimensions": {
             "x": 1.0,
             "y": 0.55,
-            "z": 0.55
+            "z": 1.0
         },
         "positionY": 0.275,
         "scale": {
             "x": 1.0,
             "y": 0.55,
-            "z": 0.55
+            "z": 1.0
         }
     }, {
         "mass": 6,
@@ -2997,13 +2997,13 @@ _RECTANGULAR_PRISM_WIDE = {
         "dimensions": {
             "x": 1.0,
             "y": 0.6,
-            "z": 0.6
+            "z": 1.0
         },
         "positionY": 0.3,
         "scale": {
             "x": 1.0,
             "y": 0.6,
-            "z": 0.6
+            "z": 1.0
         }
     }, {
         "mass": 6.5,
@@ -3011,13 +3011,13 @@ _RECTANGULAR_PRISM_WIDE = {
         "dimensions": {
             "x": 1.0,
             "y": 0.65,
-            "z": 0.65
+            "z": 1.0
         },
         "positionY": 0.325,
         "scale": {
             "x": 1.0,
             "y": 0.65,
-            "z": 0.65
+            "z": 1.0
         }
     }, {
         "mass": 7,
@@ -3025,13 +3025,13 @@ _RECTANGULAR_PRISM_WIDE = {
         "dimensions": {
             "x": 1.0,
             "y": 0.7,
-            "z": 0.7
+            "z": 1.0
         },
         "positionY": 0.35,
         "scale": {
             "x": 1.0,
             "y": 0.7,
-            "z": 0.7
+            "z": 1.0
         }
     }, {
         "mass": 7.5,
@@ -3039,13 +3039,13 @@ _RECTANGULAR_PRISM_WIDE = {
         "dimensions": {
             "x": 1.0,
             "y": 0.75,
-            "z": 0.75
+            "z": 1.0
         },
         "positionY": 0.375,
         "scale": {
             "x": 1.0,
             "y": 0.75,
-            "z": 0.75
+            "z": 1.0
         }
     }, {
         "mass": 8,
@@ -3053,13 +3053,13 @@ _RECTANGULAR_PRISM_WIDE = {
         "dimensions": {
             "x": 1.0,
             "y": 0.8,
-            "z": 0.8
+            "z": 1.0
         },
         "positionY": 0.4,
         "scale": {
             "x": 1.0,
             "y": 0.8,
-            "z": 0.8
+            "z": 1.0
         }
     }, {
         "mass": 8.5,
@@ -3067,13 +3067,13 @@ _RECTANGULAR_PRISM_WIDE = {
         "dimensions": {
             "x": 1.0,
             "y": 0.85,
-            "z": 0.85
+            "z": 1.0
         },
         "positionY": 0.425,
         "scale": {
             "x": 1.0,
             "y": 0.85,
-            "z": 0.85
+            "z": 1.0
         }
     }, {
         "mass": 9,
@@ -3081,13 +3081,13 @@ _RECTANGULAR_PRISM_WIDE = {
         "dimensions": {
             "x": 1.0,
             "y": 0.9,
-            "z": 0.9
+            "z": 1.0
         },
         "positionY": 0.45,
         "scale": {
             "x": 1.0,
             "y": 0.9,
-            "z": 0.9
+            "z": 1.0
         }
     }, {
         "mass": 9.5,
@@ -3095,13 +3095,13 @@ _RECTANGULAR_PRISM_WIDE = {
         "dimensions": {
             "x": 1.0,
             "y": 0.95,
-            "z": 0.95
+            "z": 1.0
         },
         "positionY": 0.475,
         "scale": {
             "x": 1.0,
             "y": 0.95,
-            "z": 0.95
+            "z": 1.0
         }
     }],
     "chooseMaterial": [{

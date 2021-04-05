@@ -527,7 +527,7 @@ def verify_object_list(scene, index, tag, object_list):
                   f'NOT SAME AS EXPECTED INSTANCE FROM OBJECT DATA')
             return False
 
-        assert verify_target_trophy(tag, expected)
+        assert verify_target_soccer_ball(tag, expected)
 
         # Verify object instance info is in goal info.
         for info in expected['info']:
@@ -582,7 +582,7 @@ def verify_object_data_list(scene, index, tag, object_data_list, ignore_list):
                   f'NOT SAME AS EXPECTED INSTANCE FROM OBJECT DATA')
             return False
 
-        assert verify_target_trophy(tag, expected)
+        assert verify_target_soccer_ball(tag, expected)
 
         # Verify object instance info is in goal info.
         for info in expected['info']:
@@ -852,6 +852,24 @@ def verify_target_obstruct_location(target, obstructor, performer_start):
     return True
 
 
+def verify_target_soccer_ball(tag, instance):
+    if tag == 'target':
+        # Eval 4+: Target is always soccer ball with scale 1.
+        if (
+            instance['type'] != 'soccer_ball' or
+            instance['shows'][0]['scale'] != {'x': 1, 'y': 1, 'z': 1}
+        ):
+            print(f'[ERROR] EXPECTED SOCCER BALL WITH SCALE 1:\n{instance}')
+            return False
+    else:
+        if instance['type'] == 'soccer_ball':
+            print(
+                f'[ERROR] EXPECTED {tag.upper()} NOT SOCCER BALL:\n{instance}'
+            )
+            return False
+    return True
+
+
 def verify_target_trophy(tag, instance):
     if tag == 'target':
         # Eval 3: Target is always trophy with scale 1.
@@ -859,11 +877,13 @@ def verify_target_trophy(tag, instance):
             instance['type'] != 'trophy' or
             instance['shows'][0]['scale'] != {'x': 1, 'y': 1, 'z': 1}
         ):
-            print(f'[ERROR] TARGET SHOULD BE TROPHY WITH SCALE 1:\n{instance}')
+            print(f'[ERROR] EXPECTED SOCCER BALL WITH SCALE 1:\n{instance}')
             return False
     else:
         if instance['type'] == 'trophy':
-            print(f'[ERROR] {tag.upper()} SHOULD NOT BE TROPHY:\n{instance}')
+            print(
+                f'[ERROR] EXPECTED {tag.upper()} NOT SOCCER BALL:\n{instance}'
+            )
             return False
     return True
 

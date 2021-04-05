@@ -1,4 +1,6 @@
-from hypercubes import Hypercube, update_scene_objects
+import copy
+
+from hypercubes import Hypercube, update_scene_objects, update_floor_and_walls
 
 
 class MockHypercube(Hypercube):
@@ -1161,3 +1163,128 @@ def test_Hypercube_tags_target_obstacle_enclosed_untrained_everything():
     assert scene['goal']['sceneInfo']['count']['all'] == 2
     assert scene['goal']['sceneInfo']['count']['obstacle'] == 1
     assert scene['goal']['sceneInfo']['count']['target'] == 1
+
+
+def retrieve_object_list_from_data(object_data):
+    return [object_data]
+
+
+def test_update_floor_and_walls():
+    template = {
+        'floorColors': [],
+        'floorMaterial': [],
+        'wallColors': [],
+        'wallMaterial': []
+    }
+
+    for color_1 in [
+        'black', 'blue', 'brown', 'green', 'grey', 'orange', 'purple',
+        'red', 'white', 'yellow'
+    ]:
+        print(f'COLOR_1 {color_1}')
+
+        # Test with no objects
+        body_template = copy.deepcopy(template)
+        body_template['floorColors'] = [color_1]
+        body_template['floorMaterial'] = [color_1]
+        body_template['wallColors'] = [color_1]
+        body_template['wallMaterial'] = [color_1]
+        role_to_object_data_list = {}
+        scenes = [copy.deepcopy(body_template), copy.deepcopy(body_template)]
+        update_floor_and_walls(
+            body_template,
+            role_to_object_data_list,
+            retrieve_object_list_from_data,
+            scenes
+        )
+        for scene in scenes:
+            assert scene['floorColors'] == [color_1]
+            assert scene['floorMaterial'] == [color_1]
+            assert scene['wallColors'] == [color_1]
+            assert scene['wallMaterial'] == [color_1]
+
+        # Test with one object
+        body_template = copy.deepcopy(template)
+        body_template['floorColors'] = [color_1]
+        body_template['floorMaterial'] = [color_1]
+        body_template['wallColors'] = [color_1]
+        body_template['wallMaterial'] = [color_1]
+        role_to_object_data_list = {
+            'target': [{'color': [color_1]}]
+        }
+        scenes = [copy.deepcopy(body_template), copy.deepcopy(body_template)]
+        update_floor_and_walls(
+            body_template,
+            role_to_object_data_list,
+            retrieve_object_list_from_data,
+            scenes
+        )
+        for scene in scenes:
+            assert scene['floorColors'] != [color_1]
+            assert scene['floorMaterial'] != [color_1]
+            assert scene['wallColors'] != [color_1]
+            assert scene['wallMaterial'] != [color_1]
+
+        for color_2 in [
+            'black', 'blue', 'brown', 'green', 'grey', 'orange', 'purple',
+            'red', 'white', 'yellow'
+        ]:
+            if color_1 == color_2:
+                continue
+
+            print(f'COLOR_2 {color_2}')
+
+            # Test with one objects
+            body_template = copy.deepcopy(template)
+            body_template['floorColors'] = [color_1]
+            body_template['floorMaterial'] = [color_1]
+            body_template['wallColors'] = [color_2]
+            body_template['wallMaterial'] = [color_2]
+            role_to_object_data_list = {
+                'target': [{'color': [color_1]}]
+            }
+            scenes = [
+                copy.deepcopy(body_template),
+                copy.deepcopy(body_template)
+            ]
+            update_floor_and_walls(
+                body_template,
+                role_to_object_data_list,
+                retrieve_object_list_from_data,
+                scenes
+            )
+            for scene in scenes:
+                assert scene['floorColors'] != [color_1]
+                assert scene['floorMaterial'] != [color_1]
+                assert scene['wallColors'] == [color_2]
+                assert scene['wallMaterial'] == [color_2]
+
+            # Test with multiple objects
+            body_template = copy.deepcopy(template)
+            body_template['floorColors'] = [color_1]
+            body_template['floorMaterial'] = [color_1]
+            body_template['wallColors'] = [color_2]
+            body_template['wallMaterial'] = [color_2]
+            role_to_object_data_list = {
+                'target': [{'color': [color_1]}],
+                'non_target': [{'color': [color_2]}]
+            }
+            scenes = [
+                copy.deepcopy(body_template),
+                copy.deepcopy(body_template)
+            ]
+            update_floor_and_walls(
+                body_template,
+                role_to_object_data_list,
+                retrieve_object_list_from_data,
+                scenes
+            )
+            for scene in scenes:
+                assert scene['floorColors'] != [color_1]
+                assert scene['floorColors'] != [color_2]
+                assert scene['floorMaterial'] != [color_1]
+                assert scene['floorMaterial'] != [color_2]
+                assert scene['wallColors'] != [color_2]
+                assert scene['wallColors'] != [color_1]
+                assert scene['wallMaterial'] != [color_2]
+                assert scene['wallMaterial'] != [color_1]

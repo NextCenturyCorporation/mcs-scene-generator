@@ -56,7 +56,7 @@ You can generate scenes containing specific objects by passing the [object type]
 - `--obstacle <type>` (optional): Force the obstacle object to be a specific type (shape). Used in interactive obstacle scenes.
 - `--occluder <type>` (optional): Force the primary occluder object (that occludes the target) to be a specific type (shape). Used in interactive occluder scenes.
 - `--symmetric <type>` (optional): Force the symmetric target object to be a specific type (shape). Used in gravity support scenes.
-- `--target <type>` (optional): Force the target object to be a specific type (shape). Used in intuitive physics (but not gravity support) and agent scenes. Please note that the target object in interactive scenes is currently always a trophy.
+- `--target <type>` (optional): Force the target object to be a specific type (shape). Used in intuitive physics (but not gravity support) and agent scenes. Please note that the target object in interactive scenes is currently always a soccer ball.
 
 ### Intuitive Physics Scenes
 
@@ -100,7 +100,7 @@ The Eval 3 Object Permanence and Shape Constancy scenes only use the following t
 - `tube_wide`
 - `turtle_on_wheels`
 
-The Eval 3 Spatio-Temporal Continuity scenes only use the following target and non-target object types:
+The Eval 3 Spatio-Temporal Continuity scenes, and all the Eval 4 scenes, only use the following target and non-target object types:
 
 - `car_1`
 - `cylinder`
@@ -120,6 +120,7 @@ The Eval 3 Spatio-Temporal Continuity scenes only use the following target and n
 Training intuitive physics scenes are not implausible and do not have any "untrained" objects.
 
 ```
+python generate_public_scenes.py -p <prefix> -t CollisionTraining
 python generate_public_scenes.py -p <prefix> -t GravitySupportTraining
 python generate_public_scenes.py -p <prefix> -t ObjectPermanenceTraining3
 python generate_public_scenes.py -p <prefix> -t ObjectPermanenceTraining4
@@ -128,6 +129,7 @@ python generate_public_scenes.py -p <prefix> -t SpatioTemporalContinuityTraining
 python generate_public_scenes.py -p <prefix> -t SpatioTemporalContinuityTraining4
 ```
 
+- Each Collisions training hypercube contains 3 scenes.
 - Each Gravity Support training hypercube contains 8 scenes.
 - Each Eval 3 or 4 Object Permanence training hypercube contains 2 scenes.
 - Each Shape Constancy training hypercube contains 2 scenes.
@@ -162,7 +164,7 @@ To generate an interactive scene that's just a random collection of objects in a
 python generate_public_scenes.py -p <prefix> -t Retrieval
 ```
 
-- Each retrieval scene contains the trophy as the target object.
+- Each retrieval scene contains the soccer ball as the target object.
 
 #### Training Interactive Datasets
 

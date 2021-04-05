@@ -304,3 +304,71 @@ INTUITIVE_PHYSICS_WALL_MATERIALS = [WALL_MATERIALS + [
     ("UnityAssetStore/Kindergarten_Interior/Models/Materials/color wood 4",
      ["yellow"]),
 ]]
+
+AZURE = ("Custom/Materials/Azure", ["azure", "blue"])
+BLACK = ("Custom/Materials/Black", ["black"])
+BLUE = ("Custom/Materials/Blue", ["blue"])
+CHARTREUSE = ("Custom/Materials/Chartreuse", ["chartreuse", "green"])
+CYAN = ("Custom/Materials/Cyan", ["cyan", "blue", "green"])
+GREEN = ("Custom/Materials/Green", ["green"])
+LIME = ("Custom/Materials/Lime", ["lime", "green"])
+MAGENTA = ("Custom/Materials/Magenta", ["magenta", "blue", "red"])
+MAROON = ("Custom/Materials/Maroon", ["maroon", "red"])
+NAVY = ("Custom/Materials/Navy", ["navy", "blue"])
+OLIVE = ("Custom/Materials/Olive", ["olive", "green", "red"])
+ORANGE = ("Custom/Materials/Orange", ["orange"])
+RED = ("Custom/Materials/Red", ["red"])
+ROSE = ("Custom/Materials/Rose", ["rose", "red"])
+PURPLE = ("Custom/Materials/Purple", ["purple"])
+SPRINGGREEN = ("Custom/Materials/SpringGreen", ["springgreen", "green"])
+TEAL = ("Custom/Materials/Teal", ["teal", "blue", "green"])
+VIOLET = ("Custom/Materials/Violet", ["violet", "purple"])
+WHITE = ("Custom/Materials/White", ["white"])
+YELLOW = ("Custom/Materials/Yellow", ["yellow"])
+
+# Only colors/materials that are exact opposites of one another.
+OPPOSITE_MATERIALS = [
+    AZURE,
+    BLACK,
+    BLUE,
+    CHARTREUSE,
+    CYAN,
+    GREEN,
+    LIME,
+    MAGENTA,
+    MAROON,
+    NAVY,
+    OLIVE,
+    ORANGE,
+    RED,
+    ROSE,
+    PURPLE,
+    SPRINGGREEN,
+    TEAL,
+    VIOLET,
+    WHITE,
+    YELLOW
+]
+
+OPPOSITE_SETS = {
+    "Custom/Materials/Azure": ORANGE,
+    "Custom/Materials/Black": WHITE,
+    "Custom/Materials/Blue": YELLOW,
+    "Custom/Materials/Chartreuse": VIOLET,
+    "Custom/Materials/Cyan": RED,
+    "Custom/Materials/Green": PURPLE,
+    "Custom/Materials/Lime": MAGENTA,
+    "Custom/Materials/Magenta": LIME,
+    "Custom/Materials/Maroon": TEAL,
+    "Custom/Materials/Navy": OLIVE,
+    "Custom/Materials/Olive": NAVY,
+    "Custom/Materials/Orange": AZURE,
+    "Custom/Materials/Purple": GREEN,
+    "Custom/Materials/Red": CYAN,
+    "Custom/Materials/Rose": SPRINGGREEN,
+    "Custom/Materials/SpringGreen": ROSE,
+    "Custom/Materials/Teal": MAROON,
+    "Custom/Materials/Violet": CHARTREUSE,
+    "Custom/Materials/White": BLACK,
+    "Custom/Materials/Yellow": BLUE
+}

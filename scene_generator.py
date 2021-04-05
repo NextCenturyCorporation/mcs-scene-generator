@@ -54,7 +54,11 @@ class SceneGenerator():
     def strip_debug_misleading_data(self, body: Dict[str, Any]) -> None:
         """Remove misleading internal debug data not needed in debug files."""
         for obj in body['objects']:
-            obj.pop('movement', None)
+            movement = obj.pop('movement', None)
+            obj['movement'] = {
+                'positionList': movement['positionList'],
+                'stepList': movement['stepList']
+            } if movement else None
 
     def strip_debug_data(self, body: Dict[str, Any]) -> None:
         """Remove internal debug data that should only be in debug files."""

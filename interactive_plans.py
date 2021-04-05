@@ -118,7 +118,7 @@ def create_container_hypercube_plan_list() -> List[InteractivePlan]:
                 slice_tags,
                 target_plan=ObjectPlan(
                     ObjectLocationPlan.INSIDE_0,
-                    definition=objects.get_trophy()
+                    definition=objects.get_soccer_ball()
                 ),
                 large_container_plan_list=[
                     ObjectPlan(ObjectLocationPlan.RANDOM),
@@ -216,7 +216,7 @@ def create_obstacle_hypercube_plan_list() -> List[InteractivePlan]:
                 slice_tags,
                 target_plan=ObjectPlan(
                     ObjectLocationPlan.BACK,
-                    definition=objects.get_trophy()
+                    definition=objects.get_soccer_ball()
                 ),
                 obstacle_plan_list=[ObjectPlan(ObjectLocationPlan.BETWEEN)]
             )
@@ -279,7 +279,7 @@ def create_occluder_hypercube_plan_list() -> List[InteractivePlan]:
                 slice_tags,
                 target_plan=ObjectPlan(
                     ObjectLocationPlan.BACK,
-                    definition=objects.get_trophy()
+                    definition=objects.get_soccer_ball()
                 ),
                 occluder_plan_list=[
                     ObjectPlan(ObjectLocationPlan.BETWEEN),

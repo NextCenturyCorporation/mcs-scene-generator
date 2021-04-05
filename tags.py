@@ -88,6 +88,7 @@ SCENE = SimpleNamespace(
     ACTION_FULL='action full',
 
     INTUITIVE_PHYSICS='intuitive physics',
+    COLLISIONS='collisions',
     GRAVITY_SUPPORT='gravity support',
     OBJECT_PERMANENCE='object permanence',
     SHAPE_CONSTANCY='shape constancy',
@@ -103,6 +104,11 @@ SCENE = SimpleNamespace(
 
 # Types of hypercubes
 TYPES = SimpleNamespace(
+    COLLISIONS_MOVES='objectMovesOffScreen',
+    COLLISIONS_OCCLUDERS='occluders',
+    COLLISIONS_REVEALS='occluderReveals',
+    COLLISIONS_TRAINED='objectsTrained',
+
     GRAVITY_SUPPORT_PLAUSIBLE='plausible',
     GRAVITY_SUPPORT_TARGET_POSITION='targetPosition',
     GRAVITY_SUPPORT_TARGET_TYPE='targetType',
@@ -146,6 +152,24 @@ TYPES = SimpleNamespace(
 )
 
 CELLS = SimpleNamespace(
+    COLLISIONS_MOVES=SimpleNamespace(
+        ONE='first object',
+        TWO='second object'
+    ),
+    COLLISIONS_OCCLUDERS=SimpleNamespace(
+        YES='yes',
+        NO='no'
+    ),
+    COLLISIONS_REVEALS=SimpleNamespace(
+        EMPTY='empty scene',
+        ON_PATH='second object on path',
+        BEHIND_PATH='second object behind path'
+    ),
+    COLLISIONS_TRAINED=SimpleNamespace(
+        YES='yes',
+        NO='no'
+    ),
+
     GRAVITY_SUPPORT_PLAUSIBLE=SimpleNamespace(
         YES='yes',
         NO='no'
@@ -330,6 +354,7 @@ LOCATIONS = SimpleNamespace(
 
 
 ABBREV = SimpleNamespace(
+    COLLISIONS='coll',
     GRAVITY_SUPPORT='grav',
     OBJECT_PERMANENCE='objp',
     SHAPE_CONSTANCY='shap',

@@ -90,10 +90,20 @@ def test_intuitive_physics_move_across_all_objects_untrained_shapes():
         [definition_list],
         tags.SCENE.UNTRAINED_SHAPE
     )[0]
+    trained_with_colors_list = []
+    for definition in trained_list:
+        trained_with_colors_list.extend(
+            util.finalize_object_materials_and_colors(definition)
+        )
+    untrained_with_colors_list = []
+    for definition in untrained_list:
+        untrained_with_colors_list.extend(
+            util.finalize_object_materials_and_colors(definition)
+        )
 
-    for definition_1 in trained_list:
+    for definition_1 in trained_with_colors_list:
         option_list = [
-            definition_2 for definition_2 in untrained_list
+            definition_2 for definition_2 in untrained_with_colors_list
             if util.is_similar_except_in_shape(definition_1, definition_2,
                                                True)
         ]
@@ -109,10 +119,20 @@ def test_intuitive_physics_fall_down_all_objects_untrained_shapes():
         [definition_list],
         tags.SCENE.UNTRAINED_SHAPE
     )[0]
+    trained_with_colors_list = []
+    for definition in trained_list:
+        trained_with_colors_list.extend(
+            util.finalize_object_materials_and_colors(definition)
+        )
+    untrained_with_colors_list = []
+    for definition in untrained_list:
+        untrained_with_colors_list.extend(
+            util.finalize_object_materials_and_colors(definition)
+        )
 
-    for definition_1 in trained_list:
+    for definition_1 in trained_with_colors_list:
         option_list = [
-            definition_2 for definition_2 in untrained_list
+            definition_2 for definition_2 in untrained_with_colors_list
             if util.is_similar_except_in_shape(definition_1, definition_2,
                                                True)
         ]
@@ -129,10 +149,20 @@ def test_intuitive_physics_move_across_basic_objects_untrained_shapes():
         [definition_list],
         tags.SCENE.UNTRAINED_SHAPE
     )[0]
+    trained_with_colors_list = []
+    for definition in trained_list:
+        trained_with_colors_list.extend(
+            util.finalize_object_materials_and_colors(definition)
+        )
+    untrained_with_colors_list = []
+    for definition in untrained_list:
+        untrained_with_colors_list.extend(
+            util.finalize_object_materials_and_colors(definition)
+        )
 
-    for definition_1 in trained_list:
+    for definition_1 in trained_with_colors_list:
         option_list = [
-            definition_2 for definition_2 in untrained_list
+            definition_2 for definition_2 in untrained_with_colors_list
             if util.is_similar_except_in_shape(definition_1, definition_2,
                                                True)
         ]
@@ -151,10 +181,20 @@ def test_intuitive_physics_fall_down_basic_objects_untrained_shapes():
         [definition_list],
         tags.SCENE.UNTRAINED_SHAPE
     )[0]
+    trained_with_colors_list = []
+    for definition in trained_list:
+        trained_with_colors_list.extend(
+            util.finalize_object_materials_and_colors(definition)
+        )
+    untrained_with_colors_list = []
+    for definition in untrained_list:
+        untrained_with_colors_list.extend(
+            util.finalize_object_materials_and_colors(definition)
+        )
 
-    for definition_1 in trained_list:
+    for definition_1 in trained_with_colors_list:
         option_list = [
-            definition_2 for definition_2 in untrained_list
+            definition_2 for definition_2 in untrained_with_colors_list
             if util.is_similar_except_in_shape(definition_1, definition_2,
                                                True)
         ]
@@ -173,10 +213,20 @@ def test_intuitive_physics_move_across_complex_objects_untrained_shapes():
         [definition_list],
         tags.SCENE.UNTRAINED_SHAPE
     )[0]
+    trained_with_colors_list = []
+    for definition in trained_list:
+        trained_with_colors_list.extend(
+            util.finalize_object_materials_and_colors(definition)
+        )
+    untrained_with_colors_list = []
+    for definition in untrained_list:
+        untrained_with_colors_list.extend(
+            util.finalize_object_materials_and_colors(definition)
+        )
 
-    for definition_1 in trained_list:
+    for definition_1 in trained_with_colors_list:
         option_list = [
-            definition_2 for definition_2 in untrained_list
+            definition_2 for definition_2 in untrained_with_colors_list
             if util.is_similar_except_in_shape(definition_1, definition_2,
                                                True)
         ]
@@ -193,10 +243,20 @@ def test_intuitive_physics_fall_down_complex_objects_untrained_shapes():
         [definition_list],
         tags.SCENE.UNTRAINED_SHAPE
     )[0]
+    trained_with_colors_list = []
+    for definition in trained_list:
+        trained_with_colors_list.extend(
+            util.finalize_object_materials_and_colors(definition)
+        )
+    untrained_with_colors_list = []
+    for definition in untrained_list:
+        untrained_with_colors_list.extend(
+            util.finalize_object_materials_and_colors(definition)
+        )
 
-    for definition_1 in trained_list:
+    for definition_1 in trained_with_colors_list:
         option_list = [
-            definition_2 for definition_2 in untrained_list
+            definition_2 for definition_2 in untrained_with_colors_list
             if util.is_similar_except_in_shape(definition_1, definition_2,
                                                True)
         ]
@@ -214,10 +274,20 @@ def test_intuitive_physics_move_across_all_objects_untrained_sizes():
         [definition_list],
         tags.SCENE.UNTRAINED_SIZE
     )[0]
+    trained_with_colors_list = []
+    for definition in trained_list:
+        trained_with_colors_list.extend(
+            util.finalize_object_materials_and_colors(definition)
+        )
+    untrained_with_colors_list = []
+    for definition in untrained_list:
+        untrained_with_colors_list.extend(
+            util.finalize_object_materials_and_colors(definition)
+        )
 
-    for definition_1 in trained_list:
+    for definition_1 in trained_with_colors_list:
         option_list = [
-            definition_2 for definition_2 in untrained_list
+            definition_2 for definition_2 in untrained_with_colors_list
             if util.is_similar_except_in_size(definition_1, definition_2,
                                               True)
         ]
@@ -235,10 +305,20 @@ def test_intuitive_physics_fall_down_all_objects_untrained_sizes():
         [definition_list],
         tags.SCENE.UNTRAINED_SIZE
     )[0]
+    trained_with_colors_list = []
+    for definition in trained_list:
+        trained_with_colors_list.extend(
+            util.finalize_object_materials_and_colors(definition)
+        )
+    untrained_with_colors_list = []
+    for definition in untrained_list:
+        untrained_with_colors_list.extend(
+            util.finalize_object_materials_and_colors(definition)
+        )
 
-    for definition_1 in trained_list:
+    for definition_1 in trained_with_colors_list:
         option_list = [
-            definition_2 for definition_2 in untrained_list
+            definition_2 for definition_2 in untrained_with_colors_list
             if util.is_similar_except_in_size(definition_1, definition_2,
                                               True)
         ]
@@ -256,10 +336,20 @@ def test_intuitive_physics_move_across_basic_objects_untrained_sizes():
         [definition_list],
         tags.SCENE.UNTRAINED_SIZE
     )[0]
+    trained_with_colors_list = []
+    for definition in trained_list:
+        trained_with_colors_list.extend(
+            util.finalize_object_materials_and_colors(definition)
+        )
+    untrained_with_colors_list = []
+    for definition in untrained_list:
+        untrained_with_colors_list.extend(
+            util.finalize_object_materials_and_colors(definition)
+        )
 
-    for definition_1 in trained_list:
+    for definition_1 in trained_with_colors_list:
         option_list = [
-            definition_2 for definition_2 in untrained_list
+            definition_2 for definition_2 in untrained_with_colors_list
             if util.is_similar_except_in_size(definition_1, definition_2,
                                               True)
         ]
@@ -277,10 +367,20 @@ def test_intuitive_physics_fall_down_basic_objects_untrained_sizes():
         [definition_list],
         tags.SCENE.UNTRAINED_SIZE
     )[0]
+    trained_with_colors_list = []
+    for definition in trained_list:
+        trained_with_colors_list.extend(
+            util.finalize_object_materials_and_colors(definition)
+        )
+    untrained_with_colors_list = []
+    for definition in untrained_list:
+        untrained_with_colors_list.extend(
+            util.finalize_object_materials_and_colors(definition)
+        )
 
-    for definition_1 in trained_list:
+    for definition_1 in trained_with_colors_list:
         option_list = [
-            definition_2 for definition_2 in untrained_list
+            definition_2 for definition_2 in untrained_with_colors_list
             if util.is_similar_except_in_size(definition_1, definition_2,
                                               True)
         ]
@@ -298,10 +398,20 @@ def test_intuitive_physics_move_across_complex_objects_untrained_sizes():
         [definition_list],
         tags.SCENE.UNTRAINED_SIZE
     )[0]
+    trained_with_colors_list = []
+    for definition in trained_list:
+        trained_with_colors_list.extend(
+            util.finalize_object_materials_and_colors(definition)
+        )
+    untrained_with_colors_list = []
+    for definition in untrained_list:
+        untrained_with_colors_list.extend(
+            util.finalize_object_materials_and_colors(definition)
+        )
 
-    for definition_1 in trained_list:
+    for definition_1 in trained_with_colors_list:
         option_list = [
-            definition_2 for definition_2 in untrained_list
+            definition_2 for definition_2 in untrained_with_colors_list
             if util.is_similar_except_in_size(definition_1, definition_2,
                                               True)
         ]
@@ -319,10 +429,20 @@ def test_intuitive_physics_fall_down_complex_objects_untrained_sizes():
         [definition_list],
         tags.SCENE.UNTRAINED_SIZE
     )[0]
+    trained_with_colors_list = []
+    for definition in trained_list:
+        trained_with_colors_list.extend(
+            util.finalize_object_materials_and_colors(definition)
+        )
+    untrained_with_colors_list = []
+    for definition in untrained_list:
+        untrained_with_colors_list.extend(
+            util.finalize_object_materials_and_colors(definition)
+        )
 
-    for definition_1 in trained_list:
+    for definition_1 in trained_with_colors_list:
         option_list = [
-            definition_2 for definition_2 in untrained_list
+            definition_2 for definition_2 in untrained_with_colors_list
             if util.is_similar_except_in_size(definition_1, definition_2,
                                               True)
         ]

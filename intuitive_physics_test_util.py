@@ -2,6 +2,7 @@ import math
 import pytest
 
 import intuitive_physics_hypercubes
+import materials
 import occluders
 import util
 
@@ -27,6 +28,11 @@ BODY_TEMPLATE = {
     'objects': [],
     'goal': {}
 }
+
+
+OPPOSITE_MATERIAL_STRING_LIST = [
+    item[0] for item in materials.OPPOSITE_MATERIALS
+]
 
 
 def verify_scene(scene, is_move_across, implausible=False, eval_only=False):
@@ -132,58 +138,115 @@ def verify_hypercube_variations(
 
     for variations in hypercube_variations_list:
         trained_default = variations.get('trained')
+        different_color = variations.get('different_color')
         different_shape = variations.get('different_shape')
         untrained_shape = variations.get('untrained_shape')
         untrained_different_shape = (
             variations.get('untrained_different_shape')
         )
         untrained_size = variations.get('untrained_size')
-        assert untrained_shape.get('untrainedShape', False)
-        assert untrained_different_shape.get('untrainedShape', False)
 
         assert not trained_default.get('untrainedShape', False)
         assert not trained_default.get('untrainedSize', False)
 
-        assert not different_shape.get('untrainedShape', False)
-        assert not different_shape.get('untrainedSize', False)
+        if different_color:
+            assert not different_color.get('untrainedShape', False)
+            assert not different_color.get('untrainedSize', False)
+            assert util.is_similar_except_in_color(
+                trained_default,
+                different_color,
+                only_diagonal_size=True
+            )
+            assert not util.are_materials_equivalent(
+                trained_default['materials'],
+                different_color['materials']
+            )
 
-        assert not untrained_shape.get('untrainedSize', False)
-        assert untrained_shape.get('untrainedShape', False)
+        if different_shape:
+            assert not different_shape.get('untrainedShape', False)
+            assert not different_shape.get('untrainedSize', False)
+            assert util.is_similar_except_in_shape(
+                trained_default,
+                different_shape,
+                only_diagonal_size=True
+            )
+            assert util.are_materials_equivalent(
+                trained_default['materials'],
+                different_shape['materials']
+            )
 
-        assert not untrained_different_shape.get('untrainedSize', False)
-        assert untrained_different_shape.get('untrainedShape', False)
+        if untrained_shape:
+            assert not untrained_shape.get('untrainedSize', False)
+            assert untrained_shape.get('untrainedShape', False)
+            assert util.is_similar_except_in_shape(
+                trained_default,
+                untrained_shape,
+                only_diagonal_size=True
+            )
+            assert util.are_materials_equivalent(
+                trained_default['materials'],
+                untrained_shape['materials']
+            )
 
-        assert not untrained_size.get('untrainedShape', False)
-        assert untrained_size.get('untrainedSize', False)
+        if untrained_different_shape:
+            assert not untrained_different_shape.get('untrainedSize', False)
+            assert untrained_different_shape.get('untrainedShape', False)
+            assert util.is_similar_except_in_shape(
+                untrained_shape,
+                untrained_different_shape,
+                only_diagonal_size=True
+            )
+            assert util.are_materials_equivalent(
+                trained_default['materials'],
+                untrained_different_shape['materials']
+            )
 
-        assert util.is_similar_except_in_shape(
-            trained_default,
-            different_shape,
-            only_diagonal_size=True
-        )
-        assert util.is_similar_except_in_shape(
-            trained_default,
-            untrained_shape,
-            only_diagonal_size=True
-        )
-        assert util.is_similar_except_in_shape(
-            untrained_shape,
-            untrained_different_shape,
-            only_diagonal_size=True
-        )
-        assert util.is_similar_except_in_size(
-            trained_default,
-            untrained_size,
-            only_diagonal_size=True
-        )
+        if untrained_size:
+            assert not untrained_size.get('untrainedShape', False)
+            assert untrained_size.get('untrainedSize', False)
+            assert util.is_similar_except_in_size(
+                trained_default,
+                untrained_size,
+                only_diagonal_size=True
+            )
+            assert util.are_materials_equivalent(
+                trained_default['materials'],
+                untrained_size['materials']
+            )
 
-        assert trained_default['materials'] == different_shape['materials']
-        assert trained_default['materials'] == untrained_shape['materials']
-        assert (
-            trained_default['materials'] ==
-            untrained_different_shape['materials']
-        )
-        assert trained_default['materials'] == untrained_size['materials']
+    return True
+
+
+def verify_hypercube_Collisions(
+    is_move_across,
+    object_dict,
+    last_step,
+    room_wall_material_name
+):
+    assert is_move_across
+    assert last_step == 90
+
+    assert verify_hypercube(object_dict, room_wall_material_name)
+    assert verify_object_list_move_across(object_dict['target'], [])
+    assert verify_occluder_list_move_across(
+        object_dict['intuitive physics occluder'],
+        object_dict['target'],
+        ignore_x_position=True
+    )
+
+    assert len(object_dict['intuitive physics occluder']) == 2
+
+    assert len(object_dict['target'][0]['materials'])
+    for material in object_dict['target'][0]['materials']:
+        assert material in OPPOSITE_MATERIAL_STRING_LIST
+
+    # The non target is not in every scene in the collisions hypercube.
+    if len(object_dict['non target']):
+        target_material = object_dict['target'][0]['materials'][0]
+        assert len(object_dict['non target'][0]['materials'])
+        for material in object_dict['non target'][0]['materials']:
+            assert material in OPPOSITE_MATERIAL_STRING_LIST
+            assert material == materials.OPPOSITE_SETS[target_material][0]
 
     return True
 
@@ -210,7 +273,7 @@ def verify_hypercube_ObjectPermanence(
         assert verify_occluder_list_move_across(
             object_dict['intuitive physics occluder'],
             object_dict['target'],
-            eval_4
+            ignore_x_position=eval_4
         )
         assert last_step == (150 if eval_4 else 90)
 
@@ -288,7 +351,7 @@ def verify_hypercube_SpatioTemporalContinuity(
         assert verify_occluder_list_move_across(
             object_dict['intuitive physics occluder'],
             [hypercube_target, hypercube_target],
-            eval_4
+            ignore_x_position=eval_4
         )
         assert last_step == 90
 
@@ -626,7 +689,7 @@ def verify_occluder_list_fall_down(occluder_list, target_list):
 def verify_occluder_list_move_across(
     occluder_list,
     target_list,
-    eval_4=False
+    ignore_x_position=False
 ):
     assert verify_occluder_list(occluder_list, target_list)
 
@@ -642,7 +705,7 @@ def verify_occluder_list_move_across(
             if position == pytest.approx(adjusted_x):
                 x_position_verified = True
                 break
-        if not eval_4 and not x_position_verified:
+        if not ignore_x_position and not x_position_verified:
             print(f'[ERROR] PAIRED MOVE ACROSS OCCLUDER WALL X POSITION '
                   f'SHOULD BE CALCULATED FROM TARGET DISTANCE BY STEP LIST\n'
                   f'OCCLUDER_WALL={occluder_wall}\nTARGET={target}\n'
@@ -783,7 +846,7 @@ def verify_target_implausible_shroud_step(is_move_across, occluder_1,
     return True
 
 
-def get_object_list(hypercube, scene, role):
+def get_object_list(scene, role):
     return [
         instance for instance in scene['objects'] if instance['role'] == role
     ]

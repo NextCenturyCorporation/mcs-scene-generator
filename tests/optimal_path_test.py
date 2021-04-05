@@ -142,7 +142,7 @@ def test_dilate_target_bounds():
 def test_find_target_or_parent_dict():
     output = optimal_path._find_target_or_parent_dict({
         'id': 'id_0',
-        'type': 'trophy'
+        'type': 'soccer_ball'
     }, [{
         'id': 'id_1',
         'type': 'ball'
@@ -156,13 +156,13 @@ def test_find_target_or_parent_dict():
         'id': 'id_4',
         'type': 'suitcase'
     }])
-    assert output == {'id': 'id_0', 'type': 'trophy'}
+    assert output == {'id': 'id_0', 'type': 'soccer_ball'}
 
 
 def test_find_target_or_parent_dict_with_parent():
     output = optimal_path._find_target_or_parent_dict({
         'id': 'id_0',
-        'type': 'trophy',
+        'type': 'soccer_ball',
         'locationParent': 'id_4'
     }, [{
         'id': 'id_1',

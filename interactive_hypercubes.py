@@ -1892,7 +1892,7 @@ class InteractiveSingleSceneFactory(hypercubes.HypercubeFactory):
     ) -> hypercubes.Hypercube:
         target_object_plan = ObjectPlan(
             ObjectLocationPlan.RANDOM,
-            definition=objects.get_trophy()
+            definition=objects.get_soccer_ball()
         )
         return InteractiveHypercube(
             body_template,

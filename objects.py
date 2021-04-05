@@ -27,6 +27,33 @@ def _create_size_option(
     }
 
 
+_SOCCER_BALL = {
+    "type": "soccer_ball",
+    "color": ["white", "black"],
+    "shape": ["ball"],
+    "size": "small",
+    "attributes": ["moveable", "pickupable"],
+    "dimensions": {
+        "x": 0.22,
+        "y": 0.22,
+        "z": 0.22
+    },
+    "mass": 1,
+    "offset": {
+        "x": 0,
+        "y": 0.11,
+        "z": 0
+    },
+    "positionY": 0.005,
+    "salientMaterials": ["rubber"],
+    "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+    }
+}
+
+
 _TROPHY = {
     "type": "trophy",
     "color": ["grey"],
@@ -79,41 +106,23 @@ _CAKE = {
     "size": "small",
     "attributes": ["moveable", "pickupable"],
     "dimensions": {
-        "x": 0.22,
-        "y": 0.1,
-        "z": 0.22
+        "x": 0.22 * 2,
+        "y": 0.1 * 2,
+        "z": 0.22 * 2
     },
     "mass": 2,
     "offset": {
         "x": 0,
-        "y": 0.05,
+        "y": 0.05 * 2,
         "z": 0
     },
     "positionY": 0.005,
     "materialCategory": [],
     "salientMaterials": ["food"],
     "scale": {
-        "x": 1,
-        "y": 1,
-        "z": 1
-    },
-    "sideways": {
-        "dimensions": {
-            "x": 0.19,
-            "y": 0.14,
-            "z": 0.3
-        },
-        "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0.15
-        },
-        "positionY": 0.075,
-        "rotation": {
-            "x": 90,
-            "y": 0,
-            "z": 0
-        }
+        "x": 2,
+        "y": 2,
+        "z": 2
     }
 }
 
@@ -7848,9 +7857,73 @@ _CASE_1_SUITCASE = {
         "salientMaterials": ["metal"],
     }],
     "chooseSize": [{
-        # Big enough to fit a trophy
+        # Big enough to fit a soccer ball inside
         "size": "medium",
         "mass": 4.5,
+        "enclosedAreas": [{
+            "position": {
+                "x": 0,
+                "y": 0.0925 * 2.5,
+                "z": 0
+            },
+            "dimensions": {
+                "x": 0.69 * 2.5,
+                "y": 0.175 * 2.5,
+                "z": 0.4 * 2.5
+            }
+        }],
+        "dimensions": {
+            "x": 0.71 * 2.5,
+            "y": 0.19 * 2.5,
+            "z": 0.42 * 2.5
+        },
+        "offset": {
+            "x": 0,
+            "y": 0.095 * 2.5,
+            "z": 0
+        },
+        "positionY": 0,
+        "scale": {
+            "x": 2.5,
+            "y": 2.5,
+            "z": 2.5
+        }
+    }, {
+        # Big enough to fit a soccer ball inside
+        "size": "medium",
+        "mass": 4,
+        "enclosedAreas": [{
+            "position": {
+                "x": 0,
+                "y": 0.0925 * 2.25,
+                "z": 0
+            },
+            "dimensions": {
+                "x": 0.69 * 2.25,
+                "y": 0.175 * 2.25,
+                "z": 0.4 * 2.25
+            }
+        }],
+        "dimensions": {
+            "x": 0.71 * 2.25,
+            "y": 0.19 * 2.25,
+            "z": 0.42 * 2.25
+        },
+        "offset": {
+            "x": 0,
+            "y": 0.095 * 2.25,
+            "z": 0
+        },
+        "positionY": 0,
+        "scale": {
+            "x": 2.25,
+            "y": 2.25,
+            "z": 2.25
+        }
+    }, {
+        # Big enough to fit a soccer ball inside
+        "size": "medium",
+        "mass": 3.5,
         "enclosedAreas": [{
             "position": {
                 "x": 0,
@@ -7880,9 +7953,9 @@ _CASE_1_SUITCASE = {
             "z": 2
         }
     }, {
-        # Big enough to fit a trophy
+        # Too little to fit a soccer ball inside
         "size": "medium",
-        "mass": 4,
+        "mass": 3,
         "enclosedAreas": [{
             "position": {
                 "x": 0,
@@ -7912,29 +7985,29 @@ _CASE_1_SUITCASE = {
             "z": 1.5
         }
     }, {
-        # Big enough to fit a trophy
-        "size": "medium",
-        "mass": 3.5,
+        # Too little to fit a soccer ball inside
+        "size": "small",
+        "mass": 2.5,
         "enclosedAreas": [{
             "position": {
                 "x": 0,
-                "y": 0.0925,
+                "y": 0.0925 * 1,
                 "z": 0
             },
             "dimensions": {
-                "x": 0.69,
-                "y": 0.175,
-                "z": 0.4
+                "x": 0.69 * 1,
+                "y": 0.175 * 1,
+                "z": 0.4 * 1
             }
         }],
         "dimensions": {
-            "x": 0.71,
-            "y": 0.19,
-            "z": 0.42
+            "x": 0.71 * 1,
+            "y": 0.19 * 1,
+            "z": 0.42 * 1
         },
         "offset": {
             "x": 0,
-            "y": 0.095,
+            "y": 0.095 * 1,
             "z": 0
         },
         "positionY": 0,
@@ -7942,70 +8015,6 @@ _CASE_1_SUITCASE = {
             "x": 1,
             "y": 1,
             "z": 1
-        }
-    }, {
-        # Too little to fit a trophy
-        "size": "medium",
-        "mass": 3,
-        "enclosedAreas": [{
-            "position": {
-                "x": 0,
-                "y": 0.0925 * 0.75,
-                "z": 0
-            },
-            "dimensions": {
-                "x": 0.69 * 0.75,
-                "y": 0.175 * 0.75,
-                "z": 0.4 * 0.75
-            }
-        }],
-        "dimensions": {
-            "x": 0.71 * 0.75,
-            "y": 0.19 * 0.75,
-            "z": 0.42 * 0.75
-        },
-        "offset": {
-            "x": 0,
-            "y": 0.095 * 0.75,
-            "z": 0
-        },
-        "positionY": 0,
-        "scale": {
-            "x": 0.75,
-            "y": 0.75,
-            "z": 0.75
-        }
-    }, {
-        # Too little to fit a trophy
-        "size": "small",
-        "mass": 2.5,
-        "enclosedAreas": [{
-            "position": {
-                "x": 0,
-                "y": 0.0925 * 0.5,
-                "z": 0
-            },
-            "dimensions": {
-                "x": 0.69 * 0.5,
-                "y": 0.175 * 0.5,
-                "z": 0.4 * 0.5
-            }
-        }],
-        "dimensions": {
-            "x": 0.71 * 0.5,
-            "y": 0.19 * 0.5,
-            "z": 0.42 * 0.5
-        },
-        "offset": {
-            "x": 0,
-            "y": 0.095 * 0.5,
-            "z": 0
-        },
-        "positionY": 0,
-        "scale": {
-            "x": 0.5,
-            "y": 0.5,
-            "z": 0.5
         }
     }]
 }
@@ -8025,164 +8034,132 @@ _CASE_3 = {
         "salientMaterials": ["metal"],
     }],
     "chooseSize": [{
-        # Big enough to fit a trophy
+        # Big enough to fit a soccer ball inside
         "size": "medium",
         "mass": 4.5,
         "enclosedAreas": [{
             "position": {
                 "x": 0,
-                "y": 0.105 * 1.6,
+                "y": 0.105 * 2.5,
                 "z": 0
             },
             "dimensions": {
-                "x": 0.79 * 1.6,
-                "y": 0.17 * 1.6,
-                "z": 0.53 * 1.6
+                "x": 0.79 * 2.5,
+                "y": 0.17 * 2.5,
+                "z": 0.53 * 2.5
             }
         }],
         "dimensions": {
-            "x": 0.81 * 1.6,
-            "y": 0.21 * 1.6,
-            "z": 0.56 * 1.6
+            "x": 0.81 * 2.5,
+            "y": 0.21 * 2.5,
+            "z": 0.56 * 2.5
         },
         "offset": {
             "x": 0,
-            "y": 0.105 * 1.6,
+            "y": 0.105 * 2.5,
             "z": 0
         },
         "positionY": 0,
         "scale": {
-            "x": 1.6,
-            "y": 1.6,
-            "z": 1.6
+            "x": 2.5,
+            "y": 2.5,
+            "z": 2.5
         }
     }, {
-        # Big enough to fit a trophy
+        # Big enough to fit a soccer ball inside
         "size": "medium",
-        "mass": 4,
+        "mass": 3.75,
         "enclosedAreas": [{
             "position": {
                 "x": 0,
-                "y": 0.105 * 1.2,
+                "y": 0.105 * 2.25,
                 "z": 0
             },
             "dimensions": {
-                "x": 0.79 * 1.2,
-                "y": 0.17 * 1.2,
-                "z": 0.53 * 1.2
+                "x": 0.79 * 2.25,
+                "y": 0.17 * 2.25,
+                "z": 0.53 * 2.25
             }
         }],
         "dimensions": {
-            "x": 0.81 * 1.2,
-            "y": 0.21 * 1.2,
-            "z": 0.56 * 1.2
+            "x": 0.81 * 2.25,
+            "y": 0.21 * 2.25,
+            "z": 0.56 * 2.25
         },
         "offset": {
             "x": 0,
-            "y": 0.105 * 1.2,
+            "y": 0.105 * 2.25,
             "z": 0
         },
         "positionY": 0,
         "scale": {
-            "x": 1.2,
-            "y": 1.2,
-            "z": 1.2
+            "x": 2.25,
+            "y": 2.25,
+            "z": 2.25
         }
     }, {
-        # Big enough to fit a trophy
-        "size": "medium",
-        "mass": 3.5,
-        "enclosedAreas": [{
-            "position": {
-                "x": 0,
-                "y": 0.105 * 0.8,
-                "z": 0
-            },
-            "dimensions": {
-                "x": 0.79 * 0.8,
-                "y": 0.17 * 0.8,
-                "z": 0.53 * 0.8
-            }
-        }],
-        "dimensions": {
-            "x": 0.81 * 0.8,
-            "y": 0.21 * 0.8,
-            "z": 0.56 * 0.8
-        },
-        "offset": {
-            "x": 0,
-            "y": 0.105 * 0.8,
-            "z": 0
-        },
-        "positionY": 0,
-        "scale": {
-            "x": 0.8,
-            "y": 0.8,
-            "z": 0.8
-        }
-    }, {
-        # Too little to fit a trophy
+        # Too little to fit a soccer ball inside
         "size": "medium",
         "mass": 3,
         "enclosedAreas": [{
             "position": {
                 "x": 0,
-                "y": 0.105 * 0.6,
+                "y": 0.105 * 1.5,
                 "z": 0
             },
             "dimensions": {
-                "x": 0.79 * 0.6,
-                "y": 0.17 * 0.6,
-                "z": 0.53 * 0.6
+                "x": 0.79 * 1.5,
+                "y": 0.17 * 1.5,
+                "z": 0.53 * 1.5
             }
         }],
         "dimensions": {
-            "x": 0.81 * 0.6,
-            "y": 0.21 * 0.6,
-            "z": 0.56 * 0.6
+            "x": 0.81 * 1.5,
+            "y": 0.21 * 1.5,
+            "z": 0.56 * 1.5
         },
         "offset": {
             "x": 0,
-            "y": 0.105 * 0.6,
+            "y": 0.105 * 1.5,
             "z": 0
         },
         "positionY": 0,
         "scale": {
-            "x": 0.6,
-            "y": 0.6,
-            "z": 0.6
+            "x": 1.5,
+            "y": 1.5,
+            "z": 1.5
         }
     }, {
-        # Too little to fit a trophy
+        # Too little to fit a soccer ball inside
         "size": "small",
         "mass": 2.5,
         "enclosedAreas": [{
             "position": {
                 "x": 0,
-                "y": 0.105 * 0.4,
+                "y": 0.105 * 1,
                 "z": 0
             },
             "dimensions": {
-                "x": 0.79 * 0.4,
-                "y": 0.17 * 0.4,
-                "z": 0.53 * 0.4
+                "x": 0.79 * 1,
+                "y": 0.17 * 1,
+                "z": 0.53 * 1
             }
         }],
         "dimensions": {
-            "x": 0.81 * 0.4,
-            "y": 0.21 * 0.4,
-            "z": 0.56 * 0.4
+            "x": 0.81 * 1,
+            "y": 0.21 * 1,
+            "z": 0.56 * 1
         },
         "offset": {
             "x": 0,
-            "y": 0.105 * 0.4,
+            "y": 0.105 * 1,
             "z": 0
         },
         "positionY": 0,
         "scale": {
-            "x": 0.4,
-            "y": 0.4,
-            "z": 0.4
+            "x": 1,
+            "y": 1,
+            "z": 1
         }
     }]
 }
@@ -8205,164 +8182,196 @@ _CHEST_1_CUBOID = {
         "salientMaterials": ["metal"],
     }],
     "chooseSize": [{
-        # Big enough to fit a trophy
+        # Big enough to fit a soccer ball inside
         "size": "medium",
         "mass": 4.5,
         "enclosedAreas": [{
             "position": {
                 "x": 0,
-                "y": 0.195 * 0.65,
+                "y": 0.195 * 1.3,
                 "z": 0
             },
             "dimensions": {
-                "x": 0.77 * 0.65,
-                "y": 0.33 * 0.65,
-                "z": 0.49 * 0.65
+                "x": 0.77 * 1.3,
+                "y": 0.33 * 1.3,
+                "z": 0.49 * 1.3
             }
         }],
         "dimensions": {
-            "x": 0.83 * 0.65,
-            "y": 0.42 * 0.65,
-            "z": 0.55 * 0.65
+            "x": 0.83 * 1.3,
+            "y": 0.42 * 1.3,
+            "z": 0.55 * 1.3
         },
         "offset": {
             "x": 0,
-            "y": 0.205 * 0.65,
+            "y": 0.205 * 1.3,
             "z": 0
         },
         "positionY": 0,
         "scale": {
-            "x": 0.65,
-            "y": 0.65,
-            "z": 0.65
+            "x": 1.3,
+            "y": 1.3,
+            "z": 1.3
         }
     }, {
-        # Big enough to fit a trophy
+        # Big enough to fit a soccer ball inside
+        "size": "medium",
+        "mass": 4.25,
+        "enclosedAreas": [{
+            "position": {
+                "x": 0,
+                "y": 0.195 * 1.1,
+                "z": 0
+            },
+            "dimensions": {
+                "x": 0.77 * 1.1,
+                "y": 0.33 * 1.1,
+                "z": 0.49 * 1.1
+            }
+        }],
+        "dimensions": {
+            "x": 0.83 * 1.1,
+            "y": 0.42 * 1.1,
+            "z": 0.55 * 1.1
+        },
+        "offset": {
+            "x": 0,
+            "y": 0.205 * 1.1,
+            "z": 0
+        },
+        "positionY": 0,
+        "scale": {
+            "x": 1.1,
+            "y": 1.1,
+            "z": 1.1
+        }
+    }, {
+        # Big enough to fit a soccer ball inside
         "size": "medium",
         "mass": 4,
         "enclosedAreas": [{
             "position": {
                 "x": 0,
-                "y": 0.195 * 0.55,
+                "y": 0.195 * 0.9,
                 "z": 0
             },
             "dimensions": {
-                "x": 0.77 * 0.55,
-                "y": 0.33 * 0.55,
-                "z": 0.49 * 0.55
+                "x": 0.77 * 0.9,
+                "y": 0.33 * 0.9,
+                "z": 0.49 * 0.9
             }
         }],
         "dimensions": {
-            "x": 0.83 * 0.55,
-            "y": 0.42 * 0.55,
-            "z": 0.55 * 0.55
+            "x": 0.83 * 0.9,
+            "y": 0.42 * 0.9,
+            "z": 0.55 * 0.9
         },
         "offset": {
             "x": 0,
-            "y": 0.205 * 0.55,
+            "y": 0.205 * 0.9,
             "z": 0
         },
         "positionY": 0,
         "scale": {
-            "x": 0.55,
-            "y": 0.55,
-            "z": 0.55
+            "x": 0.9,
+            "y": 0.9,
+            "z": 0.9
         }
     }, {
-        # Big enough to fit a trophy
+        # Big enough to fit a soccer ball inside
         "size": "medium",
         "mass": 3.5,
         "enclosedAreas": [{
             "position": {
                 "x": 0,
-                "y": 0.195 * 0.45,
+                "y": 0.195 * 0.7,
                 "z": 0
             },
             "dimensions": {
-                "x": 0.77 * 0.45,
-                "y": 0.33 * 0.45,
-                "z": 0.49 * 0.45
+                "x": 0.77 * 0.7,
+                "y": 0.33 * 0.7,
+                "z": 0.49 * 0.7
             }
         }],
         "dimensions": {
-            "x": 0.83 * 0.45,
-            "y": 0.42 * 0.45,
-            "z": 0.55 * 0.45
+            "x": 0.83 * 0.7,
+            "y": 0.42 * 0.7,
+            "z": 0.55 * 0.7
         },
         "offset": {
             "x": 0,
-            "y": 0.205 * 0.45,
+            "y": 0.205 * 0.7,
             "z": 0
         },
         "positionY": 0,
         "scale": {
-            "x": 0.45,
-            "y": 0.45,
-            "z": 0.45
+            "x": 0.7,
+            "y": 0.7,
+            "z": 0.7
         }
     }, {
-        # Too little to fit a trophy
+        # Too little to fit a soccer ball inside
         "size": "medium",
         "mass": 3,
         "enclosedAreas": [{
             "position": {
                 "x": 0,
-                "y": 0.195 * 0.35,
+                "y": 0.195 * 0.5,
                 "z": 0
             },
             "dimensions": {
-                "x": 0.77 * 0.35,
-                "y": 0.33 * 0.35,
-                "z": 0.49 * 0.35
+                "x": 0.77 * 0.5,
+                "y": 0.33 * 0.5,
+                "z": 0.49 * 0.5
             }
         }],
         "dimensions": {
-            "x": 0.83 * 0.35,
-            "y": 0.42 * 0.35,
-            "z": 0.55 * 0.35
+            "x": 0.83 * 0.5,
+            "y": 0.42 * 0.5,
+            "z": 0.55 * 0.5
         },
         "offset": {
             "x": 0,
-            "y": 0.205 * 0.35,
+            "y": 0.205 * 0.5,
             "z": 0
         },
         "positionY": 0,
         "scale": {
-            "x": 0.35,
-            "y": 0.35,
-            "z": 0.35
+            "x": 0.5,
+            "y": 0.5,
+            "z": 0.5
         }
     }, {
-        # Too little to fit a trophy
+        # Too little to fit a soccer ball inside
         "size": "small",
         "mass": 2.5,
         "enclosedAreas": [{
             "position": {
                 "x": 0,
-                "y": 0.195 * 0.25,
+                "y": 0.195 * 0.3,
                 "z": 0
             },
             "dimensions": {
-                "x": 0.77 * 0.25,
-                "y": 0.33 * 0.25,
-                "z": 0.49 * 0.25
+                "x": 0.77 * 0.3,
+                "y": 0.33 * 0.3,
+                "z": 0.49 * 0.3
             }
         }],
         "dimensions": {
-            "x": 0.83 * 0.25,
-            "y": 0.42 * 0.25,
-            "z": 0.55 * 0.25
+            "x": 0.83 * 0.3,
+            "y": 0.42 * 0.3,
+            "z": 0.55 * 0.3
         },
         "offset": {
             "x": 0,
-            "y": 0.205 * 0.25,
+            "y": 0.205 * 0.3,
             "z": 0
         },
         "positionY": 0,
         "scale": {
-            "x": 0.25,
-            "y": 0.25,
-            "z": 0.25
+            "x": 0.3,
+            "y": 0.3,
+            "z": 0.3
         }
     }]
 }
@@ -8385,105 +8394,201 @@ _CHEST_2_SEMICYLINDER = {
         "salientMaterials": ["metal"],
     }],
     "chooseSize": [{
-        # Big enough to fit a trophy
+        # Big enough to fit a soccer ball inside
         "size": "medium",
         "mass": 4.5,
         "enclosedAreas": [{
             "position": {
                 "x": 0,
-                "y": 0.165 * 1.1,
+                "y": 0.165 * 2,
                 "z": 0
             },
             "dimensions": {
-                "x": 0.44 * 1.1,
-                "y": 0.25 * 1.1,
-                "z": 0.31 * 1.1
+                "x": 0.44 * 2,
+                "y": 0.25 * 2,
+                "z": 0.31 * 2
             }
         }],
         "dimensions": {
-            "x": 0.52 * 1.1,
-            "y": 0.42 * 1.1,
-            "z": 0.38 * 1.1
+            "x": 0.52 * 2,
+            "y": 0.42 * 2,
+            "z": 0.38 * 2
         },
         "offset": {
             "x": 0,
-            "y": 0.21 * 1.1,
+            "y": 0.21 * 2,
             "z": 0
         },
         "positionY": 0,
         "scale": {
-            "x": 1.1,
-            "y": 1.1,
-            "z": 1.1
+            "x": 2,
+            "y": 2,
+            "z": 2
         }
     }, {
-        # Big enough to fit a trophy
+        # Big enough to fit a soccer ball inside
+        "size": "medium",
+        "mass": 4.25,
+        "enclosedAreas": [{
+            "position": {
+                "x": 0,
+                "y": 0.165 * 1.75,
+                "z": 0
+            },
+            "dimensions": {
+                "x": 0.44 * 1.75,
+                "y": 0.25 * 1.75,
+                "z": 0.31 * 1.75
+            }
+        }],
+        "dimensions": {
+            "x": 0.52 * 1.75,
+            "y": 0.42 * 1.75,
+            "z": 0.38 * 1.75
+        },
+        "offset": {
+            "x": 0,
+            "y": 0.21 * 1.75,
+            "z": 0
+        },
+        "positionY": 0,
+        "scale": {
+            "x": 1.75,
+            "y": 1.75,
+            "z": 1.75
+        }
+    }, {
+        # Big enough to fit a soccer ball inside
         "size": "medium",
         "mass": 4,
         "enclosedAreas": [{
             "position": {
                 "x": 0,
-                "y": 0.165 * 0.9,
+                "y": 0.165 * 1.5,
                 "z": 0
             },
             "dimensions": {
-                "x": 0.44 * 0.9,
-                "y": 0.25 * 0.9,
-                "z": 0.31 * 0.9
+                "x": 0.44 * 1.5,
+                "y": 0.25 * 1.5,
+                "z": 0.31 * 1.5
             }
         }],
         "dimensions": {
-            "x": 0.52 * 0.9,
-            "y": 0.42 * 0.9,
-            "z": 0.38 * 0.9
+            "x": 0.52 * 1.5,
+            "y": 0.42 * 1.5,
+            "z": 0.38 * 1.5
         },
         "offset": {
             "x": 0,
-            "y": 0.21 * 0.9,
+            "y": 0.21 * 1.5,
             "z": 0
         },
         "positionY": 0,
         "scale": {
-            "x": 0.9,
-            "y": 0.9,
-            "z": 0.9
+            "x": 1.5,
+            "y": 1.5,
+            "z": 1.5
         }
     }, {
-        # Big enough to fit a trophy
+        # Big enough to fit a soccer ball inside
+        "size": "medium",
+        "mass": 4,
+        "enclosedAreas": [{
+            "position": {
+                "x": 0,
+                "y": 0.165 * 1.25,
+                "z": 0
+            },
+            "dimensions": {
+                "x": 0.44 * 1.25,
+                "y": 0.25 * 1.25,
+                "z": 0.31 * 1.25
+            }
+        }],
+        "dimensions": {
+            "x": 0.52 * 1.25,
+            "y": 0.42 * 1.25,
+            "z": 0.38 * 1.25
+        },
+        "offset": {
+            "x": 0,
+            "y": 0.21 * 1.25,
+            "z": 0
+        },
+        "positionY": 0,
+        "scale": {
+            "x": 1.25,
+            "y": 1.25,
+            "z": 1.25
+        }
+    }, {
+        # Big enough to fit a soccer ball inside
         "size": "medium",
         "mass": 3.5,
         "enclosedAreas": [{
             "position": {
                 "x": 0,
-                "y": 0.165 * 0.7,
+                "y": 0.165 * 1,
                 "z": 0
             },
             "dimensions": {
-                "x": 0.44 * 0.7,
-                "y": 0.25 * 0.7,
-                "z": 0.31 * 0.7
+                "x": 0.44 * 1,
+                "y": 0.25 * 1,
+                "z": 0.31 * 1
             }
         }],
         "dimensions": {
-            "x": 0.52 * 0.7,
-            "y": 0.42 * 0.7,
-            "z": 0.38 * 0.7
+            "x": 0.52 * 1,
+            "y": 0.42 * 1,
+            "z": 0.38 * 1
         },
         "offset": {
             "x": 0,
-            "y": 0.21 * 0.7,
+            "y": 0.21 * 1,
             "z": 0
         },
         "positionY": 0,
         "scale": {
-            "x": 0.7,
-            "y": 0.7,
-            "z": 0.7
+            "x": 1,
+            "y": 1,
+            "z": 1
         }
     }, {
-        # Too little to fit a trophy
+        # Too little to fit a soccer ball inside
         "size": "medium",
         "mass": 3,
+        "enclosedAreas": [{
+            "position": {
+                "x": 0,
+                "y": 0.165 * 0.75,
+                "z": 0
+            },
+            "dimensions": {
+                "x": 0.44 * 0.75,
+                "y": 0.25 * 0.75,
+                "z": 0.31 * 0.75
+            }
+        }],
+        "dimensions": {
+            "x": 0.52 * 0.75,
+            "y": 0.42 * 0.75,
+            "z": 0.38 * 0.75
+        },
+        "offset": {
+            "x": 0,
+            "y": 0.21 * 0.75,
+            "z": 0
+        },
+        "positionY": 0,
+        "scale": {
+            "x": 0.75,
+            "y": 0.75,
+            "z": 0.75
+        }
+    }, {
+        # Too little to fit a soccer ball inside
+        "size": "small",
+        "mass": 2.5,
         "enclosedAreas": [{
             "position": {
                 "x": 0,
@@ -8512,38 +8617,6 @@ _CHEST_2_SEMICYLINDER = {
             "y": 0.5,
             "z": 0.5
         }
-    }, {
-        # Too little to fit a trophy
-        "size": "small",
-        "mass": 2.5,
-        "enclosedAreas": [{
-            "position": {
-                "x": 0,
-                "y": 0.165 * 0.3,
-                "z": 0
-            },
-            "dimensions": {
-                "x": 0.44 * 0.3,
-                "y": 0.25 * 0.3,
-                "z": 0.31 * 0.3
-            }
-        }],
-        "dimensions": {
-            "x": 0.52 * 0.3,
-            "y": 0.42 * 0.3,
-            "z": 0.38 * 0.3
-        },
-        "offset": {
-            "x": 0,
-            "y": 0.21 * 0.3,
-            "z": 0
-        },
-        "positionY": 0,
-        "scale": {
-            "x": 0.3,
-            "y": 0.3,
-            "z": 0.3
-        }
     }]
 }
 
@@ -8566,164 +8639,164 @@ _CHEST_3_CUBOID = {
         "salientMaterials": ["metal"],
     }],
     "chooseSize": [{
-        # Big enough to fit a trophy
+        # Big enough to fit a soccer ball inside
         "size": "medium",
         "mass": 4.5,
         "enclosedAreas": [{
             "position": {
                 "x": 0,
-                "y": 0.09 * 1.45,
+                "y": 0.09 * 2.4,
                 "z": 0
             },
             "dimensions": {
-                "x": 0.35 * 1.45,
-                "y": 0.12 * 1.45,
-                "z": 0.21 * 1.45
+                "x": 0.35 * 2.4,
+                "y": 0.12 * 2.4,
+                "z": 0.21 * 2.4
             }
         }],
         "dimensions": {
-            "x": 0.46 * 1.45,
-            "y": 0.26 * 1.45,
-            "z": 0.32 * 1.45
+            "x": 0.46 * 2.4,
+            "y": 0.26 * 2.4,
+            "z": 0.32 * 2.4
         },
         "offset": {
             "x": 0,
-            "y": 0.13 * 1.45,
+            "y": 0.13 * 2.4,
             "z": 0
         },
         "positionY": 0,
         "scale": {
-            "x": 1.45,
-            "y": 1.45,
-            "z": 1.45
+            "x": 2.4,
+            "y": 2.4,
+            "z": 2.4
         }
     }, {
-        # Big enough to fit a trophy
+        # Big enough to fit a soccer ball inside
         "size": "medium",
         "mass": 4,
         "enclosedAreas": [{
             "position": {
                 "x": 0,
-                "y": 0.09 * 1.15,
+                "y": 0.09 * 2,
                 "z": 0
             },
             "dimensions": {
-                "x": 0.35 * 1.15,
-                "y": 0.12 * 1.15,
-                "z": 0.21 * 1.15
+                "x": 0.35 * 2,
+                "y": 0.12 * 2,
+                "z": 0.21 * 2
             }
         }],
         "dimensions": {
-            "x": 0.46 * 1.15,
-            "y": 0.26 * 1.15,
-            "z": 0.32 * 1.15
+            "x": 0.46 * 2,
+            "y": 0.26 * 2,
+            "z": 0.32 * 2
         },
         "offset": {
             "x": 0,
-            "y": 0.13 * 1.15,
+            "y": 0.13 * 2,
             "z": 0
         },
         "positionY": 0,
         "scale": {
-            "x": 1.15,
-            "y": 1.15,
-            "z": 1.15
+            "x": 2,
+            "y": 2,
+            "z": 2
         }
     }, {
-        # Big enough to fit a trophy
+        # Big enough to fit a soccer ball inside
         "size": "medium",
         "mass": 3.5,
         "enclosedAreas": [{
             "position": {
                 "x": 0,
-                "y": 0.09 * 0.85,
+                "y": 0.09 * 1.6,
                 "z": 0
             },
             "dimensions": {
-                "x": 0.35 * 0.85,
-                "y": 0.12 * 0.85,
-                "z": 0.21 * 0.85
+                "x": 0.35 * 1.6,
+                "y": 0.12 * 1.6,
+                "z": 0.21 * 1.6
             }
         }],
         "dimensions": {
-            "x": 0.46 * 0.85,
-            "y": 0.26 * 0.85,
-            "z": 0.32 * 0.85
+            "x": 0.46 * 1.6,
+            "y": 0.26 * 1.6,
+            "z": 0.32 * 1.6
         },
         "offset": {
             "x": 0,
-            "y": 0.13 * 0.85,
+            "y": 0.13 * 1.6,
             "z": 0
         },
         "positionY": 0,
         "scale": {
-            "x": 0.85,
-            "y": 0.85,
-            "z": 0.85
+            "x": 1.6,
+            "y": 1.6,
+            "z": 1.6
         }
     }, {
-        # Too little to fit a trophy
+        # Too little to fit a soccer ball inside
         "size": "medium",
         "mass": 3,
         "enclosedAreas": [{
             "position": {
                 "x": 0,
-                "y": 0.09 * 0.65,
+                "y": 0.09 * 1.2,
                 "z": 0
             },
             "dimensions": {
-                "x": 0.35 * 0.65,
-                "y": 0.12 * 0.65,
-                "z": 0.21 * 0.65
+                "x": 0.35 * 1.2,
+                "y": 0.12 * 1.2,
+                "z": 0.21 * 1.2
             }
         }],
         "dimensions": {
-            "x": 0.46 * 0.65,
-            "y": 0.26 * 0.65,
-            "z": 0.32 * 0.65
+            "x": 0.46 * 1.2,
+            "y": 0.26 * 1.2,
+            "z": 0.32 * 1.2
         },
         "offset": {
             "x": 0,
-            "y": 0.13 * 0.65,
+            "y": 0.13 * 1.2,
             "z": 0
         },
         "positionY": 0,
         "scale": {
-            "x": 0.65,
-            "y": 0.65,
-            "z": 0.65
+            "x": 1.2,
+            "y": 1.2,
+            "z": 1.2
         }
     }, {
-        # Too little to fit a trophy
+        # Too little to fit a soccer ball inside
         "size": "small",
         "mass": 2.5,
         "enclosedAreas": [{
             "position": {
                 "x": 0,
-                "y": 0.09 * 0.55,
+                "y": 0.09 * 0.8,
                 "z": 0
             },
             "dimensions": {
-                "x": 0.35 * 0.55,
-                "y": 0.12 * 0.55,
-                "z": 0.21 * 0.55
+                "x": 0.35 * 0.8,
+                "y": 0.12 * 0.8,
+                "z": 0.21 * 0.8
             }
         }],
         "dimensions": {
-            "x": 0.46 * 0.55,
-            "y": 0.26 * 0.55,
-            "z": 0.32 * 0.55
+            "x": 0.46 * 0.8,
+            "y": 0.26 * 0.8,
+            "z": 0.32 * 0.8
         },
         "offset": {
             "x": 0,
-            "y": 0.13 * 0.55,
+            "y": 0.13 * 0.8,
             "z": 0
         },
         "positionY": 0,
         "scale": {
-            "x": 0.55,
-            "y": 0.55,
-            "z": 0.55
+            "x": 0.8,
+            "y": 0.8,
+            "z": 0.8
         }
     }]
 }
@@ -8747,41 +8820,105 @@ _CHEST_8_SEMICYLINDER = {
         "salientMaterials": ["metal"],
     }],
     "chooseSize": [{
-        # Big enough to fit a trophy
+        # Big enough to fit a soccer ball inside
         "size": "medium",
         "mass": 4.5,
         "enclosedAreas": [{
             "position": {
                 "x": 0,
-                "y": 0.09 * 1.6,
+                "y": 0.09 * 3,
                 "z": 0
             },
             "dimensions": {
-                "x": 0.36 * 1.6,
-                "y": 0.135 * 1.6,
-                "z": 0.28 * 1.6
+                "x": 0.36 * 3,
+                "y": 0.135 * 3,
+                "z": 0.28 * 3
             }
         }],
         "dimensions": {
-            "x": 0.42 * 1.6,
-            "y": 0.32 * 1.6,
-            "z": 0.36 * 1.6
+            "x": 0.42 * 3,
+            "y": 0.32 * 3,
+            "z": 0.36 * 3
         },
         "offset": {
             "x": 0,
-            "y": 0.16 * 1.6,
+            "y": 0.16 * 3,
             "z": 0
         },
         "positionY": 0,
         "scale": {
-            "x": 1.6,
-            "y": 1.6,
-            "z": 1.6
+            "x": 3,
+            "y": 3,
+            "z": 3
         }
     }, {
-        # Big enough to fit a trophy
+        # Big enough to fit a soccer ball inside
         "size": "medium",
         "mass": 4,
+        "enclosedAreas": [{
+            "position": {
+                "x": 0,
+                "y": 0.09 * 2.4,
+                "z": 0
+            },
+            "dimensions": {
+                "x": 0.36 * 2.4,
+                "y": 0.135 * 2.4,
+                "z": 0.28 * 2.4
+            }
+        }],
+        "dimensions": {
+            "x": 0.42 * 2.4,
+            "y": 0.32 * 2.4,
+            "z": 0.36 * 2.4
+        },
+        "offset": {
+            "x": 0,
+            "y": 0.16 * 2.4,
+            "z": 0
+        },
+        "positionY": 0,
+        "scale": {
+            "x": 2.4,
+            "y": 2.4,
+            "z": 2.4
+        }
+    }, {
+        # Big enough to fit a soccer ball inside
+        "size": "medium",
+        "mass": 3.5,
+        "enclosedAreas": [{
+            "position": {
+                "x": 0,
+                "y": 0.09 * 1.8,
+                "z": 0
+            },
+            "dimensions": {
+                "x": 0.36 * 1.8,
+                "y": 0.135 * 1.8,
+                "z": 0.28 * 1.8
+            }
+        }],
+        "dimensions": {
+            "x": 0.42 * 1.8,
+            "y": 0.32 * 1.8,
+            "z": 0.36 * 1.8
+        },
+        "offset": {
+            "x": 0,
+            "y": 0.16 * 1.8,
+            "z": 0
+        },
+        "positionY": 0,
+        "scale": {
+            "x": 1.8,
+            "y": 1.8,
+            "z": 1.8
+        }
+    }, {
+        # Too little to fit a soccer ball inside
+        "size": "medium",
+        "mass": 3,
         "enclosedAreas": [{
             "position": {
                 "x": 0,
@@ -8811,9 +8948,9 @@ _CHEST_8_SEMICYLINDER = {
             "z": 1.2
         }
     }, {
-        # Big enough to fit a trophy
-        "size": "medium",
-        "mass": 3.5,
+        # Too little to fit a soccer ball inside
+        "size": "small",
+        "mass": 2.5,
         "enclosedAreas": [{
             "position": {
                 "x": 0,
@@ -8841,70 +8978,6 @@ _CHEST_8_SEMICYLINDER = {
             "x": 0.8,
             "y": 0.8,
             "z": 0.8
-        }
-    }, {
-        # Too little to fit a trophy
-        "size": "medium",
-        "mass": 3,
-        "enclosedAreas": [{
-            "position": {
-                "x": 0,
-                "y": 0.09 * 0.6,
-                "z": 0
-            },
-            "dimensions": {
-                "x": 0.36 * 0.6,
-                "y": 0.135 * 0.6,
-                "z": 0.28 * 0.6
-            }
-        }],
-        "dimensions": {
-            "x": 0.42 * 0.6,
-            "y": 0.32 * 0.6,
-            "z": 0.36 * 0.6
-        },
-        "offset": {
-            "x": 0,
-            "y": 0.16 * 0.6,
-            "z": 0
-        },
-        "positionY": 0,
-        "scale": {
-            "x": 0.6,
-            "y": 0.6,
-            "z": 0.6
-        }
-    }, {
-        # Too little to fit a trophy
-        "size": "small",
-        "mass": 2.5,
-        "enclosedAreas": [{
-            "position": {
-                "x": 0,
-                "y": 0.09 * 0.4,
-                "z": 0
-            },
-            "dimensions": {
-                "x": 0.36 * 0.4,
-                "y": 0.135 * 0.4,
-                "z": 0.28 * 0.4
-            }
-        }],
-        "dimensions": {
-            "x": 0.42 * 0.4,
-            "y": 0.32 * 0.4,
-            "z": 0.36 * 0.4
-        },
-        "offset": {
-            "x": 0,
-            "y": 0.16 * 0.4,
-            "z": 0
-        },
-        "positionY": 0,
-        "scale": {
-            "x": 0.4,
-            "y": 0.4,
-            "z": 0.4
         }
     }]
 }
@@ -9604,7 +9677,7 @@ _TRUCK_BASE_SIZE = {
         "z": 0.2
     },
     "mass": 0.25,
-    "positionY": 0,
+    "positionY": 0.095,
     "scale": {
         "x": 1,
         "y": 1,
@@ -9778,10 +9851,10 @@ _MOVE_ACROSS_COMPLEX = [
     _INTUITIVE_PHYSICS_CAR,
     _INTUITIVE_PHYSICS_RACECAR,
     # Eval 3 Untrained Shapes
-    _INTUITIVE_PHYSICS_DOG,
+    # _INTUITIVE_PHYSICS_DOG,
     _INTUITIVE_PHYSICS_TRAIN,
-    _INTUITIVE_PHYSICS_TROLLEY,
-    _INTUITIVE_PHYSICS_TRUCK
+    _INTUITIVE_PHYSICS_TROLLEY
+    # _INTUITIVE_PHYSICS_TRUCK
 ]
 
 _FALL_DOWN_COMPLEX = _MOVE_ACROSS_COMPLEX.copy()
@@ -9828,6 +9901,6 @@ def get_intuitive_physics(
     ))
 
 
-def get_trophy() -> Dict[str, Any]:
-    """Returns a deep copy of the trophy object (Eval 3 interactive target)."""
-    return _get('TROPHY')
+def get_soccer_ball() -> Dict[str, Any]:
+    """Returns a deep copy of the soccer ball (Eval 4 interactive target)."""
+    return _get('SOCCER_BALL')

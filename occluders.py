@@ -68,16 +68,16 @@ _OCCLUDER_INSTANCE_NORMAL = [{
         }
     }],
     "rotates": [{
-        "stepBegin": 1,
-        "stepEnd": 2,
+        "stepBegin": 5,
+        "stepEnd": 6,
         "vector": {
             "x": 0,
             "y": 45,
             "z": 0
         }
     }, {
-        "stepBegin": 11,
-        "stepEnd": 12,
+        "stepBegin": 7,
+        "stepEnd": 8,
         "vector": {
             "x": 0,
             "y": -45,
