@@ -898,9 +898,9 @@ def test_retrieve_untrained_definition_list():
     }]
 
     actual_1 = retrieve_untrained_definition_list([definition_list],
-                                                  'untrainedShape')[0]
+                                                  'untrainedCategory')[0]
     assert len(actual_1) == 1
-    assert actual_1[0]['type'] == 'e'
+    assert actual_1[0]['type'] == 'b'
 
     actual_2 = retrieve_untrained_definition_list([definition_list],
                                                   'untrainedSize')[0]

@@ -26,6 +26,10 @@ You may need to install `testresources`:
 sudo apt install python3-testresources
 ```
 
+## Notes
+
+- Eval 4: If you generate Eval 3 hypercubes for training (interactive container, interactive obstacle, interactive occluder, intuitive physics shape constancy), please note that all "untrained"/"novel" shapes will be chosen from the same set of "trained"/"familiar" shapes that are currently available for all training in Eval 4.
+
 ## Running
 
 To see all of the scene generator's options:
@@ -114,6 +118,8 @@ The Eval 3 Spatio-Temporal Continuity scenes, and all the Eval 4 scenes, only us
 - `tube_narrow`
 - `tube_wide`
 - `turtle_on_wheels`
+
+The Eval 4 Object Permanence and Spatio-Temporal Continuity scenes (both during training and the Eval) use the same objects as listed above EXCEPT they cannot use spheres.
 
 #### Training Intuitive Physics Datasets
 
