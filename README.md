@@ -91,7 +91,7 @@ The Eval 3 Object Permanence and Shape Constancy scenes only use the following t
 - `cone`
 - `cube`
 - `cylinder`
-- `dog_on_wheels`
+- `duck_on_wheels`
 - `pyramid`
 - `racecar_red`
 - `sphere`
