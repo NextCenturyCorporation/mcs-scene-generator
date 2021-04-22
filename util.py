@@ -437,6 +437,10 @@ def retrieve_untrained_definition_list(
 ) -> List[List[Dict[str, Any]]]:
     """Return only the object definitions from the given list that have the
     given untrained tag but are otherwise completely trained."""
+    # TODO FIXME MCS-635
+    if untrained_tag == tags.SCENE.UNTRAINED_SHAPE:
+        return retrieve_trained_definition_list(nested_definition_list)
+
     trained_tag_list = [tag for tag in [
         tags.SCENE.UNTRAINED_CATEGORY,
         tags.SCENE.UNTRAINED_COLOR,

@@ -981,7 +981,6 @@ _PLATE = {
 
 
 _BOOKCASE = {
-    "untrainedShape": True,
     "shape": ["shelf"],
     "attributes": ["receptacle", "stackTarget", "occluder"],
     "chooseMaterial": [{
@@ -1697,7 +1696,6 @@ _BOOKCASE = {
 
 
 _BOOKCASE_SIDELESS = {
-    "untrainedShape": True,
     "shape": ["shelf"],
     "attributes": ["receptacle", "stackTarget", "obstacle"],
     "chooseMaterial": [{
@@ -2413,7 +2411,6 @@ _BOOKCASE_SIDELESS = {
 
 
 _CART = {
-    "untrainedShape": True,
     "type": "cart_1",
     "shape": ["cart"],
     "attributes": ["moveable", "receptacle", "stackTarget", "obstacle"],
@@ -2952,7 +2949,6 @@ _CHAIR_2_STOOL_CIRCLE = {
 
 
 _CHAIR_3_STOOL_RECT = {
-    "untrainedShape": True,
     "type": "chair_3",
     "shape": ["stool"],
     "attributes": ["moveable", "receptacle", "stackTarget", "obstacle"],
@@ -3069,7 +3065,6 @@ _CHAIR_3_STOOL_RECT = {
 
 
 _CHAIR_4_OFFICE = {
-    "untrainedShape": True,
     "type": "chair_4",
     "shape": ["chair"],
     "attributes": ["moveable", "receptacle", "obstacle"],
@@ -3822,7 +3817,6 @@ _TABLE_1_RECT_INACCESSIBLE = {
 
 
 _TABLE_2_CIRCLE_BABY_SIZE = {
-    "untrainedShape": True,
     "type": "table_2",
     "shape": ["table"],
     "attributes": ["moveable", "receptacle", "stackTarget", "obstacle"],
@@ -3907,7 +3901,6 @@ _TABLE_2_CIRCLE_BABY_SIZE = {
 
 
 _TABLE_2_CIRCLE_ACCESSIBLE = {
-    "untrainedShape": True,
     "type": "table_2",
     "shape": ["table"],
     "attributes": ["moveable", "receptacle", "stackTarget", "obstacle"],
@@ -4056,7 +4049,6 @@ _TABLE_2_CIRCLE_ACCESSIBLE = {
 
 
 _TABLE_2_CIRCLE_INACCESSIBLE = {
-    "untrainedShape": True,
     "type": "table_2",
     "shape": ["table"],
     "attributes": ["receptacle", "obstacle"],
@@ -4449,7 +4441,6 @@ _TABLE_3_CIRCLE_INACCESSIBLE = {
 
 
 _TABLE_4_SEMICIRCLE_ACCESSIBLE = {
-    "untrainedShape": True,
     "type": "table_4",
     "shape": ["table"],
     "attributes": ["moveable", "receptacle", "stackTarget", "obstacle"],
@@ -4598,7 +4589,6 @@ _TABLE_4_SEMICIRCLE_ACCESSIBLE = {
 
 
 _TABLE_4_SEMICIRCLE_INACCESSIBLE = {
-    "untrainedShape": True,
     "type": "table_4",
     "shape": ["table"],
     "attributes": ["receptacle", "obstacle"],
@@ -5039,7 +5029,6 @@ _TABLE_5_RECT_INACCESSIBLE = {
 
 
 _TABLE_7_RECT_ACCESSIBLE = {
-    "untrainedShape": True,
     "type": "table_7",
     "shape": ["table"],
     "attributes": ["receptacle", "stackTarget", "obstacle"],
@@ -5248,7 +5237,6 @@ _TABLE_7_RECT_ACCESSIBLE = {
 
 
 _TABLE_7_RECT_INACCESSIBLE = {
-    "untrainedShape": True,
     "type": "table_7",
     "shape": ["table"],
     "attributes": ["receptacle", "obstacle"],
@@ -5457,7 +5445,6 @@ _TABLE_7_RECT_INACCESSIBLE = {
 
 
 _TABLE_8_RECT_ACCESSIBLE = {
-    "untrainedShape": True,
     "type": "table_8",
     "shape": ["table"],
     "attributes": ["receptacle", "stackTarget", "obstacle"],
@@ -5666,7 +5653,6 @@ _TABLE_8_RECT_ACCESSIBLE = {
 
 
 _TABLE_8_RECT_INACCESSIBLE = {
-    "untrainedShape": True,
     "type": "table_8",
     "shape": ["table"],
     "attributes": ["receptacle", "obstacle"],
@@ -5875,7 +5861,6 @@ _TABLE_8_RECT_INACCESSIBLE = {
 
 
 _TABLE_11_T_LEGS = {
-    "untrainedShape": True,
     "type": "table_11",
     "shape": ["table"],
     "attributes": ["receptacle", "stackTarget", "occluder"],
@@ -6024,7 +6009,6 @@ _TABLE_11_T_LEGS = {
 
 
 _TABLE_12_X_LEGS = {
-    "untrainedShape": True,
     "type": "table_12",
     "shape": ["table"],
     "attributes": ["receptacle", "stackTarget", "occluder"],
@@ -6173,7 +6157,6 @@ _TABLE_12_X_LEGS = {
 
 
 _TV = {
-    "untrainedShape": True,
     "type": "tv_2",
     "shape": ["television"],
     "color": ["grey", "black"],
@@ -7344,7 +7327,6 @@ _SOFA_2 = {
 
 
 _SOFA_3 = {
-    "untrainedShape": True,
     "type": "sofa_3",
     "shape": ["sofa"],
     "materialCategory": ["sofa_3"],
@@ -7679,7 +7661,6 @@ _SOFA_CHAIR_2 = {
 
 
 _SOFA_CHAIR_3 = {
-    "untrainedShape": True,
     "type": "sofa_chair_3",
     "shape": ["sofa chair"],
     "materialCategory": ["sofa_3"],
@@ -8021,7 +8002,6 @@ _CASE_1_SUITCASE = {
 
 
 _CASE_3 = {
-    "untrainedShape": True,
     "type": "case_3",
     "shape": ["case"],
     "attributes": ["receptacle", "openable", "occluder"],
@@ -8622,7 +8602,6 @@ _CHEST_2_SEMICYLINDER = {
 
 
 _CHEST_3_CUBOID = {
-    "untrainedShape": True,
     "type": "chest_3",
     "shape": ["chest"],
     "attributes": ["receptacle", "openable", "occluder"],
@@ -8803,7 +8782,6 @@ _CHEST_3_CUBOID = {
 
 
 _CHEST_8_SEMICYLINDER = {
-    "untrainedShape": True,
     "type": "chest_8",
     "shape": ["chest"],
     "attributes": ["receptacle", "openable", "occluder"],
@@ -9173,7 +9151,6 @@ _RECT_BASE_SIZE = {
 
 
 _INTUITIVE_PHYSICS_CIRCLE_FRUSTUM = {
-    "untrainedShape": True,
     "type": "circle_frustum",
     "shape": ["circle frustum"],
     "chooseSize": [
@@ -9256,7 +9233,6 @@ _INTUITIVE_PHYSICS_CYLINDER = {
 
 
 _INTUITIVE_PHYSICS_PYRAMID = {
-    "untrainedShape": True,
     "type": "pyramid",
     "shape": ["pyramid"],
     "chooseSize": [
@@ -9333,7 +9309,6 @@ _INTUITIVE_PHYSICS_SQUARE_FRUSTUM = {
 
 
 _INTUITIVE_PHYSICS_TUBE_NARROW = {
-    "untrainedShape": True,
     "type": "tube_narrow",
     "shape": ["narrow tube"],
     "rotation": {
@@ -9359,7 +9334,6 @@ _INTUITIVE_PHYSICS_TUBE_NARROW = {
 
 
 _INTUITIVE_PHYSICS_TUBE_WIDE = {
-    "untrainedShape": True,
     "type": "tube_wide",
     "shape": ["wide tube"],
     "rotation": {
@@ -9557,7 +9531,6 @@ _DOG_BASE_SIZE = {
 
 
 _INTUITIVE_PHYSICS_DOG = {
-    "untrainedShape": True,
     "type": "dog_on_wheels",
     "shape": ["dog"],
     "rotation": {
@@ -9601,7 +9574,6 @@ _TRAIN_BASE_SIZE = {
 
 
 _INTUITIVE_PHYSICS_TRAIN = {
-    "untrainedShape": True,
     "type": "train_1",
     "shape": ["train"],
     "rotation": {
@@ -9644,7 +9616,6 @@ _TROLLEY_BASE_SIZE = {
 
 
 _INTUITIVE_PHYSICS_TROLLEY = {
-    "untrainedShape": True,
     "type": "trolley_1",
     "shape": ["trolley"],
     "rotation": {
@@ -9687,7 +9658,6 @@ _TRUCK_BASE_SIZE = {
 
 
 _INTUITIVE_PHYSICS_TRUCK = {
-    "untrainedShape": True,
     "type": "truck_1",
     "shape": ["truck"],
     "rotation": {
