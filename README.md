@@ -92,14 +92,12 @@ The Eval 3 Object Permanence and Shape Constancy scenes only use the following t
 - `cube`
 - `cylinder`
 - `dog_on_wheels`
-- `duck_on_wheels`
 - `pyramid`
 - `racecar_red`
 - `sphere`
 - `square_frustum`
 - `train_1`
 - `trolley_1`
-- `truck_1`
 - `tube_narrow`
 - `tube_wide`
 - `turtle_on_wheels`
@@ -108,13 +106,11 @@ The Eval 3 Spatio-Temporal Continuity scenes, and all the Eval 4 scenes, only us
 
 - `car_1`
 - `cylinder`
-- `dog_on_wheels`
 - `duck_on_wheels`
 - `racecar_red`
 - `sphere`
 - `train_1`
 - `trolley_1`
-- `truck_1`
 - `tube_narrow`
 - `tube_wide`
 - `turtle_on_wheels`
