@@ -16,6 +16,10 @@ MIN_RANDOM_INTERVAL = 0.05
 PERFORMER_HALF_WIDTH = 0.27
 PERFORMER_WIDTH = PERFORMER_HALF_WIDTH * 2.0
 
+MAX_REACH_DISTANCE = 1.0
+MOVE_DISTANCE = 0.1
+PERFORMER_CAMERA_Y = 0.762
+
 
 def random_real(a: float, b: float,
                 step: float = MIN_RANDOM_INTERVAL) -> float:
@@ -440,7 +444,6 @@ def retrieve_untrained_definition_list(
     # TODO FIXME MCS-635
     if untrained_tag == tags.SCENE.UNTRAINED_SHAPE:
         return retrieve_trained_definition_list(nested_definition_list)
-
     trained_tag_list = [tag for tag in [
         tags.SCENE.UNTRAINED_CATEGORY,
         tags.SCENE.UNTRAINED_COLOR,

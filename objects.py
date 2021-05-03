@@ -9648,7 +9648,7 @@ _TRUCK_BASE_SIZE = {
         "z": 0.2
     },
     "mass": 0.25,
-    "positionY": 0.095,
+    "positionY": 0.1,
     "scale": {
         "x": 1,
         "y": 1,

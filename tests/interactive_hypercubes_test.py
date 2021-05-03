@@ -8,7 +8,6 @@ from interactive_hypercubes import WALL_DEPTH, WALL_HEIGHT, WALL_MAX_WIDTH, \
     InteractiveContainerEvaluationHypercubeFactory, \
     InteractiveObstacleEvaluationHypercubeFactory, \
     InteractiveOccluderEvaluationHypercubeFactory
-from machine_common_sense.controller import PERFORMER_CAMERA_Y
 import shapely
 from shapely import affinity
 import util
@@ -435,7 +434,7 @@ def verify_obstacle(obstacle, target, object_list, performer_start):
             f'target={target}\nobstacle={obstacle}')
         return False
 
-    if dimensions['y'] < (PERFORMER_CAMERA_Y / 2.0):
+    if dimensions['y'] < (util.PERFORMER_CAMERA_Y / 2.0):
         print(
             f'[ERROR] OBSTACLE SHOULD BE TALL ENOUGH SO THE PERFORMER CANNOT '
             f'SIMPLY WALK OVER IT:\ntarget={target}\nobstacle={obstacle}')
@@ -482,7 +481,7 @@ def verify_occluder(occluder, target, object_list, performer_start):
             f'target={target}\noccluder={occluder}')
         return False
 
-    if dimensions['y'] < (PERFORMER_CAMERA_Y / 2.0):
+    if dimensions['y'] < (util.PERFORMER_CAMERA_Y / 2.0):
         print(
             f'[ERROR] OCCLUDER SHOULD BE TALL ENOUGH SO THE PERFORMER CANNOT '
             f'SIMPLY WALK OVER IT:\ntarget={target}\noccluder={occluder}')

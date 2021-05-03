@@ -4,7 +4,9 @@ import util
 import uuid
 
 
-OCCLUDER_HEIGHT = 1.5
+# Default occluder height of 1.8 enables seeing a falling object for 8+ frames.
+OCCLUDER_HEIGHT = 1.8
+OCCLUDER_HEIGHT_TALL = 3
 OCCLUDER_POSITION_Z = 1
 
 OCCLUDER_MIN_SCALE_X = 0.5
@@ -16,8 +18,13 @@ OCCLUDER_BUFFER = 0.1
 OCCLUDER_MAX_X = 3
 OCCLUDER_DEFAULT_MAX_X = OCCLUDER_MAX_X - (OCCLUDER_MIN_SCALE_X / 2)
 
-# Each occluder will take 6 steps to move and rotate.
-OCCLUDER_MOVEMENT_TIME = 6
+# Each occluder will take up to 40 steps to move, rotate, and wait before it
+# can move again.
+OCCLUDER_MOVEMENT_TIME = 40
+
+MOVE_STEP_LENGTH = 6
+MOVE_AMOUNT_UP = 1.5 / MOVE_STEP_LENGTH
+ROTATE_STEP_WAIT = 4
 
 
 _OCCLUDER_INSTANCE_NORMAL = [{
@@ -44,51 +51,51 @@ _OCCLUDER_INSTANCE_NORMAL = [{
     }],
     "moves": [{
         "stepBegin": 1,
-        "stepEnd": 6,
+        "stepEnd": MOVE_STEP_LENGTH,
         "vector": {
             "x": 0,
-            "y": 0.25,
+            "y": MOVE_AMOUNT_UP,
             "z": 0
         }
     }, {
-        "stepBegin": 7,
-        "stepEnd": 12,
+        "stepBegin": None,
+        "stepEnd": None,
         "vector": {
             "x": 0,
-            "y": -0.25,
+            "y": -MOVE_AMOUNT_UP,
             "z": 0
         }
     }, {
-        "stepBegin": 85,
-        "stepEnd": 90,
+        "stepBegin": None,
+        "stepEnd": None,
         "vector": {
             "x": 0,
-            "y": 0.25,
+            "y": MOVE_AMOUNT_UP,
             "z": 0
         }
     }],
     "rotates": [{
-        "stepBegin": 5,
-        "stepEnd": 6,
+        "stepBegin": MOVE_STEP_LENGTH + 1,
+        "stepEnd": None,
         "vector": {
             "x": 0,
-            "y": 45,
+            "y": None,
             "z": 0
         }
     }, {
-        "stepBegin": 7,
-        "stepEnd": 8,
+        "stepBegin": None,
+        "stepEnd": None,
         "vector": {
             "x": 0,
-            "y": -45,
+            "y": None,
             "z": 0
         }
     }, {
-        "stepBegin": 89,
-        "stepEnd": 90,
+        "stepBegin": None,
+        "stepEnd": None,
         "vector": {
             "x": 0,
-            "y": 45,
+            "y": None,
             "z": 0
         }
     }]
@@ -116,26 +123,26 @@ _OCCLUDER_INSTANCE_NORMAL = [{
     }],
     "moves": [{
         "stepBegin": 1,
-        "stepEnd": 6,
+        "stepEnd": MOVE_STEP_LENGTH,
         "vector": {
             "x": 0,
-            "y": 0.25,
+            "y": MOVE_AMOUNT_UP,
             "z": 0
         }
     }, {
-        "stepBegin": 7,
-        "stepEnd": 12,
+        "stepBegin": None,
+        "stepEnd": None,
         "vector": {
             "x": 0,
-            "y": -0.25,
+            "y": -MOVE_AMOUNT_UP,
             "z": 0
         }
     }, {
-        "stepBegin": 85,
-        "stepEnd": 90,
+        "stepBegin": None,
+        "stepEnd": None,
         "vector": {
             "x": 0,
-            "y": 0.25,
+            "y": MOVE_AMOUNT_UP,
             "z": 0
         }
     }]
@@ -166,34 +173,34 @@ _OCCLUDER_INSTANCE_SIDEWAYS = [{
     }],
     "moves": [{
         "stepBegin": 1,
-        "stepEnd": 4,
+        "stepEnd": MOVE_STEP_LENGTH,
         "vector": {
             "x": 0,
-            "y": 0.25,
+            "y": MOVE_AMOUNT_UP,
             "z": 0
         }
     }, {
-        "stepBegin": 9,
-        "stepEnd": 12,
+        "stepBegin": None,
+        "stepEnd": None,
         "vector": {
             "x": 0,
-            "y": -0.25,
+            "y": -MOVE_AMOUNT_UP,
             "z": 0
         }
     }, {
-        "stepBegin": 55,
-        "stepEnd": 58,
+        "stepBegin": None,
+        "stepEnd": None,
         "vector": {
             "x": 0,
-            "y": 0.25,
+            "y": MOVE_AMOUNT_UP,
             "z": 0
         }
     }],
     "rotates": [{
-        "stepBegin": 5,
-        "stepEnd": 6,
+        "stepBegin": MOVE_STEP_LENGTH + 1,
+        "stepEnd": None,
         "vector": {
-            "x": 45,
+            "x": None,
             "y": 0,
             "z": 0
         }
@@ -201,7 +208,7 @@ _OCCLUDER_INSTANCE_SIDEWAYS = [{
         "stepBegin": 7,
         "stepEnd": 8,
         "vector": {
-            "x": -45,
+            "x": None,
             "y": 0,
             "z": 0
         }
@@ -209,7 +216,7 @@ _OCCLUDER_INSTANCE_SIDEWAYS = [{
         "stepBegin": 59,
         "stepEnd": 60,
         "vector": {
-            "x": 45,
+            "x": None,
             "y": 0,
             "z": 0
         }
@@ -243,30 +250,97 @@ _OCCLUDER_INSTANCE_SIDEWAYS = [{
     }],
     "moves": [{
         "stepBegin": 1,
-        "stepEnd": 4,
+        "stepEnd": MOVE_STEP_LENGTH,
         "vector": {
-            "x": 0.25,
+            "x": MOVE_AMOUNT_UP,
             "y": 0,
             "z": 0
         }
     }, {
-        "stepBegin": 9,
-        "stepEnd": 12,
+        "stepBegin": None,
+        "stepEnd": None,
         "vector": {
-            "x": -0.25,
+            "x": -MOVE_AMOUNT_UP,
             "y": 0,
             "z": 0
         }
     }, {
-        "stepBegin": 55,
-        "stepEnd": 58,
+        "stepBegin": None,
+        "stepEnd": None,
         "vector": {
-            "x": 0.25,
+            "x": MOVE_AMOUNT_UP,
             "y": 0,
             "z": 0
         }
     }]
 }]
+
+
+WALL = 0
+POLE = 1
+
+
+def adjust_movement_and_rotation_to_scale(
+    occluder: List[Dict[str, Any]],
+    sideways: bool,
+    last_step: int,
+    x_scale_override: float = None
+) -> None:
+    """Adjust the move and rotate properties of the given occluder based on its
+    given X scale and the other input."""
+    x_position = occluder[WALL]['shows'][0]['position']['x']
+    x_scale = (
+        x_scale_override if x_scale_override
+        else occluder[WALL]['shows'][0]['scale']['x']
+    )
+
+    # Rotation step length based on occluder's X scale.
+    rotate_length = find_rotate_step_length(x_scale)
+    rotate_amount = 90.0 / rotate_length
+    rotate_prop = 'x' if sideways else 'y'
+
+    # Note: Subtract 1 from each stepEnd because the property's inclusive.
+
+    # Rotate occluder wall by 90 degrees after a short delay.
+    occluder[WALL]['rotates'][0]['stepEnd'] = MOVE_STEP_LENGTH + rotate_length
+    occluder[WALL]['rotates'][0]['vector'][rotate_prop] = rotate_amount
+
+    # Rotate occluder wall back after a short pause.
+    occluder[WALL]['rotates'][1]['stepBegin'] = (
+        MOVE_STEP_LENGTH + rotate_length + ROTATE_STEP_WAIT + 1
+    )
+    occluder[WALL]['rotates'][1]['stepEnd'] = (
+        MOVE_STEP_LENGTH + (2 * rotate_length) + ROTATE_STEP_WAIT
+    )
+    occluder[WALL]['rotates'][1]['vector'][rotate_prop] = -rotate_amount
+
+    # Move occluder back down after its first rotation.
+    move_down_step_begin = occluder[WALL]['rotates'][1]['stepEnd'] + 1
+    move_down_step_end = move_down_step_begin + MOVE_STEP_LENGTH - 1
+    occluder[WALL]['moves'][1]['stepBegin'] = move_down_step_begin
+    occluder[WALL]['moves'][1]['stepEnd'] = move_down_step_end
+    occluder[POLE]['moves'][1]['stepBegin'] = move_down_step_begin
+    occluder[POLE]['moves'][1]['stepEnd'] = move_down_step_end
+
+    # Move occluder back up at end of scene before its final rotate.
+    move_up_step_begin = (
+        last_step - rotate_length - MOVE_STEP_LENGTH - ROTATE_STEP_WAIT + 1
+    )
+    move_up_step_end = move_up_step_begin + MOVE_STEP_LENGTH - 1
+    occluder[WALL]['moves'][2]['stepBegin'] = move_up_step_begin
+    occluder[WALL]['moves'][2]['stepEnd'] = move_up_step_end
+    occluder[POLE]['moves'][2]['stepBegin'] = move_up_step_begin
+    occluder[POLE]['moves'][2]['stepEnd'] = move_up_step_end
+
+    # Rotate occluder wall by 90 degrees at end of scene after its final move.
+    occluder[WALL]['rotates'][2]['stepBegin'] = move_up_step_end + 1
+    occluder[WALL]['rotates'][2]['stepEnd'] = last_step - ROTATE_STEP_WAIT
+    occluder[WALL]['rotates'][2]['vector'][rotate_prop] = rotate_amount
+
+    if (not sideways) and (x_position > 0):
+        # Rotate counterclockwise if occluder is on the right (positive) side.
+        for rotate in occluder[WALL]['rotates']:
+            rotate['vector']['y'] *= -1
 
 
 def calculate_separation_distance(
@@ -288,25 +362,21 @@ def create_occluder(
     pole_material: Tuple[str, List[str]],
     x_position: float,
     x_scale: float,
-    sideways_left: bool = False,
-    sideways_right: bool = False,
-    occluder_height: float = OCCLUDER_HEIGHT,
-    last_step: int = None
+    sideways_left: bool,
+    sideways_right: bool,
+    occluder_height: float,
+    last_step: int
 ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
     """Create an occluder as a pair of separate wall and pole objects."""
 
     if sideways_left or sideways_right:
         occluder = copy.deepcopy(_OCCLUDER_INSTANCE_SIDEWAYS)
-        occluder[0]['shows'][0]['position']['y'] = occluder_height / 2.0
-        occluder[0]['shows'][0]['scale']['y'] = occluder_height
-        occluder[1]['shows'][0]['position']['y'] = occluder_height / 2.0
+        occluder[POLE]['shows'][0]['position']['y'] = occluder_height / 2.0
     else:
         occluder = copy.deepcopy(_OCCLUDER_INSTANCE_NORMAL)
-        occluder[0]['shows'][0]['position']['y'] = occluder_height / 2.0
-        occluder[0]['shows'][0]['scale']['y'] = occluder_height
 
-    WALL = 0
-    POLE = 1
+    occluder[WALL]['shows'][0]['position']['y'] = occluder_height / 2.0
+    occluder[WALL]['shows'][0]['scale']['y'] = occluder_height
 
     occluder_id = str(uuid.uuid4())
     occluder[WALL]['id'] = occluder[WALL]['id'] + occluder_id
@@ -328,6 +398,7 @@ def create_occluder(
     occluder[WALL]['shows'][0]['scale']['x'] = x_scale
 
     if sideways_left or sideways_right:
+        # Adjust the pole position for the sideways occluder.
         occluder[POLE]['shows'][0]['position']['x'] = (
             generate_occluder_pole_position_x(
                 x_position,
@@ -335,27 +406,36 @@ def create_occluder(
                 sideways_left
             )
         )
-    elif x_position > 0:
-        for rot in occluder[WALL]['rotates']:
-            rot['vector']['y'] *= -1
 
-    if last_step:
-        if sideways_left or sideways_right:
-            occluder[POLE]['moves'][-1]['stepBegin'] = last_step - 5
-            occluder[POLE]['moves'][-1]['stepEnd'] = last_step - 2
-            occluder[WALL]['moves'][-1]['stepBegin'] = last_step - 5
-            occluder[WALL]['moves'][-1]['stepEnd'] = last_step - 2
-            occluder[WALL]['rotates'][-1]['stepBegin'] = last_step - 1
-            occluder[WALL]['rotates'][-1]['stepEnd'] = last_step
-        else:
-            occluder[POLE]['moves'][-1]['stepBegin'] = last_step - 5
-            occluder[POLE]['moves'][-1]['stepEnd'] = last_step
-            occluder[WALL]['moves'][-1]['stepBegin'] = last_step - 5
-            occluder[WALL]['moves'][-1]['stepEnd'] = last_step
-            occluder[WALL]['rotates'][-1]['stepBegin'] = last_step - 1
-            occluder[WALL]['rotates'][-1]['stepEnd'] = last_step
+    adjust_movement_and_rotation_to_scale(
+        occluder,
+        sideways_left or sideways_right,
+        last_step
+    )
 
     return occluder
+
+
+def find_rotate_step_length(x_size: float) -> int:
+    # Values chosen somewhat arbitrarily. All values evenly divide into 90,
+    # because (I believe) the rotation amount (in degrees) must be an int.
+    # TODO Consider refactoring to use a single equation in the future.
+    if x_size <= 0.5:
+        return 3
+    if x_size <= 1:
+        return 5
+    if x_size <= 1.5:
+        return 6
+    # Larger values needed for hypercubes with "stop" movement.
+    if x_size <= 2:
+        return 9
+    if x_size <= 2.5:
+        return 10
+    if x_size <= 3:
+        return 15
+    if x_size <= 3.5:
+        return 18
+    return 30
 
 
 def generate_occluder_pole_position_x(

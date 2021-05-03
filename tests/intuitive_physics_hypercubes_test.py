@@ -385,7 +385,7 @@ def test_GravitySupportHypercube_default_scene_fall_down():
         intuitive_physics_hypercubes.GravitySupportHypercube.GOAL_TEMPLATE
     )
     scene = hypercube._create_default_scene(BODY_TEMPLATE, goal_template)
-    verify_scene(scene, hypercube.is_move_across())
+    verify_scene(scene, hypercube.is_move_across(), last_step=60)
     assert 'gravity support' == scene['goal']['sceneInfo']['tertiaryType']
 
 
@@ -1170,7 +1170,8 @@ def test_GravitySupportHypercube_scenes_fall_down():
             verify_scene(
                 scene_dict[j],
                 hypercube.is_move_across(),
-                implausible
+                implausible,
+                last_step=60
             )
 
             for instance in scene['objects']:
@@ -1224,7 +1225,7 @@ def test_ObjectPermanenceHypercubeEval4_default_scene_move_across():
         intuitive_physics_hypercubes.ObjectPermanenceHypercube.GOAL_TEMPLATE
     )
     scene = hypercube._create_default_scene(BODY_TEMPLATE, goal_template)
-    verify_scene(scene, hypercube.is_move_across())
+    verify_scene(scene, hypercube.is_move_across(), last_step=240)
     assert 'object permanence' == scene['goal']['sceneInfo']['tertiaryType']
 
 
@@ -1287,7 +1288,8 @@ def test_ObjectPermanenceHypercubeEval4_scenes_move_across():
                 scene_dict[j],
                 hypercube.is_move_across(),
                 implausible,
-                eval_only
+                eval_only,
+                last_step=240
             )
 
             verify_hypercube_ObjectPermanence(

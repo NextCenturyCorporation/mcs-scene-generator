@@ -35,7 +35,13 @@ OPPOSITE_MATERIAL_STRING_LIST = [
 ]
 
 
-def verify_scene(scene, is_move_across, implausible=False, eval_only=False):
+def verify_scene(
+    scene,
+    is_move_across,
+    implausible=False,
+    eval_only=False,
+    last_step=None
+):
     assert scene['intuitivePhysics']
     assert scene['evaluationOnly'] == (eval_only or implausible)
     assert scene['goal']['answer']['choice'] == (
@@ -44,12 +50,9 @@ def verify_scene(scene, is_move_across, implausible=False, eval_only=False):
     assert scene['goal']['metadata']['choose'] == ['plausible', 'implausible']
 
     if is_move_across:
-        assert (
-            scene['goal']['last_step'] == 90 or
-            scene['goal']['last_step'] == 150
-        )
+        assert scene['goal']['last_step'] == (last_step if last_step else 200)
     else:
-        assert scene['goal']['last_step'] == 60
+        assert scene['goal']['last_step'] == (last_step if last_step else 160)
     assert scene['goal']['action_list'] == (
         [['Pass']] * scene['goal']['last_step']
     )
@@ -140,6 +143,7 @@ def verify_hypercube_variations(
         trained_default = variations.get('trained')
         different_color = variations.get('different_color')
         different_shape = variations.get('different_shape')
+        different_size = variations.get('different_size')
         untrained_shape = variations.get('untrained_shape')
         untrained_different_shape = (
             variations.get('untrained_different_shape')
@@ -173,6 +177,19 @@ def verify_hypercube_variations(
             assert util.are_materials_equivalent(
                 trained_default['materials'],
                 different_shape['materials']
+            )
+
+        if different_size:
+            assert not different_size.get('untrainedShape', False)
+            assert not different_size.get('untrainedSize', False)
+            assert util.is_similar_except_in_size(
+                trained_default,
+                different_size,
+                only_diagonal_size=True
+            )
+            assert util.are_materials_equivalent(
+                trained_default['materials'],
+                different_size['materials']
             )
 
         if untrained_shape:
@@ -226,7 +243,7 @@ def verify_hypercube_Collisions(
     room_wall_material_name
 ):
     assert is_move_across
-    assert last_step == 90
+    assert last_step == 200
 
     assert verify_hypercube(object_dict, room_wall_material_name)
     assert verify_object_list_move_across(object_dict['target'], [])
@@ -277,7 +294,7 @@ def verify_hypercube_ObjectPermanence(
             object_dict['target'],
             ignore_x_position=eval_4
         )
-        assert last_step == (150 if eval_4 else 90)
+        assert last_step == (240 if eval_4 else 200)
 
     else:
         assert verify_object_list_fall_down(
@@ -289,7 +306,7 @@ def verify_hypercube_ObjectPermanence(
             object_dict['intuitive physics occluder'],
             object_dict['target']
         )
-        assert last_step == 60
+        assert last_step == 160
 
     return True
 
@@ -314,7 +331,7 @@ def verify_hypercube_ShapeConstancy(
             object_dict['intuitive physics occluder'],
             object_dict['target']
         )
-        assert last_step == 90
+        assert last_step == 200
 
     else:
         assert verify_object_list_fall_down(
@@ -326,7 +343,7 @@ def verify_hypercube_ShapeConstancy(
             object_dict['intuitive physics occluder'],
             object_dict['target']
         )
-        assert last_step == 60
+        assert last_step == 160
 
     return True
 
@@ -355,7 +372,7 @@ def verify_hypercube_SpatioTemporalContinuity(
             [hypercube_target, hypercube_target],
             ignore_x_position=eval_4
         )
-        assert last_step == 90
+        assert last_step == 200
 
     else:
         assert verify_object_list_fall_down(
@@ -367,7 +384,7 @@ def verify_hypercube_SpatioTemporalContinuity(
             object_dict['intuitive physics occluder'],
             [hypercube_target]
         )
-        assert last_step == 60
+        assert last_step == 160
 
     return True
 

@@ -11,9 +11,8 @@ from extremitypathfinder.extremitypathfinder import (
 )
 from extremitypathfinder import plotting
 from geometry import ROOM_X_MIN, ROOM_X_MAX, ROOM_Z_MIN, ROOM_Z_MAX
-from machine_common_sense.controller import MAX_REACH_DISTANCE, \
-    MOVE_DISTANCE, PERFORMER_CAMERA_Y
-from util import PERFORMER_HALF_WIDTH
+from util import MAX_REACH_DISTANCE, MOVE_DISTANCE, PERFORMER_CAMERA_Y, \
+    PERFORMER_HALF_WIDTH
 
 
 plotting.EXPORT_SIZE_X = plotting.EXPORT_SIZE_Y

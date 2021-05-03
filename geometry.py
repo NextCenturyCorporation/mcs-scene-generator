@@ -5,12 +5,9 @@ from typing import List, Dict, Any, Optional, Callable, Tuple
 
 import shapely
 from shapely import affinity
+from shapely import geometry
 
 import util
-from machine_common_sense.controller import (
-    MAX_REACH_DISTANCE,
-    PERFORMER_CAMERA_Y
-)
 from separating_axis_theorem import sat_entry
 
 PERFORMER_MASS = 2
@@ -207,20 +204,20 @@ def position_distance(a: Dict[str, float], b: Dict[str, float]) -> float:
                                              b['y'])**2 + (a['z'] - b['z'])**2)
 
 
-def get_room_box() -> shapely.geometry.Polygon:
-    room = shapely.geometry.box(ROOM_X_MIN, ROOM_Z_MIN, ROOM_X_MAX, ROOM_Z_MAX)
+def get_room_box() -> geometry.Polygon:
+    room = geometry.box(ROOM_X_MIN, ROOM_Z_MIN, ROOM_X_MAX, ROOM_Z_MAX)
     return room
 
 
 def get_visible_segment(performer_start: Dict[str, Dict[str, float]]) \
-        -> shapely.geometry.LineString:
+        -> geometry.LineString:
     """Get a line segment that should be visible to the performer
     (straight ahead and at least MIN_FORWARD_VISIBILITY_DISTANCE but within
     the room). Return None if no visible segment is possible.
     """
     max_dimension = max(ROOM_X_MAX - ROOM_X_MIN, ROOM_Z_MAX - ROOM_Z_MIN)
     # make it long enough for the far end to be outside the room
-    view_segment = shapely.geometry.LineString(
+    view_segment = geometry.LineString(
         [[0, MIN_FORWARD_VISIBILITY_DISTANCE], [0, max_dimension * 2]])
     view_segment = affinity.rotate(
         view_segment, -performer_start['rotation']['y'], origin=(0, 0))
@@ -279,14 +276,14 @@ def get_location_in_back_of_performer(
     # (the 180 degree arc in the opposite direction from its start rotation).
     # If the performer would start at (0, 0) facing north (its rotation is 0),
     # its rear poly would then be: minx, miny, maxx, maxy
-    rear_poly = shapely.geometry.box(
+    rear_poly = geometry.box(
         -(ROOM_X_MAX - ROOM_X_MIN),
         -(ROOM_Z_MAX - ROOM_Z_MIN),
         (ROOM_X_MAX - ROOM_X_MIN),
         -0.5 - object_half_size
     )
     # Move the rear poly to behind the performer's start location.
-    performer_point = shapely.geometry.Point(
+    performer_point = geometry.Point(
         performer_start['position']['x'],
         performer_start['position']['z']
     )
@@ -302,7 +299,7 @@ def get_location_in_back_of_performer(
         origin=performer_point
     )
     # Restrict the rear poly to the room's dimensions.
-    room_poly = shapely.geometry.box(
+    room_poly = geometry.box(
         ROOM_X_MIN + object_half_size,
         ROOM_Z_MIN + object_half_size,
         ROOM_X_MAX - object_half_size,
@@ -323,7 +320,7 @@ def get_location_in_back_of_performer(
             # Try choosing a random X within the rear X bounds.
             x = util.random_real(rear_min_x, rear_max_x)
             # Draw a vertical line with that X within the rear Z bounds.
-            vertical_line = shapely.geometry.LineString(
+            vertical_line = geometry.LineString(
                 [[x, rear_min_z], [x, rear_max_z]]
             )
             # Restrict that vertical line to within the full rear bounds.
@@ -450,7 +447,7 @@ def generate_location_in_line_with_object(
         while line_distance <= max_distance:
             # Create a line of the distance and rotation away from the static
             # object to identify the 2nd object's possible location.
-            line = shapely.geometry.LineString([[0, 0], [line_distance, 0]])
+            line = geometry.LineString([[0, 0], [line_distance, 0]])
             line = affinity.rotate(line, line_rotation, origin=(0, 0))
             line = affinity.translate(line, static_x, static_z)
             x = line.coords[1][0] - offset['x']
@@ -499,7 +496,7 @@ def generate_location_in_line_with_object(
                     (dimensions['x'] / 2.0),
                     (dimensions['z'] / 2.0)
                 )
-                if reachable_distance <= MAX_REACH_DISTANCE:
+                if reachable_distance <= util.MAX_REACH_DISTANCE:
                     successful = False
 
             if successful:
@@ -555,7 +552,9 @@ def retrieve_obstacle_occluder_definition_list(
             dimensions = definition['dimensions']
             if definition.get('closedDimensions'):
                 dimensions = definition.get('closedDimensions')
-            cannot_walk_over = dimensions['y'] >= (PERFORMER_CAMERA_Y / 2.0)
+            cannot_walk_over = (
+                dimensions['y'] >= (util.PERFORMER_CAMERA_Y / 2.0)
+            )
             cannot_walk_into = definition['mass'] > PERFORMER_MASS
             # Only need a larger Y dimension if the object is an occluder.
             if cannot_walk_over and cannot_walk_into and (
@@ -571,7 +570,7 @@ def retrieve_obstacle_occluder_definition_list(
 
 
 def get_bounding_polygon(
-        object_or_location: Dict[str, Any]) -> shapely.geometry.Polygon:
+        object_or_location: Dict[str, Any]) -> geometry.Polygon:
     if 'boundingBox' in object_or_location:
         bounding_box: List[Dict[str, float]
                            ] = object_or_location['boundingBox']
@@ -588,7 +587,7 @@ def get_bounding_polygon(
             z = show['position']['z']
             dx = object_or_location['dimensions']['x'] / 2.0
             dz = object_or_location['dimensions']['z'] / 2.0
-            poly = shapely.geometry.box(x - dx, z - dz, x + dx, z + dz)
+            poly = geometry.box(x - dx, z - dz, x + dx, z + dz)
             poly = shapely.affinity.rotate(poly, -show['rotation']['y'])
     return poly
 
@@ -601,9 +600,9 @@ def are_adjacent(obj_a: Dict[str, Any], obj_b: Dict[str, Any],
     return actual_distance <= distance
 
 
-def rect_to_poly(rect: List[Dict[str, Any]]) -> shapely.geometry.Polygon:
+def rect_to_poly(rect: List[Dict[str, Any]]) -> geometry.Polygon:
     points = [(point['x'], point['z']) for point in rect]
-    return shapely.geometry.Polygon(points)
+    return geometry.Polygon(points)
 
 
 def find_performer_rect(
@@ -637,7 +636,7 @@ def generate_object_bounds(dimensions: Dict[str, float],
 
 def does_fully_obstruct_target(performer_start_position: Dict[str, float],
                                target_or_location: Dict[str, Any],
-                               object_poly: shapely.geometry.Polygon) -> bool:
+                               object_poly: geometry.Polygon) -> bool:
     """Returns whether the given object_poly obstructs each line between the
     given performer_start_position and
     all four corners of the given target object or location."""
@@ -652,7 +651,7 @@ def does_fully_obstruct_target(performer_start_position: Dict[str, float],
 
 def does_partly_obstruct_target(performer_start_position: Dict[str, float],
                                 target_or_location: Dict[str, Any],
-                                object_poly: shapely.geometry.Polygon) -> bool:
+                                object_poly: geometry.Polygon) -> bool:
     """Returns whether the given object_poly obstructs one line between the
     given performer_start_position and
     the four corners of the given target object or location."""
@@ -667,7 +666,7 @@ def does_partly_obstruct_target(performer_start_position: Dict[str, float],
 
 def _does_obstruct_target_helper(performer_start_position: Dict[str, float],
                                  target_or_location: Dict[str, Any],
-                                 object_poly: shapely.geometry.Polygon,
+                                 object_poly: geometry.Polygon,
                                  fully: bool = False) -> bool:
 
     obstructing_points = 0
@@ -686,7 +685,7 @@ def _does_obstruct_target_helper(performer_start_position: Dict[str, float],
     if not fully:
         for index, next_point in enumerate(bounds):
             previous_point = bounds[(index - 1) if (index > 0) else -1]
-            line_full = shapely.geometry.LineString([
+            line_full = geometry.LineString([
                 (previous_point['x'], previous_point['z']),
                 (next_point['x'], next_point['z'])
             ])
@@ -696,7 +695,7 @@ def _does_obstruct_target_helper(performer_start_position: Dict[str, float],
             for point_1, point_2 in [
                 (previous_point, center_point), (center_point, next_point)
             ]:
-                line = shapely.geometry.LineString([
+                line = geometry.LineString([
                     (point_1['x'], point_1['z']), (point_2['x'], point_2['z'])
                 ])
                 line_center = line.centroid.coords[0]
@@ -704,7 +703,7 @@ def _does_obstruct_target_helper(performer_start_position: Dict[str, float],
 
     for point in points:
         target_corner_coordinates = (point['x'], point['z'])
-        line_to_target = shapely.geometry.LineString([
+        line_to_target = geometry.LineString([
             performer_start_coordinates,
             target_corner_coordinates
         ])

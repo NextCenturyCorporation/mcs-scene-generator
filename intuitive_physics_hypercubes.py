@@ -19,18 +19,16 @@ from shapely import affinity
 import tags
 import util
 
-
 PLAUSIBLE = 'plausible'
 IMPLAUSIBLE = 'implausible'
 
 # The number of steps any object will take to fall and settle.
-OBJECT_FALL_TIME = 34
+OBJECT_FALL_TIME = 36
 
-LAST_STEP_MOVE_ACROSS = 90
-LAST_STEP_FALL_DOWN = 60
+LAST_STEP_MOVE_ACROSS = 200
+LAST_STEP_FALL_DOWN = 160
 
 EARLIEST_ACTION_STEP = occluders.OCCLUDER_MOVEMENT_TIME * 2 + 1
-LATEST_ACTION_STEP_MOVE_ACROSS = 50 - (occluders.OCCLUDER_MOVEMENT_TIME * 3)
 
 BACKGROUND_MAX_X = 6.5
 BACKGROUND_MIN_Z = 3.25
@@ -55,6 +53,7 @@ SEPARATION_Z = 1.1
 # Expect all target objects will be smaller on the X axis than 1.3
 # (the diagonal of an 0.9 x 0.9 object).
 MAX_TARGET_SIZE_X = 1.3
+STRICT_BOUNDS = occluders.OCCLUDER_MAX_X - MAX_TARGET_SIZE_X
 
 MIN_OFFSCREEN_X = 4.16
 STEP_OFFSCREEN_X = 0.03
@@ -120,7 +119,6 @@ def load_movement_from_json_file():
 
 MOVEMENT = load_movement_from_json_file()
 
-
 def adjust_movement_to_position(
     movement: Optional[Dict[str, Any]],
     position: Dict[str, float],
@@ -130,7 +128,7 @@ def adjust_movement_to_position(
     movement using the given starting position."""
     if not movement:
         return None
-    end_x = 2 * abs(position['x'])
+    end_x = 2 * abs(movement.get('startX', position['x']))
     # Add/subtract the object's starting position to/from its X/Z move
     # distance in each X/Z distance-by-step list.
     movement['xDistanceByStep'] = [
@@ -245,8 +243,10 @@ VARIATIONS = SimpleNamespace(
     TRAINED='trained',
     DIFFERENT_COLOR='different_color',
     DIFFERENT_SHAPE='different_shape',
+    DIFFERENT_SIZE='different_size',
     UNTRAINED_SHAPE='untrained_shape',
     UNTRAINED_DIFFERENT_SHAPE='untrained_different_shape',
+    UNTRAINED_SHAPE_DIFFERENT_SIZE='untrained_shape_different_size',
     UNTRAINED_SIZE='untrained_size',
     # Gravity Support
     SYMMETRIC='symmetric',
@@ -609,7 +609,10 @@ class IntuitivePhysicsHypercube(hypercubes.Hypercube, ABC):
         """Choose and return the implausible event step and X position lists
         for paired occluders using the given object movement and starting
         position. Return None if impossible using the given movement."""
-        occluder_count = len(self._find_move_across_paired_list(None))
+        occluder_count = max(
+            len(self._find_move_across_paired_list(None)),
+            1
+        )
 
         # Each step will correspond to the X position of a moving object.
         step_option_list = list(
@@ -749,19 +752,31 @@ class IntuitivePhysicsHypercube(hypercubes.Hypercube, ABC):
 
     def _choose_object_definition(
         self,
+        variation_tag: str,
+        definition_list: List[Dict[str, Any]]
+    ) -> Dict[str, Any]:
+        """Return an object definition chosen from the given object definition
+        list for the object variation with the given tag string."""
+        return random.choice(definition_list)
+
+    def _choose_object_variations(
+        self,
         location: Dict[str, Any],
         index: int
     ) -> TargetVariations:
         """Return trained and untrained variations of an object definition for
         a target or non-target object positioned at the given location."""
-        # Restrict object to a specific type, if type was given as input.
+        # Restrict the target object to a specific type, if a specific type was
+        # given as input.
         role = tags.ROLES.TARGET if index == 0 else tags.ROLES.NON_TARGET
         object_type = self._role_to_type[role]
 
-        # Choose trained target object definition.
+        # Choose the trained target object definition. Finalize its materials
+        # and colors now, in case a different color variation is needed.
         definitions = {}
         definitions[VARIATIONS.TRAINED] = random.choice(
             util.finalize_object_materials_and_colors(self._choose_with_filter(
+                VARIATIONS.TRAINED,
                 self._trained_definition_list,
                 object_type
             ))
@@ -769,7 +784,10 @@ class IntuitivePhysicsHypercube(hypercubes.Hypercube, ABC):
 
         different_color_list = []
         different_shape_list = []
+        different_size_list = []
         for definition in self._trained_definition_list:
+            # Sometimes object variations must have colors that are completely
+            # the same as or opposite to the trained variation's colors.
             if 'opposite' in definition['materialCategory']:
                 definition_same_colors = copy.deepcopy(definition)
                 definition_same_colors['materials'] = []
@@ -784,11 +802,14 @@ class IntuitivePhysicsHypercube(hypercubes.Hypercube, ABC):
                     definition_same_colors['color'].extend(same[1])
                     definition_opposite_colors['materials'].append(opposite[0])
                     definition_opposite_colors['color'].extend(opposite[1])
+                # Only use the copies of this object definition that have the
+                # same or opposite colors/materials.
                 definition_with_colors_list = [
                     definition_same_colors,
                     definition_opposite_colors
                 ]
             else:
+                # Else use all possible colors/materials.
                 definition_with_colors_list = (
                     util.finalize_object_materials_and_colors(definition)
                 )
@@ -805,24 +826,51 @@ class IntuitivePhysicsHypercube(hypercubes.Hypercube, ABC):
                     only_diagonal_size=True
                 ):
                     different_shape_list.append(definition_with_colors)
+                if util.is_similar_except_in_size(
+                    definitions[VARIATIONS.TRAINED],
+                    definition_with_colors,
+                    only_diagonal_size=True
+                ):
+                    different_size_list.append(definition_with_colors)
 
-        if len(different_color_list) == 0:
-            raise exceptions.SceneException(
-                f'Intuitive physics trained object definition does not have '
-                f'any different trained colors '
-                f'{definitions[VARIATIONS.TRAINED]}')
-        definitions[VARIATIONS.DIFFERENT_COLOR] = random.choice(
-            different_color_list
-        )
+        if self._does_need_target_variations(VARIATIONS.DIFFERENT_COLOR):
+            if len(different_color_list) == 0:
+                raise exceptions.SceneException(
+                    f'Cannot find different trained color variation for '
+                    f'intuitive physics trained object definition\n'
+                    f'TRAINED: {definitions[VARIATIONS.TRAINED]}')
+            definitions[VARIATIONS.DIFFERENT_COLOR] = (
+                self._choose_object_definition(
+                    VARIATIONS.DIFFERENT_COLOR,
+                    different_color_list
+                )
+            )
 
-        if len(different_shape_list) == 0:
-            raise exceptions.SceneException(
-                f'Intuitive physics trained object definition does not have '
-                f'any different trained shapes '
-                f'{definitions[VARIATIONS.TRAINED]}')
-        definitions[VARIATIONS.DIFFERENT_SHAPE] = random.choice(
-            different_shape_list
-        )
+        if self._does_need_target_variations(VARIATIONS.DIFFERENT_SHAPE):
+            if len(different_shape_list) == 0:
+                raise exceptions.SceneException(
+                    f'Cannot find different trained shape variation for '
+                    f'intuitive physics trained object definition\n'
+                    f'TRAINED: {definitions[VARIATIONS.TRAINED]}')
+            definitions[VARIATIONS.DIFFERENT_SHAPE] = (
+                self._choose_object_definition(
+                    VARIATIONS.DIFFERENT_SHAPE,
+                    different_shape_list
+                )
+            )
+
+        if self._does_need_target_variations(VARIATIONS.DIFFERENT_SIZE):
+            if len(different_size_list) == 0:
+                raise exceptions.SceneException(
+                    f'Cannot find different trained size variation for '
+                    f'intuitive physics trained object definition\n'
+                    f'TRAINED: {definitions[VARIATIONS.TRAINED]}')
+            definitions[VARIATIONS.DIFFERENT_SIZE] = (
+                self._choose_object_definition(
+                    VARIATIONS.DIFFERENT_SIZE,
+                    different_size_list
+                )
+            )
 
         untrained_shape_list = []
         for definition in self._untrained_shape_definition_list:
@@ -837,14 +885,18 @@ class IntuitivePhysicsHypercube(hypercubes.Hypercube, ABC):
                 ):
                     untrained_shape_list.append(definition_with_colors)
 
-        if len(untrained_shape_list) == 0:
-            raise exceptions.SceneException(
-                f'Intuitive physics trained object definition does not have '
-                f'any different untrained shapes '
-                f'{definitions[VARIATIONS.TRAINED]}')
-        definitions[VARIATIONS.UNTRAINED_SHAPE] = random.choice(
-            untrained_shape_list
-        )
+        if self._does_need_target_variations(VARIATIONS.UNTRAINED_SHAPE):
+            if len(untrained_shape_list) == 0:
+                raise exceptions.SceneException(
+                    f'Cannot find one untrained shape variation for '
+                    f'intuitive physics trained object definition\n'
+                    f'TRAINED: {definitions[VARIATIONS.TRAINED]}')
+            definitions[VARIATIONS.UNTRAINED_SHAPE] = (
+                self._choose_object_definition(
+                    VARIATIONS.UNTRAINED_SHAPE,
+                    untrained_shape_list
+                )
+            )
 
         different_untrained_shape_list = []
         for definition in untrained_shape_list:
@@ -861,15 +913,54 @@ class IntuitivePhysicsHypercube(hypercubes.Hypercube, ABC):
                         definition_with_colors
                     )
 
-        if len(different_untrained_shape_list) == 0:
-            raise exceptions.SceneException(
-                f'Intuitive physics trained object definition does not have '
-                f'a second different untrained shape '
-                f'{definitions[VARIATIONS.TRAINED]} '
-                f'and {definitions[VARIATIONS.UNTRAINED_SHAPE]}')
-        definitions[VARIATIONS.UNTRAINED_DIFFERENT_SHAPE] = random.choice(
-            different_untrained_shape_list
-        )
+        if self._does_need_target_variations(
+            VARIATIONS.UNTRAINED_DIFFERENT_SHAPE
+        ):
+            if len(different_untrained_shape_list) == 0:
+                raise exceptions.SceneException(
+                    f'Cannot find different (second) untrained shape '
+                    f'variation for intuitive physics trained and untrained '
+                    f'shape object definitions\n'
+                    f'TRAINED: {definitions[VARIATIONS.TRAINED]}\n'
+                    f'UNTRAINED: {definitions[VARIATIONS.UNTRAINED_SHAPE]}')
+            definitions[VARIATIONS.UNTRAINED_DIFFERENT_SHAPE] = (
+                self._choose_object_definition(
+                    VARIATIONS.UNTRAINED_DIFFERENT_SHAPE,
+                    different_untrained_shape_list
+                )
+            )
+
+        untrained_shape_different_size_list = []
+        for definition in self._untrained_shape_definition_list:
+            definition_with_colors_list = (
+                util.finalize_object_materials_and_colors(definition)
+            )
+            for definition_with_colors in definition_with_colors_list:
+                if util.is_similar_except_in_size(
+                    definitions[VARIATIONS.UNTRAINED_SHAPE],
+                    definition_with_colors,
+                    only_diagonal_size=True
+                ):
+                    untrained_shape_different_size_list.append(
+                        definition_with_colors
+                    )
+
+        if self._does_need_target_variations(
+            VARIATIONS.UNTRAINED_SHAPE_DIFFERENT_SIZE
+        ):
+            if len(untrained_shape_different_size_list) == 0:
+                raise exceptions.SceneException(
+                    f'Cannot find different (second) untrained size '
+                    f'variation for intuitive physics trained and untrained '
+                    f'shape object definitions\n'
+                    f'TRAINED: {definitions[VARIATIONS.TRAINED]}\n'
+                    f'UNTRAINED: {definitions[VARIATIONS.UNTRAINED_SHAPE]}')
+            definitions[VARIATIONS.UNTRAINED_SHAPE_DIFFERENT_SIZE] = (
+                self._choose_object_definition(
+                    VARIATIONS.UNTRAINED_SHAPE_DIFFERENT_SIZE,
+                    untrained_shape_different_size_list
+                )
+            )
 
         similar_except_size_list = []
         for definition in self._untrained_size_definition_list:
@@ -884,19 +975,24 @@ class IntuitivePhysicsHypercube(hypercubes.Hypercube, ABC):
                 ):
                     similar_except_size_list.append(definition_with_colors)
 
-        if len(similar_except_size_list) == 0:
-            raise exceptions.SceneException(
-                f'Intuitive physics trained object definition does not have '
-                f'any different untrained sizes '
-                f'{definitions[VARIATIONS.TRAINED]}')
-        definitions[VARIATIONS.UNTRAINED_SIZE] = random.choice(
-            similar_except_size_list
-        )
+        if self._does_need_target_variations(VARIATIONS.UNTRAINED_SIZE):
+            if len(similar_except_size_list) == 0:
+                raise exceptions.SceneException(
+                    f'Cannot find one untrained size variation for '
+                    f'intuitive physics trained object definition\n'
+                    f'TRAINED: {definitions[VARIATIONS.TRAINED]}')
+            definitions[VARIATIONS.UNTRAINED_SIZE] = (
+                self._choose_object_definition(
+                    VARIATIONS.UNTRAINED_SIZE,
+                    similar_except_size_list
+                )
+            )
 
         return TargetVariations(definitions, location, self.is_fall_down())
 
     def _choose_with_filter(
         self,
+        variation_tag: str,
         definition_list: List[Dict[str, Any]],
         object_type: Optional[str]
     ) -> Dict[str, Any]:
@@ -908,7 +1004,8 @@ class IntuitivePhysicsHypercube(hypercubes.Hypercube, ABC):
             definition for definition in definition_list
             if definition['type'] == object_type
         ] if object_type else definition_list
-        return random.choice(
+        return self._choose_object_definition(
+            variation_tag,
             filtered_list if len(filtered_list) else definition_list
         )
 
@@ -979,6 +1076,24 @@ class IntuitivePhysicsHypercube(hypercubes.Hypercube, ABC):
             self,
             occluder_wall_material_list
         )
+        # Each occluder should have the same movement/rotation.
+        if len(occluder_list) > 2:
+            max_scale_x = 0
+            # Loop over the occluder wall objects (at each even index).
+            for occluder_index in range(0, len(occluder_list), 2):
+                max_scale_x = max(
+                    max_scale_x,
+                    occluder_list[occluder_index]['shows'][0]['scale']['x']
+                )
+            # Adjust each occluder's movement/rotation to use the max scale.
+            for occluder_index in range(0, len(occluder_list), 2):
+                occluder_list[occluder_index]
+                occluders.adjust_movement_and_rotation_to_scale(
+                    occluder_list[occluder_index:(occluder_index + 2)],
+                    self.is_fall_down(),
+                    self._last_step,
+                    x_scale_override=max_scale_x
+                )
         target_list, distractor_list = self._identify_targets_and_non_targets(
             moving_object_list
         )
@@ -1008,6 +1123,11 @@ class IntuitivePhysicsHypercube(hypercubes.Hypercube, ABC):
 
     def _does_have_toss_move(self) -> bool:
         """Return whether this hypercube must generate toss movement."""
+        return False
+
+    def _does_need_target_variations(self, variation_tag: str) -> bool:
+        """Return whether this hypercube must generate a variation of the
+        target object with the given tag."""
         return False
 
     def _find_fall_down_paired_list(self) -> List[TargetVariations]:
@@ -1169,7 +1289,7 @@ class IntuitivePhysicsHypercube(hypercubes.Hypercube, ABC):
                 min(latest_action_step, show_step + 1)
             )
 
-            variations = self._choose_object_definition(object_location, i)
+            variations = self._choose_object_variations(object_location, i)
             for instance in variations.all():
                 instance['shows'][0]['stepBegin'] = object_show_step
 
@@ -1352,15 +1472,16 @@ class IntuitivePhysicsHypercube(hypercubes.Hypercube, ABC):
                     break
             if not move_dict:
                 raise exceptions.SceneException(
-                    'Cannot find a valid moveExit option after max tries')
+                    'Cannot find a valid movement option after max try count!'
+                )
 
             max_movement = max(
                 max_movement,
-                len(move_dict['moveExit']['xDistanceByStep'])
+                len(move_dict[move_dict['active']]['xDistanceByStep'])
             )
 
             # Create the object and its variations.
-            variations = self._choose_object_definition(object_location, i)
+            variations = self._choose_object_variations(object_location, i)
 
             for instance in variations.all():
                 instance['movement'] = move_dict
@@ -1369,8 +1490,8 @@ class IntuitivePhysicsHypercube(hypercubes.Hypercube, ABC):
             self._variations_list.append(variations)
 
         # Adjust the latest action step by the slowest chosen movement.
-        latest_action_step = min(
-            LATEST_ACTION_STEP_MOVE_ACROSS,
+        latest_action_step = max(
+            EARLIEST_ACTION_STEP,
             (self._last_step - occluders.OCCLUDER_MOVEMENT_TIME - max_movement)
         )
 
@@ -1403,14 +1524,14 @@ class IntuitivePhysicsHypercube(hypercubes.Hypercube, ABC):
             # Assign the needed properties to each of the object's variations.
             for instance in self._variations_list[i].all():
                 instance['shows'][0]['stepBegin'] = show_step_list[i]
-                move_across = instance['movement']['moveExit']
+                movement = instance['movement'][instance['movement']['active']]
                 instance['forces'] = [{
                     'stepBegin': show_step_list[i],
                     'stepEnd': show_step_list[i],
                     'vector': {
-                        'x': move_across['forceX'] * instance['mass'],
-                        'y': 0,
-                        'z': 0
+                        'x': movement['forceX'] * instance['mass'],
+                        'y': movement.get('forceY', 0) * instance['mass'],
+                        'z': movement.get('forceZ', 0) * instance['mass']
                     }
                 }]
 
@@ -1442,6 +1563,8 @@ class IntuitivePhysicsHypercube(hypercubes.Hypercube, ABC):
             random.choice(materials.METAL_MATERIALS),
             x_position,
             x_scale,
+            sideways_left=False,
+            sideways_right=False,
             occluder_height=self._get_occluder_height(),
             last_step=self._last_step
         )
@@ -1532,25 +1655,25 @@ class IntuitivePhysicsHypercube(hypercubes.Hypercube, ABC):
 
     def _init_each_object_definition_list(self, is_fall_down: bool) -> None:
         """Set each object definition list needed by this hypercube, used in
-        _choose_object_definition."""
+        _choose_object_variations."""
 
         # List with each possible intuitive physics object definition (shape)
         # and material (color) combination for the specific scene setup.
-        definition_list = util.retrieve_complete_definition_list(
-            [objects.get_intuitive_physics(is_fall_down)]
+        complete_definition_list = util.retrieve_complete_definition_list(
+            [self._retrieve_definition_list(is_fall_down)]
         )[0]
         self._trained_definition_list = (
-            util.retrieve_trained_definition_list([definition_list])
+            util.retrieve_trained_definition_list([complete_definition_list])
         )[0]
         self._untrained_shape_definition_list = (
             util.retrieve_untrained_definition_list(
-                [definition_list],
+                [complete_definition_list],
                 tags.SCENE.UNTRAINED_SHAPE
             )
         )[0]
         self._untrained_size_definition_list = (
             util.retrieve_untrained_definition_list(
-                [definition_list],
+                [complete_definition_list],
                 tags.SCENE.UNTRAINED_SIZE
             )
         )[0]
@@ -1563,9 +1686,16 @@ class IntuitivePhysicsHypercube(hypercubes.Hypercube, ABC):
         self,
         moving_object_list: List[Dict[str, Any]]
     ) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
-        """Return the target and non-target lists from the given moving object
-        list."""
+        """Return the two separate target and non-target lists using the given
+        moving object list."""
         return moving_object_list, []
+
+    def _retrieve_definition_list(
+        self,
+        is_fall_down: bool
+    ) -> List[Dict[str, Any]]:
+        """Return the full base object definition list for the hypercube."""
+        return objects.get_intuitive_physics(is_fall_down)
 
     def _update_object_tags(
         self,
@@ -1726,6 +1856,7 @@ class CollisionsHypercube(IntuitivePhysicsHypercube):
         self,
         default_scene: Dict[str, Any]
     ) -> Dict[str, Dict[str, Any]]:
+        """Create and return a collection of new intuitive physics scenes."""
         target_variations = self._variations_list[0]
         target_trained = target_variations.get(VARIATIONS.TRAINED)
 
@@ -1801,6 +1932,15 @@ class CollisionsHypercube(IntuitivePhysicsHypercube):
         return scenes
 
     # Override
+    def _does_need_target_variations(self, variation_tag: str) -> bool:
+        """Return whether this hypercube must generate a variation of the
+        target object with the given tag."""
+        return (
+            variation_tag == VARIATIONS.UNTRAINED_SHAPE or
+            variation_tag == VARIATIONS.DIFFERENT_COLOR
+        )
+
+    # Override
     def _get_move_across_object_count(self) -> int:
         """Return the number of objects for the move-across scene."""
         return 1
@@ -1815,6 +1955,8 @@ class CollisionsHypercube(IntuitivePhysicsHypercube):
         self,
         target_object_list: List[Dict[str, Any]]
     ) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+        """Return the two separate target and non-target lists using the given
+        moving object list."""
         target_variations = self._variations_list[0]
         target_trained = target_variations.get(VARIATIONS.TRAINED)
         target_untrained = target_variations.get(VARIATIONS.UNTRAINED_SHAPE)
@@ -1885,10 +2027,11 @@ class CollisionsHypercube(IntuitivePhysicsHypercube):
         return target_object_list, [non_target_trained]
 
     # Override
-    def _init_each_object_definition_list(self, is_fall_down: bool) -> None:
-        """Set each object definition list needed by this hypercube, used in
-        _choose_object_definition."""
-
+    def _retrieve_definition_list(
+        self,
+        is_fall_down: bool
+    ) -> List[Dict[str, Any]]:
+        """Return the full base object definition list for the hypercube."""
         # Override each object definition so that this hypercube can only
         # choose from a specific list of colors/materials.
         original_list = objects.get_intuitive_physics(is_fall_down)
@@ -1900,37 +2043,13 @@ class CollisionsHypercube(IntuitivePhysicsHypercube):
                 'materialCategory': ['opposite'] * materials_count,
                 'salientMaterials': ['plastic']
             }]
-
-        # Now create each list just like in the superclass function.
-        complete_list = util.retrieve_complete_definition_list(
-            [original_list]
-        )[0]
-        self._trained_definition_list = (
-            util.retrieve_trained_definition_list([complete_list])
-        )[0]
-        self._untrained_shape_definition_list = (
-            util.retrieve_untrained_definition_list(
-                [complete_list],
-                tags.SCENE.UNTRAINED_SHAPE
-            )
-        )[0]
-        self._untrained_size_definition_list = (
-            util.retrieve_untrained_definition_list(
-                [complete_list],
-                tags.SCENE.UNTRAINED_SIZE
-            )
-        )[0]
+        return original_list
 
     # Override
     def _validate_in_view(self, occluder_x: float, starting_x: float) -> bool:
         """Return whether the given X position is within view of the camera."""
-        x_limit = occluders.OCCLUDER_MAX_X
         # Add a buffer because we will expand the size of the occluder.
-        return validate_in_view(
-            occluder_x,
-            (-x_limit + MAX_TARGET_SIZE_X),
-            (x_limit - MAX_TARGET_SIZE_X),
-        )
+        return validate_in_view(occluder_x, -STRICT_BOUNDS, STRICT_BOUNDS)
 
 
 class GravitySupportHypercube(IntuitivePhysicsHypercube):
@@ -1976,7 +2095,8 @@ class GravitySupportHypercube(IntuitivePhysicsHypercube):
             # All gravity support scenes are fall-down in Eval 4.
             is_fall_down=True,
             is_move_across=False,
-            training=training
+            training=training,
+            last_step=60
         )
 
     # Override
@@ -2035,7 +2155,7 @@ class GravitySupportHypercube(IntuitivePhysicsHypercube):
     # Override
     def _init_each_object_definition_list(self, is_fall_down: bool) -> None:
         """Set each object definition list needed by this hypercube, used in
-        _choose_object_definition."""
+        _choose_object_variations."""
         # Not used since we override _create_default_objects.
         pass
 
@@ -2056,6 +2176,7 @@ class GravitySupportHypercube(IntuitivePhysicsHypercube):
         definitions = {}
         definitions[VARIATIONS.SYMMETRIC] = random.choice(
             util.finalize_object_materials_and_colors(self._choose_with_filter(
+                VARIATIONS.SYMMETRIC,
                 base_symmetric_list,
                 symmetric_object_type
             ))
@@ -2083,6 +2204,7 @@ class GravitySupportHypercube(IntuitivePhysicsHypercube):
 
         # Choose asymmetric target object definition.
         definitions[VARIATIONS.ASYMMETRIC_LEFT] = self._choose_with_filter(
+            VARIATIONS.ASYMMETRIC_LEFT,
             modified_asymmetric_list,
             asymmetric_object_type
         )
@@ -2304,6 +2426,7 @@ class GravitySupportHypercube(IntuitivePhysicsHypercube):
         self,
         default_scene: Dict[str, Any]
     ) -> Dict[str, Dict[str, Any]]:
+        """Create and return a collection of new intuitive physics scenes."""
         target_id = self._target.get(VARIATIONS.SYMMETRIC)['id']
         pole_id = self._pole.get(VARIATIONS.SYMMETRIC)['id']
 
@@ -2718,6 +2841,7 @@ class ObjectPermanenceHypercube(IntuitivePhysicsHypercube):
         self,
         default_scene: Dict[str, Any]
     ) -> Dict[str, Dict[str, Any]]:
+        """Create and return a collection of new intuitive physics scenes."""
         target_id_1 = self._target_list[0]['id']
         target_id_2 = self._target_list[1]['id']
 
@@ -2893,6 +3017,15 @@ class ObjectPermanenceHypercube(IntuitivePhysicsHypercube):
 
         return scenes
 
+    # Override
+    def _does_need_target_variations(self, variation_tag: str) -> bool:
+        """Return whether this hypercube must generate a variation of the
+        target object with the given tag."""
+        return (
+            variation_tag == VARIATIONS.UNTRAINED_SHAPE or
+            variation_tag == VARIATIONS.UNTRAINED_SIZE
+        )
+
 
 class ShapeConstancyHypercube(IntuitivePhysicsHypercube):
     GOAL_TEMPLATE = {
@@ -2993,6 +3126,7 @@ class ShapeConstancyHypercube(IntuitivePhysicsHypercube):
         self,
         default_scene: Dict[str, Any]
     ) -> Dict[str, Dict[str, Any]]:
+        """Create and return a collection of new intuitive physics scenes."""
         target_id_1 = self._target_list[0]['id']
         target_id_2 = self._target_list[1]['id']
 
@@ -3144,6 +3278,16 @@ class ShapeConstancyHypercube(IntuitivePhysicsHypercube):
 
         return scenes
 
+    # Override
+    def _does_need_target_variations(self, variation_tag: str) -> bool:
+        """Return whether this hypercube must generate a variation of the
+        target object with the given tag."""
+        return (
+            variation_tag == VARIATIONS.UNTRAINED_SHAPE or
+            variation_tag == VARIATIONS.DIFFERENT_SHAPE or
+            variation_tag == VARIATIONS.UNTRAINED_DIFFERENT_SHAPE
+        )
+
 
 class SpatioTemporalContinuityHypercube(IntuitivePhysicsHypercube):
     GOAL_TEMPLATE = {
@@ -3231,6 +3375,7 @@ class SpatioTemporalContinuityHypercube(IntuitivePhysicsHypercube):
         self,
         default_scene: Dict[str, Any]
     ) -> List[Dict[str, Any]]:
+        """Create and return a collection of new intuitive physics scenes."""
         target_id = self._target_list[0]['id']
         non_target_id = self._distractor_list[0]['id']
 
@@ -3402,10 +3547,18 @@ class SpatioTemporalContinuityHypercube(IntuitivePhysicsHypercube):
         return scenes
 
     # Override
+    def _does_need_target_variations(self, variation_tag: str) -> bool:
+        """Return whether this hypercube must generate a variation of the
+        target object with the given tag."""
+        return variation_tag == VARIATIONS.UNTRAINED_SHAPE
+
+    # Override
     def _find_move_across_paired_list(
         self,
         target_variation: TargetVariations
     ) -> List[TargetVariations]:
+        """Return objects that must be paired with occluders in move-across
+        scenes."""
         # Generate two occluders paired with the target object.
         return [target_variation, target_variation]
 
@@ -3414,8 +3567,8 @@ class SpatioTemporalContinuityHypercube(IntuitivePhysicsHypercube):
         self,
         moving_object_list: List[Dict[str, Any]]
     ) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
-        """Return the target and non-target lists from the given moving object
-        list."""
+        """Return the two separate target and non-target lists using the given
+        moving object list."""
         # STC scenes will always have one target and one non-target in Eval 3.
         return moving_object_list[:1], moving_object_list[1:]
 
@@ -3436,8 +3589,9 @@ class ObjectPermanenceHypercubeEval4(ObjectPermanenceHypercube):
             is_fall_down=False,
             is_move_across=True,
             training=training,
-            # All object permanence scenes must be longer in Eval 4.
-            last_step=150
+            # All object permanence scenes must be longer in Eval 4 due to the
+            # length of the target's "stop" movement variations.
+            last_step=240
         )
 
     # Override
@@ -3532,12 +3686,12 @@ class ObjectPermanenceHypercubeEval4(ObjectPermanenceHypercube):
     # Override
     def _get_occluder_height(self) -> int:
         """Return the occluder height to use."""
-        return occluders.OCCLUDER_HEIGHT * 2
+        return occluders.OCCLUDER_HEIGHT_TALL
 
     # Override
     def _init_each_object_definition_list(self, is_fall_down: bool) -> None:
         """Set each object definition list needed by this hypercube, used in
-        _choose_object_definition."""
+        _choose_object_variations."""
 
         super()._init_each_object_definition_list(is_fall_down)
 
@@ -3560,6 +3714,7 @@ class ObjectPermanenceHypercubeEval4(ObjectPermanenceHypercube):
         self,
         default_scene: Dict[str, Any]
     ) -> Dict[str, Dict[str, Any]]:
+        """Create and return a collection of new intuitive physics scenes."""
         # Initialize scenes.
         scenes = {}
         for j in self._get_scene_ids():
@@ -3681,12 +3836,12 @@ class SpatioTemporalContinuityHypercubeEval4(
     # Override
     def _get_occluder_height(self) -> int:
         """Return the occluder height to use."""
-        return occluders.OCCLUDER_HEIGHT * 2
+        return occluders.OCCLUDER_HEIGHT_TALL
 
     # Override
     def _init_each_object_definition_list(self, is_fall_down: bool) -> None:
         """Set each object definition list needed by this hypercube, used in
-        _choose_object_definition."""
+        _choose_object_variations."""
 
         super()._init_each_object_definition_list(is_fall_down)
 
@@ -3709,6 +3864,7 @@ class SpatioTemporalContinuityHypercubeEval4(
         self,
         default_scene: Dict[str, Any]
     ) -> List[Dict[str, Any]]:
+        """Create and return a collection of new intuitive physics scenes."""
         # Initialize scenes.
         scenes = {}
         for j in self._get_scene_ids():
