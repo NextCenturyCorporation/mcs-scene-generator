@@ -104,7 +104,6 @@ def test_put_object_in_container():
             )
             expected_position_y = (
                 container_def['enclosedAreas'][0]['position']['y'] -
-                obj_def.get('offset', {}).get('y', 0) -
                 (container_def['enclosedAreas'][area_index]['dimensions']['y'] / 2.0) +  # noqa: E501
                 obj_def.get('positionY', 0)
             )

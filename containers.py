@@ -22,12 +22,13 @@ def put_object_in_container(
         x_prop = 'z' if sideways else 'x'
         z_prop = 'x' if sideways else 'z'
         instance['shows'][0]['position']['x'] -= instance['offset'][x_prop]
-        instance['shows'][0]['position']['y'] -= instance['offset']['y']
         instance['shows'][0]['position']['z'] -= instance['offset'][z_prop]
 
     # Position object at bottom of container's enclosed area.
-    instance['shows'][0]['position']['y'] += \
-        (-area['dimensions']['y'] / 2.0) + instance.get('positionY', 0)
+    instance['shows'][0]['position']['y'] += (
+        (-area['dimensions']['y'] / 2.0) +
+        instance.get('positionY', 0)
+    )
 
     if 'rotation' not in instance['shows'][0]:
         instance['shows'][0]['rotation'] = geometry.ORIGIN.copy()

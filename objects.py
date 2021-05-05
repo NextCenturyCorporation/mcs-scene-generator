@@ -44,7 +44,7 @@ _SOCCER_BALL = {
         "y": 0.11,
         "z": 0
     },
-    "positionY": 0.005,
+    "positionY": 0.11,
     "salientMaterials": ["rubber"],
     "scale": {
         "x": 1,
