@@ -137,11 +137,16 @@ class AgentHypercubeFactory(hypercubes.HypercubeFactory):
         self._untrained = False
 
     # Override
-    def _build(self, body_template: Dict[str, Any]) -> hypercubes.Hypercube:
+    def _build(
+        self,
+        body_template: Dict[str, Any],
+        role_to_type: Dict[str, str]
+    ) -> hypercubes.Hypercube:
         return AgentHypercube(
             self._filename_prefix,
             body_template,
             self._goal_template,
+            role_to_type,
             self.training,
             # Must use only untrained shapes in 50% of scenes.
             untrained=self._untrained
@@ -152,6 +157,7 @@ class AgentHypercubeFactory(hypercubes.HypercubeFactory):
         self,
         total: str,
         body_template_function: Callable[[], Dict[str, Any]],
+        role_to_type: Dict[str, str],
         throw_error=False
     ) -> List[hypercubes.Hypercube]:
         # Return one hypercube per pair of expected/unexpected JSON scene files
@@ -187,7 +193,10 @@ class AgentHypercubeFactory(hypercubes.HypercubeFactory):
             print(f'Generating agent hypercube {count} / {total}')
             self._filename_prefix = prefix
             try:
-                hypercube = self._build(body_template_function())
+                hypercube = self._build(
+                    body_template_function(),
+                    role_to_type
+                )
                 hypercubes.append(hypercube)
                 # Every other scene pair should have untrained objects.
                 self._untrained = (not self._untrained)
@@ -220,16 +229,31 @@ class AgentHypercubeFactory(hypercubes.HypercubeFactory):
         return hypercubes
 
 
-class AgentSingleObjectTrainingHypercubeFactory(AgentHypercubeFactory):
+class AgentInstrumentalActionTrainingHypercubeFactory(AgentHypercubeFactory):
     GOAL_TEMPLATE = copy.deepcopy(AGENT_GOAL_TEMPLATE)
     GOAL_TEMPLATE['sceneInfo'][tags.SCENE.TERTIARY] = (
-        tags.TYPES.AGENT_BACKGROUND_SINGLE_OBJECT
+        tags.TYPES.AGENT_BACKGROUND_INSTRUMENTAL_ACTION
     )
 
     def __init__(self) -> None:
         super().__init__(
-            'AgentSingleObjectTraining',
-            'agents_background_single_object',
+            'AgentInstrumentalActionTraining',
+            'agents_background_instrumental_action',
+            self.GOAL_TEMPLATE,
+            training=True
+        )
+
+
+class AgentMultipleAgentsTrainingHypercubeFactory(AgentHypercubeFactory):
+    GOAL_TEMPLATE = copy.deepcopy(AGENT_GOAL_TEMPLATE)
+    GOAL_TEMPLATE['sceneInfo'][tags.SCENE.TERTIARY] = (
+        tags.TYPES.AGENT_BACKGROUND_MULTIPLE_AGENTS
+    )
+
+    def __init__(self) -> None:
+        super().__init__(
+            'AgentMultipleAgentsTraining',
+            'agents_background_multiple_agents',
             self.GOAL_TEMPLATE,
             training=True
         )
@@ -245,6 +269,21 @@ class AgentObjectPreferenceTrainingHypercubeFactory(AgentHypercubeFactory):
         super().__init__(
             'AgentObjectPreferenceTraining',
             'agents_background_object_preference',
+            self.GOAL_TEMPLATE,
+            training=True
+        )
+
+
+class AgentSingleObjectTrainingHypercubeFactory(AgentHypercubeFactory):
+    GOAL_TEMPLATE = copy.deepcopy(AGENT_GOAL_TEMPLATE)
+    GOAL_TEMPLATE['sceneInfo'][tags.SCENE.TERTIARY] = (
+        tags.TYPES.AGENT_BACKGROUND_SINGLE_OBJECT
+    )
+
+    def __init__(self) -> None:
+        super().__init__(
+            'AgentSingleObjectTraining',
+            'agents_background_single_object',
             self.GOAL_TEMPLATE,
             training=True
         )
@@ -268,7 +307,7 @@ class AgentObjectPreferenceEvaluationHypercubeFactory(AgentHypercubeFactory):
 class AgentEfficientActionAEvaluationHypercubeFactory(AgentHypercubeFactory):
     GOAL_TEMPLATE = copy.deepcopy(AGENT_GOAL_TEMPLATE)
     GOAL_TEMPLATE['sceneInfo'][tags.SCENE.TERTIARY] = (
-        tags.TYPES.AGENT_EVALUATION_EFFICIENT_ACTION_A
+        tags.TYPES.AGENT_EVALUATION_EFFICIENT_PATH
     )
 
     def __init__(self) -> None:
@@ -283,7 +322,7 @@ class AgentEfficientActionAEvaluationHypercubeFactory(AgentHypercubeFactory):
 class AgentEfficientActionBEvaluationHypercubeFactory(AgentHypercubeFactory):
     GOAL_TEMPLATE = copy.deepcopy(AGENT_GOAL_TEMPLATE)
     GOAL_TEMPLATE['sceneInfo'][tags.SCENE.TERTIARY] = (
-        tags.TYPES.AGENT_EVALUATION_EFFICIENT_ACTION_B
+        tags.TYPES.AGENT_EVALUATION_EFFICIENT_TIME
     )
 
     def __init__(self) -> None:
@@ -322,18 +361,15 @@ class AgentExamplesEvaluationHypercubeFactory(AgentHypercubeFactory):
 
 
 AGENT_TRAINING_HYPERCUBE_LIST = [
-    AgentSingleObjectTrainingHypercubeFactory(),
+    AgentInstrumentalActionTrainingHypercubeFactory(),
+    AgentMultipleAgentsTrainingHypercubeFactory(),
     AgentObjectPreferenceTrainingHypercubeFactory(),
-    AgentEfficientActionAEvaluationHypercubeFactory(),
-    AgentEfficientActionBEvaluationHypercubeFactory(),
-    AgentObjectPreferenceEvaluationHypercubeFactory(),
+    AgentSingleObjectTrainingHypercubeFactory(),
     AgentExamplesTrainingHypercubeFactory()
 ]
 
 
 AGENT_EVALUATION_HYPERCUBE_LIST = [
-    AgentSingleObjectTrainingHypercubeFactory(),
-    AgentObjectPreferenceTrainingHypercubeFactory(),
     AgentEfficientActionAEvaluationHypercubeFactory(),
     AgentEfficientActionBEvaluationHypercubeFactory(),
     AgentObjectPreferenceEvaluationHypercubeFactory(),

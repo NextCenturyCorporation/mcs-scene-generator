@@ -67,7 +67,7 @@ GRAVITY_SUPPORT_MAX_ONSCREEN_X = 1.5
 
 GRAVITY_SUPPORT_MOVE = 0.25
 GRAVITY_SUPPORT_WAIT = 5
-GRAVITY_SUPPORT_WIND = 250
+GRAVITY_SUPPORT_WIND = 400
 GRAVITY_SUPPORT_MOVEMENT = {
     "stepBegin": 0,
     "stepEnd": 0,
@@ -118,6 +118,7 @@ def load_movement_from_json_file():
 
 
 MOVEMENT = load_movement_from_json_file()
+
 
 def adjust_movement_to_position(
     movement: Optional[Dict[str, Any]],
@@ -796,8 +797,8 @@ class IntuitivePhysicsHypercube(hypercubes.Hypercube, ABC):
                 definition_opposite_colors['materials'] = []
                 definition_opposite_colors['color'] = []
                 for material in definitions[VARIATIONS.TRAINED]['materials']:
-                    opposite = materials.OPPOSITE_SETS[material]
-                    same = materials.OPPOSITE_SETS[opposite[0]]
+                    opposite = copy.deepcopy(materials.OPPOSITE_SETS[material])
+                    same = copy.deepcopy(materials.OPPOSITE_SETS[opposite[0]])
                     definition_same_colors['materials'].append(same[0])
                     definition_same_colors['color'].extend(same[1])
                     definition_opposite_colors['materials'].append(opposite[0])
@@ -1022,9 +1023,9 @@ class IntuitivePhysicsHypercube(hypercubes.Hypercube, ABC):
         scene['intuitivePhysics'] = True
 
         # Choose a new room wall material from a restricted list.
-        room_wall_material_choice = random.choice(
+        room_wall_material_choice = copy.deepcopy(random.choice(
             random.choice(materials.INTUITIVE_PHYSICS_WALL_MATERIALS)
-        )
+        ))
         scene['wallMaterial'] = room_wall_material_choice[0]
         scene['wallColors'] = room_wall_material_choice[1]
 
@@ -1057,7 +1058,11 @@ class IntuitivePhysicsHypercube(hypercubes.Hypercube, ABC):
             role_to_object_list,
             retrieve_as_list,
             [scene],
-            wall_material_list=materials.INTUITIVE_PHYSICS_WALL_MATERIALS
+            wall_material_list=[
+                copy.deepcopy(material_option)
+                for material_list in materials.INTUITIVE_PHYSICS_WALL_MATERIALS
+                for material_option in material_list
+            ]
         )[0]
 
         return scene
@@ -1155,7 +1160,7 @@ class IntuitivePhysicsHypercube(hypercubes.Hypercube, ABC):
             filtered_material_list = []
             for material in material_list:
                 if material[0] != room_wall_material_name:
-                    filtered_material_list.append(material)
+                    filtered_material_list.append(copy.deepcopy(material))
             structural_object_material_list.append(filtered_material_list)
         return structural_object_material_list
 
@@ -1387,8 +1392,10 @@ class IntuitivePhysicsHypercube(hypercubes.Hypercube, ABC):
                     )
 
         return occluders.create_occluder(
-            random.choice(random.choice(occluder_wall_material_list)),
-            random.choice(materials.METAL_MATERIALS),
+            copy.deepcopy(random.choice(random.choice(
+                occluder_wall_material_list
+            ))),
+            copy.deepcopy(random.choice(materials.METAL_MATERIALS)),
             x_position,
             x_scale,
             sideways_left=sideways_left,
@@ -1559,8 +1566,10 @@ class IntuitivePhysicsHypercube(hypercubes.Hypercube, ABC):
         )
 
         return occluders.create_occluder(
-            random.choice(random.choice(occluder_wall_material_list)),
-            random.choice(materials.METAL_MATERIALS),
+            copy.deepcopy(random.choice(random.choice(
+                occluder_wall_material_list
+            ))),
+            copy.deepcopy(random.choice(materials.METAL_MATERIALS)),
             x_position,
             x_scale,
             sideways_left=False,
@@ -1621,8 +1630,10 @@ class IntuitivePhysicsHypercube(hypercubes.Hypercube, ABC):
                 (not sideways_left) if self.is_fall_down() else False
             )
             return occluders.create_occluder(
-                random.choice(random.choice(occluder_wall_material_list)),
-                random.choice(materials.METAL_MATERIALS),
+                copy.deepcopy(random.choice(random.choice(
+                    occluder_wall_material_list
+                ))),
+                copy.deepcopy(random.choice(materials.METAL_MATERIALS)),
                 x_position,
                 x_scale,
                 sideways_left=sideways_left,
@@ -2404,6 +2415,7 @@ class GravitySupportHypercube(IntuitivePhysicsHypercube):
         return ['o', 'p']
 
     def _get_scene_ids_implausible_force(self) -> List[int]:
+        # Override in a subclass
         return []
 
     def _get_scene_ids_implausible_support(self) -> List[int]:
@@ -2434,7 +2446,7 @@ class GravitySupportHypercube(IntuitivePhysicsHypercube):
         is_positive = random.choice([True, False])
 
         # Choose the multipler of the target's movement in no-support scenes.
-        # Must be a max of # 1.5 so the target is always in view of the camera.
+        # Must be a max of 1.5 so the target is always in view of the camera.
         no_support_multiplier = 0.5 + (random.randint(1, 10) / 20.0)
 
         # Choose the height of the invisible support in the implausible
@@ -2475,7 +2487,7 @@ class GravitySupportHypercube(IntuitivePhysicsHypercube):
                     tags.TYPES.GRAVITY_SUPPORT_TARGET_POSITION
                 ] = tags.CELLS.GRAVITY_SUPPORT_TARGET_POSITION.NONE
                 x_position_multiplier = no_support_multiplier
-            # Move target to its minimal-support X position.
+            # Move target to its minimal-support (5%) X position.
             if i in self._get_scene_ids_target_support_minimal():
                 scene['goal']['sceneInfo'][
                     tags.TYPES.GRAVITY_SUPPORT_TARGET_POSITION
@@ -2485,7 +2497,7 @@ class GravitySupportHypercube(IntuitivePhysicsHypercube):
             if i in self._get_scene_ids_target_support_25():
                 scene['goal']['sceneInfo'][
                     tags.TYPES.GRAVITY_SUPPORT_TARGET_POSITION
-                ] = tags.CELLS.GRAVITY_SUPPORT_TARGET_POSITION.HALF
+                ] = tags.CELLS.GRAVITY_SUPPORT_TARGET_POSITION.TWENTY_FIVE
                 x_position_multiplier = 0.25
             for instance in scene['objects']:
                 if instance['id'] == target_id:

@@ -84,7 +84,10 @@ def update_floor_and_walls(
             room_colors = choice[1]
         if not successful:
             raise exceptions.SceneException(
-                f'Cannot find {prefix} material without color {object_colors}')
+                f'Cannot find a {prefix} material without color(s) '
+                f'{object_colors}\nCHOICES: {choice_list}\n'
+                f'OBJECTS: {role_to_object_data_list}'
+            )
         if room_material != body_template[prefix + 'Material']:
             for scene in scenes:
                 scene[prefix + 'Material'] = room_material

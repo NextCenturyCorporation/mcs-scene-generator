@@ -18,6 +18,7 @@ ROLE_DICT = {
     'CONTAINER': 'container',
     'CONTEXT': 'context',
     'HOME': 'home',
+    'KEY': 'key',
     'INTUITIVE_PHYSICS_OCCLUDER': 'intuitive physics occluder',
     'NON_TARGET': 'non target',
     'OBSTACLE': 'obstacle',
@@ -143,12 +144,20 @@ TYPES = SimpleNamespace(
     INTERACTIVE_TARGET_HIDDEN='targetHidden',
     INTERACTIVE_TARGET_INSIDE='targetInside',
 
-    AGENT_BACKGROUND_SINGLE_OBJECT='agents single object',
+    AGENT_BACKGROUND_INSTRUMENTAL_ACTION='agents instrumental action',
+    AGENT_BACKGROUND_MULTIPLE_AGENTS='agents multiple agents',
     AGENT_BACKGROUND_OBJECT_PREFERENCE='agents object preference',
-    AGENT_BACKGROUND_UNDIRECTED_MOVEMENT='agents undirected movement',
-    AGENT_EVALUATION_OBJECT_PREFERENCE='agents object preference',
-    AGENT_EVALUATION_EFFICIENT_ACTION_A='agents efficient action path lure',
-    AGENT_EVALUATION_EFFICIENT_ACTION_B='agents efficient action time control'
+    AGENT_BACKGROUND_SINGLE_OBJECT='agents single object',
+
+    AGENT_EVALUATION_EFFICIENT_IRRATIONAL='agents efficient action irrational',
+    AGENT_EVALUATION_EFFICIENT_PATH='agents efficient action path lure',
+    AGENT_EVALUATION_EFFICIENT_TIME='agents efficient action time control',
+    AGENT_EVALUATION_INACCESSIBLE_GOAL='agents inaccessible goal',
+    AGENT_EVALUATION_INSTRUMENTAL_BLOCKING='agents instrumental action blocking barriers',  # noqa: E501
+    AGENT_EVALUATION_INSTRUMENTAL_INCONSEQUENTIAL='agents instrumental action inconsequential barriers',  # noqa: E501
+    AGENT_EVALUATION_INSTRUMENTAL_NO_BARRIERS='agents instrumental action no barriers',  # noqa: E501
+    AGENT_EVALUATION_MULTIPLE_AGENTS='agents multiple agents',
+    AGENT_EVALUATION_OBJECT_PREFERENCE='agents object preference'
 )
 
 CELLS = SimpleNamespace(
@@ -176,7 +185,8 @@ CELLS = SimpleNamespace(
     ),
     GRAVITY_SUPPORT_TARGET_POSITION=SimpleNamespace(
         FULL='full support',
-        HALF='half support',
+        TWENTY_FIVE='twenty five percent support',
+        SEVENTY_FIVE='seventy five percent support',
         MINIMAL='minimal support',
         NONE='no support'
     ),

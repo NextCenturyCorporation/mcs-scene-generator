@@ -189,13 +189,6 @@ CEILING_AND_WALL_MATERIALS = [
     WOOD_MATERIALS
 ]
 
-OCCLUDER_MATERIALS = [
-    CERAMIC_MATERIALS,
-    METAL_MATERIALS,
-    WALL_MATERIALS,
-    WOOD_MATERIALS
-]
-
 # Choose only ceramic, fabric, metal, and wood materials that aren't too shiny
 # or have distracting patterns.
 FLOOR_MATERIALS = [

@@ -27,7 +27,7 @@ sudo apt install python3-testresources
 ```
 
 ## Notes
-
+￼
 - Eval 4: If you generate Eval 3 hypercubes for training (interactive container, interactive obstacle, interactive occluder, intuitive physics shape constancy), please note that all "untrained"/"novel" shapes will be chosen from the same set of "trained"/"familiar" shapes that are currently available for all training in Eval 4.
 
 ## Running
@@ -59,6 +59,7 @@ You can generate scenes containing specific objects by passing the [object type]
 - `--non-target <type>` (optional): Force the non-target object to be a specific type (shape). Used in intuitive physics (but not gravity support) and agent scenes.
 - `--obstacle <type>` (optional): Force the obstacle object to be a specific type (shape). Used in interactive obstacle scenes.
 - `--occluder <type>` (optional): Force the primary occluder object (that occludes the target) to be a specific type (shape). Used in interactive occluder scenes.
+- `--second-agent <type>` (optional): Force the second agent object in multi-agent scenes to be a specific type (shape). Used in agent scenes.
 - `--symmetric <type>` (optional): Force the symmetric target object to be a specific type (shape). Used in gravity support scenes.
 - `--target <type>` (optional): Force the target object to be a specific type (shape). Used in intuitive physics (but not gravity support) and agent scenes. Please note that the target object in interactive scenes is currently always a soccer ball.
 
@@ -201,11 +202,20 @@ python generate_public_scenes.py -p <prefix> -t OccluderRetrievalEvaluation
 
 First, download and unzip the bundles containing the NYU agent scene JSON files that we convert:
 
+Winter 2020 Evaluation
+
 - [agents_background_object_preference.zip](https://nyu-datasets.s3.amazonaws.com/agents_background_object_preference.zip)
 - [agents_background_single_object.zip](https://nyu-datasets.s3.amazonaws.com/agents_background_single_object.zip)
 - [agents_evaluation_object_preference.zip](https://nyu-datasets.s3.amazonaws.com/agents_evaluation_object_preference.zip)
 - [agents_evaluation_efficient_action_a.zip](https://nyu-datasets.s3.amazonaws.com/agents_evaluation_efficient_action_a.zip)
 - [agents_evaluation_efficient_action_b.zip](https://nyu-datasets.s3.amazonaws.com/agents_evaluation_efficient_action_b.zip)
+
+Summer 2021 Evaluation
+
+- [agents_background_instrumental_action.zip](https://nyu-datasets.s3.amazonaws.com/agents_background_instrumental_action.zip)
+- [agents_background_multiple_agents.zip](https://nyu-datasets.s3.amazonaws.com/agents_background_multiple_agents.zip)
+- [agents_background_object_preference_v2.zip](https://nyu-datasets.s3.amazonaws.com/agents_background_object_preference_v2.zip)
+- [agents_background_single_object_v2.zip](https://nyu-datasets.s3.amazonaws.com/agents_background_single_object_v2.zip)
 
 Unzipping each bundle should extract a corresponding folder (containing the JSON files) nested within this folder, with a name like "agents_background_object_preference".
 
@@ -242,8 +252,10 @@ The Eval 3.5 Gravity Support scenes only use the following object types:
 Training agent scenes are not unexpected and do not have any "untrained" objects.
 
 ```
-python generate_public_scenes.py -p <prefix> -t AgentSingleObjectTraining
+python generate_public_scenes.py -p <prefix> -t AgentInstrumentalActionTraining
+python generate_public_scenes.py -p <prefix> -t AgentMultipleAgentsTraining
 python generate_public_scenes.py -p <prefix> -t AgentObjectPreferenceTraining
+python generate_public_scenes.py -p <prefix> -t AgentSingleObjectTraining
 ```
 
 #### Evaluation Agent Datasets

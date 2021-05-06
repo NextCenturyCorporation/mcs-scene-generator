@@ -240,7 +240,6 @@ class SceneGenerator():
                 scene_copy['training'] = hypercube_factory.training
 
                 # Save the scene as both normal and debug JSON files.
-                self.strip_debug_misleading_data(scene_copy)
                 self.write_scene(debug_filename + '_debug.json', scene_copy)
                 self.strip_debug_data(scene_copy)
                 self.write_scene(scene_filename + '.json', scene_copy)
@@ -329,6 +328,11 @@ class SceneGenerator():
             default=None,
             help='Specific agent type (agent scenes)')
         parser.add_argument(
+            '--second-agent',
+            type=str,
+            default=None,
+            help='Specific second agent type (multi-agent scenes)')
+        parser.add_argument(
             '--symmetric',
             type=str,
             default=None,
@@ -355,6 +359,7 @@ class SceneGenerator():
         role_to_type[tags.ROLES.TARGET] = args.target
         role_to_type['symmetric'] = args.symmetric
         role_to_type['asymmetric'] = args.asymmetric
+        role_to_type['second agent'] = args.second_agent
 
         self.generate_scenes(
             args.prefix,
