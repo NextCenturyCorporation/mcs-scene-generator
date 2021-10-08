@@ -1,9 +1,9 @@
 import numpy
-from numpy.testing import assert_array_almost_equal_nulp
 import pytest
+from numpy.testing import assert_array_almost_equal_nulp
 from shapely.geometry import Point
 
-import optimal_path
+from generator import geometry, optimal_path
 
 
 def test_dilate_and_unify_object_bounds():
@@ -232,7 +232,10 @@ def test_remove_duplicate_paths():
 
 
 def test_generate_shortest_path_position_list_trivial():
-    environment = optimal_path._generate_pathfinding_environment([])
+    environment = optimal_path._generate_pathfinding_environment(
+        geometry.DEFAULT_ROOM_DIMENSIONS,
+        []
+    )
     assert environment
     position_list = optimal_path._generate_shortest_path_position_list(
         (0, 0),
@@ -248,6 +251,7 @@ def test_generate_shortest_path_position_list_basic():
         {'x': 0.5, 'z': 0.5}
     ]
     environment = optimal_path._generate_pathfinding_environment(
+        geometry.DEFAULT_ROOM_DIMENSIONS,
         [bounds_1]
     )
     assert environment
@@ -279,6 +283,7 @@ def test_generate_shortest_path_position_list_complex():
         {'x': 1.0, 'z': 3.5}
     ]
     environment = optimal_path._generate_pathfinding_environment(
+        geometry.DEFAULT_ROOM_DIMENSIONS,
         [bounds_1, bounds_2, bounds_3, bounds_4]
     )
     assert environment
@@ -308,6 +313,7 @@ def test_generate_shortest_path_position_list_squeeze():
         {'x': 4.44, 'z': 0.5}
     ]
     environment = optimal_path._generate_pathfinding_environment(
+        geometry.DEFAULT_ROOM_DIMENSIONS,
         [bounds_1, bounds_2, bounds_3]
     )
     assert environment
@@ -327,6 +333,7 @@ def test_generate_shortest_path_position_list_almost_impossible():
         {'x': 4.43, 'z': 0.5}
     ]
     environment = optimal_path._generate_pathfinding_environment(
+        geometry.DEFAULT_ROOM_DIMENSIONS,
         [bounds_1]
     )
     assert environment
@@ -346,6 +353,7 @@ def test_generate_shortest_path_position_list_impossible():
         {'x': 4.45, 'z': 0.5}
     ]
     environment = optimal_path._generate_pathfinding_environment(
+        geometry.DEFAULT_ROOM_DIMENSIONS,
         [bounds_1]
     )
     assert environment

@@ -1,32 +1,40 @@
-import pytest
-
-import geometry
-from separating_axis_theorem import sat_entry
 import math
+
+import pytest
 import shapely
-import util
-import objects
+
+from generator import DefinitionDataset, geometry, specific_objects
+from generator.separating_axis_theorem import sat_entry
+
+DEFAULT_ROOM_X_MAX = (geometry.DEFAULT_ROOM_DIMENSIONS['x'] / 2.0)
+DEFAULT_ROOM_Z_MAX = (geometry.DEFAULT_ROOM_DIMENSIONS['z'] / 2.0)
+DEFAULT_ROOM_X_MIN = -DEFAULT_ROOM_X_MAX
+DEFAULT_ROOM_Z_MIN = -DEFAULT_ROOM_Z_MAX
 
 
+DATASET = specific_objects.get_interactable_definition_dataset(unshuffled=True)
 ALL_DEFINITIONS = [
-    definition for definition_list in util.retrieve_complete_definition_list(
-        objects.get(objects.ObjectDefinitionList.ALL)
-    ) for definition in definition_list
+    # Just use the first variation (color) of each object for faster testing.
+    definition_variations[0]
+    for definition_selections in DATASET._definition_groups
+    for definition_variations in definition_selections
 ]
+# Reassign the dataset to use the filtered definition list for faster testing.
+DATASET = DefinitionDataset([[ALL_DEFINITIONS]])
 
 
 # Use the sofa because it should obstruct any pickupable object.
-LARGEST_OBJECT = util.finalize_object_definition([
-    item for item in ALL_DEFINITIONS if item.get('type') == 'sofa_1' and
-    item.get('scale') == {'x': 1, 'y': 1, 'z': 1}
-][0])
+LARGEST_OBJECT = [
+    item for item in ALL_DEFINITIONS if item.type == 'sofa_1' and
+    vars(item.scale) == {'x': 1, 'y': 1, 'z': 1}
+][0]
 
 
 # Use the pacifier because it shouldn't obstruct any pickupable object.
-SMALLEST_OBJECT = util.finalize_object_definition([
-    item for item in ALL_DEFINITIONS if item.get('type') == 'pacifier' and
-    item.get('scale') == {'x': 1, 'y': 1, 'z': 1}
-][0])
+SMALLEST_OBJECT = [
+    item for item in ALL_DEFINITIONS if item.type == 'pacifier' and
+    vars(item.scale) == {'x': 1, 'y': 1, 'z': 1}
+][0]
 
 
 def test_collision():
@@ -65,25 +73,35 @@ def test_rect_intersection():
     assert sat_entry(C, A) is True
 
 
-def test_point_within_room():
-    outside1 = {
-        'x': geometry.ROOM_X_MIN - 1,
-        'y': 0,
-        'z': 0
-    }
-    assert geometry.point_within_room(outside1) is False
-    outside2 = {
-        'x': 0,
-        'y': 0,
-        'z': geometry.ROOM_Z_MAX + 1,
-    }
-    assert geometry.point_within_room(outside2) is False
-    inside = {
-        'x': (geometry.ROOM_X_MIN + geometry.ROOM_X_MAX) / 2.0,
-        'y': 0,
-        'z': (geometry.ROOM_Z_MIN + geometry.ROOM_Z_MAX) / 2.0,
-    }
-    assert geometry.point_within_room(inside) is True
+def test_rect_within_room():
+    valid_1 = {'x': 0, 'z': 0}
+    valid_2 = {'x': 5, 'z': 5}
+    valid_3 = {'x': 5, 'z': -5}
+    valid_4 = {'x': -5, 'z': -5}
+    valid_5 = {'x': -5, 'z': 5}
+    valid_6 = {'x': 0.1, 'z': 0.1}
+    invalid_1 = {'x': 5.1, 'z': 0}
+    invalid_2 = {'x': -5.1, 'z': 0}
+    invalid_3 = {'x': 0, 'z': 5.1}
+    invalid_4 = {'x': 0, 'z': -5.1}
+    assert geometry.rect_within_room([
+        valid_1, valid_2, valid_3, valid_4, valid_5, valid_6
+    ], geometry.DEFAULT_ROOM_DIMENSIONS)
+    assert geometry.rect_within_room([
+        valid_1, valid_2, valid_3, valid_4, valid_5, valid_6, invalid_1
+    ], geometry.DEFAULT_ROOM_DIMENSIONS) is False
+    assert geometry.rect_within_room([
+        valid_1, valid_2, valid_3, valid_4, valid_5, valid_6, invalid_2
+    ], geometry.DEFAULT_ROOM_DIMENSIONS) is False
+    assert geometry.rect_within_room([
+        valid_1, valid_2, valid_3, valid_4, valid_5, valid_6, invalid_3
+    ], geometry.DEFAULT_ROOM_DIMENSIONS) is False
+    assert geometry.rect_within_room([
+        valid_1, valid_2, valid_3, valid_4, valid_5, valid_6, invalid_4
+    ], geometry.DEFAULT_ROOM_DIMENSIONS) is False
+    assert geometry.rect_within_room([
+        invalid_1, invalid_2, invalid_3, invalid_4
+    ], geometry.DEFAULT_ROOM_DIMENSIONS) is False
 
 
 def test_mcs_157():
@@ -109,7 +127,10 @@ def test_mcs_157():
             "z": -5.1342640687119285
         }
     ]
-    assert geometry.rect_within_room(bounding_box) is False
+    assert geometry.rect_within_room(
+        bounding_box,
+        geometry.DEFAULT_ROOM_DIMENSIONS
+    ) is False
 
 
 def test_calc_obj_coords_identity():
@@ -433,11 +454,13 @@ def test_object_collision():
 
 
 def test_get_visible_segment():
-    actual = geometry.get_visible_segment(
-        {'position': {'x': 0, 'y': 0, 'z': 0}, 'rotation': {'y': 0}})
+    actual = geometry._get_visible_segment(
+        {'position': {'x': 0, 'y': 0, 'z': 0}, 'rotation': {'y': 0}},
+        geometry.DEFAULT_ROOM_DIMENSIONS
+    )
     expected = shapely.geometry.LineString(
         [[0, geometry.MIN_FORWARD_VISIBILITY_DISTANCE],
-         [0, geometry.ROOM_Z_MAX]]
+         [0, DEFAULT_ROOM_Z_MAX]]
     )
     actual_coords = list(actual.coords)
     expected_coords = list(expected.coords)
@@ -446,15 +469,17 @@ def test_get_visible_segment():
     assert actual_coords[1][0] == pytest.approx(expected_coords[1][0])
     assert actual_coords[1][1] == pytest.approx(expected_coords[1][1])
 
-    actual = geometry.get_visible_segment(
-        {'position': {'x': 0, 'y': 0, 'z': 0}, 'rotation': {'y': 45}})
+    actual = geometry._get_visible_segment(
+        {'position': {'x': 0, 'y': 0, 'z': 0}, 'rotation': {'y': 45}},
+        geometry.DEFAULT_ROOM_DIMENSIONS
+    )
     expected = shapely.geometry.LineString(
         [
             [
                 math.sqrt(2) / 2.0 * geometry.MIN_FORWARD_VISIBILITY_DISTANCE,
                 math.sqrt(2) / 2.0 * geometry.MIN_FORWARD_VISIBILITY_DISTANCE
             ],
-            [geometry.ROOM_X_MAX, geometry.ROOM_Z_MAX]
+            [DEFAULT_ROOM_X_MAX, DEFAULT_ROOM_Z_MAX]
         ]
     )
     actual_coords = list(actual.coords)
@@ -464,11 +489,13 @@ def test_get_visible_segment():
     assert actual_coords[1][0] == pytest.approx(expected_coords[1][0])
     assert actual_coords[1][1] == pytest.approx(expected_coords[1][1])
 
-    actual = geometry.get_visible_segment(
-        {'position': {'x': 0, 'y': 0, 'z': 0}, 'rotation': {'y': 90}})
+    actual = geometry._get_visible_segment(
+        {'position': {'x': 0, 'y': 0, 'z': 0}, 'rotation': {'y': 90}},
+        geometry.DEFAULT_ROOM_DIMENSIONS
+    )
     expected = shapely.geometry.LineString(
         [[geometry.MIN_FORWARD_VISIBILITY_DISTANCE, 0],
-         [geometry.ROOM_X_MAX, 0]]
+         [DEFAULT_ROOM_X_MAX, 0]]
     )
     actual_coords = list(actual.coords)
     expected_coords = list(expected.coords)
@@ -477,15 +504,17 @@ def test_get_visible_segment():
     assert actual_coords[1][0] == pytest.approx(expected_coords[1][0])
     assert actual_coords[1][1] == pytest.approx(expected_coords[1][1])
 
-    actual = geometry.get_visible_segment(
-        {'position': {'x': 0, 'y': 0, 'z': 0}, 'rotation': {'y': 135}})
+    actual = geometry._get_visible_segment(
+        {'position': {'x': 0, 'y': 0, 'z': 0}, 'rotation': {'y': 135}},
+        geometry.DEFAULT_ROOM_DIMENSIONS
+    )
     expected = shapely.geometry.LineString(
         [
             [
                 math.sqrt(2) / 2.0 * geometry.MIN_FORWARD_VISIBILITY_DISTANCE,
                 -math.sqrt(2) / 2.0 * geometry.MIN_FORWARD_VISIBILITY_DISTANCE
             ],
-            [geometry.ROOM_X_MAX, -geometry.ROOM_Z_MAX]
+            [DEFAULT_ROOM_X_MAX, -DEFAULT_ROOM_Z_MAX]
         ]
     )
     actual_coords = list(actual.coords)
@@ -496,11 +525,13 @@ def test_get_visible_segment():
     assert actual_coords[1][0] == pytest.approx(expected_coords[1][0])
     assert actual_coords[1][1] == pytest.approx(expected_coords[1][1])
 
-    actual = geometry.get_visible_segment(
-        {'position': {'x': 0, 'y': 0, 'z': 0}, 'rotation': {'y': 180}})
+    actual = geometry._get_visible_segment(
+        {'position': {'x': 0, 'y': 0, 'z': 0}, 'rotation': {'y': 180}},
+        geometry.DEFAULT_ROOM_DIMENSIONS
+    )
     expected = shapely.geometry.LineString(
         [[0, -geometry.MIN_FORWARD_VISIBILITY_DISTANCE],
-         [0, -geometry.ROOM_Z_MAX]]
+         [0, -DEFAULT_ROOM_Z_MAX]]
     )
     actual_coords = list(actual.coords)
     expected_coords = list(expected.coords)
@@ -509,15 +540,17 @@ def test_get_visible_segment():
     assert actual_coords[1][0] == pytest.approx(expected_coords[1][0])
     assert actual_coords[1][1] == pytest.approx(expected_coords[1][1])
 
-    actual = geometry.get_visible_segment(
-        {'position': {'x': 0, 'y': 0, 'z': 0}, 'rotation': {'y': 225}})
+    actual = geometry._get_visible_segment(
+        {'position': {'x': 0, 'y': 0, 'z': 0}, 'rotation': {'y': 225}},
+        geometry.DEFAULT_ROOM_DIMENSIONS
+    )
     expected = shapely.geometry.LineString(
         [
             [
                 -math.sqrt(2) / 2.0 * geometry.MIN_FORWARD_VISIBILITY_DISTANCE,
                 -math.sqrt(2) / 2.0 * geometry.MIN_FORWARD_VISIBILITY_DISTANCE
             ],
-            [-geometry.ROOM_X_MAX, -geometry.ROOM_Z_MAX]
+            [-DEFAULT_ROOM_X_MAX, -DEFAULT_ROOM_Z_MAX]
         ]
     )
     actual_coords = list(actual.coords)
@@ -527,11 +560,13 @@ def test_get_visible_segment():
     assert actual_coords[1][0] == pytest.approx(expected_coords[1][0])
     assert actual_coords[1][1] == pytest.approx(expected_coords[1][1])
 
-    actual = geometry.get_visible_segment(
-        {'position': {'x': 0, 'y': 0, 'z': 0}, 'rotation': {'y': 270}})
+    actual = geometry._get_visible_segment(
+        {'position': {'x': 0, 'y': 0, 'z': 0}, 'rotation': {'y': 270}},
+        geometry.DEFAULT_ROOM_DIMENSIONS
+    )
     expected = shapely.geometry.LineString(
         [[-geometry.MIN_FORWARD_VISIBILITY_DISTANCE, 0],
-         [-geometry.ROOM_X_MAX, 0]]
+         [-DEFAULT_ROOM_X_MAX, 0]]
     )
     actual_coords = list(actual.coords)
     expected_coords = list(expected.coords)
@@ -540,15 +575,17 @@ def test_get_visible_segment():
     assert actual_coords[1][0] == pytest.approx(expected_coords[1][0])
     assert actual_coords[1][1] == pytest.approx(expected_coords[1][1])
 
-    actual = geometry.get_visible_segment(
-        {'position': {'x': 0, 'y': 0, 'z': 0}, 'rotation': {'y': 315}})
+    actual = geometry._get_visible_segment(
+        {'position': {'x': 0, 'y': 0, 'z': 0}, 'rotation': {'y': 315}},
+        geometry.DEFAULT_ROOM_DIMENSIONS
+    )
     expected = shapely.geometry.LineString(
         [
             [
                 -math.sqrt(2) / 2.0 * geometry.MIN_FORWARD_VISIBILITY_DISTANCE,
                 math.sqrt(2) / 2.0 * geometry.MIN_FORWARD_VISIBILITY_DISTANCE
             ],
-            [-geometry.ROOM_X_MAX, geometry.ROOM_Z_MAX]
+            [-DEFAULT_ROOM_X_MAX, DEFAULT_ROOM_Z_MAX]
         ]
     )
     actual_coords = list(actual.coords)
@@ -560,8 +597,10 @@ def test_get_visible_segment():
 
 
 def test_get_visible_segment_with_position():
-    actual = geometry.get_visible_segment(
-        {'position': {'x': 1, 'y': 0, 'z': 1}, 'rotation': {'y': 45}})
+    actual = geometry._get_visible_segment(
+        {'position': {'x': 1, 'y': 0, 'z': 1}, 'rotation': {'y': 45}},
+        geometry.DEFAULT_ROOM_DIMENSIONS
+    )
     expected = shapely.geometry.LineString(
         [
             [
@@ -570,7 +609,7 @@ def test_get_visible_segment_with_position():
                 math.sqrt(2) / 2.0 *
                 geometry.MIN_FORWARD_VISIBILITY_DISTANCE + 1
             ],
-            [geometry.ROOM_X_MAX, geometry.ROOM_Z_MAX]
+            [DEFAULT_ROOM_X_MAX, DEFAULT_ROOM_Z_MAX]
         ]
     )
     actual_coords = list(actual.coords)
@@ -580,8 +619,10 @@ def test_get_visible_segment_with_position():
     assert actual_coords[1][0] == pytest.approx(expected_coords[1][0])
     assert actual_coords[1][1] == pytest.approx(expected_coords[1][1])
 
-    actual = geometry.get_visible_segment(
-        {'position': {'x': -5, 'y': 0, 'z': -5}, 'rotation': {'y': 45}})
+    actual = geometry._get_visible_segment(
+        {'position': {'x': -5, 'y': 0, 'z': -5}, 'rotation': {'y': 45}},
+        geometry.DEFAULT_ROOM_DIMENSIONS
+    )
     expected = shapely.geometry.LineString(
         [
             [
@@ -590,7 +631,7 @@ def test_get_visible_segment_with_position():
                 math.sqrt(2) / 2.0 *
                 geometry.MIN_FORWARD_VISIBILITY_DISTANCE - 5
             ],
-            [geometry.ROOM_X_MAX, geometry.ROOM_Z_MAX]
+            [DEFAULT_ROOM_X_MAX, DEFAULT_ROOM_Z_MAX]
         ]
     )
     actual_coords = list(actual.coords)
@@ -601,26 +642,30 @@ def test_get_visible_segment_with_position():
     assert actual_coords[1][1] == pytest.approx(expected_coords[1][1])
 
     assert (
-        geometry.get_visible_segment(
-            {'position': {'x': 4.5, 'y': 0, 'z': 0}, 'rotation': {'y': 45}}
+        geometry._get_visible_segment(
+            {'position': {'x': 4.5, 'y': 0, 'z': 0}, 'rotation': {'y': 45}},
+            geometry.DEFAULT_ROOM_DIMENSIONS
         )
         is None
     )
     assert (
-        geometry.get_visible_segment(
-            {'position': {'x': 0, 'y': 0, 'z': 4.5}, 'rotation': {'y': 45}}
+        geometry._get_visible_segment(
+            {'position': {'x': 0, 'y': 0, 'z': 4.5}, 'rotation': {'y': 45}},
+            geometry.DEFAULT_ROOM_DIMENSIONS
         )
         is None
     )
     assert (
-        geometry.get_visible_segment(
-            {'position': {'x': 4.5, 'y': 0, 'z': 4.5}, 'rotation': {'y': 45}}
+        geometry._get_visible_segment(
+            {'position': {'x': 4.5, 'y': 0, 'z': 4.5}, 'rotation': {'y': 45}},
+            geometry.DEFAULT_ROOM_DIMENSIONS
         )
         is None
     )
     assert (
-        geometry.get_visible_segment(
-            {'position': {'x': 5, 'y': 0, 'z': 0}, 'rotation': {'y': 45}}
+        geometry._get_visible_segment(
+            {'position': {'x': 5, 'y': 0, 'z': 0}, 'rotation': {'y': 45}},
+            geometry.DEFAULT_ROOM_DIMENSIONS
         )
         is None
     )
@@ -633,48 +678,48 @@ def test_get_position_in_front_of_performer():
             'y': 0}}
 
     for target_definition in ALL_DEFINITIONS:
-        target_half_size_x = target_definition['dimensions']['x'] / 2.0  # noqa: F811, E501
-        target_half_size_z = target_definition['dimensions']['z'] / 2.0
+        target_half_size_x = (target_definition.dimensions.x / 2.0)
+        target_half_size_z = (target_definition.dimensions.z / 2.0)
 
         performer_start['rotation']['y'] = 0
         positive_z = geometry.get_location_in_front_of_performer(
             performer_start, target_definition)
         assert 0 <= positive_z['position']['z']
-        assert positive_z['position']['z'] <= geometry.ROOM_Z_MAX
+        assert positive_z['position']['z'] <= DEFAULT_ROOM_Z_MAX
         assert -target_half_size_x <= positive_z['position']['x']
         assert positive_z['position']['x'] <= target_half_size_x
         assert geometry.get_bounding_polygon(positive_z).intersection(
-            shapely.geometry.LineString([[0, 1], [0, geometry.ROOM_Z_MAX]]))
+            shapely.geometry.LineString([[0, 1], [0, DEFAULT_ROOM_Z_MAX]]))
 
         performer_start['rotation']['y'] = 90
         positive_x = geometry.get_location_in_front_of_performer(
             performer_start, target_definition)
         assert 0 <= positive_x['position']['x']
-        assert positive_x['position']['x'] <= geometry.ROOM_X_MAX
+        assert positive_x['position']['x'] <= DEFAULT_ROOM_X_MAX
         assert -target_half_size_z <= positive_x['position']['z']
         assert positive_x['position']['z'] <= target_half_size_z
         assert geometry.get_bounding_polygon(positive_x).intersection(
-            shapely.geometry.LineString([[1, 0], [geometry.ROOM_X_MAX, 0]]))
+            shapely.geometry.LineString([[1, 0], [DEFAULT_ROOM_X_MAX, 0]]))
 
         performer_start['rotation']['y'] = 180
         negative_z = geometry.get_location_in_front_of_performer(
             performer_start, target_definition)
-        assert geometry.ROOM_Z_MIN <= negative_z['position']['z']
+        assert DEFAULT_ROOM_Z_MIN <= negative_z['position']['z']
         assert negative_z['position']['z'] <= 0
         assert -target_half_size_x <= negative_z['position']['x']
         assert negative_z['position']['x'] <= target_half_size_x
         assert geometry.get_bounding_polygon(negative_z).intersection(
-            shapely.geometry.LineString([[0, -1], [0, -geometry.ROOM_Z_MAX]]))
+            shapely.geometry.LineString([[0, -1], [0, -DEFAULT_ROOM_Z_MAX]]))
 
         performer_start['rotation']['y'] = 270
         negative_x = geometry.get_location_in_front_of_performer(
             performer_start, target_definition)
-        assert geometry.ROOM_X_MIN <= negative_x['position']['x']
+        assert DEFAULT_ROOM_X_MIN <= negative_x['position']['x']
         assert negative_x['position']['x'] <= 0
         assert -target_half_size_z <= negative_x['position']['z']
         assert negative_x['position']['z'] <= target_half_size_z
         assert geometry.get_bounding_polygon(negative_x).intersection(
-            shapely.geometry.LineString([[-1, 0], [-geometry.ROOM_X_MAX, 0]]))
+            shapely.geometry.LineString([[-1, 0], [-DEFAULT_ROOM_X_MAX, 0]]))
 
 
 def test_get_position_in_front_of_performer_next_to_room_wall():
@@ -684,7 +729,7 @@ def test_get_position_in_front_of_performer_next_to_room_wall():
             'y': 0}}
 
     for target_definition in ALL_DEFINITIONS:
-        performer_start['position']['z'] = geometry.ROOM_Z_MAX
+        performer_start['position']['z'] = DEFAULT_ROOM_Z_MAX
         location = geometry.get_location_in_front_of_performer(
             performer_start, target_definition)
         assert location is None
@@ -697,16 +742,16 @@ def test_get_position_in_back_of_performer():
     }
 
     for target_definition in ALL_DEFINITIONS:
-        target_half_x = (target_definition['dimensions']['x'] / 2.0)
-        target_half_z = (target_definition['dimensions']['z'] / 2.0)
-        min_x = geometry.ROOM_X_MIN + target_half_x - 0.05
-        max_x = geometry.ROOM_X_MAX - target_half_x + 0.05
-        min_z = geometry.ROOM_Z_MIN + target_half_z - 0.05
-        max_z = geometry.ROOM_Z_MAX - target_half_z + 0.05
+        target_half_x = (target_definition.dimensions.x / 2.0)
+        target_half_z = (target_definition.dimensions.z / 2.0)
+        min_x = DEFAULT_ROOM_X_MIN + target_half_x - 0.05
+        max_x = DEFAULT_ROOM_X_MAX - target_half_x + 0.05
+        min_z = DEFAULT_ROOM_Z_MIN + target_half_z - 0.05
+        max_z = DEFAULT_ROOM_Z_MAX - target_half_z + 0.05
         rear = shapely.geometry.box(
-            -(geometry.ROOM_X_MAX - geometry.ROOM_X_MIN),
-            -(geometry.ROOM_Z_MAX - geometry.ROOM_Z_MIN),
-            (geometry.ROOM_X_MAX - geometry.ROOM_X_MIN),
+            -(DEFAULT_ROOM_X_MAX - DEFAULT_ROOM_X_MIN),
+            -(DEFAULT_ROOM_Z_MAX - DEFAULT_ROOM_Z_MIN),
+            (DEFAULT_ROOM_X_MAX - DEFAULT_ROOM_X_MIN),
             -target_half_z
         )
         room = shapely.geometry.box(min_x, min_z, max_x, max_z)
@@ -815,7 +860,7 @@ def test_get_position_in_back_of_performer_next_to_room_wall():
             'y': 0}}
 
     for target_definition in ALL_DEFINITIONS:
-        performer_start['position']['z'] = geometry.ROOM_Z_MIN
+        performer_start['position']['z'] = DEFAULT_ROOM_Z_MIN
         location = geometry.get_location_in_back_of_performer(
             performer_start, target_definition)
         assert location is None
@@ -1214,19 +1259,16 @@ def test_generate_location_in_line_with_object():
             'rotation': {'x': 0, 'y': 0, 'z': 0}
         }
         object_1_location['boundingBox'] = geometry.generate_object_bounds(
-            object_1_definition['dimensions'],
-            object_1_definition.get('offset'),
+            vars(object_1_definition.dimensions),
+            vars(object_1_definition.offset),
             object_1_location['position'],
             object_1_location['rotation']
         )
         object_1_poly = geometry.get_bounding_polygon(object_1_location)
-        object_1_offset = object_1_definition.get('offset', {'x': 0, 'z': 0})
+        object_1_offset = vars(object_1_definition.offset)
 
         for object_2_definition in [LARGEST_OBJECT, SMALLEST_OBJECT]:
-            object_2_offset = object_2_definition.get(
-                'offset',
-                {'x': 0, 'z': 0}
-            )
+            object_2_offset = vars(object_2_definition.offset)
             location = geometry.generate_location_in_line_with_object(
                 object_2_definition,
                 object_1_definition,
@@ -1242,7 +1284,8 @@ def test_generate_location_in_line_with_object():
             assert geometry.validate_location_rect(
                 location['boundingBox'],
                 performer_start['position'],
-                [object_1_location['boundingBox']]
+                [object_1_location['boundingBox']],
+                geometry.DEFAULT_ROOM_DIMENSIONS
             )
             # Location is orthogonal on the Z axis to 1st object.
             assert (
@@ -1269,15 +1312,17 @@ def test_generate_location_in_line_with_object_too_close():
     }
 
     for object_1_definition in ALL_DEFINITIONS:
-        object_1_half_z = (object_1_definition['dimensions']['z'] / 2.0)
+        object_1_half_z = (
+            object_1_definition.dimensions.z / 2.0
+        )
         object_1_location = {
             # Ensure object is directly in front of performer start location.
             'position': {'x': 0, 'y': 0, 'z': object_1_half_z},
             'rotation': {'x': 0, 'y': 0, 'z': 0}
         }
         object_1_location['boundingBox'] = geometry.generate_object_bounds(
-            object_1_definition['dimensions'],
-            object_1_definition.get('offset'),
+            vars(object_1_definition.dimensions),
+            vars(object_1_definition.offset),
             object_1_location['position'],
             object_1_location['rotation']
         )
@@ -1301,16 +1346,20 @@ def test_generate_location_in_line_with_object_too_close_diagonal():
     }
 
     for object_1_definition in ALL_DEFINITIONS:
-        object_1_half_x = (object_1_definition['dimensions']['x'] / 2.0)
-        object_1_half_z = (object_1_definition['dimensions']['z'] / 2.0)
+        object_1_half_x = (
+            object_1_definition.dimensions.x / 2.0
+        )
+        object_1_half_z = (
+            object_1_definition.dimensions.z / 2.0
+        )
         object_1_location = {
             # Ensure object is directly in front of performer start location.
             'position': {'x': object_1_half_x, 'y': 0, 'z': object_1_half_z},
             'rotation': {'x': 0, 'y': 0, 'z': 0}
         }
         object_1_location['boundingBox'] = geometry.generate_object_bounds(
-            object_1_definition['dimensions'],
-            object_1_definition.get('offset'),
+            vars(object_1_definition.dimensions),
+            vars(object_1_definition.offset),
             object_1_location['position'],
             object_1_location['rotation']
         )
@@ -1340,19 +1389,16 @@ def test_generate_location_in_line_with_object_diagonal():
             'rotation': {'x': 0, 'y': 0, 'z': 0}
         }
         object_1_location['boundingBox'] = geometry.generate_object_bounds(
-            object_1_definition['dimensions'],
-            object_1_definition.get('offset'),
+            vars(object_1_definition.dimensions),
+            vars(object_1_definition.offset),
             object_1_location['position'],
             object_1_location['rotation']
         )
         object_1_poly = geometry.get_bounding_polygon(object_1_location)
-        object_1_offset = object_1_definition.get('offset', {'x': 0, 'z': 0})
+        object_1_offset = vars(object_1_definition.offset)
 
         for object_2_definition in [LARGEST_OBJECT, SMALLEST_OBJECT]:
-            object_2_offset = object_2_definition.get(
-                'offset',
-                {'x': 0, 'z': 0}
-            )
+            object_2_offset = vars(object_2_definition.offset)
             location = geometry.generate_location_in_line_with_object(
                 object_2_definition,
                 object_1_definition,
@@ -1368,7 +1414,8 @@ def test_generate_location_in_line_with_object_diagonal():
             assert geometry.validate_location_rect(
                 location['boundingBox'],
                 performer_start['position'],
-                [object_1_location['boundingBox']]
+                [object_1_location['boundingBox']],
+                geometry.DEFAULT_ROOM_DIMENSIONS
             )
             # Location is on the diagonal line from the performer start.
             assert (
@@ -1405,19 +1452,16 @@ def test_generate_location_in_line_with_object_adjacent():
             'rotation': {'x': 0, 'y': 0, 'z': 0}
         }
         object_1_location['boundingBox'] = geometry.generate_object_bounds(
-            object_1_definition['dimensions'],
-            object_1_definition.get('offset'),
+            vars(object_1_definition.dimensions),
+            vars(object_1_definition.offset),
             object_1_location['position'],
             object_1_location['rotation']
         )
         object_1_poly = geometry.get_bounding_polygon(object_1_location)
-        object_1_offset = object_1_definition.get('offset', {'x': 0, 'z': 0})
+        object_1_offset = vars(object_1_definition.offset)
 
         for object_2_definition in [LARGEST_OBJECT, SMALLEST_OBJECT]:
-            object_2_offset = object_2_definition.get(
-                'offset',
-                {'x': 0, 'z': 0}
-            )
+            object_2_offset = vars(object_2_definition.offset)
             location = geometry.generate_location_in_line_with_object(
                 object_2_definition,
                 object_1_definition,
@@ -1434,7 +1478,8 @@ def test_generate_location_in_line_with_object_adjacent():
             assert geometry.validate_location_rect(
                 location['boundingBox'],
                 performer_start['position'],
-                [object_1_location['boundingBox']]
+                [object_1_location['boundingBox']],
+                geometry.DEFAULT_ROOM_DIMENSIONS
             )
             # Location is orthogonal on the X axis to 1st object.
             assert (
@@ -1461,19 +1506,16 @@ def test_generate_location_in_line_with_object_adjacent_diagonal():
             'rotation': {'x': 0, 'y': 0, 'z': 0}
         }
         object_1_location['boundingBox'] = geometry.generate_object_bounds(
-            object_1_definition['dimensions'],
-            object_1_definition.get('offset'),
+            vars(object_1_definition.dimensions),
+            vars(object_1_definition.offset),
             object_1_location['position'],
             object_1_location['rotation']
         )
         object_1_poly = geometry.get_bounding_polygon(object_1_location)
-        object_1_offset = object_1_definition.get('offset', {'x': 0, 'z': 0})
+        object_1_offset = vars(object_1_definition.offset)
 
         for object_2_definition in [LARGEST_OBJECT, SMALLEST_OBJECT]:
-            object_2_offset = object_2_definition.get(
-                'offset',
-                {'x': 0, 'z': 0}
-            )
+            object_2_offset = vars(object_2_definition.offset)
             location = geometry.generate_location_in_line_with_object(
                 object_2_definition,
                 object_1_definition,
@@ -1490,7 +1532,8 @@ def test_generate_location_in_line_with_object_adjacent_diagonal():
             assert geometry.validate_location_rect(
                 location['boundingBox'],
                 performer_start['position'],
-                [object_1_location['boundingBox']]
+                [object_1_location['boundingBox']],
+                geometry.DEFAULT_ROOM_DIMENSIONS
             )
             # Location is on the perpendicular line from the performer start.
             assert (
@@ -1521,19 +1564,16 @@ def test_generate_location_in_line_with_object_behind():
             'rotation': {'x': 0, 'y': 0, 'z': 0}
         }
         object_1_location['boundingBox'] = geometry.generate_object_bounds(
-            object_1_definition['dimensions'],
-            object_1_definition.get('offset'),
+            vars(object_1_definition.dimensions),
+            vars(object_1_definition.offset),
             object_1_location['position'],
             object_1_location['rotation']
         )
         object_1_poly = geometry.get_bounding_polygon(object_1_location)
-        object_1_offset = object_1_definition.get('offset', {'x': 0, 'z': 0})
+        object_1_offset = vars(object_1_definition.offset)
 
         for object_2_definition in [LARGEST_OBJECT, SMALLEST_OBJECT]:
-            object_2_offset = object_2_definition.get(
-                'offset',
-                {'x': 0, 'z': 0}
-            )
+            object_2_offset = vars(object_2_definition.offset)
             location = geometry.generate_location_in_line_with_object(
                 object_2_definition,
                 object_1_definition,
@@ -1550,7 +1590,8 @@ def test_generate_location_in_line_with_object_behind():
             assert geometry.validate_location_rect(
                 location['boundingBox'],
                 performer_start['position'],
-                [object_1_location['boundingBox']]
+                [object_1_location['boundingBox']],
+                geometry.DEFAULT_ROOM_DIMENSIONS
             )
             # Location is orthogonal on the Z axis to 1st object.
             assert (
@@ -1583,19 +1624,16 @@ def test_generate_location_in_line_with_object_behind_diagonal():
             'rotation': {'x': 0, 'y': 0, 'z': 0}
         }
         object_1_location['boundingBox'] = geometry.generate_object_bounds(
-            object_1_definition['dimensions'],
-            object_1_definition.get('offset'),
+            vars(object_1_definition.dimensions),
+            vars(object_1_definition.offset),
             object_1_location['position'],
             object_1_location['rotation']
         )
         object_1_poly = geometry.get_bounding_polygon(object_1_location)
-        object_1_offset = object_1_definition.get('offset', {'x': 0, 'z': 0})
+        object_1_offset = vars(object_1_definition.offset)
 
         for object_2_definition in [LARGEST_OBJECT, SMALLEST_OBJECT]:
-            object_2_offset = object_2_definition.get(
-                'offset',
-                {'x': 0, 'z': 0}
-            )
+            object_2_offset = vars(object_2_definition.offset)
             location = geometry.generate_location_in_line_with_object(
                 object_2_definition,
                 object_1_definition,
@@ -1612,7 +1650,8 @@ def test_generate_location_in_line_with_object_behind_diagonal():
             assert geometry.validate_location_rect(
                 location['boundingBox'],
                 performer_start['position'],
-                [object_1_location['boundingBox']]
+                [object_1_location['boundingBox']],
+                geometry.DEFAULT_ROOM_DIMENSIONS
             )
             # Location is on the diagonal line from the performer start.
             assert (
@@ -1649,18 +1688,15 @@ def test_generate_location_in_line_with_object_obstruct():
             'rotation': {'x': 0, 'y': 0, 'z': 0}
         }
         object_1_location['boundingBox'] = geometry.generate_object_bounds(
-            object_1_definition['dimensions'],
-            object_1_definition.get('offset'),
+            vars(object_1_definition.dimensions),
+            vars(object_1_definition.offset),
             object_1_location['position'],
             object_1_location['rotation']
         )
-        object_1_offset = object_1_definition.get('offset', {'x': 0, 'z': 0})
+        object_1_offset = vars(object_1_definition.offset)
 
         for object_2_definition in [LARGEST_OBJECT]:
-            object_2_offset = object_2_definition.get(
-                'offset',
-                {'x': 0, 'z': 0}
-            )
+            object_2_offset = vars(object_2_definition.offset)
             location = geometry.generate_location_in_line_with_object(
                 object_2_definition,
                 object_1_definition,
@@ -1675,7 +1711,8 @@ def test_generate_location_in_line_with_object_obstruct():
             assert geometry.validate_location_rect(
                 location['boundingBox'],
                 performer_start['position'],
-                [object_1_location['boundingBox']]
+                [object_1_location['boundingBox']],
+                geometry.DEFAULT_ROOM_DIMENSIONS
             )
             # Location is orthogonal on the Z axis to 1st object.
             assert (
@@ -1708,18 +1745,15 @@ def test_generate_location_in_line_with_object_obstruct_diagonal():
             'rotation': {'x': 0, 'y': 0, 'z': 0}
         }
         object_1_location['boundingBox'] = geometry.generate_object_bounds(
-            object_1_definition['dimensions'],
-            object_1_definition.get('offset'),
+            vars(object_1_definition.dimensions),
+            vars(object_1_definition.offset),
             object_1_location['position'],
             object_1_location['rotation']
         )
-        object_1_offset = object_1_definition.get('offset', {'x': 0, 'z': 0})
+        object_1_offset = vars(object_1_definition.offset)
 
         for object_2_definition in [LARGEST_OBJECT]:
-            object_2_offset = object_2_definition.get(
-                'offset',
-                {'x': 0, 'z': 0}
-            )
+            object_2_offset = vars(object_2_definition.offset)
             location = geometry.generate_location_in_line_with_object(
                 object_2_definition,
                 object_1_definition,
@@ -1734,7 +1768,8 @@ def test_generate_location_in_line_with_object_obstruct_diagonal():
             assert geometry.validate_location_rect(
                 location['boundingBox'],
                 performer_start['position'],
-                [object_1_location['boundingBox']]
+                [object_1_location['boundingBox']],
+                geometry.DEFAULT_ROOM_DIMENSIONS
             )
             # Location is on the diagonal line from the performer start.
             assert (
@@ -1771,19 +1806,16 @@ def test_generate_location_in_line_with_object_unreachable():
             'rotation': {'x': 0, 'y': 0, 'z': 0}
         }
         object_1_location['boundingBox'] = geometry.generate_object_bounds(
-            object_1_definition['dimensions'],
-            object_1_definition.get('offset'),
+            vars(object_1_definition.dimensions),
+            vars(object_1_definition.offset),
             object_1_location['position'],
             object_1_location['rotation']
         )
         object_1_poly = geometry.get_bounding_polygon(object_1_location)
-        object_1_offset = object_1_definition.get('offset', {'x': 0, 'z': 0})
+        object_1_offset = vars(object_1_definition.offset)
 
         for object_2_definition in [LARGEST_OBJECT, SMALLEST_OBJECT]:
-            object_2_offset = object_2_definition.get(
-                'offset',
-                {'x': 0, 'z': 0}
-            )
+            object_2_offset = vars(object_2_definition.offset)
             location = geometry.generate_location_in_line_with_object(
                 object_2_definition,
                 object_1_definition,
@@ -1797,15 +1829,16 @@ def test_generate_location_in_line_with_object_unreachable():
             # Location is far enough away from 1st object.
             assert (
                 object_2_poly.distance(object_1_poly) + max(
-                    object_2_definition['dimensions']['x'] / 2.0,
-                    object_2_definition['dimensions']['z'] / 2.0,
+                    object_2_definition.dimensions.x / 2.0,
+                    object_2_definition.dimensions.z / 2.0,
                 ) > 1
             )
             # Location is in the room and does not overlap with 1st object.
             assert geometry.validate_location_rect(
                 location['boundingBox'],
                 performer_start['position'],
-                [object_1_location['boundingBox']]
+                [object_1_location['boundingBox']],
+                geometry.DEFAULT_ROOM_DIMENSIONS
             )
             # Location is orthogonal on the Z axis to 1st object.
             assert (
@@ -1838,19 +1871,16 @@ def test_generate_location_in_line_with_object_unreachable_diagonal():
             'rotation': {'x': 0, 'y': 0, 'z': 0}
         }
         object_1_location['boundingBox'] = geometry.generate_object_bounds(
-            object_1_definition['dimensions'],
-            object_1_definition.get('offset'),
+            vars(object_1_definition.dimensions),
+            vars(object_1_definition.offset),
             object_1_location['position'],
             object_1_location['rotation']
         )
         object_1_poly = geometry.get_bounding_polygon(object_1_location)
-        object_1_offset = object_1_definition.get('offset', {'x': 0, 'z': 0})
+        object_1_offset = vars(object_1_definition.offset)
 
         for object_2_definition in [LARGEST_OBJECT, SMALLEST_OBJECT]:
-            object_2_offset = object_2_definition.get(
-                'offset',
-                {'x': 0, 'z': 0}
-            )
+            object_2_offset = vars(object_2_definition.offset)
             location = geometry.generate_location_in_line_with_object(
                 object_2_definition,
                 object_1_definition,
@@ -1864,15 +1894,16 @@ def test_generate_location_in_line_with_object_unreachable_diagonal():
             # Location is far enough away from 1st object.
             assert (
                 object_2_poly.distance(object_1_poly) + max(
-                    object_2_definition['dimensions']['x'] / 2.0,
-                    object_2_definition['dimensions']['z'] / 2.0,
+                    object_2_definition.dimensions.x / 2.0,
+                    object_2_definition.dimensions.x / 2.0,
                 ) > 1
             )
             # Location is in the room and does not overlap with 1st object.
             assert geometry.validate_location_rect(
                 location['boundingBox'],
                 performer_start['position'],
-                [object_1_location['boundingBox']]
+                [object_1_location['boundingBox']],
+                geometry.DEFAULT_ROOM_DIMENSIONS
             )
             # Location is on the diagonal line from the performer start.
             assert (
@@ -1896,73 +1927,57 @@ def test_generate_location_in_line_with_object_unreachable_diagonal():
 
 
 def test_retrieve_obstacle_occluder_definition_list():
-    nested_definition_list = util.retrieve_complete_definition_list(
-        objects.get(objects.ObjectDefinitionList.ALL)
-    )
     for object_definition in ALL_DEFINITIONS:
-        object_dimensions = object_definition.get(
-            'closedDimensions',
-            object_definition['dimensions']
+        object_dimensions = vars(
+            object_definition.closedDimensions or object_definition.dimensions
         )
-        output = geometry.retrieve_obstacle_occluder_definition_list(
+        definition_list = geometry.retrieve_obstacle_occluder_definition_list(
             object_definition,
-            nested_definition_list,
+            DATASET,
             False
         )
-        for definition_list in output:
-            assert len(definition_list) > 0
-            for bigger_definition_result in definition_list:
-                bigger_definition, angle = bigger_definition_result
-                bigger_definition = util.finalize_object_definition(
-                    bigger_definition)
-                bigger_dimensions = bigger_definition.get(
-                    'closedDimensions',
-                    bigger_definition['dimensions']
-                )
-                assert 'obstacle' in bigger_definition['attributes']
-                assert bigger_dimensions['y'] >= 0.2
-                assert bigger_definition['mass'] > 2
-                if angle == 0:
-                    assert bigger_dimensions['x'] >= object_dimensions['x']
-                else:
-                    # We rotate the bigger object so compare its side to the
-                    # original object's front.
-                    assert bigger_dimensions['z'] >= object_dimensions['x']
+        for bigger_definition_result in definition_list:
+            bigger_definition, angle = bigger_definition_result
+            bigger_dimensions = vars(
+                bigger_definition.closedDimensions or
+                bigger_definition.dimensions
+            )
+            assert bigger_definition.obstacle
+            assert bigger_dimensions['y'] >= 0.2
+            assert bigger_definition.mass > 2
+            if angle == 0:
+                assert bigger_dimensions['x'] >= object_dimensions['x']
+            else:
+                # We rotate the bigger object so compare its side to the
+                # original object's front.
+                assert bigger_dimensions['z'] >= object_dimensions['x']
 
 
 def test_retrieve_obstacle_occluder_definition_list_is_occluder():
-    nested_definition_list = util.retrieve_complete_definition_list(
-        objects.get(objects.ObjectDefinitionList.ALL)
-    )
     for object_definition in ALL_DEFINITIONS:
-        object_dimensions = object_definition.get(
-            'closedDimensions',
-            object_definition['dimensions']
+        object_dimensions = vars(
+            object_definition.closedDimensions or object_definition.dimensions
         )
-        output = geometry.retrieve_obstacle_occluder_definition_list(
+        definition_list = geometry.retrieve_obstacle_occluder_definition_list(
             object_definition,
-            nested_definition_list,
+            DATASET,
             True
         )
-        for definition_list in output:
-            assert len(definition_list) > 0
-            for bigger_definition_result in definition_list:
-                bigger_definition, angle = bigger_definition_result
-                bigger_definition = util.finalize_object_definition(
-                    bigger_definition)
-                bigger_dimensions = bigger_definition.get(
-                    'closedDimensions',
-                    bigger_definition['dimensions']
-                )
-                assert 'occluder' in bigger_definition['attributes']
-                assert bigger_dimensions['y'] >= object_dimensions['y']
-                assert bigger_definition['mass'] > 2
-                if angle == 0:
-                    assert bigger_dimensions['x'] >= object_dimensions['x']
-                else:
-                    # We rotate the bigger object so compare its side to the
-                    # original object's front.
-                    assert bigger_dimensions['z'] >= object_dimensions['x']
+        for bigger_definition_result in definition_list:
+            bigger_definition, angle = bigger_definition_result
+            bigger_dimensions = vars(
+                bigger_definition.closedDimensions or
+                bigger_definition.dimensions
+            )
+            assert bigger_definition.occluder
+            assert bigger_dimensions['y'] >= object_dimensions['y']
+            assert bigger_definition.mass > 2
+            if angle == 0:
+                assert bigger_dimensions['x'] >= object_dimensions['x']
+            else:
+                # We rotate the bigger object so compare its side to the
+                # original object's front.
+                assert bigger_dimensions['z'] >= object_dimensions['x']
 
 
 def test_get_bounding_poly():
@@ -2018,7 +2033,7 @@ def test_does_fully_obstruct_target():
     )
     obstructor_poly = geometry.get_bounding_polygon(obstructor_location)
     assert geometry.does_fully_obstruct_target(
-        {'x': geometry.ROOM_X_MIN, 'y': 0, 'z': 0}, target_location,
+        {'x': DEFAULT_ROOM_X_MIN, 'y': 0, 'z': 0}, target_location,
         obstructor_poly)
 
     obstructor_location = {
@@ -2033,7 +2048,7 @@ def test_does_fully_obstruct_target():
     )
     obstructor_poly = geometry.get_bounding_polygon(obstructor_location)
     assert geometry.does_fully_obstruct_target(
-        {'x': geometry.ROOM_X_MAX, 'y': 0, 'z': 0}, target_location,
+        {'x': DEFAULT_ROOM_X_MAX, 'y': 0, 'z': 0}, target_location,
         obstructor_poly)
 
     obstructor_location = {
@@ -2053,7 +2068,7 @@ def test_does_fully_obstruct_target():
     )
     obstructor_poly = geometry.get_bounding_polygon(obstructor_location)
     assert geometry.does_fully_obstruct_target(
-        {'x': 0, 'y': 0, 'z': geometry.ROOM_Z_MIN}, target_location,
+        {'x': 0, 'y': 0, 'z': DEFAULT_ROOM_Z_MIN}, target_location,
         obstructor_poly)
 
     obstructor_location = {
@@ -2068,7 +2083,7 @@ def test_does_fully_obstruct_target():
     )
     obstructor_poly = geometry.get_bounding_polygon(obstructor_location)
     assert geometry.does_fully_obstruct_target(
-        {'x': 0, 'y': 0, 'z': geometry.ROOM_Z_MAX}, target_location,
+        {'x': 0, 'y': 0, 'z': DEFAULT_ROOM_Z_MAX}, target_location,
         obstructor_poly)
 
 
@@ -2101,7 +2116,7 @@ def test_does_fully_obstruct_target_returns_false_too_small():
     )
     obstructor_poly = geometry.get_bounding_polygon(obstructor_location)
     assert not geometry.does_fully_obstruct_target(
-        {'x': geometry.ROOM_X_MIN, 'y': 0, 'z': 0}, target_location,
+        {'x': DEFAULT_ROOM_X_MIN, 'y': 0, 'z': 0}, target_location,
         obstructor_poly)
 
     obstructor_location = {
@@ -2116,7 +2131,7 @@ def test_does_fully_obstruct_target_returns_false_too_small():
     )
     obstructor_poly = geometry.get_bounding_polygon(obstructor_location)
     assert not geometry.does_fully_obstruct_target(
-        {'x': geometry.ROOM_X_MAX, 'y': 0, 'z': 0}, target_location,
+        {'x': DEFAULT_ROOM_X_MAX, 'y': 0, 'z': 0}, target_location,
         obstructor_poly)
 
     obstructor_location = {
@@ -2136,7 +2151,7 @@ def test_does_fully_obstruct_target_returns_false_too_small():
     )
     obstructor_poly = geometry.get_bounding_polygon(obstructor_location)
     assert not geometry.does_fully_obstruct_target(
-        {'x': 0, 'y': 0, 'z': geometry.ROOM_Z_MIN}, target_location,
+        {'x': 0, 'y': 0, 'z': DEFAULT_ROOM_Z_MIN}, target_location,
         obstructor_poly)
 
     obstructor_location = {
@@ -2151,7 +2166,7 @@ def test_does_fully_obstruct_target_returns_false_too_small():
     )
     obstructor_poly = geometry.get_bounding_polygon(obstructor_location)
     assert not geometry.does_fully_obstruct_target(
-        {'x': 0, 'y': 0, 'z': geometry.ROOM_Z_MAX}, target_location,
+        {'x': 0, 'y': 0, 'z': DEFAULT_ROOM_Z_MAX}, target_location,
         obstructor_poly)
 
 
@@ -2184,23 +2199,23 @@ def test_does_fully_obstruct_target_returns_false_performer_start():
     )
     obstructor_poly = geometry.get_bounding_polygon(obstructor_location)
     assert not geometry.does_fully_obstruct_target(
-        {'x': geometry.ROOM_X_MAX, 'y': 0, 'z': 0}, target_location,
+        {'x': DEFAULT_ROOM_X_MAX, 'y': 0, 'z': 0}, target_location,
         obstructor_poly)
     assert not geometry.does_fully_obstruct_target(
-        {'x': 0, 'y': 0, 'z': geometry.ROOM_Z_MIN}, target_location,
+        {'x': 0, 'y': 0, 'z': DEFAULT_ROOM_Z_MIN}, target_location,
         obstructor_poly)
     assert not geometry.does_fully_obstruct_target(
-        {'x': 0, 'y': 0, 'z': geometry.ROOM_Z_MAX}, target_location,
+        {'x': 0, 'y': 0, 'z': DEFAULT_ROOM_Z_MAX}, target_location,
         obstructor_poly)
     assert not geometry.does_fully_obstruct_target(
-        {'x': geometry.ROOM_X_MIN, 'y': 0,
-         'z': geometry.ROOM_Z_MIN},
+        {'x': DEFAULT_ROOM_X_MIN, 'y': 0,
+         'z': DEFAULT_ROOM_Z_MIN},
         target_location,
         obstructor_poly
     )
     assert not geometry.does_fully_obstruct_target(
-        {'x': geometry.ROOM_X_MIN, 'y': 0,
-         'z': geometry.ROOM_Z_MAX},
+        {'x': DEFAULT_ROOM_X_MIN, 'y': 0,
+         'z': DEFAULT_ROOM_Z_MAX},
         target_location,
         obstructor_poly
     )
@@ -2217,23 +2232,23 @@ def test_does_fully_obstruct_target_returns_false_performer_start():
     )
     obstructor_poly = geometry.get_bounding_polygon(obstructor_location)
     assert not geometry.does_fully_obstruct_target(
-        {'x': geometry.ROOM_X_MIN, 'y': 0, 'z': 0}, target_location,
+        {'x': DEFAULT_ROOM_X_MIN, 'y': 0, 'z': 0}, target_location,
         obstructor_poly)
     assert not geometry.does_fully_obstruct_target(
-        {'x': 0, 'y': 0, 'z': geometry.ROOM_Z_MIN}, target_location,
+        {'x': 0, 'y': 0, 'z': DEFAULT_ROOM_Z_MIN}, target_location,
         obstructor_poly)
     assert not geometry.does_fully_obstruct_target(
-        {'x': 0, 'y': 0, 'z': geometry.ROOM_Z_MAX}, target_location,
+        {'x': 0, 'y': 0, 'z': DEFAULT_ROOM_Z_MAX}, target_location,
         obstructor_poly)
     assert not geometry.does_fully_obstruct_target(
-        {'x': geometry.ROOM_X_MAX, 'y': 0,
-         'z': geometry.ROOM_Z_MIN},
+        {'x': DEFAULT_ROOM_X_MAX, 'y': 0,
+         'z': DEFAULT_ROOM_Z_MIN},
         target_location,
         obstructor_poly
     )
     assert not geometry.does_fully_obstruct_target(
-        {'x': geometry.ROOM_X_MAX, 'y': 0,
-         'z': geometry.ROOM_Z_MAX},
+        {'x': DEFAULT_ROOM_X_MAX, 'y': 0,
+         'z': DEFAULT_ROOM_Z_MAX},
         target_location,
         obstructor_poly
     )
@@ -2255,23 +2270,23 @@ def test_does_fully_obstruct_target_returns_false_performer_start():
     )
     obstructor_poly = geometry.get_bounding_polygon(obstructor_location)
     assert not geometry.does_fully_obstruct_target(
-        {'x': 0, 'y': 0, 'z': geometry.ROOM_Z_MAX}, target_location,
+        {'x': 0, 'y': 0, 'z': DEFAULT_ROOM_Z_MAX}, target_location,
         obstructor_poly)
     assert not geometry.does_fully_obstruct_target(
-        {'x': geometry.ROOM_X_MIN, 'y': 0, 'z': 0}, target_location,
+        {'x': DEFAULT_ROOM_X_MIN, 'y': 0, 'z': 0}, target_location,
         obstructor_poly)
     assert not geometry.does_fully_obstruct_target(
-        {'x': geometry.ROOM_X_MAX, 'y': 0, 'z': 0}, target_location,
+        {'x': DEFAULT_ROOM_X_MAX, 'y': 0, 'z': 0}, target_location,
         obstructor_poly)
     assert not geometry.does_fully_obstruct_target(
-        {'x': geometry.ROOM_X_MIN, 'y': 0,
-         'z': geometry.ROOM_Z_MIN},
+        {'x': DEFAULT_ROOM_X_MIN, 'y': 0,
+         'z': DEFAULT_ROOM_Z_MIN},
         target_location,
         obstructor_poly
     )
     assert not geometry.does_fully_obstruct_target(
-        {'x': geometry.ROOM_X_MAX, 'y': 0,
-         'z': geometry.ROOM_Z_MIN},
+        {'x': DEFAULT_ROOM_X_MAX, 'y': 0,
+         'z': DEFAULT_ROOM_Z_MIN},
         target_location,
         obstructor_poly
     )
@@ -2287,23 +2302,23 @@ def test_does_fully_obstruct_target_returns_false_performer_start():
     )
     obstructor_poly = geometry.get_bounding_polygon(obstructor_location)
     assert not geometry.does_fully_obstruct_target(
-        {'x': 0, 'y': 0, 'z': geometry.ROOM_Z_MIN}, target_location,
+        {'x': 0, 'y': 0, 'z': DEFAULT_ROOM_Z_MIN}, target_location,
         obstructor_poly)
     assert not geometry.does_fully_obstruct_target(
-        {'x': geometry.ROOM_X_MIN, 'y': 0, 'z': 0}, target_location,
+        {'x': DEFAULT_ROOM_X_MIN, 'y': 0, 'z': 0}, target_location,
         obstructor_poly)
     assert not geometry.does_fully_obstruct_target(
-        {'x': geometry.ROOM_X_MAX, 'y': 0, 'z': 0}, target_location,
+        {'x': DEFAULT_ROOM_X_MAX, 'y': 0, 'z': 0}, target_location,
         obstructor_poly)
     assert not geometry.does_fully_obstruct_target(
-        {'x': geometry.ROOM_X_MIN, 'y': 0,
-         'z': geometry.ROOM_Z_MAX},
+        {'x': DEFAULT_ROOM_X_MIN, 'y': 0,
+         'z': DEFAULT_ROOM_Z_MAX},
         target_location,
         obstructor_poly
     )
     assert not geometry.does_fully_obstruct_target(
-        {'x': geometry.ROOM_X_MAX, 'y': 0,
-         'z': geometry.ROOM_Z_MAX},
+        {'x': DEFAULT_ROOM_X_MAX, 'y': 0,
+         'z': DEFAULT_ROOM_Z_MAX},
         target_location,
         obstructor_poly
     )
@@ -2338,7 +2353,7 @@ def test_does_fully_obstruct_target_returns_false_visible_corners():
     )
     obstructor_poly = geometry.get_bounding_polygon(obstructor_location)
     assert not geometry.does_fully_obstruct_target(
-        {'x': geometry.ROOM_X_MIN, 'y': 0, 'z': 0}, target_location,
+        {'x': DEFAULT_ROOM_X_MIN, 'y': 0, 'z': 0}, target_location,
         obstructor_poly)
 
     obstructor_location = {
@@ -2358,7 +2373,7 @@ def test_does_fully_obstruct_target_returns_false_visible_corners():
     )
     obstructor_poly = geometry.get_bounding_polygon(obstructor_location)
     assert not geometry.does_fully_obstruct_target(
-        {'x': geometry.ROOM_X_MIN, 'y': 0, 'z': 0}, target_location,
+        {'x': DEFAULT_ROOM_X_MIN, 'y': 0, 'z': 0}, target_location,
         obstructor_poly)
 
     obstructor_location = {
@@ -2373,7 +2388,7 @@ def test_does_fully_obstruct_target_returns_false_visible_corners():
     )
     obstructor_poly = geometry.get_bounding_polygon(obstructor_location)
     assert not geometry.does_fully_obstruct_target(
-        {'x': geometry.ROOM_X_MAX, 'y': 0, 'z': 0}, target_location,
+        {'x': DEFAULT_ROOM_X_MAX, 'y': 0, 'z': 0}, target_location,
         obstructor_poly)
 
     obstructor_location = {
@@ -2393,7 +2408,7 @@ def test_does_fully_obstruct_target_returns_false_visible_corners():
     )
     obstructor_poly = geometry.get_bounding_polygon(obstructor_location)
     assert not geometry.does_fully_obstruct_target(
-        {'x': geometry.ROOM_X_MAX, 'y': 0, 'z': 0}, target_location,
+        {'x': DEFAULT_ROOM_X_MAX, 'y': 0, 'z': 0}, target_location,
         obstructor_poly)
 
     obstructor_location = {
@@ -2413,7 +2428,7 @@ def test_does_fully_obstruct_target_returns_false_visible_corners():
     )
     obstructor_poly = geometry.get_bounding_polygon(obstructor_location)
     assert not geometry.does_fully_obstruct_target(
-        {'x': 0, 'y': 0, 'z': geometry.ROOM_Z_MIN}, target_location,
+        {'x': 0, 'y': 0, 'z': DEFAULT_ROOM_Z_MIN}, target_location,
         obstructor_poly)
 
     obstructor_location = {
@@ -2433,7 +2448,7 @@ def test_does_fully_obstruct_target_returns_false_visible_corners():
     )
     obstructor_poly = geometry.get_bounding_polygon(obstructor_location)
     assert not geometry.does_fully_obstruct_target(
-        {'x': 0, 'y': 0, 'z': geometry.ROOM_Z_MIN}, target_location,
+        {'x': 0, 'y': 0, 'z': DEFAULT_ROOM_Z_MIN}, target_location,
         obstructor_poly)
 
     obstructor_location = {
@@ -2448,7 +2463,7 @@ def test_does_fully_obstruct_target_returns_false_visible_corners():
     )
     obstructor_poly = geometry.get_bounding_polygon(obstructor_location)
     assert not geometry.does_fully_obstruct_target(
-        {'x': 0, 'y': 0, 'z': geometry.ROOM_Z_MAX}, target_location,
+        {'x': 0, 'y': 0, 'z': DEFAULT_ROOM_Z_MAX}, target_location,
         obstructor_poly)
 
     obstructor_location = {
@@ -2468,7 +2483,7 @@ def test_does_fully_obstruct_target_returns_false_visible_corners():
     )
     obstructor_poly = geometry.get_bounding_polygon(obstructor_location)
     assert not geometry.does_fully_obstruct_target(
-        {'x': 0, 'y': 0, 'z': geometry.ROOM_Z_MAX}, target_location,
+        {'x': 0, 'y': 0, 'z': DEFAULT_ROOM_Z_MAX}, target_location,
         obstructor_poly)
 
 

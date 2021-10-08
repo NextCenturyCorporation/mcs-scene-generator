@@ -2,13 +2,12 @@ import argparse
 import glob
 import logging
 import os
+
+import machine_common_sense as mcs
 import shapely
 from shapely import affinity
 
-import machine_common_sense as mcs
-
-import optimal_path
-
+from generator import optimal_path
 
 DEBUG_DIRECTORY = './'
 PERFORMER_AGENT_MAX_REACH = 1
@@ -52,6 +51,7 @@ def find_path_list(scene_data, debug_plots):
     """Find and return the list of each possible best path."""
     target_dict = find_target_dict(scene_data)
     path_list = optimal_path.find_possible_best_path_list(
+        scene_data.get('roomDimensions'),
         scene_data['performerStart'],
         target_dict,
         [object_dict for object_dict in scene_data['objects'] if (

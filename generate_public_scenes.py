@@ -2,12 +2,12 @@
 
 import sys
 
-import agent_hypercubes
-import interactive_hypercubes
-import intuitive_physics_hypercubes
-
-from scene_generator import SceneGenerator
-
+from hypercube import (
+    SceneGenerator,
+    agent_hypercubes,
+    interactive_hypercubes,
+    intuitive_physics_hypercubes,
+)
 
 HYPERCUBE_LIST = (
     interactive_hypercubes.INTERACTIVE_TRAINING_HYPERCUBE_LIST +

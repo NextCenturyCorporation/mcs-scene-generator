@@ -1,58 +1,59 @@
+import copy
+
 import pytest
+from machine_common_sense.config_manager import Vector3d
 
-import geometry
-import objects
-import util
-from containers import put_object_in_container, put_objects_in_container, \
-    can_enclose, can_contain_both, can_contain
-from geometry import are_adjacent
+from generator import (
+    ObjectDefinition,
+    ObjectInteractableArea,
+    definitions,
+    geometry,
+    specific_objects,
+    util,
+)
+from generator.containers import (
+    can_contain,
+    can_contain_both,
+    can_enclose,
+    put_object_in_container,
+    put_objects_in_container,
+)
 
-
-DEFAULT_CONTAINER = {
-    'type': 'box',
-    'attributes': ['receptacle', 'openable'],
-    'dimensions': {
-        'x': 1,
-        'y': 1,
-        'z': 1
-    },
-    'mass': 1,
-    'scale': {
-        'x': 1,
-        'y': 1,
-        'z': 1
-    },
-    'enclosedAreas': [{
-        'position': {
-            'x': 0,
-            'y': 0.5,
-            'z': 0
-        },
-        'dimensions': {
-            'x': 1,
-            'y': 1,
-            'z': 1
-        }
-    }]
-}
+DEFAULT_CONTAINER = definitions.finalize_object_definition(ObjectDefinition(
+    type='box',
+    attributes=['receptacle', 'openable'],
+    dimensions=Vector3d(1, 1, 1),
+    scale=Vector3d(1, 1, 1),
+    enclosedAreas=[ObjectInteractableArea(
+        area_id='',
+        dimensions=Vector3d(1, 1, 1),
+        position=Vector3d(0, 0.5, 0)
+    ).to_dict()]
+))
 
 
 PICKUPABLE_OBJECTS_WITHOUT_CONTAINMENTS = [
-    'duck_on_wheels', 'chair_1', 'chair_2', 'table_1', 'table_3'
+    'duck_on_wheels', 'chair_1', 'chair_2', 'table_1', 'table_3', 'shelf_1'
 ]
 
 
+CONTAINERS = specific_objects.get_container_definition_dataset(unshuffled=True)
 CONTAINER_DEFINITIONS = [
-    definition for definition_list in util.retrieve_complete_definition_list(
-        objects.get(objects.ObjectDefinitionList.CONTAINERS)
-    ) for definition in definition_list
+    # Just use the first variation (color) of each object for faster testing.
+    definition_variations[0]
+    for definition_selections in CONTAINERS._definition_groups
+    for definition_variations in definition_selections
 ]
 
 
+PICKUPABLES = specific_objects.get_pickupable_definition_dataset(
+    unshuffled=True
+)
 PICKUPABLE_DEFINITIONS = [
-    definition for definition_list in util.retrieve_complete_definition_list(
-        objects.get(objects.ObjectDefinitionList.PICKUPABLES)
-    ) for definition in definition_list
+    # Just use the first variation (color) of each object for faster testing.
+    definition_variations[0]
+    for definition_selections in PICKUPABLES._definition_groups
+    for definition_variations in definition_selections
 ]
 
 
@@ -78,9 +79,8 @@ def test_put_object_in_container():
 
         containments = get_valid_containments(obj_def)
         if (
-            len(containments) == 0 and
-            not obj_def.get('enclosedAreas', []) and
-            obj_def['type'] not in PICKUPABLE_OBJECTS_WITHOUT_CONTAINMENTS
+            len(containments) == 0 and not obj_def.enclosedAreas and
+            obj_def.type not in PICKUPABLE_OBJECTS_WITHOUT_CONTAINMENTS
         ):
             print(
                 f'pickupable object should have at least one containment: '
@@ -89,6 +89,7 @@ def test_put_object_in_container():
             assert False
 
         for container_def, containment in containments:
+            print(f'\nCONTAINER={container_def}')
             area_index, rotations = containment
             container_location = geometry.calc_obj_pos(
                 {'x': -1, 'y': 0, 'z': -1}, [], container_def)
@@ -97,27 +98,30 @@ def test_put_object_in_container():
 
             put_object_in_container(obj, container, area_index, rotations[0])
 
+            enclosed_area = container_def.enclosedAreas[area_index]
             assert obj['locationParent'] == container['id']
             assert (
                 obj['shows'][0]['position']['x'] ==
-                container_def['enclosedAreas'][0]['position']['x']
+                enclosed_area['position']['x']
             )
             expected_position_y = (
-                container_def['enclosedAreas'][0]['position']['y'] -
-                (container_def['enclosedAreas'][area_index]['dimensions']['y'] / 2.0) +  # noqa: E501
-                obj_def.get('positionY', 0)
+                enclosed_area['position']['y'] -
+                (enclosed_area['dimensions']['y'] / 2.0) + obj_def.positionY
             )
-            assert obj['shows'][0]['position']['y'] == pytest.approx(
-                expected_position_y)
+            assert (
+                obj['shows'][0]['position']['y'] ==
+                pytest.approx(expected_position_y)
+            )
             assert (
                 obj['shows'][0]['position']['z'] ==
-                container_def['enclosedAreas'][0]['position']['z']
+                enclosed_area['position']['z']
             )
             assert obj['shows'][0]['rotation']
             assert obj['shows'][0]['boundingBox']
             assert obj['shows'][0]['boundingBox'] != obj_bounds
 
 
+@pytest.mark.skip(reason="Runs very slowly and is not currently needed")
 def test_put_objects_in_container():
     for obj_a_def in PICKUPABLE_DEFINITIONS:
         print(f'\nOBJECT_A={obj_a_def}')
@@ -135,11 +139,11 @@ def test_put_objects_in_container():
             containments = get_valid_containments(obj_a_def, obj_b_def)
             if (
                 len(containments) == 0 and
-                not obj_a_def.get('enclosedAreas', []) and
-                not obj_b_def.get('enclosedAreas', []) and
-                obj_a_def['type'] not in
+                not obj_a_def.enclosedAreas and
+                not obj_b_def.enclosedAreas and
+                obj_a_def.type not in
                 PICKUPABLE_OBJECTS_WITHOUT_CONTAINMENTS and
-                obj_b_def['type'] not in
+                obj_b_def.type not in
                 PICKUPABLE_OBJECTS_WITHOUT_CONTAINMENTS
             ):
                 print(
@@ -165,51 +169,21 @@ def test_put_objects_in_container():
                 assert obj_b['shows'][0]['boundingBox']
                 assert obj_a['shows'][0]['boundingBox'] != obj_a_bounds
                 assert obj_b['shows'][0]['boundingBox'] != obj_b_bounds
-                assert are_adjacent(obj_a, obj_b)
+                assert geometry.are_adjacent(obj_a, obj_b)
 
 
 def test_can_enclose():
-    small = {
-        'dimensions': {
-            'x': 1,
-            'y': 1,
-            'z': 1
-        }
-    }
-    big = {
-        'dimensions': {
-            'x': 42,
-            'y': 42,
-            'z': 42
-        }
-    }
-    assert can_enclose(big, small) is not None
-    assert can_enclose(small, big) is None
+    small = ObjectDefinition(dimensions=Vector3d(1, 1, 1))
+    big = ObjectDefinition(dimensions=Vector3d(42, 42, 42))
+    assert can_enclose({'dimensions': vars(big.dimensions)}, small) is not None
+    assert can_enclose({'dimensions': vars(small.dimensions)}, big) is None
 
 
 def test_can_contain():
-    small1 = {
-        'dimensions': {
-            'x': 0.01,
-            'y': 0.01,
-            'z': 0.01
-        }
-    }
-    small2 = {
-        'dimensions': {
-            'x': 0.02,
-            'y': 0.02,
-            'z': 0.02
-        }
-    }
-    big = {
-        'dimensions': {
-            'x': 42,
-            'y': 42,
-            'z': 42
-        }
-    }
-    container_def = util.finalize_object_definition(DEFAULT_CONTAINER)
+    small1 = ObjectDefinition(dimensions=Vector3d(0.01, 0.01, 0.01))
+    small2 = ObjectDefinition(dimensions=Vector3d(0.02, 0.02, 0.02))
+    big = ObjectDefinition(dimensions=Vector3d(42, 42, 42))
+    container_def = copy.deepcopy(DEFAULT_CONTAINER)
     assert can_contain(container_def, small1, small2) is not None
     assert can_contain(container_def, small1, big) is None
     assert can_contain(container_def, small1) is not None
@@ -217,28 +191,10 @@ def test_can_contain():
 
 
 def test_can_contain_both():
-    small1 = {
-        'dimensions': {
-            'x': 0.01,
-            'y': 0.01,
-            'z': 0.01
-        }
-    }
-    small2 = {
-        'dimensions': {
-            'x': 0.02,
-            'y': 0.02,
-            'z': 0.02
-        }
-    }
-    big = {
-        'dimensions': {
-            'x': 42,
-            'y': 42,
-            'z': 42
-        }
-    }
-    container_def = util.finalize_object_definition(DEFAULT_CONTAINER)
+    small1 = ObjectDefinition(dimensions=Vector3d(0.01, 0.01, 0.01))
+    small2 = ObjectDefinition(dimensions=Vector3d(0.02, 0.02, 0.02))
+    big = ObjectDefinition(dimensions=Vector3d(42, 42, 42))
+    container_def = copy.deepcopy(DEFAULT_CONTAINER)
     assert can_contain_both(container_def, small1, small2) is not None
     assert can_contain_both(container_def, small1, big) is None
 

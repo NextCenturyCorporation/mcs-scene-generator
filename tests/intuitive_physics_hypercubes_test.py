@@ -1,26 +1,25 @@
-import intuitive_physics_hypercubes
-import materials
-import pytest
 import random
-import hypercubes
-import util
 
-from intuitive_physics_test_util import (
+import pytest
+
+from generator import definitions, materials
+from hypercube import hypercubes, intuitive_physics_hypercubes
+from hypercube.intuitive_physics_test_util import (
     BODY_TEMPLATE,
     get_object_list,
     verify_hypercube,
-    verify_hypercube_variations,
     verify_hypercube_Collisions,
     verify_hypercube_ObjectPermanence,
     verify_hypercube_ShapeConstancy,
     verify_hypercube_SpatioTemporalContinuity,
+    verify_hypercube_variations,
     verify_object_fall_down_position,
     verify_object_tags,
     verify_same_object,
     verify_scene,
     verify_target_implausible_hide_step,
     verify_target_implausible_show_step,
-    verify_target_implausible_shroud_step
+    verify_target_implausible_shroud_step,
 )
 
 
@@ -30,7 +29,7 @@ def test_CollisionsHypercube_default_objects_move_across():
         {'target': None, 'non target': None}
     )
     assert hypercube.is_move_across()
-    wall_material_tuple = random.choice(materials.CEILING_AND_WALL_MATERIALS)
+    wall_material_tuple = random.choice(materials.CEILING_AND_WALL_GROUPINGS)
     object_dict = hypercube._create_default_objects(
         wall_material_tuple[0],
         wall_material_tuple[1]
@@ -50,7 +49,7 @@ def test_CollisionsHypercube_default_objects_move_across():
         hypercube._last_step,
         wall_material_tuple[0]
     )
-    assert util.is_similar_except_in_color(
+    assert definitions.is_similar_except_in_color(
         object_dict['target'][0],
         object_dict['non target'][0],
         only_diagonal_size=True
@@ -111,7 +110,7 @@ def test_CollisionsHypercube_scenes_move_across():
             # Verify non-target is in the scene.
             if i in ['c', 'h']:
                 assert len(non_target_list) == 1
-                assert util.is_similar_except_in_color(
+                assert definitions.is_similar_except_in_color(
                     target_list[0],
                     non_target_list[0],
                     only_diagonal_size=True
@@ -198,7 +197,7 @@ def test_ObjectPermanenceHypercube_default_objects_fall_down():
         is_fall_down=True
     )
     assert hypercube.is_fall_down()
-    wall_material_tuple = random.choice(materials.CEILING_AND_WALL_MATERIALS)
+    wall_material_tuple = random.choice(materials.CEILING_AND_WALL_GROUPINGS)
     object_dict = hypercube._create_default_objects(
         wall_material_tuple[0],
         wall_material_tuple[1]
@@ -242,7 +241,7 @@ def test_ShapeConstancyHypercube_default_objects_fall_down():
         is_fall_down=True
     )
     assert hypercube.is_fall_down()
-    wall_material_tuple = random.choice(materials.CEILING_AND_WALL_MATERIALS)
+    wall_material_tuple = random.choice(materials.CEILING_AND_WALL_GROUPINGS)
     object_dict = hypercube._create_default_objects(
         wall_material_tuple[0],
         wall_material_tuple[1]
@@ -286,7 +285,7 @@ def test_SpatioTemporalContinuityHypercube_default_objects_move_across():
         is_move_across=True
     )
     assert hypercube.is_move_across()
-    wall_material_tuple = random.choice(materials.CEILING_AND_WALL_MATERIALS)
+    wall_material_tuple = random.choice(materials.CEILING_AND_WALL_GROUPINGS)
     object_dict = hypercube._create_default_objects(
         wall_material_tuple[0],
         wall_material_tuple[1]
@@ -334,7 +333,7 @@ def test_GravitySupportHypercube_default_objects_fall_down():
         is_fall_down=True
     )
     assert hypercube.is_fall_down()
-    wall_material_tuple = random.choice(materials.CEILING_AND_WALL_MATERIALS)
+    wall_material_tuple = random.choice(materials.CEILING_AND_WALL_GROUPINGS)
     object_dict = hypercube._create_default_objects(
         wall_material_tuple[0],
         wall_material_tuple[1]
@@ -353,13 +352,17 @@ def test_GravitySupportHypercube_default_objects_fall_down():
         assert asymmetric_right
         assert symmetric['id'] == asymmetric_left['id']
         assert symmetric['id'] == asymmetric_right['id']
-        assert util.are_materials_equivalent(
+        assert definitions.do_materials_match(
             symmetric['materials'],
-            asymmetric_left['materials']
+            asymmetric_left['materials'],
+            symmetric['debug']['color'],
+            asymmetric_left['debug']['color']
         )
-        assert util.are_materials_equivalent(
+        assert definitions.do_materials_match(
             symmetric['materials'],
-            asymmetric_right['materials']
+            asymmetric_right['materials'],
+            symmetric['debug']['color'],
+            asymmetric_right['debug']['color']
         )
 
     assert object_dict['target'] == [hypercube._target.get('symmetric')]
@@ -371,7 +374,7 @@ def test_GravitySupportHypercube_default_objects_fall_down():
 
     assert verify_object_fall_down_position(object_dict['target'][0], 'TARGET')
 
-    assert hypercube._last_step == 60
+    assert hypercube._last_step == 100
 
 
 def test_GravitySupportHypercube_default_scene_fall_down():
@@ -385,7 +388,7 @@ def test_GravitySupportHypercube_default_scene_fall_down():
         intuitive_physics_hypercubes.GravitySupportHypercube.GOAL_TEMPLATE
     )
     scene = hypercube._create_default_scene(BODY_TEMPLATE, goal_template)
-    verify_scene(scene, hypercube.is_move_across(), last_step=60)
+    verify_scene(scene, hypercube.is_move_across(), last_step=100)
     assert 'gravity support' == scene['goal']['sceneInfo']['tertiaryType']
 
 
@@ -966,11 +969,12 @@ def test_GravitySupportHypercube_scenes_fall_down():
 
             # How much time the target will need to move with the pole.
             y_difference = target['shows'][0]['position']['y'] - (
-                target['dimensions']['y'] / 2.0
-            ) - visible_support['dimensions']['y']
-            if i in ['o', 'p']:
+                target['debug']['dimensions']['y'] / 2.0
+            ) - visible_support['debug']['dimensions']['y']
+            # TODO Keep if needed in the future.
+            if i in []:
                 assert invisible_support
-                y_difference -= invisible_support['dimensions']['y']
+                y_difference -= invisible_support['debug']['dimensions']['y']
             move_step_count = int(y_difference / 0.25) - 1
 
             # Verify scene-agnostic target properties.
@@ -1047,8 +1051,7 @@ def test_GravitySupportHypercube_scenes_fall_down():
                 # Verify heavy side unsupported.
                 if i in ['b', 'd', 'f', 'h', 'j', 'l', 'n', 'p']:
                     assert target['shows'][0]['rotation']['y'] == (
-                        definition.get('rotation', {'y': 0})['y'] +
-                        (180 if is_positive else 0)
+                        definition.rotation.y + (180 if is_positive else 0)
                     )
 
             target_position = target['shows'][0]['position']['x']
@@ -1056,8 +1059,8 @@ def test_GravitySupportHypercube_scenes_fall_down():
             # Verify no-support position.
             if i in ['a', 'b', 'c', 'd']:
                 modifier = (1 if is_positive else -1) * (
-                    (visible_support['dimensions']['x'] / 2.0) +
-                    (0.55 * target['dimensions']['x'])
+                    (visible_support['debug']['dimensions']['x'] / 2.0) +
+                    (0.55 * target['debug']['dimensions']['x'])
                 )
                 min_position = (
                     visible_support['shows'][0]['position']['x'] + modifier
@@ -1070,8 +1073,8 @@ def test_GravitySupportHypercube_scenes_fall_down():
             # Verify minimal-support position.
             if i in ['e', 'f', 'g', 'h']:
                 modifier = (1 if is_positive else -1) * (
-                    (visible_support['dimensions']['x'] / 2.0) +
-                    (0.45 * target['dimensions']['x'])
+                    (visible_support['debug']['dimensions']['x'] / 2.0) +
+                    (0.45 * target['debug']['dimensions']['x'])
                 )
                 expected_position = (
                     visible_support['shows'][0]['position']['x'] + modifier
@@ -1081,19 +1084,12 @@ def test_GravitySupportHypercube_scenes_fall_down():
             # Verify 25%-support position.
             if i in ['i', 'j', 'k', 'l']:
                 modifier = (1 if is_positive else -1) * (
-                    (visible_support['dimensions']['x'] / 2.0) +
-                    (0.25 * target['dimensions']['x'])
+                    (visible_support['debug']['dimensions']['x'] / 2.0) +
+                    (0.25 * target['debug']['dimensions']['x'])
                 )
                 expected_position = (
                     visible_support['shows'][0]['position']['x'] + modifier
                 )
-                # Adjust asymmetric object position to center of mass.
-                if i in ['j', 'l']:
-                    asymmetric_center = hypercube._find_center_of_mass_x(
-                        hypercube._target._definitions['asymmetric_left'],
-                        (not is_positive)
-                    )
-                    expected_position += asymmetric_center
                 assert target_position == pytest.approx(expected_position)
 
             # Verify full-support position.
@@ -1106,7 +1102,7 @@ def test_GravitySupportHypercube_scenes_fall_down():
             implausible = False
 
             # Verify implausible scene with invisible support.
-            if i in ['c', 'd', 'g', 'h', 'k', 'l', 'o', 'p']:
+            if i in ['c', 'd', 'g', 'h', 'k', 'l']:
                 implausible = True
                 assert len(scene['objects']) == 4
                 assert invisible_support
@@ -1116,7 +1112,7 @@ def test_GravitySupportHypercube_scenes_fall_down():
                 assert 'shrouds' in invisible_support
                 assert len(invisible_support['shrouds']) == 1
                 assert invisible_support['shrouds'][0]['stepBegin'] == 0
-                assert invisible_support['shrouds'][0]['stepEnd'] == 61
+                assert invisible_support['shrouds'][0]['stepEnd'] == 101
                 assert 'moves' not in invisible_support
                 assert 'togglePhysics' not in invisible_support
                 # Invisible support on the floor next to the visible support.
@@ -1125,33 +1121,35 @@ def test_GravitySupportHypercube_scenes_fall_down():
                         assert (
                             invisible_support['shows'][0]['position']['x'] >
                             visible_support['shows'][0]['position']['x'] +
-                            (visible_support['dimensions']['x'] / 2.0)
+                            (visible_support['debug']['dimensions']['x'] / 2.0)
                         )
                     else:
                         assert (
                             invisible_support['shows'][0]['position']['x'] <
                             visible_support['shows'][0]['position']['x'] -
-                            (visible_support['dimensions']['x'] / 2.0)
+                            (visible_support['debug']['dimensions']['x'] / 2.0)
                         )
                     assert (
                         invisible_support['shows'][0]['position']['y'] ==
                         pytest.approx(
-                            invisible_support['dimensions']['y'] / 2.0
+                            invisible_support['debug']['dimensions']['y'] / 2.0
                         )
                     )
                 # Invisible support on top of the visible support.
-                if i in ['o', 'p']:
+                # TODO Keep if needed in the future.
+                if i in []:
                     assert invisible_support['shows'][0]['position']['x'] == (
                         visible_support['shows'][0]['position']['x']
                     )
                     assert invisible_support['shows'][0]['position']['y'] == (
-                        visible_support['dimensions']['y'] +
-                        (invisible_support['dimensions']['y'] / 2.0)
+                        visible_support['debug']['dimensions']['y'] +
+                        (invisible_support['debug']['dimensions']['y'] / 2.0)
                     )
             else:
                 assert len(scene['objects']) == 3
 
             # Verify implausible scene with invisible wind.
+            # TODO Keep if needed in the future.
             if i in []:
                 implausible = True
                 assert 'forces' in target
@@ -1160,18 +1158,42 @@ def test_GravitySupportHypercube_scenes_fall_down():
                     target['togglePhysics'][0]['stepBegin'] + 11
                 )
                 assert target['forces'][0]['vector']['x'] == (
-                    (1 if is_positive else -1) * target['mass'] * 250
+                    (1 if is_positive else -1) * target['mass'] * 400
                 )
                 assert target['forces'][0]['vector']['y'] == 0
                 assert target['forces'][0]['vector']['z'] == 0
             else:
                 assert 'forces' not in target
 
+            # Verify implausible center of mass/gravity.
+            if i in ['o', 'p']:
+                implausible = True
+                width_key = 'z' if (
+                    target['shows'][0]['rotation']['y'] == -90 or
+                    target['shows'][0]['rotation']['y'] == 90
+                ) else 'x'
+                width_value = (
+                    round((target['debug']['dimensions']['x'] / 2.0), 4) + 0.05
+                ) * (
+                    (1 if is_positive else -1) *
+                    (-1 if width_key == 'z' else 1) *
+                    (-1 if target['shows'][0]['rotation']['y'] > 0 else 1)
+                )
+                assert target['centerOfMass'] == {
+                    'x': width_value if width_key == 'x' else 0,
+                    'y': 0,
+                    'z': width_value if width_key == 'z' else 0
+                }
+                assert target['resetCenterOfMass'] is True
+            else:
+                assert 'centerOfMass' not in target
+                assert 'resetCenterOfMass' not in target
+
             verify_scene(
                 scene_dict[j],
                 hypercube.is_move_across(),
                 implausible,
-                last_step=60
+                last_step=100
             )
 
             for instance in scene['objects']:
@@ -1191,7 +1213,7 @@ def test_ObjectPermanenceHypercubeEval4_default_objects_move_across():
         is_move_across=True
     )
     assert hypercube.is_move_across()
-    wall_material_tuple = random.choice(materials.CEILING_AND_WALL_MATERIALS)
+    wall_material_tuple = random.choice(materials.CEILING_AND_WALL_GROUPINGS)
     object_dict = hypercube._create_default_objects(
         wall_material_tuple[0],
         wall_material_tuple[1]
@@ -1276,7 +1298,7 @@ def test_ObjectPermanenceHypercubeEval4_scenes_move_across():
             is_left = target_list[0]['shows'][0]['position']['x'] < 0
 
             # Verify normal exit/stop movement.
-            target_movement = target_list[0]['movement']
+            target_movement = target_list[0]['debug']['movement']
             move_property = 'moveStop' if j.endswith('1') else 'moveExit'
             assert target_movement['active'] == move_property
             assert target_list[0]['forces'][0]['vector']['x'] == (
@@ -1315,7 +1337,7 @@ def test_SpatioTemporalContinuityHypercubeEval4_default_objects_move_across():
         is_move_across=True
     )
     assert hypercube.is_move_across()
-    wall_material_tuple = random.choice(materials.CEILING_AND_WALL_MATERIALS)
+    wall_material_tuple = random.choice(materials.CEILING_AND_WALL_GROUPINGS)
     object_dict = hypercube._create_default_objects(
         wall_material_tuple[0],
         wall_material_tuple[1]

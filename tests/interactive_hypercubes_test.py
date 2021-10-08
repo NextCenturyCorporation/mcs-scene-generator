@@ -1,30 +1,33 @@
 import json
 import os
 
-import geometry
-from interactive_goals import RetrievalGoal
-from interactive_hypercubes import WALL_DEPTH, WALL_HEIGHT, WALL_MAX_WIDTH, \
-    WALL_MIN_WIDTH, WALL_Y, InteractiveSingleSceneFactory, \
-    InteractiveContainerEvaluationHypercubeFactory, \
-    InteractiveObstacleEvaluationHypercubeFactory, \
-    InteractiveOccluderEvaluationHypercubeFactory
 import shapely
 from shapely import affinity
-import util
 
-
-MAX_DIMENSION = max(
-    geometry.ROOM_X_MAX - geometry.ROOM_X_MIN,
-    geometry.ROOM_Z_MAX - geometry.ROOM_Z_MIN
+from generator import RetrievalGoal, definitions, geometry, util
+from hypercube import (
+    InteractiveContainerEvaluation4HypercubeFactory,
+    InteractiveContainerEvaluationHypercubeFactory,
+    InteractiveObstacleEvaluationHypercubeFactory,
+    InteractiveOccluderEvaluationHypercubeFactory,
+    InteractiveSingleSceneFactory,
 )
-
+from hypercube.interactive_hypercubes import (
+    ROOM_DIMENSIONS,
+    WALL_DEPTH,
+    WALL_HEIGHT,
+    WALL_MAX_WIDTH,
+    WALL_MIN_WIDTH,
+)
 
 BODY_TEMPLATE = {
     'ceilingMaterial': 'AI2-THOR/Materials/Walls/Drywall',
-    'floorColors': ['white'],
     'floorMaterial': 'AI2-THOR/Materials/Fabrics/CarpetWhite 3',
-    'wallColors': ['white'],
     'wallMaterial': 'AI2-THOR/Materials/Walls/DrywallBeige',
+    'debug': {
+        'floorColors': ['white'],
+        'wallColors': ['white']
+    },
     'performerStart': {
         'position': {
             'x': 0,
@@ -90,7 +93,7 @@ class ExpectedLocation():
             instance['id'],
             object_data.location_plan_list[index].name,
             target_data.location_plan_list[index].name
-            if instance['role'] != 'target' else None,
+            if instance['debug']['role'] != 'target' else None,
             object_data.untrained_plan_list[index],
             receptacle_data.untrained_plan_list[index] if receptacle_data
             else False
@@ -136,7 +139,7 @@ def test_generate_wall():
     )
     wall = hypercube._create_interior_wall(
         'test_material',
-        ['test_color_1', 'test_color_2'],
+        ['black', 'white'],
         geometry.ORIGIN_LOCATION,
         []
     )
@@ -145,10 +148,14 @@ def test_generate_wall():
     assert wall['id']
     assert wall['materials'] == ['test_material']
     assert wall['type'] == 'cube'
-    assert wall['kinematic'] == 'true'
-    assert wall['structure'] == 'true'
-    assert wall['mass'] == 200
-    assert wall['info'] == ['test_color_1', 'test_color_2']
+    assert wall['kinematic'] is True
+    assert wall['structure'] is True
+    # Calculated by structures._calculate_mass
+    assert wall['mass'] >= 37.5
+    assert wall['debug']['info'] == [
+        'black', 'white', 'wall', 'black wall', 'white wall',
+        'black white wall'
+    ]
 
     assert len(wall['shows']) == 1
     assert wall['shows'][0]['stepBegin'] == 0
@@ -160,7 +167,7 @@ def test_generate_wall():
     assert wall['shows'][0]['rotation']['y'] % 90 == 0
     assert wall['shows'][0]['rotation']['z'] == 0
     assert wall['shows'][0]['position']['x'] is not None
-    assert wall['shows'][0]['position']['y'] == WALL_Y
+    assert wall['shows'][0]['position']['y'] == (WALL_HEIGHT / 2.0)
     assert wall['shows'][0]['position']['z'] is not None
     assert wall['shows'][0]['boundingBox'] is not None
 
@@ -173,7 +180,10 @@ def test_generate_wall():
     player_poly = geometry.rect_to_poly(player_rect)
     wall_poly = geometry.rect_to_poly(wall['shows'][0]['boundingBox'])
     assert not wall_poly.intersects(player_poly)
-    assert geometry.rect_within_room(wall['shows'][0]['boundingBox'])
+    assert geometry.rect_within_room(
+        wall['shows'][0]['boundingBox'],
+        ROOM_DIMENSIONS
+    )
 
 
 def test_generate_wall_multiple():
@@ -244,18 +254,20 @@ def get_parent(object_instance, object_list):
 
 def verify_confusor(target, confusor):
     assert target['id'] != confusor['id']
-    is_same_color = set(target['color']) == set(confusor['color'])
-    is_same_shape = target['shape'] == confusor['shape']
-    is_same_size = target['size'] == confusor['size'] and \
-        (target['dimensions']['x'] - util.MAX_SIZE_DIFFERENCE) <= \
-        confusor['dimensions']['x'] <= \
-        (target['dimensions']['x'] + util.MAX_SIZE_DIFFERENCE) and \
-        (target['dimensions']['y'] - util.MAX_SIZE_DIFFERENCE) <= \
-        confusor['dimensions']['y'] <= \
-        (target['dimensions']['y'] + util.MAX_SIZE_DIFFERENCE) and \
-        (target['dimensions']['z'] - util.MAX_SIZE_DIFFERENCE) <= \
-        confusor['dimensions']['z'] <= \
-        (target['dimensions']['z'] + util.MAX_SIZE_DIFFERENCE)
+    is_same_color = (
+        set(target['debug']['color']) == set(confusor['debug']['color'])
+    )
+    is_same_shape = target['debug']['shape'] == confusor['debug']['shape']
+    is_same_size = target['debug']['size'] == confusor['debug']['size'] and \
+        (target['debug']['dimensions']['x'] - definitions.MAX_SIZE_DIFF) <= \
+        confusor['debug']['dimensions']['x'] <= \
+        (target['debug']['dimensions']['x'] + definitions.MAX_SIZE_DIFF) and \
+        (target['debug']['dimensions']['y'] - definitions.MAX_SIZE_DIFF) <= \
+        confusor['debug']['dimensions']['y'] <= \
+        (target['debug']['dimensions']['y'] + definitions.MAX_SIZE_DIFF) and \
+        (target['debug']['dimensions']['z'] - definitions.MAX_SIZE_DIFF) <= \
+        confusor['debug']['dimensions']['z'] <= \
+        (target['debug']['dimensions']['z'] + definitions.MAX_SIZE_DIFF)
     if (
         (not is_same_color and not is_same_shape) or
         (not is_same_color and not is_same_size) or
@@ -284,7 +296,7 @@ def verify_immediately_visible(
         if 'locationParent' in target else target
     target_poly = geometry.get_bounding_polygon(target_or_parent)
 
-    view_line = shapely.geometry.LineString([[0, 0], [0, MAX_DIMENSION]])
+    view_line = shapely.geometry.LineString([[0, 0], [0, 10]])
     view_line = affinity.rotate(
         view_line,
         -performer_start['rotation']['y'],
@@ -407,8 +419,8 @@ def verify_not_parent(
         return False
 
     if not (
-        expected_parent.get('isParentOf', []) == [] and
-        actual_parent.get('isParentOf', []) == []
+        expected_parent['debug'].get('isParentOf', []) == [] and
+        actual_parent['debug'].get('isParentOf', []) == []
     ):
         print(f'[ERROR] OBJECT SHOULD NOT HAVE TARGET CHILD:\n'
               f'{expected_parent}\n{actual_parent}')
@@ -421,13 +433,15 @@ def verify_obstacle(obstacle, target, object_list, performer_start):
     """Verify the mass/size of the given obstacle using the given target."""
 
     print(f'[DEBUG] obstacle={obstacle}')
-    assert obstacle['obstacle']
 
-    dimensions = obstacle.get('closedDimensions', obstacle['dimensions'])
+    dimensions = obstacle['debug'].get(
+        'closedDimensions',
+        obstacle['debug']['dimensions']
+    )
 
     if not (
-        target['dimensions']['x'] <= dimensions['x'] or
-        target['dimensions']['z'] <= dimensions['z']
+        target['debug']['dimensions']['x'] <= dimensions['x'] or
+        target['debug']['dimensions']['z'] <= dimensions['z']
     ):
         print(
             f'[ERROR] OBSTACLE SHOULD BE BIGGER THAN TARGET:\n'
@@ -448,7 +462,10 @@ def verify_obstacle(obstacle, target, object_list, performer_start):
         return False
 
     for instance in object_list:
-        if instance['id'] == obstacle['id'] or instance['role'] == 'target':
+        if (
+            instance['id'] == obstacle['id'] or
+            instance['debug']['role'] == 'target'
+        ):
             continue
         if not verify_location_not_obstruct_target(
             instance,
@@ -467,14 +484,16 @@ def verify_occluder(occluder, target, object_list, performer_start):
     """Verify the mass/size of the given occluder using the given target."""
 
     print(f'[DEBUG] occluder={occluder}')
-    assert occluder['occluder']
 
-    dimensions = occluder.get('closedDimensions', occluder['dimensions'])
+    dimensions = occluder['debug'].get(
+        'closedDimensions',
+        occluder['debug']['dimensions']
+    )
 
     if not (
-        target['dimensions']['x'] <= dimensions['x'] or
-        target['dimensions']['y'] <= dimensions['y'] or
-        target['dimensions']['z'] <= dimensions['z']
+        target['debug']['dimensions']['x'] <= dimensions['x'] or
+        target['debug']['dimensions']['y'] <= dimensions['y'] or
+        target['debug']['dimensions']['z'] <= dimensions['z']
     ):
         print(
             f'[ERROR] OCCLUDER SHOULD BE BIGGER THAN TARGET:\n'
@@ -517,8 +536,8 @@ def verify_object_list(scene, index, tag, object_list):
     for expected in object_list:
         actual = get_object(expected['id'], scene['objects'], True)
 
-        assert expected['role'] == tag
-        assert actual['role'] == tag
+        assert expected['debug']['role'] == tag
+        assert actual['debug']['role'] == tag
 
         # Verify instance in scene is same as object data instance.
         if not verify_same_object(tag, expected, actual, []):
@@ -529,7 +548,7 @@ def verify_object_list(scene, index, tag, object_list):
         assert verify_target_soccer_ball(tag, expected)
 
         # Verify object instance info is in goal info.
-        for info in expected['info']:
+        for info in expected['debug']['info']:
             if info not in scene['goal']['objectsInfo']['all']:
                 return False
             if info != tag:
@@ -560,8 +579,8 @@ def verify_object_data_list(scene, index, tag, object_data_list, ignore_list):
 
         count += 1
 
-        assert expected['role'] == tag
-        assert actual['role'] == tag
+        assert expected['debug']['role'] == tag
+        assert actual['debug']['role'] == tag
 
         # Verify object data instance is same as template.
         if object_data.untrained_plan_list[index]:
@@ -584,7 +603,7 @@ def verify_object_data_list(scene, index, tag, object_data_list, ignore_list):
         assert verify_target_soccer_ball(tag, expected)
 
         # Verify object instance info is in goal info.
-        for info in expected['info']:
+        for info in expected['debug']['info']:
             if info not in scene['goal']['objectsInfo']['all']:
                 return False
             if info != tag:
@@ -610,9 +629,11 @@ def verify_same_object(name, object_1, object_2, ignore_list):
     """Verify the two given objects have all the same properties, except for
     the specific given ignore_list."""
 
-    ignore_list = ignore_list + ['info', 'role']
+    ignore_list = ignore_list + ['debug', 'info', 'role']
     key_set_1 = set(object_1.keys())
     key_set_2 = set(object_2.keys())
+    debug_key_set_1 = set(object_1['debug'].keys())
+    debug_key_set_2 = set(object_2['debug'].keys())
     for key in key_set_1.union(key_set_2):
         if key not in ignore_list and not key.startswith('is'):
             if (
@@ -622,6 +643,17 @@ def verify_same_object(name, object_1, object_2, ignore_list):
             ):
                 print(
                     f'[ERROR] "{key}" PROPERTY SHOULD BE THE SAME:\n'
+                    f'{name}_1={object_1}\n{name}_2={object_2}')
+                return False
+    for key in debug_key_set_1.union(debug_key_set_2):
+        if key not in ignore_list and not key.startswith('is'):
+            if (
+                key not in object_1['debug'] or
+                key not in object_2['debug'] or
+                object_1['debug'][key] != object_2['debug'][key]
+            ):
+                print(
+                    f'[ERROR] "{key}" DEBUG PROPERTY SHOULD BE THE SAME:\n'
                     f'{name}_1={object_1}\n{name}_2={object_2}')
                 return False
     return True
@@ -648,12 +680,12 @@ def verify_same_parent(
         return False
 
     if not (
-        expected_parent.get('isParentOf') == [target_id] and
-        actual_parent.get('isParentOf') == [target_id]
+        expected_parent['debug'].get('isParentOf') == [target_id] and
+        actual_parent['debug'].get('isParentOf') == [target_id]
     ):
         print(f'[ERROR] OBJECT SHOULD HAVE SAME TARGET CHILD {target_id} BUT '
-              f'ACTUALLY HAD {expected_parent.get("isParentOf")} AND '
-              f'{actual_parent.get("isParentOf")}:\n'
+              f'ACTUALLY HAD {expected_parent["debug"].get("isParentOf")} AND '
+              f'{actual_parent["debug"].get("isParentOf")}:\n'
               f'{expected_parent}\n{actual_parent}')
         return False
 
@@ -690,7 +722,7 @@ def verify_scene(hypercube, scene, index, ignore_parent=False,
     assert scene
 
     # Floor should not have distracting patterns.
-    assert len(scene['floorColors']) == 1
+    assert len(scene['debug']['floorColors']) == 1
 
     # Floor should not have the same color as critical (non-context) objects.
     for role in [
@@ -699,10 +731,13 @@ def verify_scene(hypercube, scene, index, ignore_parent=False,
     ]:
         for object_data in hypercube._data[role]:
             if object_data.instance_list[index]:
-                for color in object_data.instance_list[index]['color']:
-                    if color in scene['floorColors']:
+                for color in (
+                    object_data.instance_list[index]['debug']['color']
+                ):
+                    if color in scene['debug']['floorColors']:
                         print(f'[ERROR] FLOOR SHOULD NOT HAVE SAME COLOR AS '
-                              f'OBJECT: floor_colors={scene["floorColors"]}\n'
+                              f'OBJECT: floor_colors='
+                              f'{scene["debug"]["floorColors"]}\n'
                               f'object={object_data.instance_list[index]}')
                         return False
 
@@ -721,7 +756,7 @@ def verify_scene(hypercube, scene, index, ignore_parent=False,
             print(
                 f'[ERROR] performer_start SHOULD NOT BE INSIDE AN '
                 f'OBJECT:\nperformer_start_poly={performer_start_poly}\n'
-                f'object_poly={object_poly}')
+                f'object_poly={object_poly}\ninstance={instance}')
             return False
 
     # Expected differences across scenes in objects that may have/be parents.
@@ -815,7 +850,7 @@ def verify_scene(hypercube, scene, index, ignore_parent=False,
     goal_template = hypercube._goal.get_goal_template()
     assert scene['goal']['category'] == goal_template['category']
     assert scene['goal']['description']
-    assert scene['goal']['last_step'] == 10000
+    assert scene['goal']['last_step'] == 2500
     assert scene['goal']['sceneInfo']['id']
     assert 'slices' in scene['goal']['sceneInfo']
 
@@ -828,7 +863,7 @@ def verify_scene(hypercube, scene, index, ignore_parent=False,
         hypercube._target_data.instance_list[index]['id']
     )
     assert target_metadata['info'] == (
-        hypercube._target_data.instance_list[index]['info']
+        hypercube._target_data.instance_list[index]['debug']['info']
     )
 
     return True
@@ -1151,6 +1186,190 @@ def test_container_hypercube():
                 assert large_container_data_3.untrained_plan_list[index]
                 assert small_container_data_1.untrained_plan_list[index]
                 assert small_container_data_2.untrained_plan_list[index]
+
+    delete_scene_debug_files(scene_dict, 'container')
+
+
+def test_eval_4_container_hypercube():
+    hypercube_factory = InteractiveContainerEvaluation4HypercubeFactory(
+        RetrievalGoal('container')
+    )
+    hypercube = hypercube_factory._build(
+        BODY_TEMPLATE,
+        {'container': None, 'obstacle': None, 'occluder': None}
+    )
+
+    assert len(hypercube._data['large_container']) == 3
+    assert len(hypercube._data['small_container']) == 0
+
+    assert len(hypercube._data['obstacle']) == 0
+    assert len(hypercube._data['occluder']) == 0
+
+    assert 0 <= len(hypercube._small_context_object_list) <= 10
+
+    target_data = hypercube._target_data
+    target_id = target_data.trained_template['id']
+    large_container_data_1 = hypercube._data['large_container'][0]
+    large_container_data_2 = hypercube._data['large_container'][1]
+    large_container_data_3 = hypercube._data['large_container'][2]
+    large_container_id_1 = large_container_data_1.trained_template['id']
+    large_container_id_2 = large_container_data_2.trained_template['id']
+    large_container_id_3 = large_container_data_3.trained_template['id']
+
+    # Save a location of each variable-location object, to verify that the
+    # objects will always keep the same locations in specific scenes.
+    expected_location = ExpectedLocation(target_data, [
+        target_data, large_container_data_1, large_container_data_2,
+        large_container_data_3
+    ], large_container_data_1)
+
+    scene_dict = {}
+    for index, scene in enumerate(hypercube.get_scenes()):
+        scene_id = scene['goal']['sceneInfo']['id'][0].lower()
+        scene_dict[scene_id] = (scene, index)
+
+    save_scene_debug_files(scene_dict, 'container')
+
+    for i in ['a', 'd', 'g', 'j', 'm', 'p']:
+        for j in [i + '1', i + '2']:
+            scene, index = scene_dict[j]
+            print(f'[DEBUG] SCENE ID={j} INDEX={index}')
+            assert verify_scene(
+                hypercube,
+                scene,
+                index,
+                # Containers may hold target (will be tested later).
+                ignore_parent=True,
+                # Containers may not be in each scene (will be tested later).
+                ignore_container_location=True
+            )
+
+            objects = scene['objects']
+            target = get_object(target_id, objects)
+            large_container_1 = get_object(large_container_id_1, objects)
+            large_container_2 = get_object(large_container_id_2, objects, True)
+            large_container_3 = get_object(large_container_id_3, objects, True)
+
+            # Verify 1st large container always at same location.
+            target_location_name = target_data.location_plan_list[index].name
+            assert verify_same_location(
+                'container',
+                expected_location.get(
+                    large_container_id_1,
+                    'random',
+                    target_location_name,
+                    j.endswith('2')
+                ),
+                get_position(large_container_data_1.instance_list[index]),
+                get_position(large_container_1)
+            )
+
+            # Verify target is inside of 1st large container.
+            if i in ['a', 'b', 'c', 'g', 'h', 'i', 'm', 'n', 'o']:
+                assert verify_same_location(
+                    'target',
+                    expected_location.get(
+                        target_id,
+                        'inside_0',
+                        is_receptacle_untrained=(j.endswith('2'))
+                    ),
+                    get_position(hypercube._target_data.instance_list[index]),
+                    get_position(target)
+                )
+                assert verify_same_parent(
+                    large_container_data_1.instance_list[index],
+                    large_container_1,
+                    hypercube._target_data.instance_list[index],
+                    target
+                )
+                assert scene['goal']['sceneInfo']['contained']['target']
+                assert not scene['goal']['sceneInfo']['uncontained']['target']
+
+            # Verify target is close to 1st large container.
+            if i in ['d', 'e', 'f', 'j', 'k', 'l', 'p', 'q', 'r']:
+                assert verify_target_obstruct_location(
+                    target_data.instance_list[index],
+                    large_container_data_1.instance_list[index],
+                    hypercube._performer_start
+                )
+                assert verify_same_location(
+                    'target',
+                    expected_location.get(target_id, 'close'),
+                    get_position(hypercube._target_data.instance_list[index]),
+                    get_position(target)
+                )
+                assert verify_not_parent(
+                    large_container_data_1.instance_list[index],
+                    large_container_1,
+                    hypercube._target_data.instance_list[index],
+                    target
+                )
+                assert not scene['goal']['sceneInfo']['contained']['target']
+                assert scene['goal']['sceneInfo']['uncontained']['target']
+
+            # Verify large container 2 location same across all scenes.
+            if i in [
+                'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l'
+            ]:
+                assert large_container_2
+                assert verify_same_location(
+                    'container',
+                    expected_location.get(
+                        large_container_id_2,
+                        'random',
+                        target_location_name,
+                        j.endswith('2')
+                    ),
+                    get_position(large_container_data_2.instance_list[index]),
+                    get_position(large_container_2)
+                )
+                assert verify_not_parent(
+                    large_container_data_2.instance_list[index],
+                    large_container_2
+                )
+
+            # Verify large container 2 not in scene.
+            if i in ['m', 'n', 'o', 'p', 'q', 'r']:
+                assert not large_container_2
+                assert not large_container_data_2.instance_list[index]
+
+            # Verify large container 3 location same across all scenes.
+            if i in ['a', 'b', 'c', 'd', 'e', 'f']:
+                assert large_container_3
+                assert verify_same_location(
+                    'container',
+                    expected_location.get(
+                        large_container_id_3,
+                        'random',
+                        target_location_name,
+                        j.endswith('2')
+                    ),
+                    get_position(large_container_data_3.instance_list[index]),
+                    get_position(large_container_3)
+                )
+                assert verify_not_parent(
+                    large_container_data_3.instance_list[index],
+                    large_container_3
+                )
+
+            # Verify large container 3 not in scene.
+            if i in [
+                'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r'
+            ]:
+                assert not large_container_3
+                assert not large_container_data_3.instance_list[index]
+
+            # Verify container trained shape.
+            if j.endswith('1'):
+                assert not large_container_data_1.untrained_plan_list[index]
+                assert not large_container_data_2.untrained_plan_list[index]
+                assert not large_container_data_3.untrained_plan_list[index]
+
+            # Verify container untrained shape.
+            if j.endswith('2'):
+                assert large_container_data_1.untrained_plan_list[index]
+                assert large_container_data_2.untrained_plan_list[index]
+                assert large_container_data_3.untrained_plan_list[index]
 
     delete_scene_debug_files(scene_dict, 'container')
 

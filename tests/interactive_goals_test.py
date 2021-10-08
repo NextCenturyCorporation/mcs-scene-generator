@@ -1,8 +1,8 @@
-import pytest
 import uuid
 
-import geometry
-from interactive_goals import RetrievalGoal, TransferralGoal, TraversalGoal
+import pytest
+
+from generator import RetrievalGoal, TransferralGoal, TraversalGoal, geometry
 
 
 def test_choose_definition():
@@ -27,7 +27,7 @@ def test_RetrievalGoal_choose_target_definition():
     goal = RetrievalGoal('')
     definition = goal.choose_target_definition(0)
     assert definition
-    assert 'pickupable' in definition['attributes']
+    assert 'pickupable' in definition.attributes
 
 
 def test_RetrievalGoal_get_target_count():
@@ -38,8 +38,10 @@ def test_RetrievalGoal_get_target_count():
 def test_RetrievalGoal_update_goal_template():
     target = {
         'id': str(uuid.uuid4()),
-        'info': ['blue', 'rubber', 'ball'],
-        'goalString': 'blue rubber ball',
+        'debug': {
+            'info': ['blue', 'rubber', 'ball'],
+            'goalString': 'blue rubber ball'
+        },
         'pickupable': True,
         'type': 'sphere'
     }
@@ -49,7 +51,9 @@ def test_RetrievalGoal_update_goal_template():
 
     assert config['description'] == 'Find and pick up the blue rubber ball.'
     assert config['metadata']['target']['id'] == target['id']
-    assert config['metadata']['target']['info'] == ['blue', 'rubber', 'ball']
+    assert config['metadata']['target']['info'] == [
+        'blue', 'rubber', 'ball'
+    ]
 
 
 def test_RetrievalGoal_validate_target_location():
@@ -61,14 +65,14 @@ def test_TransferralGoal_choose_target_definition_0():
     goal = TransferralGoal('')
     definition = goal.choose_target_definition(0)
     assert definition
-    assert 'pickupable' in definition['attributes']
+    assert 'pickupable' in definition.attributes
 
 
 def test_TransferralGoal_choose_target_definition_1():
     goal = TransferralGoal('')
     definition = goal.choose_target_definition(1)
     assert definition
-    assert 'stackTarget' in definition['attributes']
+    assert definition.stackTarget
 
 
 def test_TransferralGoal_get_target_count():
@@ -79,16 +83,20 @@ def test_TransferralGoal_get_target_count():
 def test_TransferralGoal_update_goal_template():
     target_1 = {
         'id': str(uuid.uuid4()),
-        'info': ['blue', 'rubber', 'ball'],
-        'goalString': 'blue rubber ball',
+        'debug': {
+            'info': ['blue', 'rubber', 'ball'],
+            'goalString': 'blue rubber ball'
+        },
         'pickupable': True,
         'type': 'sphere'
     }
     target_2 = {
         'id': str(uuid.uuid4()),
-        'info': ['grey', 'fabric', 'sofa'],
-        'goalString': 'grey fabric sofa',
-        'attributes': [],
+        'debug': {
+            'info': ['grey', 'fabric', 'sofa'],
+            'goalString': 'grey fabric sofa',
+            'attributes': []
+        },
         'type': 'sofa',
         'stackTarget': True
     }
@@ -105,9 +113,13 @@ def test_TransferralGoal_update_goal_template():
     assert config['description'] == 'Find and pick up the blue rubber ' + \
         'ball and move it ' + relationship_type + ' the grey fabric sofa.'
     assert config['metadata']['target_1']['id'] == target_1['id']
-    assert config['metadata']['target_1']['info'] == ['blue', 'rubber', 'ball']
+    assert config['metadata']['target_1']['info'] == [
+        'blue', 'rubber', 'ball'
+    ]
     assert config['metadata']['target_2']['id'] == target_2['id']
-    assert config['metadata']['target_2']['info'] == ['grey', 'fabric', 'sofa']
+    assert config['metadata']['target_2']['info'] == [
+        'grey', 'fabric', 'sofa'
+    ]
 
 
 def test_TransferralGoal_validate_target_location_0():
@@ -205,8 +217,10 @@ def test_TraversalGoal_get_target_count():
 def test_TraversalGoal_update_goal_template():
     target = {
         'id': str(uuid.uuid4()),
-        'info': ['blue', 'rubber', 'ball'],
-        'goalString': 'blue rubber ball',
+        'debug': {
+            'info': ['blue', 'rubber', 'ball'],
+            'goalString': 'blue rubber ball'
+        },
         'pickupable': True,
         'type': 'sphere'
     }
@@ -217,7 +231,9 @@ def test_TraversalGoal_update_goal_template():
     assert config['description'] == 'Find the blue rubber ball and move ' + \
         'near it.'
     assert config['metadata']['target']['id'] == target['id']
-    assert config['metadata']['target']['info'] == ['blue', 'rubber', 'ball']
+    assert config['metadata']['target']['info'] == [
+        'blue', 'rubber', 'ball'
+    ]
 
 
 def test_TraversalGoal_validate_target_location_true():
@@ -392,10 +408,12 @@ def test_add_RotateLook_to_action_list_before_Pickup_or_Put_Object():
         'objects': [{
             'id': 'object-01',
             'type': 'sphere',
-            'dimensions': {
-                'x': 0.02,
-                'y': 0.02,
-                'z': 0.02
+            'debug': {
+                'dimensions': {
+                    'x': 0.02,
+                    'y': 0.02,
+                    'z': 0.02
+                }
             },
             'shows': [{
                 'position': {

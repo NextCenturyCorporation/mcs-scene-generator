@@ -1,50 +1,16 @@
-import materials
-import objects
-import pytest
 import random
-from util import are_materials_equivalent, finalize_object_definition, \
-    finalize_object_materials_and_colors, instantiate_object, \
-    random_real, move_to_location, retrieve_complete_definition_list, \
-    retrieve_trained_definition_list, retrieve_untrained_definition_list, \
-    is_similar_except_in_color, is_similar_except_in_shape, \
-    is_similar_except_in_size, choose_distractor_definition
 
+from machine_common_sense.config_manager import Vector3d
 
-DEFINITIONS = [
-    definition for definition_list in retrieve_complete_definition_list(
-        objects.get(objects.ObjectDefinitionList.ALL)
-    ) for definition in definition_list
-]
-ALL_DEFINITIONS = []
-for definition in DEFINITIONS:
-    ALL_DEFINITIONS.extend(finalize_object_materials_and_colors(definition))
+from generator import ObjectDefinition, base_objects, specific_objects
+from generator.util import (
+    choose_distractor_definition,
+    instantiate_object,
+    move_to_location,
+    random_real,
+)
 
-
-PACIFIER = {
-    "type": "pacifier",
-    "color": "blue",
-    "shape": "pacifier",
-    "size": "tiny",
-    "salientMaterials": ["plastic"],
-    "attributes": ["moveable", "pickupable"],
-    "dimensions": {
-        "x": 0.07,
-        "y": 0.04,
-        "z": 0.05
-    },
-    "mass": 0.125,
-    "offset": {
-        "x": 0,
-        "y": 0.02,
-        "z": 0
-    },
-    "positionY": 0.01,
-    "scale": {
-        "x": 1,
-        "y": 1,
-        "z": 1
-    }
-}
+DATASET = specific_objects.get_interactable_definition_dataset(unshuffled=True)
 
 
 def test_random_real():
@@ -55,40 +21,18 @@ def test_random_real():
     assert n * 10 % 1 < 1e-8
 
 
-def test_finalize_object_definition():
-    dimensions = {'x': 1, 'y': 1, 'z': 1}
-    mass = 12.34
-    material_category = ['plastic']
-    salient_materials = ['plastic', 'hollow']
-    object_def = {
-        'type': 'type1',
-        'mass': 56.78,
-        'chooseMaterial': [{
-            'materialCategory': material_category,
-            'salientMaterials': salient_materials
-        }],
-        'chooseSize': [{
-            'dimensions': dimensions,
-            'mass': mass
-        }]
-    }
-    obj = finalize_object_definition(object_def)
-    assert obj['dimensions'] == dimensions
-    assert obj['mass'] == mass
-    assert obj['materialCategory'] == material_category
-    assert obj['salientMaterials'] == salient_materials
-
-
 def test_instantiate_object():
-    object_def = {
-        'type': 'sofa_1',
-        'dimensions': {'x': 1, 'y': 0.5, 'z': 0.5},
-        'shape': 'sofa',
-        'size': 'huge',
-        'mass': 12.34,
-        'attributes': ['foo', 'bar'],
-        'scale': {'x': 1, 'y': 1, 'z': 1}
-    }
+    object_def = ObjectDefinition(
+        color=['blue'],
+        materials=['blue_material'],
+        type='sofa_1',
+        mass=12.34,
+        attributes=['foo', 'bar'],
+        dimensions=Vector3d(**{'x': 1, 'y': 0.5, 'z': 0.5}),
+        scale=Vector3d(**{'x': 1, 'y': 1, 'z': 1}),
+        shape=['sofa'],
+        size='huge'
+    )
     object_location = {
         'position': {
             'x': 0.0,
@@ -104,98 +48,42 @@ def test_instantiate_object():
     obj = instantiate_object(object_def, object_location)
     assert isinstance(obj['id'], str)
     assert obj['type'] == 'sofa_1'
-    assert obj['dimensions'] == object_def['dimensions']
-    assert obj['goalString'] == 'huge massive sofa'
-    assert obj['info'] == [
-        'huge', 'massive', 'sofa', 'huge massive', 'huge sofa', 'massive sofa',
-        'huge massive sofa'
+    assert obj['debug']['dimensions'] == vars(object_def.dimensions)
+    assert obj['debug']['goalString'] == 'huge massive blue sofa'
+    assert obj['debug']['info'] == [
+        'huge', 'massive', 'blue', 'sofa', 'huge massive', 'huge blue',
+        'huge sofa', 'massive blue', 'massive sofa', 'blue sofa',
+        'huge massive blue sofa'
     ]
     assert obj['mass'] == 12.34
-    assert obj['untrainedCategory'] is False
-    assert obj['untrainedColor'] is False
-    assert obj['untrainedCombination'] is False
-    assert obj['untrainedShape'] is False
-    assert obj['untrainedSize'] is False
-    assert obj['shape'] == ['sofa']
-    assert obj['size'] == 'huge'
-    assert obj['weight'] == 'massive'
+    assert obj['debug']['untrainedCategory'] is False
+    assert obj['debug']['untrainedColor'] is False
+    assert obj['debug']['untrainedCombination'] is False
+    assert obj['debug']['untrainedShape'] is False
+    assert obj['debug']['untrainedSize'] is False
+    assert obj['debug']['shape'] == ['sofa']
+    assert obj['debug']['size'] == 'huge'
+    assert obj['debug']['weight'] == 'massive'
     assert obj['foo'] is True
     assert obj['bar'] is True
     assert obj['shows'][0]['stepBegin'] == 0
     assert obj['shows'][0]['position'] == object_location['position']
     assert obj['shows'][0]['rotation'] == object_location['rotation']
-    assert obj['shows'][0]['scale'] == object_def['scale']
-
-
-def test_instantiate_object_choose():
-    object_def = {
-        'type': 'sofa_1',
-        'chooseSize': [{
-            'untrainedShape': True,
-            'shape': 'sofa',
-            'size': 'medium',
-            'attributes': ['moveable'],
-            'dimensions': {'x': 0.5, 'y': 0.25, 'z': 0.25},
-            'mass': 12.34,
-            'scale': {'x': 0.5, 'y': 0.5, 'z': 0.5}
-        }, {
-            'shape': 'sofa',
-            'size': 'huge',
-            'attributes': [],
-            'dimensions': {'x': 1, 'y': 0.5, 'z': 0.5},
-            'mass': 56.78,
-            'scale': {'x': 1, 'y': 1, 'z': 1}
-        }]
-    }
-    object_location = {
-        'position': {
-            'x': 0.0,
-            'y': 0.0,
-            'z': 0.0
-        },
-        'rotation': {
-            'x': 0.0,
-            'y': 0.0,
-            'z': 0.0
-        }
-    }
-    obj = instantiate_object(object_def, object_location)
-    assert obj['size'] == 'medium' or obj['size'] == 'huge'
-    if obj['size'] == 'medium':
-        assert obj['moveable']
-        assert obj['untrainedShape']
-        assert obj['info'] == [
-            'medium', 'heavy', 'sofa', 'medium heavy', 'medium sofa',
-            'heavy sofa', 'medium heavy sofa', 'untrained shape',
-            'untrained medium heavy sofa'
-        ]
-        assert obj['goalString'] == 'medium heavy sofa'
-        assert obj['dimensions'] == {'x': 0.5, 'y': 0.25, 'z': 0.25}
-        assert obj['mass'] == 12.34
-        assert obj['shows'][0]['scale'] == {'x': 0.5, 'y': 0.5, 'z': 0.5}
-    if obj['size'] == 'huge':
-        assert 'moveable' not in obj
-        assert not obj['untrainedShape']
-        assert obj['info'] == [
-            'huge', 'massive', 'sofa', 'huge massive', 'huge sofa',
-            'massive sofa', 'huge massive sofa'
-        ]
-        assert obj['goalString'] == 'huge massive sofa'
-        assert obj['dimensions'] == {'x': 1, 'y': 0.5, 'z': 0.5}
-        assert obj['mass'] == 56.78
-        assert obj['shows'][0]['scale'] == {'x': 1, 'y': 1, 'z': 1}
+    assert obj['shows'][0]['scale'] == vars(object_def.scale)
 
 
 def test_instantiate_object_heavy_moveable():
-    object_def = {
-        'type': 'sofa_1',
-        'dimensions': {'x': 1, 'y': 0.5, 'z': 0.5},
-        'shape': 'sofa',
-        'size': 'huge',
-        'mass': 12.34,
-        'attributes': ['moveable'],
-        'scale': {'x': 1, 'y': 1, 'z': 1}
-    }
+    object_def = ObjectDefinition(
+        color=['blue'],
+        materials=['blue_material'],
+        type='sofa_1',
+        mass=12.34,
+        dimensions=Vector3d(**{'x': 1, 'y': 0.5, 'z': 0.5}),
+        shape=['sofa'],
+        size='huge',
+        attributes=['moveable'],
+        scale=Vector3d(**{'x': 1, 'y': 1, 'z': 1})
+    )
     object_location = {
         'position': {
             'x': 0.0,
@@ -209,24 +97,27 @@ def test_instantiate_object_heavy_moveable():
         }
     }
     obj = instantiate_object(object_def, object_location)
-    assert obj['goalString'] == 'huge heavy sofa'
-    assert obj['info'] == [
-        'huge', 'heavy', 'sofa', 'huge heavy', 'huge sofa', 'heavy sofa',
-        'huge heavy sofa'
+    assert obj['debug']['goalString'] == 'huge heavy blue sofa'
+    assert obj['debug']['info'] == [
+        'huge', 'heavy', 'blue', 'sofa', 'huge heavy', 'huge blue',
+        'huge sofa', 'heavy blue', 'heavy sofa', 'blue sofa',
+        'huge heavy blue sofa'
     ]
     assert obj['moveable'] is True
 
 
 def test_instantiate_object_light_pickupable():
-    object_def = {
-        'type': 'sofa_1',
-        'dimensions': {'x': 1, 'y': 0.5, 'z': 0.5},
-        'shape': 'sofa',
-        'size': 'huge',
-        'mass': 12.34,
-        'attributes': ['moveable', 'pickupable'],
-        'scale': {'x': 1, 'y': 1, 'z': 1}
-    }
+    object_def = ObjectDefinition(
+        color=['blue'],
+        materials=['blue_material'],
+        type='sofa_1',
+        mass=12.34,
+        dimensions=Vector3d(**{'x': 1, 'y': 0.5, 'z': 0.5}),
+        shape=['sofa'],
+        size='huge',
+        attributes=['moveable', 'pickupable'],
+        scale=Vector3d(**{'x': 1, 'y': 1, 'z': 1})
+    )
     object_location = {
         'position': {
             'x': 0.0,
@@ -240,10 +131,11 @@ def test_instantiate_object_light_pickupable():
         }
     }
     obj = instantiate_object(object_def, object_location)
-    assert obj['goalString'] == 'huge light sofa'
-    assert obj['info'] == [
-        'huge', 'light', 'sofa', 'huge light', 'huge sofa', 'light sofa',
-        'huge light sofa'
+    assert obj['debug']['goalString'] == 'huge light blue sofa'
+    assert obj['debug']['info'] == [
+        'huge', 'light', 'blue', 'sofa', 'huge light', 'huge blue',
+        'huge sofa', 'light blue', 'light sofa', 'blue sofa',
+        'huge light blue sofa'
     ]
     assert obj['moveable'] is True
     assert obj['pickupable'] is True
@@ -254,16 +146,18 @@ def test_instantiate_object_offset():
         'x': random.random(),
         'z': random.random()
     }
-    object_def = {
-        'type': 'sofa_1',
-        'dimensions': {'x': 1, 'y': 0.5, 'z': 0.5},
-        'shape': 'sofa',
-        'size': 'huge',
-        'mass': 12.34,
-        'scale': {'x': 1, 'y': 1, 'z': 1},
-        'attributes': [],
-        'offset': offset
-    }
+    object_def = ObjectDefinition(
+        color=['blue'],
+        materials=['blue_material'],
+        type='sofa_1',
+        mass=12.34,
+        dimensions=Vector3d(**{'x': 1, 'y': 0.5, 'z': 0.5}),
+        shape=['sofa'],
+        size='huge',
+        scale=Vector3d(**{'x': 1, 'y': 1, 'z': 1}),
+        attributes=[],
+        offset=Vector3d(**offset)
+    )
     x = random.random()
     z = random.random()
     object_location = {
@@ -285,16 +179,18 @@ def test_instantiate_object_offset():
 
 
 def test_instantiate_object_rotation():
-    object_def = {
-        'type': 'sofa_1',
-        'dimensions': {'x': 1, 'y': 0.5, 'z': 0.5},
-        'shape': 'sofa',
-        'size': 'huge',
-        'mass': 12.34,
-        'scale': {'x': 1, 'y': 1, 'z': 1},
-        'attributes': [],
-        'rotation': {'x': 1, 'y': 2, 'z': 3}
-    }
+    object_def = ObjectDefinition(
+        color=['blue'],
+        materials=['blue_material'],
+        type='sofa_1',
+        mass=12.34,
+        dimensions=Vector3d(**{'x': 1, 'y': 0.5, 'z': 0.5}),
+        shape=['sofa'],
+        size='huge',
+        scale=Vector3d(**{'x': 1, 'y': 1, 'z': 1}),
+        attributes=[],
+        rotation=Vector3d(**{'x': 1, 'y': 2, 'z': 3})
+    )
     object_location = {
         'position': {
             'x': 0.0,
@@ -311,88 +207,19 @@ def test_instantiate_object_rotation():
     assert obj['shows'][0]['rotation'] == {'x': 31.0, 'y': 62.0, 'z': 93.0}
 
 
-def test_instantiate_object_materials():
-    materials.TEST_MATERIALS = [('test_material', ['blue', 'yellow'])]
-    object_def = {
-        'type': 'sofa_1',
-        'dimensions': {'x': 1, 'y': 0.5, 'z': 0.5},
-        'shape': 'sofa',
-        'size': 'huge',
-        'mass': 12.34,
-        'scale': {'x': 1, 'y': 1, 'z': 1},
-        'attributes': [],
-        'materialCategory': ['test']
-    }
-    object_location = {
-        'position': {
-            'x': 0.0,
-            'y': 0.0,
-            'z': 0.0
-        },
-        'rotation': {
-            'x': 0.0,
-            'y': 0.0,
-            'z': 0.0
-        }
-    }
-    obj = instantiate_object(object_def, object_location)
-    assert obj['materials'] == ['test_material']
-    assert obj['color'] == ['blue', 'yellow']
-    assert obj['goalString'] == 'huge massive blue yellow sofa'
-    assert obj['info'] == [
-        'huge', 'massive', 'blue', 'yellow', 'sofa', 'blue yellow',
-        'huge massive', 'huge blue yellow', 'huge sofa', 'massive blue yellow',
-        'massive sofa', 'blue yellow sofa', 'huge massive blue yellow sofa'
-    ]
-
-
-def test_instantiate_object_multiple_materials():
-    materials.TEST1_MATERIALS = [('test_material_1', ['blue'])]
-    materials.TEST2_MATERIALS = [('test_material_2', ['yellow'])]
-    object_def = {
-        'type': 'sofa_1',
-        'dimensions': {'x': 1, 'y': 0.5, 'z': 0.5},
-        'shape': 'sofa',
-        'size': 'huge',
-        'mass': 12.34,
-        'scale': {'x': 1, 'y': 1, 'z': 1},
-        'attributes': [],
-        'materialCategory': ['test1', 'test2']
-    }
-    object_location = {
-        'position': {
-            'x': 0.0,
-            'y': 0.0,
-            'z': 0.0
-        },
-        'rotation': {
-            'x': 0.0,
-            'y': 0.0,
-            'z': 0.0
-        }
-    }
-    obj = instantiate_object(object_def, object_location)
-    assert obj['materials'] == ['test_material_1', 'test_material_2']
-    assert obj['color'] == ['blue', 'yellow']
-    assert obj['goalString'] == 'huge massive blue yellow sofa'
-    assert obj['info'] == [
-        'huge', 'massive', 'blue', 'yellow', 'sofa', 'blue yellow',
-        'huge massive', 'huge blue yellow', 'huge sofa', 'massive blue yellow',
-        'massive sofa', 'blue yellow sofa', 'huge massive blue yellow sofa'
-    ]
-
-
 def test_instantiate_object_salient_materials():
-    object_def = {
-        'type': 'sofa_1',
-        'dimensions': {'x': 1, 'y': 0.5, 'z': 0.5},
-        'shape': 'sofa',
-        'size': 'huge',
-        'mass': 12.34,
-        'scale': {'x': 1, 'y': 1, 'z': 1},
-        'attributes': [],
-        'salientMaterials': ['fabric', 'wood']
-    }
+    object_def = ObjectDefinition(
+        color=['blue'],
+        materials=['blue_material'],
+        type='sofa_1',
+        mass=12.34,
+        salientMaterials=['fabric', 'wood'],
+        dimensions=Vector3d(**{'x': 1, 'y': 0.5, 'z': 0.5}),
+        shape=['sofa'],
+        size='huge',
+        scale=Vector3d(**{'x': 1, 'y': 1, 'z': 1}),
+        attributes=[]
+    )
     object_location = {
         'position': {
             'x': 0.0,
@@ -407,24 +234,28 @@ def test_instantiate_object_salient_materials():
     }
     obj = instantiate_object(object_def, object_location)
     assert obj['salientMaterials'] == ['fabric', 'wood']
-    assert obj['goalString'] == 'huge massive fabric wood sofa'
-    assert obj['info'] == [
-        'huge', 'massive', 'fabric', 'wood', 'sofa', 'fabric wood',
-        'huge massive', 'huge fabric wood', 'huge sofa', 'massive fabric wood',
-        'massive sofa', 'fabric wood sofa', 'huge massive fabric wood sofa'
+    assert obj['debug']['goalString'] == 'huge massive blue fabric wood sofa'
+    assert obj['debug']['info'] == [
+        'huge', 'massive', 'blue', 'fabric', 'wood', 'sofa', 'fabric wood',
+        'huge massive', 'huge fabric wood', 'huge blue', 'huge sofa',
+        'massive fabric wood', 'massive blue', 'massive sofa',
+        'fabric wood blue', 'fabric wood sofa', 'blue sofa',
+        'huge massive blue fabric wood sofa'
     ]
 
 
 def test_instantiate_object_size():
-    object_def = {
-        'type': 'sofa_1',
-        'dimensions': {'x': 1, 'y': 0.5, 'z': 0.5},
-        'shape': 'sofa',
-        'size': 'huge',
-        'mass': 12.34,
-        'scale': {'x': 1, 'y': 1, 'z': 1},
-        'attributes': [],
-    }
+    object_def = ObjectDefinition(
+        color=['blue'],
+        materials=['blue_material'],
+        type='sofa_1',
+        mass=12.34,
+        dimensions=Vector3d(**{'x': 1, 'y': 0.5, 'z': 0.5}),
+        shape=['sofa'],
+        size='huge',
+        scale=Vector3d(**{'x': 1, 'y': 1, 'z': 1}),
+        attributes=[]
+    )
     object_location = {
         'position': {
             'x': 0.0,
@@ -444,24 +275,24 @@ def test_instantiate_object_size():
     }
     for attribute in size_mapping:
         size = size_mapping[attribute]
-        object_def['attributes'] = [attribute]
+        object_def.attributes = [attribute]
         obj = instantiate_object(object_def, object_location)
-        assert size in obj['info']
+        assert size in obj['debug']['info']
 
 
 def test_instantiate_object_untrained_category():
-    materials.TEST_MATERIALS = [('test_material', ['blue', 'yellow'])]
-    object_def = {
-        'type': 'sofa_1',
-        'dimensions': {'x': 1, 'y': 0.5, 'z': 0.5},
-        'untrainedCategory': True,
-        'shape': 'sofa',
-        'size': 'huge',
-        'mass': 12.34,
-        'scale': 1.0,
-        'attributes': [],
-        'materialCategory': ['test']
-    }
+    object_def = ObjectDefinition(
+        color=['blue'],
+        materials=['blue_material'],
+        type='sofa_1',
+        mass=12.34,
+        dimensions=Vector3d(**{'x': 1, 'y': 0.5, 'z': 0.5}),
+        untrainedCategory=True,
+        shape=['sofa'],
+        size='huge',
+        scale=Vector3d(**{'x': 1, 'y': 1, 'z': 1}),
+        attributes=[]
+    )
     object_location = {
         'position': {
             'x': 0.0,
@@ -475,28 +306,28 @@ def test_instantiate_object_untrained_category():
         }
     }
     obj = instantiate_object(object_def, object_location)
-    assert obj['goalString'] == 'huge massive blue yellow sofa'
-    assert obj['info'] == [
-        'huge', 'massive', 'blue', 'yellow', 'sofa', 'blue yellow',
-        'huge massive', 'huge blue yellow', 'huge sofa', 'massive blue yellow',
-        'massive sofa', 'blue yellow sofa', 'huge massive blue yellow sofa',
-        'untrained category', 'untrained huge massive blue yellow sofa'
+    assert obj['debug']['goalString'] == 'huge massive blue sofa'
+    assert obj['debug']['info'] == [
+        'huge', 'massive', 'blue', 'sofa',
+        'huge massive', 'huge blue', 'huge sofa', 'massive blue',
+        'massive sofa', 'blue sofa', 'huge massive blue sofa',
+        'untrained category', 'untrained huge massive blue sofa'
     ]
 
 
 def test_instantiate_object_untrained_color():
-    materials.TEST_MATERIALS = [('test_material', ['blue', 'yellow'])]
-    object_def = {
-        'type': 'sofa_1',
-        'dimensions': {'x': 1, 'y': 0.5, 'z': 0.5},
-        'untrainedColor': True,
-        'shape': 'sofa',
-        'size': 'huge',
-        'mass': 12.34,
-        'scale': 1.0,
-        'attributes': [],
-        'materialCategory': ['test']
-    }
+    object_def = ObjectDefinition(
+        color=['blue'],
+        materials=['blue_material'],
+        type='sofa_1',
+        mass=12.34,
+        dimensions=Vector3d(**{'x': 1, 'y': 0.5, 'z': 0.5}),
+        untrainedColor=True,
+        shape=['sofa'],
+        size='huge',
+        scale=Vector3d(**{'x': 1, 'y': 1, 'z': 1}),
+        attributes=[]
+    )
     object_location = {
         'position': {
             'x': 0.0,
@@ -510,28 +341,28 @@ def test_instantiate_object_untrained_color():
         }
     }
     obj = instantiate_object(object_def, object_location)
-    assert obj['goalString'] == 'huge massive blue yellow sofa'
-    assert obj['info'] == [
-        'huge', 'massive', 'blue', 'yellow', 'sofa', 'blue yellow',
-        'huge massive', 'huge blue yellow', 'huge sofa', 'massive blue yellow',
-        'massive sofa', 'blue yellow sofa', 'huge massive blue yellow sofa',
-        'untrained color', 'untrained huge massive blue yellow sofa'
+    assert obj['debug']['goalString'] == 'huge massive blue sofa'
+    assert obj['debug']['info'] == [
+        'huge', 'massive', 'blue', 'sofa',
+        'huge massive', 'huge blue', 'huge sofa', 'massive blue',
+        'massive sofa', 'blue sofa', 'huge massive blue sofa',
+        'untrained color', 'untrained huge massive blue sofa'
     ]
 
 
 def test_instantiate_object_untrained_combination():
-    materials.TEST_MATERIALS = [('test_material', ['blue', 'yellow'])]
-    object_def = {
-        'type': 'sofa_1',
-        'dimensions': {'x': 1, 'y': 0.5, 'z': 0.5},
-        'untrainedCombination': True,
-        'shape': 'sofa',
-        'size': 'huge',
-        'mass': 12.34,
-        'scale': 1.0,
-        'attributes': [],
-        'materialCategory': ['test']
-    }
+    object_def = ObjectDefinition(
+        color=['blue'],
+        materials=['blue_material'],
+        type='sofa_1',
+        mass=12.34,
+        dimensions=Vector3d(**{'x': 1, 'y': 0.5, 'z': 0.5}),
+        untrainedCombination=True,
+        shape=['sofa'],
+        size='huge',
+        scale=Vector3d(**{'x': 1, 'y': 1, 'z': 1}),
+        attributes=[]
+    )
     object_location = {
         'position': {
             'x': 0.0,
@@ -545,28 +376,28 @@ def test_instantiate_object_untrained_combination():
         }
     }
     obj = instantiate_object(object_def, object_location)
-    assert obj['goalString'] == 'huge massive blue yellow sofa'
-    assert obj['info'] == [
-        'huge', 'massive', 'blue', 'yellow', 'sofa', 'blue yellow',
-        'huge massive', 'huge blue yellow', 'huge sofa', 'massive blue yellow',
-        'massive sofa', 'blue yellow sofa', 'huge massive blue yellow sofa',
-        'untrained combination', 'untrained huge massive blue yellow sofa'
+    assert obj['debug']['goalString'] == 'huge massive blue sofa'
+    assert obj['debug']['info'] == [
+        'huge', 'massive', 'blue', 'sofa',
+        'huge massive', 'huge blue', 'huge sofa', 'massive blue',
+        'massive sofa', 'blue sofa', 'huge massive blue sofa',
+        'untrained combination', 'untrained huge massive blue sofa'
     ]
 
 
 def test_instantiate_object_untrained_shape():
-    materials.TEST_MATERIALS = [('test_material', ['blue', 'yellow'])]
-    object_def = {
-        'type': 'sofa_1',
-        'dimensions': {'x': 1, 'y': 0.5, 'z': 0.5},
-        'untrainedShape': True,
-        'shape': 'sofa',
-        'size': 'huge',
-        'mass': 12.34,
-        'scale': 1.0,
-        'attributes': [],
-        'materialCategory': ['test']
-    }
+    object_def = ObjectDefinition(
+        color=['blue'],
+        materials=['blue_material'],
+        type='sofa_1',
+        mass=12.34,
+        dimensions=Vector3d(**{'x': 1, 'y': 0.5, 'z': 0.5}),
+        untrainedShape=True,
+        shape=['sofa'],
+        size='huge',
+        scale=Vector3d(**{'x': 1, 'y': 1, 'z': 1}),
+        attributes=[]
+    )
     object_location = {
         'position': {
             'x': 0.0,
@@ -580,28 +411,28 @@ def test_instantiate_object_untrained_shape():
         }
     }
     obj = instantiate_object(object_def, object_location)
-    assert obj['goalString'] == 'huge massive blue yellow sofa'
-    assert obj['info'] == [
-        'huge', 'massive', 'blue', 'yellow', 'sofa', 'blue yellow',
-        'huge massive', 'huge blue yellow', 'huge sofa', 'massive blue yellow',
-        'massive sofa', 'blue yellow sofa', 'huge massive blue yellow sofa',
-        'untrained shape', 'untrained huge massive blue yellow sofa'
+    assert obj['debug']['goalString'] == 'huge massive blue sofa'
+    assert obj['debug']['info'] == [
+        'huge', 'massive', 'blue', 'sofa',
+        'huge massive', 'huge blue', 'huge sofa', 'massive blue',
+        'massive sofa', 'blue sofa', 'huge massive blue sofa',
+        'untrained shape', 'untrained huge massive blue sofa'
     ]
 
 
 def test_instantiate_object_untrained_size():
-    materials.TEST_MATERIALS = [('test_material', ['blue', 'yellow'])]
-    object_def = {
-        'type': 'sofa_1',
-        'dimensions': {'x': 1, 'y': 0.5, 'z': 0.5},
-        'untrainedSize': True,
-        'shape': 'sofa',
-        'size': 'huge',
-        'mass': 12.34,
-        'scale': 1.0,
-        'attributes': [],
-        'materialCategory': ['test']
-    }
+    object_def = ObjectDefinition(
+        color=['blue'],
+        materials=['blue_material'],
+        type='sofa_1',
+        mass=12.34,
+        dimensions=Vector3d(**{'x': 1, 'y': 0.5, 'z': 0.5}),
+        untrainedSize=True,
+        shape=['sofa'],
+        size='huge',
+        scale=Vector3d(**{'x': 1, 'y': 1, 'z': 1}),
+        attributes=[]
+    )
     object_location = {
         'position': {
             'x': 0.0,
@@ -615,17 +446,61 @@ def test_instantiate_object_untrained_size():
         }
     }
     obj = instantiate_object(object_def, object_location)
-    assert obj['goalString'] == 'huge massive blue yellow sofa'
-    assert obj['info'] == [
-        'huge', 'massive', 'blue', 'yellow', 'sofa', 'blue yellow',
-        'huge massive', 'huge blue yellow', 'huge sofa', 'massive blue yellow',
-        'massive sofa', 'blue yellow sofa', 'huge massive blue yellow sofa',
-        'untrained size', 'untrained huge massive blue yellow sofa'
+    assert obj['debug']['goalString'] == 'huge massive blue sofa'
+    assert obj['debug']['info'] == [
+        'huge', 'massive', 'blue', 'sofa',
+        'huge massive', 'huge blue', 'huge sofa', 'massive blue',
+        'massive sofa', 'blue sofa', 'huge massive blue sofa',
+        'untrained size', 'untrained huge massive blue sofa'
     ]
+
+
+def test_instantiate_soccer_ball():
+    definition = base_objects.create_soccer_ball()
+    location = {
+        'position': {
+            'x': 0.0,
+            'y': 0.0,
+            'z': 0.0
+        },
+        'rotation': {
+            'x': 0.0,
+            'y': 0.0,
+            'z': 0.0
+        }
+    }
+    instance = instantiate_object(definition, location)
+    assert instance
+    assert instance['type'] == 'soccer_ball'
+    assert instance['mass'] == 1
+    assert instance['debug']['dimensions'] == vars(definition.dimensions)
+    assert instance['debug']['goalString'] == (
+        'tiny light black white rubber ball'
+    )
+    assert instance['debug']['info'] == [
+        'tiny', 'light', 'black', 'white', 'rubber', 'ball', 'black white',
+        'tiny light', 'tiny rubber', 'tiny black white', 'tiny ball',
+        'light rubber', 'light black white', 'light ball',
+        'rubber black white', 'rubber ball', 'black white ball',
+        'tiny light black white rubber ball'
+    ]
+    assert instance['debug']['untrainedCategory'] is False
+    assert instance['debug']['untrainedColor'] is False
+    assert instance['debug']['untrainedCombination'] is False
+    assert instance['debug']['untrainedShape'] is False
+    assert instance['debug']['untrainedSize'] is False
+    assert instance['debug']['shape'] == ['ball']
+    assert instance['debug']['size'] == 'tiny'
+    assert instance['debug']['weight'] == 'light'
+    assert instance['shows'][0]['stepBegin'] == 0
+    assert instance['shows'][0]['position'] == location['position']
+    assert instance['shows'][0]['rotation'] == location['rotation']
+    assert instance['shows'][0]['scale'] == vars(definition.scale)
 
 
 def test_move_to_location():
     instance = {
+        'debug': {},
         'shows': [
             {
                 'position': {'x': -1, 'y': 0, 'z': -1},
@@ -640,7 +515,7 @@ def test_move_to_location():
             'x': 2, 'y': 0, 'z': 2}, 'rotation': {
             'x': 0, 'y': 0, 'z': 0}}
 
-    actual = move_to_location(instance, location, bounds, {})
+    actual = move_to_location(instance, location, bounds, None)
     assert actual == instance
     assert instance['shows'][0]['position'] == {'x': 2, 'y': 0, 'z': 2}
     assert instance['shows'][0]['rotation'] == {'x': 0, 'y': 0, 'z': 0}
@@ -651,7 +526,7 @@ def test_move_to_location():
         {'x': 1, 'z': 3}
     ]
 
-    previous = {'offset': {'x': 0.2, 'z': -0.4}}
+    previous = ObjectDefinition(offset=Vector3d(**{'x': 0.2, 'z': -0.4}))
 
     actual = move_to_location(instance, location, bounds, previous)
     assert actual == instance
@@ -664,9 +539,9 @@ def test_move_to_location():
         {'x': 1, 'z': 3}
     ]
 
-    instance['offset'] = {'x': 0.1, 'z': -0.5}
+    instance['debug']['offset'] = {'x': 0.1, 'z': -0.5}
 
-    actual = move_to_location(instance, location, bounds, {})
+    actual = move_to_location(instance, location, bounds, None)
     assert actual == instance
     assert instance['shows'][0]['position'] == {'x': 1.9, 'y': 0, 'z': 2.5}
     assert instance['shows'][0]['rotation'] == {'x': 0, 'y': 0, 'z': 0}
@@ -689,538 +564,13 @@ def test_move_to_location():
     ]
 
 
-def test_retrieve_complete_definition_list():
-    list_1 = [{'type': 'ball', 'mass': 1}]
-    actual_1 = retrieve_complete_definition_list([list_1])[0]
-    assert len(actual_1) == 1
-
-    list_2 = [{'type': 'ball', 'chooseSize': [{'mass': 1}, {'mass': 2}]}]
-    actual_2 = retrieve_complete_definition_list([list_2])[0]
-    assert len(actual_2) == 2
-
-    list_3 = [
-        {'type': 'sofa'},
-        {'type': 'ball', 'chooseSize': [{'mass': 1}, {'mass': 2}]}
-    ]
-    actual_3 = retrieve_complete_definition_list([list_3])[0]
-    assert len(actual_3) == 3
-
-    list_4 = [
-        {'type': 'sofa', 'chooseSize': [{'mass': 1}, {'mass': 3}]},
-        {'type': 'ball', 'chooseSize': [{'mass': 1}, {'mass': 2}]}
-    ]
-    actual_4 = retrieve_complete_definition_list([list_4])[0]
-    assert len(actual_4) == 4
-
-    list_5 = [{'chooseType': [{'type': 'sphere'}, {'type': 'cube'}]}]
-    actual_5 = retrieve_complete_definition_list([list_5])[0]
-    assert len(actual_5) == 2
-
-    list_6 = [
-        {'type': 'sofa'},
-        {'chooseType': [{'type': 'sphere'}, {'type': 'cube'}]}
-    ]
-    actual_6 = retrieve_complete_definition_list([list_6])[0]
-    assert len(actual_6) == 3
-
-    list_7 = [
-        {'chooseType': [{'type': 'ball'}, {'type': 'sofa'}]},
-        {'chooseType': [{'type': 'sphere'}, {'type': 'cube'}]}
-    ]
-    actual_7 = retrieve_complete_definition_list([list_7])[0]
-    assert len(actual_7) == 4
-
-    list_8 = [{
-        'chooseMaterial': [
-            {'materialCategory': ['metal']},
-            {'materialCategory': ['plastic']}
-        ],
-        'chooseSize': [{'mass': 1}, {'mass': 2}],
-        'chooseType': [{'type': 'ball'}, {'type': 'sofa'}]
-    }]
-    actual_8 = retrieve_complete_definition_list([list_8])[0]
-    assert len(actual_8) == 8
-
-
-def test_retrieve_complete_definition_list_nested_list():
-    list_1 = [
-        [{'chooseType': [{'type': 'ball'}, {'type': 'sofa'}]}],
-        [{'chooseType': [{'type': 'sphere'}, {'type': 'cube'}]}]
-    ]
-    actual_1 = retrieve_complete_definition_list(list_1)
-    assert len(actual_1) == 2
-    assert len(actual_1[0]) == 2
-    assert len(actual_1[1]) == 2
-
-    type_list_a = [item['type'] for item in actual_1[0]]
-    type_list_b = [item['type'] for item in actual_1[1]]
-    assert (
-        (
-            'ball' in type_list_a and 'sofa' in type_list_a and
-            'sphere' in type_list_b and 'cube' in type_list_b
-        ) or (
-            'ball' in type_list_b and 'sofa' in type_list_b and
-            'sphere' in type_list_a and 'cube' in type_list_a
-        )
-    )
-
-
-def test_retrieve_complete_definition_list_choose_material():
-    definition_list = [{
-        'type': 'metal_thing',
-        'chooseMaterial': [{'materialCategory': ['metal']}]
-    }, {
-        'type': 'plastic_thing',
-        'chooseMaterial': [{'materialCategory': ['plastic']}]
-    }, {
-        'type': 'rubber_thing',
-        'chooseMaterial': [{'materialCategory': ['rubber']}]
-    }, {
-        'type': 'wood_thing',
-        'chooseMaterial': [{'materialCategory': ['wood']}]
-    }, {
-        'type': 'other_thing',
-        'chooseMaterial': [
-            {'materialCategory': ['metal']},
-            {'materialCategory': ['plastic']},
-            {'materialCategory': ['rubber']},
-            {'materialCategory': ['wood']}
-        ]
-    }]
-
-    actual_1 = retrieve_complete_definition_list([definition_list])[0]
-    assert len(actual_1) == 8
-
-    metal = [item for item in actual_1 if item['type'] == 'metal_thing']
-    assert len(metal) == 1
-    assert metal[0]['materialCategory'] == ['metal']
-    assert 'materials' not in metal[0]
-
-    plastic = [item for item in actual_1 if item['type'] == 'plastic_thing']
-    assert len(plastic) == 1
-    assert plastic[0]['materialCategory'] == ['plastic']
-    assert 'materials' not in plastic[0]
-
-    rubber = [item for item in actual_1 if item['type'] == 'rubber_thing']
-    assert len(rubber) == 1
-    assert rubber[0]['materialCategory'] == ['rubber']
-    assert 'materials' not in rubber[0]
-
-    wood = [item for item in actual_1 if item['type'] == 'wood_thing']
-    assert len(wood) == 1
-    assert wood[0]['materialCategory'] == ['wood']
-    assert 'materials' not in wood[0]
-
-    other_material_list = ['metal', 'plastic', 'rubber', 'wood']
-
-    other = [item for item in actual_1 if item['type'] == 'other_thing']
-    assert len(other) == 4
-
-    assert other[0]['materialCategory'][0] in other_material_list
-    other_material_list.remove(other[0]['materialCategory'][0])
-    assert 'materials' not in other[0]
-
-    assert other[1]['materialCategory'][0] in other_material_list
-    other_material_list.remove(other[1]['materialCategory'][0])
-    assert 'materials' not in other[1]
-
-    assert other[2]['materialCategory'][0] in other_material_list
-    other_material_list.remove(other[2]['materialCategory'][0])
-    assert 'materials' not in other[2]
-
-    assert other[3]['materialCategory'][0] in other_material_list
-    other_material_list.remove(other[3]['materialCategory'][0])
-    assert 'materials' not in other[3]
-
-
-def test_retrieve_trained_definition_list():
-    definition_list = [{
-        'type': 'a'
-    }, {
-        'type': 'b',
-        'untrainedCategory': True
-    }, {
-        'type': 'c',
-        'untrainedColor': True
-    }, {
-        'type': 'd',
-        'untrainedCombination': True
-    }, {
-        'type': 'e',
-        'untrainedShape': True
-    }, {
-        'type': 'f',
-        'untrainedSize': True
-    }, {
-        'type': 'g',
-        'untrainedCategory': True,
-        'untrainedColor': True,
-        'untrainedCombination': True,
-        'untrainedShape': True,
-        'untrainedSize': True
-    }, {
-        'type': 'h'
-    }]
-
-    actual_1 = retrieve_trained_definition_list([definition_list])[0]
-    assert len(actual_1) == 2
-    assert actual_1[0]['type'] == 'a'
-    assert actual_1[1]['type'] == 'h'
-
-
-def test_retrieve_untrained_definition_list():
-    definition_list = [{
-        'type': 'a'
-    }, {
-        'type': 'b',
-        'untrainedCategory': True
-    }, {
-        'type': 'c',
-        'untrainedColor': True
-    }, {
-        'type': 'd',
-        'untrainedCombination': True
-    }, {
-        'type': 'e',
-        'untrainedShape': True
-    }, {
-        'type': 'f',
-        'untrainedSize': True
-    }, {
-        'type': 'g',
-        'untrainedCategory': True,
-        'untrainedColor': True,
-        'untrainedCombination': True,
-        'untrainedShape': True,
-        'untrainedSize': True
-    }, {
-        'type': 'h'
-    }]
-
-    actual_1 = retrieve_untrained_definition_list([definition_list],
-                                                  'untrainedCategory')[0]
-    assert len(actual_1) == 1
-    assert actual_1[0]['type'] == 'b'
-
-    actual_2 = retrieve_untrained_definition_list([definition_list],
-                                                  'untrainedSize')[0]
-    assert len(actual_2) == 1
-    assert actual_2[0]['type'] == 'f'
-
-
-def test_retrieve_trained_definition_list_all_objects():
-    assert len(retrieve_trained_definition_list(objects.get(
-        objects.ObjectDefinitionList.ALL)
-    )) > 0
-
-
-def test_retrieve_trained_definition_list_container_objects():
-    assert len(retrieve_trained_definition_list(objects.get(
-        objects.ObjectDefinitionList.CONTAINERS)
-    )) > 0
-
-
-def test_retrieve_trained_definition_list_obstacle_objects():
-    assert len(retrieve_trained_definition_list(
-        objects.get(objects.ObjectDefinitionList.OBSTACLES)
-    )) > 0
-
-
-def test_retrieve_trained_definition_list_occluder_objects():
-    assert len(retrieve_trained_definition_list(
-        objects.get(objects.ObjectDefinitionList.OCCLUDERS)
-    )) > 0
-
-
-def test_retrieve_untrained_definition_list_all_objects():
-    assert len(retrieve_untrained_definition_list(
-        objects.get(objects.ObjectDefinitionList.ALL),
-        'untrainedShape'
-    )) > 0
-
-
-def test_retrieve_untrained_definition_list_container_objects():
-    assert len(retrieve_untrained_definition_list(
-        objects.get(objects.ObjectDefinitionList.CONTAINERS),
-        'untrainedShape'
-    )) > 0
-
-
-def test_retrieve_untrained_definition_list_obstacle_objects():
-    assert len(retrieve_untrained_definition_list(
-        objects.get(objects.ObjectDefinitionList.OBSTACLES),
-        'untrainedShape'
-    )) > 0
-
-
-def test_retrieve_untrained_definition_list_occluder_objects():
-    assert len(retrieve_untrained_definition_list(
-        objects.get(objects.ObjectDefinitionList.OCCLUDERS),
-        'untrainedShape'
-    )) > 0
-
-
-def test_is_similar_except_in_color():
-    definition_1 = {
-        'type': 'a',
-        'color': ['x'],
-        'materials': ['x'],
-        'dimensions': {'x': 1, 'y': 1, 'z': 1}
-    }
-    definition_2 = {
-        'type': 'a',
-        'color': ['y'],
-        'materials': ['y'],
-        'dimensions': {'x': 1, 'y': 1, 'z': 1}
-    }
-    definition_3 = {
-        'type': 'a',
-        'color': ['x', 'y'],
-        'materials': ['x', 'y'],
-        'dimensions': {'x': 1, 'y': 1, 'z': 1}
-    }
-    definition_4 = {
-        'type': 'b',
-        'color': ['y'],
-        'materials': ['y'],
-        'dimensions': {'x': 1, 'y': 1, 'z': 1}
-    }
-    definition_5 = {
-        'type': 'a',
-        'color': ['y'],
-        'materials': ['y'],
-        'dimensions': {'x': 2, 'y': 1, 'z': 1}
-    }
-    definition_6 = {
-        'type': 'a',
-        'color': ['y'],
-        'materials': ['y'],
-        'dimensions': {'x': 0.5, 'y': 1, 'z': 1}
-    }
-    definition_7 = {
-        'type': 'a',
-        'color': ['y'],
-        'materials': ['y'],
-        'dimensions': {'x': 1.05, 'y': 1, 'z': 1}
-    }
-    definition_8 = {
-        'type': 'a',
-        'color': ['y'],
-        'materials': ['y'],
-        'dimensions': {'x': 0.95, 'y': 1, 'z': 1}
-    }
-    assert is_similar_except_in_color(definition_1, definition_2)
-    assert is_similar_except_in_color(definition_1, definition_3)
-    assert not is_similar_except_in_color(definition_1, definition_4)
-    assert not is_similar_except_in_color(definition_1, definition_5)
-    assert not is_similar_except_in_color(definition_1, definition_6)
-    assert is_similar_except_in_color(definition_1, definition_7)
-    assert is_similar_except_in_color(definition_1, definition_8)
-
-
-def test_is_similar_except_in_shape():
-    definition_1 = {
-        'type': 'a',
-        'materials': ['x'],
-        'dimensions': {'x': 1, 'y': 1, 'z': 1}
-    }
-    definition_2 = {
-        'type': 'b',
-        'materials': ['x'],
-        'dimensions': {'x': 1, 'y': 1, 'z': 1}
-    }
-    definition_3 = {
-        'type': 'b',
-        'materials': ['y'],
-        'dimensions': {'x': 1, 'y': 1, 'z': 1}
-    }
-    definition_4 = {
-        'type': 'b',
-        'materials': ['x', 'y'],
-        'dimensions': {'x': 1, 'y': 1, 'z': 1}
-    }
-    definition_5 = {
-        'type': 'b',
-        'materials': ['x'],
-        'dimensions': {'x': 2, 'y': 1, 'z': 1}
-    }
-    definition_6 = {
-        'type': 'b',
-        'materials': ['x'],
-        'dimensions': {'x': 0.5, 'y': 1, 'z': 1}
-    }
-    definition_7 = {
-        'type': 'b',
-        'materials': ['x'],
-        'dimensions': {'x': 1.05, 'y': 1, 'z': 1}
-    }
-    definition_8 = {
-        'type': 'b',
-        'materials': ['x'],
-        'dimensions': {'x': 0.95, 'y': 1, 'z': 1}
-    }
-    assert is_similar_except_in_shape(definition_1, definition_2)
-    assert not is_similar_except_in_shape(definition_1, definition_3)
-    assert not is_similar_except_in_shape(definition_1, definition_4)
-    assert not is_similar_except_in_shape(definition_1, definition_5)
-    assert not is_similar_except_in_shape(definition_1, definition_6)
-    assert is_similar_except_in_shape(definition_1, definition_7)
-    assert is_similar_except_in_shape(definition_1, definition_8)
-
-
-def test_is_similar_except_in_size():
-    definition_1 = {
-        'type': 'a',
-        'materials': ['x'],
-        'dimensions': {'x': 1, 'y': 1, 'z': 1}
-    }
-    definition_2 = {
-        'type': 'b',
-        'materials': ['x'],
-        'dimensions': {'x': 1, 'y': 1, 'z': 1}
-    }
-    definition_3 = {
-        'type': 'a',
-        'materials': ['y'],
-        'dimensions': {'x': 1, 'y': 1, 'z': 1}
-    }
-    definition_4 = {
-        'type': 'a',
-        'materials': ['x', 'y'],
-        'dimensions': {'x': 1, 'y': 1, 'z': 1}
-    }
-    definition_5 = {
-        'type': 'a',
-        'materials': ['x'],
-        'dimensions': {'x': 2, 'y': 1, 'z': 1}
-    }
-    definition_6 = {
-        'type': 'a',
-        'materials': ['x'],
-        'dimensions': {'x': 0.5, 'y': 1, 'z': 1}
-    }
-    definition_7 = {
-        'type': 'a',
-        'materials': ['x'],
-        'dimensions': {'x': 1.05, 'y': 1, 'z': 1}
-    }
-    definition_8 = {
-        'type': 'a',
-        'materials': ['x'],
-        'dimensions': {'x': 0.95, 'y': 1, 'z': 1}
-    }
-    assert not is_similar_except_in_size(definition_1, definition_2)
-    assert not is_similar_except_in_size(definition_1, definition_3)
-    assert not is_similar_except_in_size(definition_1, definition_4)
-    assert is_similar_except_in_size(definition_1, definition_5)
-    assert is_similar_except_in_size(definition_1, definition_6)
-    assert not is_similar_except_in_size(definition_1, definition_7)
-    assert not is_similar_except_in_size(definition_1, definition_8)
-
-
-@pytest.mark.skip(reason="Taking a long time")
-def test_is_similar_except_in_color_all_objects():
-    for definition_1 in ALL_DEFINITIONS:
-        for definition_2 in ALL_DEFINITIONS:
-            if definition_1 != definition_2:
-                x_size_1 = definition_1['dimensions']['x']
-                x_size_2 = definition_2['dimensions']['x']
-                y_size_1 = definition_1['dimensions']['y']
-                y_size_2 = definition_2['dimensions']['y']
-                z_size_1 = definition_1['dimensions']['z']
-                z_size_2 = definition_2['dimensions']['z']
-                expected = (
-                    definition_1['type'] == definition_2['type'] and
-                    not are_materials_equivalent(
-                        definition_1.get('materials', []),
-                        definition_2.get('materials', [])
-                    ) and
-                    definition_1['color'] != definition_2['color'] and
-                    (x_size_1 + 0.05) >= x_size_2 and
-                    (x_size_1 - 0.05) <= x_size_2 and
-                    (y_size_1 + 0.05) >= y_size_2 and
-                    (y_size_1 - 0.05) <= y_size_2 and
-                    (z_size_1 + 0.05) >= z_size_2 and
-                    (z_size_1 - 0.05) <= z_size_2
-                )
-                actual = is_similar_except_in_color(definition_1, definition_2)
-                if actual != expected:
-                    print(f'ONE={definition_1}')
-                    print(f'TWO={definition_2}')
-                assert actual == expected
-
-
-@pytest.mark.skip(reason="Taking a long time")
-def test_is_similar_except_in_shape_all_objects():
-    for definition_1 in ALL_DEFINITIONS:
-        for definition_2 in ALL_DEFINITIONS:
-            if definition_1 != definition_2:
-                x_size_1 = definition_1['dimensions']['x']
-                x_size_2 = definition_2['dimensions']['x']
-                y_size_1 = definition_1['dimensions']['y']
-                y_size_2 = definition_2['dimensions']['y']
-                z_size_1 = definition_1['dimensions']['z']
-                z_size_2 = definition_2['dimensions']['z']
-                expected = (
-                    definition_1['type'] != definition_2['type'] and
-                    are_materials_equivalent(
-                        definition_1.get('materials', []),
-                        definition_2.get('materials', [])
-                    ) and
-                    (x_size_1 + 0.05) >= x_size_2 and
-                    (x_size_1 - 0.05) <= x_size_2 and
-                    (y_size_1 + 0.05) >= y_size_2 and
-                    (y_size_1 - 0.05) <= y_size_2 and
-                    (z_size_1 + 0.05) >= z_size_2 and
-                    (z_size_1 - 0.05) <= z_size_2
-                )
-                actual = is_similar_except_in_shape(definition_1, definition_2)
-                if actual != expected:
-                    print(f'ONE={definition_1}')
-                    print(f'TWO={definition_2}')
-                assert actual == expected
-
-
-@pytest.mark.skip(reason="Taking a long time")
-def test_is_similar_except_in_size_all_objects():
-    for definition_1 in ALL_DEFINITIONS:
-        for definition_2 in ALL_DEFINITIONS:
-            if definition_1 != definition_2:
-                x_size_1 = definition_1['dimensions']['x']
-                x_size_2 = definition_2['dimensions']['x']
-                y_size_1 = definition_1['dimensions']['y']
-                y_size_2 = definition_2['dimensions']['y']
-                z_size_1 = definition_1['dimensions']['z']
-                z_size_2 = definition_2['dimensions']['z']
-                expected = (
-                    definition_1['type'] == definition_2['type'] and
-                    are_materials_equivalent(
-                        definition_1.get('materials', []),
-                        definition_2.get('materials', [])
-                    ) and
-                    (
-                        (x_size_1 + 0.05) < x_size_2 or
-                        (x_size_1 - 0.05) > x_size_2 or
-                        (y_size_1 + 0.05) < y_size_2 or
-                        (y_size_1 - 0.05) > y_size_2 or
-                        (z_size_1 + 0.05) < z_size_2 or
-                        (z_size_1 - 0.05) > z_size_2
-                    )
-                )
-                actual = is_similar_except_in_size(definition_1, definition_2)
-                if actual != expected:
-                    print(f'ONE={definition_1}')
-                    print(f'TWO={definition_2}')
-                assert actual == expected
-
-
-def test_similarity_pacifier():
-    # Not similar because materialCategory is not defined.
-    assert not is_similar_except_in_color(PACIFIER, PACIFIER)
-    assert not is_similar_except_in_shape(PACIFIER, PACIFIER)
-    assert not is_similar_except_in_size(PACIFIER, PACIFIER)
-
-
 def test_choose_distractor_definition():
-    for definition in DEFINITIONS:
-        assert choose_distractor_definition([definition])
+    assert len(DATASET._definition_groups)
+    for definition_selections in DATASET._definition_groups:
+        assert len(definition_selections)
+        for definition_variations in definition_selections:
+            assert len(definition_variations)
+            # Just test the first element since testing the full list will take
+            # a long time and each variation here is simply a different color.
+            definition = definition_variations[0]
+            assert choose_distractor_definition([definition.shape])

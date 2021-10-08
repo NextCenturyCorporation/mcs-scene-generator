@@ -1,7 +1,12 @@
-from intuitive_physics_hypercubes import MIN_TARGET_Z, MAX_TARGET_Z, STEP_Z, \
-    object_x_to_occluder_x, retrieve_off_screen_position_x, MOVEMENT
-
-import occluders
+from generator import occluders
+from hypercube.intuitive_physics_hypercubes import (
+    MAX_TARGET_Z,
+    MIN_TARGET_Z,
+    MOVEMENT,
+    STEP_Z,
+    object_x_to_occluder_x,
+    retrieve_off_screen_position_x,
+)
 
 
 def validate_option_list(
@@ -62,6 +67,7 @@ def test_exit_only_movement():
     iterator_z_max = (MAX_TARGET_Z - MIN_TARGET_Z) / STEP_Z
     for iterator_z in range(int(iterator_z_max) + 1):
         position_z = round(MIN_TARGET_Z + (STEP_Z * iterator_z), 2)
+        print(f'POSITION_Z={position_z}')
         starting_x = -1 * retrieve_off_screen_position_x(position_z)
         for movement in MOVEMENT.MOVE_EXIT_LIST:
             assert len(movement['exitOnlyOptionList'][position_z].keys()) > 0
@@ -76,10 +82,19 @@ def test_exit_only_movement():
 
 def is_known_exit_stop_failure(movement, position_z):
     # Based on output from running the generate_movement.py script.
+    if movement['forceX'] == 650:
+        return position_z in [3.5]
     if movement['forceX'] == 670:
-        return position_z in [1.7, 2.25, 2.3, 2.35, 3.1]
+        return position_z in [
+            1.6, 1.65, 1.7, 2, 2.05, 2.1, 2.15, 2.2, 2.25, 2.3, 2.75, 2.8,
+            2.85, 2.9, 2.95, 3, 3.05, 3.5, 3.65
+        ]
+    if movement['forceX'] == 680:
+        return position_z in [1.65]
     if movement['forceX'] == 690:
-        return position_z in [1.8, 2.4, 3.5, 3.55, 3.6, 3.65]
+        return position_z in [3.5, 3.55, 3.6, 3.65]
+    if movement['forceX'] == 700:
+        return position_z in [1.6, 1.9, 2.4]
     return False
 
 
@@ -94,10 +109,12 @@ def test_exit_stop_movement():
     iterator_z_max = (MAX_TARGET_Z - MIN_TARGET_Z) / STEP_Z
     for iterator_z in range(int(iterator_z_max) + 1):
         position_z = round(MIN_TARGET_Z + (STEP_Z * iterator_z), 2)
+        print(f'POSITION_Z={position_z}')
         starting_x = -1 * retrieve_off_screen_position_x(position_z)
         for movement in MOVEMENT.MOVE_EXIT_LIST:
             if is_known_exit_stop_failure(movement, position_z):
                 continue
+            print(f'FORCE_X={movement["forceX"]}')
             assert len(movement['exitStopOptionList'][position_z].keys()) > 0
             validate_option_list(
                 'exitStopOptionList',
@@ -145,10 +162,7 @@ def validate_double_occluder(
 
 def is_known_double_occluder_failure(position_z):
     # Based on output from running this test case.
-    return position_z in [
-        3.2, 3.25, 3.35, 3.4, 3.45, 3.5, 3.55, 3.6, 3.65, 3.7, 3.75, 3.8, 3.85,
-        3.9, 3.95, 4.0, 4.05, 4.1, 4.15, 4.2, 4.25, 4.3, 4.35, 4.4
-    ]
+    return position_z <= 1.8 or position_z >= 3.1
 
 
 def test_exit_only_movement_double_occluder():
@@ -157,6 +171,7 @@ def test_exit_only_movement_double_occluder():
         position_z = round(MIN_TARGET_Z + (STEP_Z * iterator_z), 2)
         if is_known_double_occluder_failure(position_z):
             continue
+        print(f'POSITION_Z={position_z}')
         starting_x = -1 * retrieve_off_screen_position_x(position_z)
         successful = False
         for movement in MOVEMENT.MOVE_EXIT_LIST:

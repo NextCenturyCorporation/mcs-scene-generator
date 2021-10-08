@@ -1,0 +1,201 @@
+ceiling_material: "Custom/Materials/GreyDrywallMCS"
+floor_material: "Custom/Materials/GreyCarpetMCS"
+floor_physics:
+    enable: false
+    angularDrag: 0.5
+    bounciness: 0
+    drag: 0
+    dynamicFriction: 0.6
+    staticFriction: 0.6
+goal:
+    category: retrieval
+    target:
+        shape: soccer_ball
+keyword_objects:
+  -
+    keyword: confusors
+    num: 1
+  -
+    keyword: containers
+    num:
+      min: 0
+      max: 3
+  -
+    keyword: containers_can_contain_target
+    num: 1
+    keyword_location:
+      keyword: front
+  -
+    keyword: containers_cannot_contain_target
+    num: 1
+  -
+    keyword: obstacles
+    num: [2, 4]
+    keyword_location:
+      keyword: adjacent
+      relative_object_label: other_object
+  -
+    keyword: occluders
+    num: 1
+  -
+    keyword: context
+    num: 20
+last_step: 1000
+num_random_interactable_objects:
+    min: 1
+    max: 10
+performer_start_position:
+    x:
+        - -1
+        - -0.5
+        - 0
+        - 0.5
+        - 1
+    y: 0
+    z:
+        min: -1
+        max: 1
+performer_start_rotation:
+    x: 0
+    y:
+        - 0
+        - 90
+        - 180
+        - 270
+random_structural_objects:
+  - type: ['walls','platforms','ramps','l_occluders']
+    num:
+        min: 0
+        max: 2
+  - type: ['walls','l_occluders']
+    num: [3, 5, 7]
+  - type: 'walls'
+    num: 2
+room_dimensions:
+    x: 10
+    y:
+        - 3
+        - 4
+        - 5
+        - 6
+    z:
+        min: 5
+        max: 10
+room_shape: square
+specific_interactable_objects:
+  -
+    num: 1
+    material: ["WOOD_MATERIALS", "PLASTIC_MATERIALS"]
+    scale: 1.2
+    shape: "table_2"
+    position:
+      x: 3
+      z: 3
+  -
+    num:
+      min: 10
+      max: 30
+    material:
+      - "WOOD_MATERIALS"
+      - "PLASTIC_MATERIALS"
+      - "AI2-THOR/Materials/Metals/Brass 1"
+    scale:
+      min: 0.8
+      max: 1.4
+    shape:
+      - "car_1"
+      - "racecar_red"
+      - "crayon_blue"
+    position:
+      x:
+        min: -4
+        max: 1
+      z:
+        min: -4
+        max: 1
+structural_l_occluders:
+    num: 2
+    position:
+      x: 1
+      y: 0
+      z: 2
+    rotation_y: 30
+    material: 'AI2-THOR/Materials/Metals/Brass 1'
+    scale_front_x: 0.3
+    scale_front_z: [0.4, 0.5, 0.6]
+    scale_side_x:
+      min: 0.1
+      max: 2.1
+    scale_side_z: 0.6
+    scale_y: 0.7
+structural_platforms:
+    num: [1, 2, 4]
+    position:
+      x: 1
+      y: 0
+      z: 2
+    rotation_y: 30
+    material: 'PLASTIC_MATERIALS'
+    scale:
+      x: 1.1
+      y: [0.5, 1]
+      z:
+        min: 0.3
+        max: 1.3
+structural_ramps:
+    num:
+      min: 0
+      max: 3
+    position:
+      x: 1
+      y: 0
+      z: 2
+    rotation_y: 30
+    material: 'AI2-THOR/Materials/Metals/Brass 1'
+    angle: 30
+    width: 0.4
+    length: 0.5
+structural_walls:
+    num:
+      min: 1
+      max: 3
+    position:
+      x: 1
+      y: 0
+      z: 2
+    rotation_y: 30
+    material: 'PLASTIC_MATERIALS'
+    width: .5
+    height: .3
+passive_scene: false
+freezes:
+  -
+    begin: 1
+    end: 3
+  -
+    begin: [11, 13 ,15]
+    end:
+      min: 16
+      max: 26
+
+teleports:
+  -
+    step: 5
+    position_x: 3
+    position_z: 6
+    rotation_y: 45
+  -
+    step: [34, 36]
+    position_x:
+      min: -3
+      max: 3
+    position_z: [3, 5, 7]
+  -
+    step:
+      min: 41
+      max: 48
+    rotation_y: [30, 120, 270]
+wall_back_material: "Custom/Materials/GreyDrywallMCS"
+wall_front_material: "Custom/Materials/GreyDrywallMCS"
+wall_left_material: "Custom/Materials/GreyDrywallMCS"
+wall_right_material: "Custom/Materials/GreyDrywallMCS"

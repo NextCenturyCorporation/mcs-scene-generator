@@ -1,6 +1,7 @@
 import copy
 
-from hypercubes import Hypercube, update_scene_objects, update_floor_and_walls
+from hypercube import Hypercube
+from hypercube.hypercubes import update_floor_and_walls, update_scene_objects
 
 
 class MockHypercube(Hypercube):
@@ -22,24 +23,26 @@ def create_tags_test_object_1():
     return {
         'id': 'test_sphere',
         'type': 'sphere',
-        'dimensions': {
-            'x': 0.1,
-            'y': 0.1,
-            'z': 0.1
-        },
-        'info': ['tiny', 'light', 'blue', 'plastic', 'ball'],
-        'goalString': 'tiny light blue plastic ball',
         'mass': 0.5,
         'materials': ['test_material'],
-        'materialCategory': ['plastic'],
-        'salientMaterials': ['plastic'],
         'moveable': True,
-        'untrainedCategory': False,
-        'untrainedColor': False,
-        'untrainedCombination': False,
-        'untrainedShape': False,
-        'untrainedSize': False,
         'pickupable': True,
+        'salientMaterials': ['plastic'],
+        'debug': {
+            'dimensions': {
+                'x': 0.1,
+                'y': 0.1,
+                'z': 0.1
+            },
+            'info': ['tiny', 'light', 'blue', 'plastic', 'ball'],
+            'goalString': 'tiny light blue plastic ball',
+            'materialCategory': ['plastic'],
+            'untrainedCategory': False,
+            'untrainedColor': False,
+            'untrainedCombination': False,
+            'untrainedShape': False,
+            'untrainedSize': False
+        },
         'shows': [{
             'stepBegin': 0,
             'position': {
@@ -55,24 +58,26 @@ def create_tags_test_object_2():
     return {
         'id': 'test_cube',
         'type': 'cube',
-        'dimensions': {
-            'x': 0.5,
-            'y': 0.5,
-            'z': 0.5
-        },
-        'info': ['medium', 'light', 'yellow', 'plastic', 'cube'],
-        'goalString': 'medium light yellow plastic cube',
         'mass': 2.5,
         'materials': ['test_material'],
-        'materialCategory': ['plastic'],
-        'salientMaterials': ['plastic'],
         'moveable': True,
-        'untrainedCategory': False,
-        'untrainedColor': False,
-        'untrainedCombination': False,
-        'untrainedShape': False,
-        'untrainedSize': False,
         'pickupable': True,
+        'salientMaterials': ['plastic'],
+        'debug': {
+            'dimensions': {
+                'x': 0.5,
+                'y': 0.5,
+                'z': 0.5
+            },
+            'info': ['medium', 'light', 'yellow', 'plastic', 'cube'],
+            'goalString': 'medium light yellow plastic cube',
+            'materialCategory': ['plastic'],
+            'untrainedCategory': False,
+            'untrainedColor': False,
+            'untrainedCombination': False,
+            'untrainedShape': False,
+            'untrainedSize': False
+        },
         'shows': [{
             'stepBegin': 0,
             'position': {
@@ -312,8 +317,8 @@ def test_Hypercube_tags_multiple_target_multiple_obstacle():
 def test_Hypercube_tags_with_intuitive_physics_occluder():
     hypercube = MockHypercube()
     target = create_tags_test_object_1()
-    occluder_wall = {'info': ['white']}
-    occluder_pole = {'info': ['brown']}
+    occluder_wall = {'debug': {'info': ['white']}}
+    occluder_pole = {'debug': {'info': ['brown']}}
     occluder_tag = 'intuitive_physics_occluder'
     scene = hypercube.get_scenes()[0]
     print(f'{scene}')
@@ -409,7 +414,7 @@ def test_Hypercube_tags_target_enclosed():
 def test_Hypercube_tags_target_untrained_category():
     hypercube = MockHypercube()
     target = create_tags_test_object_1()
-    target['untrainedCategory'] = True
+    target['debug']['untrainedCategory'] = True
     scene = hypercube.get_scenes()[0]
     print(f'{scene}')
     scene = update_scene_objects(scene, {'target': [target]})
@@ -448,7 +453,7 @@ def test_Hypercube_tags_target_untrained_category():
 def test_Hypercube_tags_target_untrained_color():
     hypercube = MockHypercube()
     target = create_tags_test_object_1()
-    target['untrainedColor'] = True
+    target['debug']['untrainedColor'] = True
     scene = hypercube.get_scenes()[0]
     print(f'{scene}')
     scene = update_scene_objects(scene, {'target': [target]})
@@ -487,7 +492,7 @@ def test_Hypercube_tags_target_untrained_color():
 def test_Hypercube_tags_target_untrained_combination():
     hypercube = MockHypercube()
     target = create_tags_test_object_1()
-    target['untrainedCombination'] = True
+    target['debug']['untrainedCombination'] = True
     scene = hypercube.get_scenes()[0]
     print(f'{scene}')
     scene = update_scene_objects(scene, {'target': [target]})
@@ -526,7 +531,7 @@ def test_Hypercube_tags_target_untrained_combination():
 def test_Hypercube_tags_target_untrained_shape():
     hypercube = MockHypercube()
     target = create_tags_test_object_1()
-    target['untrainedShape'] = True
+    target['debug']['untrainedShape'] = True
     scene = hypercube.get_scenes()[0]
     print(f'{scene}')
     scene = update_scene_objects(scene, {'target': [target]})
@@ -565,7 +570,7 @@ def test_Hypercube_tags_target_untrained_shape():
 def test_Hypercube_tags_target_untrained_size():
     hypercube = MockHypercube()
     target = create_tags_test_object_1()
-    target['untrainedSize'] = True
+    target['debug']['untrainedSize'] = True
     scene = hypercube.get_scenes()[0]
     print(f'{scene}')
     scene = update_scene_objects(scene, {'target': [target]})
@@ -605,10 +610,10 @@ def test_Hypercube_tags_target_enclosed_untrained_everything():
     hypercube = MockHypercube()
     target = create_tags_test_object_1()
     target['locationParent'] = 'parent'
-    target['untrainedCategory'] = True
-    target['untrainedColor'] = True
-    target['untrainedShape'] = True
-    target['untrainedSize'] = True
+    target['debug']['untrainedCategory'] = True
+    target['debug']['untrainedColor'] = True
+    target['debug']['untrainedShape'] = True
+    target['debug']['untrainedSize'] = True
     scene = hypercube.get_scenes()[0]
     print(f'{scene}')
     scene = update_scene_objects(scene, {'target': [target]})
@@ -712,7 +717,7 @@ def test_Hypercube_tags_obstacle_untrained_category():
     hypercube = MockHypercube()
     target = create_tags_test_object_1()
     obstacle = create_tags_test_object_2()
-    obstacle['untrainedCategory'] = True
+    obstacle['debug']['untrainedCategory'] = True
     scene = hypercube.get_scenes()[0]
     print(f'{scene}')
     scene = update_scene_objects(
@@ -775,7 +780,7 @@ def test_Hypercube_tags_obstacle_untrained_color():
     hypercube = MockHypercube()
     target = create_tags_test_object_1()
     obstacle = create_tags_test_object_2()
-    obstacle['untrainedColor'] = True
+    obstacle['debug']['untrainedColor'] = True
     scene = hypercube.get_scenes()[0]
     print(f'{scene}')
     scene = update_scene_objects(
@@ -838,7 +843,7 @@ def test_Hypercube_tags_obstacle_untrained_combination():
     hypercube = MockHypercube()
     target = create_tags_test_object_1()
     obstacle = create_tags_test_object_2()
-    obstacle['untrainedCombination'] = True
+    obstacle['debug']['untrainedCombination'] = True
     scene = hypercube.get_scenes()[0]
     print(f'{scene}')
     scene = update_scene_objects(
@@ -901,7 +906,7 @@ def test_Hypercube_tags_obstacle_untrained_shape():
     hypercube = MockHypercube()
     target = create_tags_test_object_1()
     obstacle = create_tags_test_object_2()
-    obstacle['untrainedShape'] = True
+    obstacle['debug']['untrainedShape'] = True
     scene = hypercube.get_scenes()[0]
     print(f'{scene}')
     scene = update_scene_objects(
@@ -965,7 +970,7 @@ def test_Hypercube_tags_obstacle_untrained_size():
     hypercube = MockHypercube()
     target = create_tags_test_object_1()
     obstacle = create_tags_test_object_2()
-    obstacle['untrainedSize'] = True
+    obstacle['debug']['untrainedSize'] = True
     scene = hypercube.get_scenes()[0]
     print(f'{scene}')
     scene = update_scene_objects(
@@ -1029,10 +1034,10 @@ def test_Hypercube_tags_obstacle_enclosed_untrained_everything():
     target = create_tags_test_object_1()
     obstacle = create_tags_test_object_2()
     obstacle['locationParent'] = 'parent'
-    obstacle['untrainedCategory'] = True
-    obstacle['untrainedColor'] = True
-    obstacle['untrainedShape'] = True
-    obstacle['untrainedSize'] = True
+    obstacle['debug']['untrainedCategory'] = True
+    obstacle['debug']['untrainedColor'] = True
+    obstacle['debug']['untrainedShape'] = True
+    obstacle['debug']['untrainedSize'] = True
     scene = hypercube.get_scenes()[0]
     print(f'{scene}')
     scene = update_scene_objects(
@@ -1097,16 +1102,16 @@ def test_Hypercube_tags_target_obstacle_enclosed_untrained_everything():
     hypercube = MockHypercube()
     target = create_tags_test_object_1()
     target['locationParent'] = 'parent'
-    target['untrainedCategory'] = True
-    target['untrainedColor'] = True
-    target['untrainedShape'] = True
-    target['untrainedSize'] = True
+    target['debug']['untrainedCategory'] = True
+    target['debug']['untrainedColor'] = True
+    target['debug']['untrainedShape'] = True
+    target['debug']['untrainedSize'] = True
     obstacle = create_tags_test_object_2()
     obstacle['locationParent'] = 'parent'
-    obstacle['untrainedCategory'] = True
-    obstacle['untrainedColor'] = True
-    obstacle['untrainedShape'] = True
-    obstacle['untrainedSize'] = True
+    obstacle['debug']['untrainedCategory'] = True
+    obstacle['debug']['untrainedColor'] = True
+    obstacle['debug']['untrainedShape'] = True
+    obstacle['debug']['untrainedSize'] = True
     scene = hypercube.get_scenes()[0]
     print(f'{scene}')
     scene = update_scene_objects(
@@ -1171,10 +1176,12 @@ def retrieve_object_list_from_data(object_data):
 
 def test_update_floor_and_walls():
     template = {
-        'floorColors': [],
         'floorMaterial': [],
-        'wallColors': [],
-        'wallMaterial': []
+        'wallMaterial': [],
+        'debug': {
+            'floorColors': [],
+            'wallColors': []
+        }
     }
 
     for color_1 in [
@@ -1185,9 +1192,9 @@ def test_update_floor_and_walls():
 
         # Test with no objects
         body_template = copy.deepcopy(template)
-        body_template['floorColors'] = [color_1]
+        body_template['debug']['floorColors'] = [color_1]
         body_template['floorMaterial'] = [color_1]
-        body_template['wallColors'] = [color_1]
+        body_template['debug']['wallColors'] = [color_1]
         body_template['wallMaterial'] = [color_1]
         role_to_object_data_list = {}
         scenes = [copy.deepcopy(body_template), copy.deepcopy(body_template)]
@@ -1198,19 +1205,19 @@ def test_update_floor_and_walls():
             scenes
         )
         for scene in scenes:
-            assert scene['floorColors'] == [color_1]
+            assert scene['debug']['floorColors'] == [color_1]
             assert scene['floorMaterial'] == [color_1]
-            assert scene['wallColors'] == [color_1]
+            assert scene['debug']['wallColors'] == [color_1]
             assert scene['wallMaterial'] == [color_1]
 
         # Test with one object
         body_template = copy.deepcopy(template)
-        body_template['floorColors'] = [color_1]
+        body_template['debug']['floorColors'] = [color_1]
         body_template['floorMaterial'] = [color_1]
-        body_template['wallColors'] = [color_1]
+        body_template['debug']['wallColors'] = [color_1]
         body_template['wallMaterial'] = [color_1]
         role_to_object_data_list = {
-            'target': [{'color': [color_1]}]
+            'target': [{'debug': {'color': [color_1]}}]
         }
         scenes = [copy.deepcopy(body_template), copy.deepcopy(body_template)]
         update_floor_and_walls(
@@ -1220,9 +1227,9 @@ def test_update_floor_and_walls():
             scenes
         )
         for scene in scenes:
-            assert scene['floorColors'] != [color_1]
+            assert scene['debug']['floorColors'] != [color_1]
             assert scene['floorMaterial'] != [color_1]
-            assert scene['wallColors'] != [color_1]
+            assert scene['debug']['wallColors'] != [color_1]
             assert scene['wallMaterial'] != [color_1]
 
         for color_2 in [
@@ -1236,12 +1243,12 @@ def test_update_floor_and_walls():
 
             # Test with one objects
             body_template = copy.deepcopy(template)
-            body_template['floorColors'] = [color_1]
+            body_template['debug']['floorColors'] = [color_1]
             body_template['floorMaterial'] = [color_1]
-            body_template['wallColors'] = [color_2]
+            body_template['debug']['wallColors'] = [color_2]
             body_template['wallMaterial'] = [color_2]
             role_to_object_data_list = {
-                'target': [{'color': [color_1]}]
+                'target': [{'debug': {'color': [color_1]}}]
             }
             scenes = [
                 copy.deepcopy(body_template),
@@ -1254,20 +1261,20 @@ def test_update_floor_and_walls():
                 scenes
             )
             for scene in scenes:
-                assert scene['floorColors'] != [color_1]
+                assert scene['debug']['floorColors'] != [color_1]
                 assert scene['floorMaterial'] != [color_1]
-                assert scene['wallColors'] == [color_2]
+                assert scene['debug']['wallColors'] == [color_2]
                 assert scene['wallMaterial'] == [color_2]
 
             # Test with multiple objects
             body_template = copy.deepcopy(template)
-            body_template['floorColors'] = [color_1]
+            body_template['debug']['floorColors'] = [color_1]
             body_template['floorMaterial'] = [color_1]
-            body_template['wallColors'] = [color_2]
+            body_template['debug']['wallColors'] = [color_2]
             body_template['wallMaterial'] = [color_2]
             role_to_object_data_list = {
-                'target': [{'color': [color_1]}],
-                'non_target': [{'color': [color_2]}]
+                'target': [{'debug': {'color': [color_1]}}],
+                'non_target': [{'debug': {'color': [color_2]}}]
             }
             scenes = [
                 copy.deepcopy(body_template),
@@ -1280,11 +1287,11 @@ def test_update_floor_and_walls():
                 scenes
             )
             for scene in scenes:
-                assert scene['floorColors'] != [color_1]
-                assert scene['floorColors'] != [color_2]
+                assert scene['debug']['floorColors'] != [color_1]
+                assert scene['debug']['floorColors'] != [color_2]
                 assert scene['floorMaterial'] != [color_1]
                 assert scene['floorMaterial'] != [color_2]
-                assert scene['wallColors'] != [color_2]
-                assert scene['wallColors'] != [color_1]
+                assert scene['debug']['wallColors'] != [color_2]
+                assert scene['debug']['wallColors'] != [color_1]
                 assert scene['wallMaterial'] != [color_2]
                 assert scene['wallMaterial'] != [color_1]

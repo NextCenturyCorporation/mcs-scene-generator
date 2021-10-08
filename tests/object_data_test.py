@@ -1,30 +1,33 @@
-from object_data import ObjectData, ReceptacleData, TargetData, \
-    identify_larger_definition
-
-from interactive_plans import ObjectLocationPlan, ObjectPlan
-import objects
-import util
-
-
-CAKE = objects._get('CAKE')
-SOCCER_BALL = objects._get('SOCCER_BALL')
-
-
-CASE_1_SUITCASE = objects._get('CASE_1_SUITCASE')
-CASE_1_SUITCASE = util.finalize_object_definition(
-    CASE_1_SUITCASE,
-    choice_size=CASE_1_SUITCASE['chooseSize'][0]
+from generator import base_objects, definitions, specific_objects, util
+from hypercube import (
+    ObjectData,
+    ObjectLocationPlan,
+    ObjectPlan,
+    ReceptacleData,
+    TargetData,
 )
-CHEST_1_CUBOID = objects._get('CHEST_1_CUBOID')
-CHEST_1_CUBOID = util.finalize_object_definition(
+from hypercube.object_data import identify_larger_definition
+
+SOFA_1 = specific_objects._get('SOFA_1')
+SOFA_1 = definitions.finalize_object_definition(SOFA_1)
+SOCCER_BALL = base_objects.create_soccer_ball()
+
+
+CASE_1_SUITCASE = specific_objects._get('CASE_1_SUITCASE')
+CASE_1_SUITCASE = definitions.finalize_object_definition(
+    CASE_1_SUITCASE,
+    choice_size=CASE_1_SUITCASE.chooseSizeList[0]
+)
+CHEST_1_CUBOID = specific_objects._get('CHEST_1_CUBOID')
+CHEST_1_CUBOID = definitions.finalize_object_definition(
     CHEST_1_CUBOID,
-    choice_size=CHEST_1_CUBOID['chooseSize'][0]
+    choice_size=CHEST_1_CUBOID.chooseSizeList[0]
 )
 
 
 def test_identify_larger_definition():
-    assert identify_larger_definition(CAKE, SOCCER_BALL) == CAKE
-    assert identify_larger_definition(SOCCER_BALL, CAKE) == CAKE
+    assert identify_larger_definition(SOFA_1, SOCCER_BALL) == SOFA_1
+    assert identify_larger_definition(SOCCER_BALL, SOFA_1) == SOFA_1
 
 
 def test_object_data_init():
@@ -57,9 +60,9 @@ def test_object_data_init():
     assert data.role == 'ROLE'
     assert data.location_plan_list == [ObjectLocationPlan.INSIDE_0]
     assert data.untrained_plan_list == [False]
-    assert data.original_definition['type'] == 'soccer_ball'
-    assert data.trained_definition['type'] == 'soccer_ball'
-    assert data.untrained_definition['type'] == 'soccer_ball'
+    assert data.original_definition.type == 'soccer_ball'
+    assert data.trained_definition.type == 'soccer_ball'
+    assert data.untrained_definition.type == 'soccer_ball'
     assert not data.trained_template
     assert not data.untrained_template
     assert data.instance_list == [None]
@@ -395,20 +398,20 @@ def test_is_random():
 def test_larger_definition():
     data = ObjectData('ROLE', ObjectPlan(ObjectLocationPlan.NONE))
 
-    data.trained_definition = CAKE
+    data.trained_definition = SOFA_1
     data.untrained_definition = SOCCER_BALL
-    assert data.larger_definition() == CAKE
+    assert data.larger_definition() == SOFA_1
 
     data.trained_definition = SOCCER_BALL
-    data.untrained_definition = CAKE
-    assert data.larger_definition() == CAKE
+    data.untrained_definition = SOFA_1
+    assert data.larger_definition() == SOFA_1
 
 
 def test_larger_definition_of():
     data = ObjectData('ROLE', ObjectPlan(ObjectLocationPlan.NONE))
-    data.trained_definition = CAKE
+    data.trained_definition = SOFA_1
     data.untrained_definition = SOCCER_BALL
-    assert data.larger_definition_of([]) == CAKE
+    assert data.larger_definition_of([]) == SOFA_1
 
     data.location_plan_list = [
         ObjectLocationPlan.BACK,
@@ -418,12 +421,12 @@ def test_larger_definition_of():
         ObjectLocationPlan.RANDOM,
         ObjectLocationPlan.NONE
     ]
-    assert data.larger_definition_of([]) == CAKE
+    assert data.larger_definition_of([]) == SOFA_1
 
 
 def test_larger_definition_of_with_containers():
     data = ObjectData('ROLE', ObjectPlan(ObjectLocationPlan.NONE))
-    data.trained_definition = CAKE
+    data.trained_definition = SOFA_1
     data.untrained_definition = SOCCER_BALL
     container_data = ReceptacleData(
         'LARGE_CONTAINER',
@@ -431,7 +434,7 @@ def test_larger_definition_of_with_containers():
     )
     container_data.trained_definition = CASE_1_SUITCASE
     container_data.untrained_definition = CHEST_1_CUBOID
-    assert data.larger_definition_of([container_data]) == CAKE
+    assert data.larger_definition_of([container_data]) == SOFA_1
 
     data.location_plan_list = [
         ObjectLocationPlan.NONE,
@@ -453,15 +456,15 @@ def test_larger_definition_of_with_second_object():
     container_data.trained_definition = CASE_1_SUITCASE
     container_data.untrained_definition = CHEST_1_CUBOID
     confusor_data = ObjectData('CONFUSOR', ObjectPlan(ObjectLocationPlan.NONE))
-    confusor_data.trained_definition = CAKE
-    confusor_data.untrained_definition = CAKE
+    confusor_data.trained_definition = SOFA_1
+    confusor_data.untrained_definition = SOFA_1
     assert (
         data.larger_definition_of([container_data], confusor_data) ==
         SOCCER_BALL
     )
 
     confusor_data.location_plan_list = [ObjectLocationPlan.CLOSE]
-    assert data.larger_definition_of([container_data], confusor_data) == CAKE
+    assert data.larger_definition_of([container_data], confusor_data) == SOFA_1
 
     data.location_plan_list = [ObjectLocationPlan.INSIDE_0]
     assert data.larger_definition_of([container_data], confusor_data) == (
@@ -510,7 +513,7 @@ def test_locations_with_indexes():
 
 def test_recreate_both_templates():
     data = ObjectData('ROLE', ObjectPlan(ObjectLocationPlan.NONE))
-    data.trained_definition = objects._get('SOCCER_BALL')
+    data.trained_definition = base_objects.create_soccer_ball()
     data.trained_template = {}
 
     data.recreate_both_templates()
@@ -525,9 +528,15 @@ def test_recreate_both_templates():
     assert not data.untrained_template
 
     data = ObjectData('ROLE', ObjectPlan(ObjectLocationPlan.NONE))
-    data.trained_definition = objects._get('SOCCER_BALL')
+    data.trained_definition = base_objects.create_soccer_ball()
     data.trained_template = {}
-    data.untrained_definition = objects._get('CAKE')
+    data.untrained_definition = (
+        definitions.finalize_object_materials_and_colors(
+            definitions.finalize_object_definition(
+                specific_objects._get('SOFA_1')
+            )
+        )
+    )[0]
     data.untrained_template = {}
 
     data.recreate_both_templates()
@@ -539,7 +548,7 @@ def test_recreate_both_templates():
         'x': 0, 'y': 0, 'z': 0
     }
     assert data.trained_template['id']
-    assert data.untrained_template['type'] == 'cake'
+    assert data.untrained_template['type'] == 'sofa_1'
     assert data.untrained_template['shows'][0]['position'] == {
         'x': 0, 'y': 0, 'z': 0
     }
