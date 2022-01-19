@@ -21,7 +21,6 @@ def test_global_settings():
     component = GlobalSettingsComponent({})
     assert component.ceiling_material is None
     assert component.floor_material is None
-    assert component.floor_physics is None
     assert component.goal is None
     assert component.last_step is None
     assert component.performer_start_position is None
@@ -73,14 +72,6 @@ def test_global_settings_configured():
     component = GlobalSettingsComponent({
         'ceiling_material': 'Custom/Materials/GreyDrywallMCS',
         'floor_material': 'Custom/Materials/GreyCarpetMCS',
-        'floor_physics': {
-            'enable': True,
-            'angularDrag': 0.5,
-            'bounciness': 0,
-            'drag': 0,
-            'dynamicFriction': 0,
-            'staticFriction': 0
-        },
         'goal': {
             'category': 'retrieval',
             'target': {
@@ -99,14 +90,6 @@ def test_global_settings_configured():
     })
     assert component.ceiling_material == 'Custom/Materials/GreyDrywallMCS'
     assert component.floor_material == 'Custom/Materials/GreyCarpetMCS'
-    assert component.floor_physics == PhysicsConfig(
-        enable=True,
-        angularDrag=0.5,
-        bounciness=0,
-        drag=0,
-        dynamicFriction=0,
-        staticFriction=0
-    )
     assert component.goal == GoalConfig(
         category='retrieval',
         target=InteractableObjectConfig(shape='soccer_ball')
@@ -157,105 +140,6 @@ def test_global_settings_fail_floor_material():
     with pytest.raises(ILEException):
         GlobalSettingsComponent({
             'floor_material': ''
-        })
-
-
-def test_global_settings_fail_floor_physics_angular_drag_above_max():
-    with pytest.raises(ILEException):
-        GlobalSettingsComponent({
-            'floor_physics': {
-                'angularDrag': 1.1
-            }
-        })
-
-
-def test_global_settings_fail_floor_physics_angular_drag_below_min():
-    with pytest.raises(ILEException):
-        GlobalSettingsComponent({
-            'floor_physics': {
-                'angularDrag': -0.1
-            }
-        })
-
-
-def test_global_settings_fail_floor_physics_bounciness_above_max():
-    with pytest.raises(ILEException):
-        GlobalSettingsComponent({
-            'floor_physics': {
-                'bounciness': 1.1
-            }
-        })
-
-
-def test_global_settings_fail_floor_physics_bounciness_below_min():
-    with pytest.raises(ILEException):
-        GlobalSettingsComponent({
-            'floor_physics': {
-                'bounciness': -0.1
-            }
-        })
-
-
-def test_global_settings_fail_floor_physics_drag_above_max():
-    with pytest.raises(ILEException):
-        GlobalSettingsComponent({
-            'floor_physics': {
-                'drag': 1.1
-            }
-        })
-
-
-def test_global_settings_fail_floor_physics_drag_below_min():
-    with pytest.raises(ILEException):
-        GlobalSettingsComponent({
-            'floor_physics': {
-                'drag': -0.1
-            }
-        })
-
-
-def test_global_settings_fail_floor_physics_dynamic_friction_above_max():
-    with pytest.raises(ILEException):
-        GlobalSettingsComponent({
-            'floor_physics': {
-                'dynamicFriction': 1.1
-            }
-        })
-
-
-def test_global_settings_fail_floor_physics_dynamic_friction_below_min():
-    with pytest.raises(ILEException):
-        GlobalSettingsComponent({
-            'floor_physics': {
-                'dynamicFriction': -0.1
-            }
-        })
-
-
-def test_global_settings_fail_floor_physics_enable_is_not_bool():
-    with pytest.raises(ILEException):
-        GlobalSettingsComponent({
-            'floor_physics': {
-                'enable': 1
-            }
-        })
-
-
-def test_global_settings_fail_floor_physics_static_friction_above_max():
-    with pytest.raises(ILEException):
-        GlobalSettingsComponent({
-            'floor_physics': {
-                'staticFriction': 1.1
-            }
-        })
-
-
-def test_global_settings_fail_floor_physics_static_friction_below_min():
-    with pytest.raises(ILEException):
-        GlobalSettingsComponent({
-            'floor_physics': {
-                'staticFriction': -0.1
-            }
         })
 
 
