@@ -98,32 +98,6 @@ class GlobalSettingsComponent(ILEComponent):
     ```
     """
 
-    floor_physics: Union[PhysicsConfig, List[PhysicsConfig]] = None
-    """
-    (dict with bool `enable`, float `angularDrag`, float `bounciness`, float
-    `drag`, float `dynamicFriction`, and float `staticFriction` keys, or list
-    of dicts): The friction, drag, and bounciness to set for the whole floor,
-    or a list of settings, from which one is chosen at random for each scene.
-    Must set `enable` to `true`; all other values must be within [0, 1].
-    Default: see example
-
-    Simple Example:
-    ```
-    floor_physics: null
-    ```
-
-    Advanced Example:
-    ```
-    floor_physics:
-        enable: false
-        angularDrag: 0.5
-        bounciness: 0
-        drag: 0
-        dynamicFriction: 0.6
-        staticFriction: 0.6
-    ```
-    """
-
     goal: Union[GoalConfig, List[GoalConfig]] = None
     """
     ([GoalConfig](#GoalConfig) dict): The goal category and target(s) in each
@@ -338,12 +312,6 @@ class GlobalSettingsComponent(ILEComponent):
 
         # TODO MCS-696 Once we define a Scene class, we can probably give it
         # the Python classes rather than calling vars() on them.
-        floor_properties = self.get_floor_physics()
-        if floor_properties:
-            scene['floorProperties'] = vars(floor_properties)
-            logger.debug(
-                f'Setting floor properties = {scene["floorProperties"]}'
-            )
         scene['roomDimensions'] = vars(self.get_room_dimensions())
         logger.debug(f'Setting room dimensions = {scene["roomDimensions"]}')
         scene['performerStart'] = {
@@ -409,15 +377,10 @@ class GlobalSettingsComponent(ILEComponent):
     def set_floor_material(self, data: Any) -> None:
         self.floor_material = data
 
-    def get_floor_physics(self) -> PhysicsConfig:
-        return self.floor_physics
-
     # If not null, each nested property (except enable) must be a number.
     @ile_config_setter(validator=ValidateNumber(props=[
         'angularDrag', 'bounciness', 'drag', 'dynamicFriction' 'staticFriction'
     ], min_value=0, max_value=1))
-    def set_floor_physics(self, data: Any) -> None:
-        self.floor_physics = data
 
     def get_goal_data(self, scene: Dict[str, Any]) -> Tuple[
         str,

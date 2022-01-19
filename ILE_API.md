@@ -426,31 +426,6 @@ Advanced Example:
 floor_material: "Custom/Materials/GreyCarpetMCS"
 ```
 
-#### floor_physics
-
-(dict with bool `enable`, float `angularDrag`, float `bounciness`, float
-`drag`, float `dynamicFriction`, and float `staticFriction` keys, or list
-of dicts): The friction, drag, and bounciness to set for the whole floor,
-or a list of settings, from which one is chosen at random for each scene.
-Must set `enable` to `true`; all other values must be within [0, 1].
-Default: see example
-
-Simple Example:
-```
-floor_physics: null
-```
-
-Advanced Example:
-```
-floor_physics:
-    enable: false
-    angularDrag: 0.5
-    bounciness: 0
-    drag: 0
-    dynamicFriction: 0.6
-    staticFriction: 0.6
-```
-
 #### freezes
 
 (list of [StepBeginEnd](#StepBeginEnd) dicts): When a freeze

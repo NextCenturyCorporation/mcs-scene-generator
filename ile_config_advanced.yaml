@@ -1,12 +1,5 @@
 ceiling_material: "Custom/Materials/GreyDrywallMCS"
 floor_material: "Custom/Materials/GreyCarpetMCS"
-floor_physics:
-    enable: false
-    angularDrag: 0.5
-    bounciness: 0
-    drag: 0
-    dynamicFriction: 0.6
-    staticFriction: 0.6
 goal:
     category: retrieval
     target:
