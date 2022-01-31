@@ -4,17 +4,22 @@ import random
 from dataclasses import dataclass
 from typing import Any, Dict, List, Tuple, Union
 
-from machine_common_sense.config_manager import PhysicsConfig, Vector3d
+from machine_common_sense.config_manager import Vector3d
 
-from generator import MaterialTuple, util
-from generator.materials import CEILING_AND_WALL_GROUPINGS, FLOOR_MATERIALS
+from generator import MaterialTuple, geometry, materials
 
-from .choosers import choose_position, choose_random, choose_rotation
+from .choosers import (
+    choose_material_tuple_from_material,
+    choose_position,
+    choose_random,
+    choose_rotation,
+)
 from .components import ILEComponent
 from .decorators import ile_config_setter
-from .defs import find_bounds
+from .defs import ILEDelayException, ILESharedConfiguration, find_bounds
 from .interactable_object_config import InteractableObjectConfig
 from .numerics import VectorFloatConfig, VectorIntConfig
+from .object_services import TARGET_LABEL
 from .validators import ValidateNoNullProp, ValidateNumber, ValidateOptions
 
 logger = logging.getLogger(__name__)
@@ -35,13 +40,16 @@ class GoalConfig():
     specific category of goal. Each `target*` property is either an
     InteractableObjectConfig dict or list of InteractableObjectConfig dicts.
     For each list, one dict will be randomly chosen within the list in each
-    new scene.
+    new scene.  All goal target objects will be assigned the 'target' label.
 
     Example:
     ```
     category: retrieval
     target:
         shape: soccer_ball
+        scale:
+          min: 1.0
+          max: 3.0
     ```
     """
 
@@ -81,6 +89,26 @@ class GlobalSettingsComponent(ILEComponent):
     ```
     """
 
+    excluded_shapes: Union[str, List[str]] = None
+    """
+    (string, or list of strings): Zero or more object shapes (types) to exclude
+    from being randomly generated. Objects with the listed shapes can still be
+    generated using specifically set configuration options, like the `type`
+    property in the `goal.target` and `specific_interactable_objects` options.
+    Useful if you want to avoid randomly generating additional objects of the
+    same shape as a configured goal target. Default: None
+
+    Simple Example:
+    ```
+    excluded_shapes: null
+    ```
+
+    Advanced Example:
+    ```
+    excluded_shapes: "soccer_ball"
+    ```
+    """
+
     floor_material: Union[str, List[str]] = None
     """
     (string, or list of strings): A single material for the floor, or a
@@ -95,32 +123,6 @@ class GlobalSettingsComponent(ILEComponent):
     Advanced Example:
     ```
     floor_material: "Custom/Materials/GreyCarpetMCS"
-    ```
-    """
-
-    floor_physics: Union[PhysicsConfig, List[PhysicsConfig]] = None
-    """
-    (dict with bool `enable`, float `angularDrag`, float `bounciness`, float
-    `drag`, float `dynamicFriction`, and float `staticFriction` keys, or list
-    of dicts): The friction, drag, and bounciness to set for the whole floor,
-    or a list of settings, from which one is chosen at random for each scene.
-    Must set `enable` to `true`; all other values must be within [0, 1].
-    Default: see example
-
-    Simple Example:
-    ```
-    floor_physics: null
-    ```
-
-    Advanced Example:
-    ```
-    floor_physics:
-        enable: false
-        angularDrag: 0.5
-        bounciness: 0
-        drag: 0
-        dynamicFriction: 0.6
-        staticFriction: 0.6
     ```
     """
 
@@ -140,6 +142,9 @@ class GlobalSettingsComponent(ILEComponent):
         category: retrieval
         target:
             shape: soccer_ball
+            scale:
+              min: 1.0
+              max: 3.0
     ```
     """
 
@@ -331,28 +336,29 @@ class GlobalSettingsComponent(ILEComponent):
 
     def __init__(self, data: Dict[str, Any]):
         super().__init__(data)
+        self._delayed_goal = False
 
     # Override
     def update_ile_scene(self, scene: Dict[str, Any]) -> Dict[str, Any]:
-        logger.debug('Running global settings component...')
+        logger.info('Configuring global settings for the scene...')
+
+        excluded_shapes = self.get_excluded_shapes()
+        ILESharedConfiguration.get_instance().set_excluded_shapes(
+            excluded_shapes
+        )
+        logger.trace(f'Setting excluded shapes = {excluded_shapes}')
 
         # TODO MCS-696 Once we define a Scene class, we can probably give it
         # the Python classes rather than calling vars() on them.
-        floor_properties = self.get_floor_physics()
-        if floor_properties:
-            scene['floorProperties'] = vars(floor_properties)
-            logger.debug(
-                f'Setting floor properties = {scene["floorProperties"]}'
-            )
         scene['roomDimensions'] = vars(self.get_room_dimensions())
-        logger.debug(f'Setting room dimensions = {scene["roomDimensions"]}')
+        logger.trace(f'Setting room dimensions = {scene["roomDimensions"]}')
         scene['performerStart'] = {
             'position': vars(self.get_performer_start_position(
                 scene['roomDimensions']
             )),
             'rotation': vars(self.get_performer_start_rotation())
         }
-        logger.debug(f'Setting performer start = {scene["performerStart"]}')
+        logger.trace(f'Setting performer start = {scene["performerStart"]}')
 
         ceiling_material_tuple = self.get_ceiling_material()
         scene['ceilingMaterial'] = ceiling_material_tuple.material
@@ -368,75 +374,94 @@ class GlobalSettingsComponent(ILEComponent):
             color for value in wall_material_data.values()
             for color in value.color
         ]))
-        logger.debug(
+        logger.trace(
             f'Setting room materials...\nCEILING={scene["ceilingMaterial"]}'
-            f'FLOOR={scene["floorMaterial"]}\nWALL={scene["roomMaterials"]}'
+            f'\nFLOOR={scene["floorMaterial"]}\nWALL={scene["roomMaterials"]}'
         )
 
         last_step = self.get_last_step()
         if last_step:
             scene['goal']['last_step'] = last_step
-            logger.debug(f'Setting last step = {last_step}')
-        goal_category, goal_metadata, target_list = self.get_goal_data(scene)
-        if goal_category:
-            scene['goal']['category'] = goal_category
-            scene['goal']['metadata'] = goal_metadata
-            logger.debug(
-                f'Setting goal category = "{goal_category}" with metadata = '
-                f'{goal_metadata} and {len(target_list)} target(s)'
-            )
-        for target in target_list:
-            scene['objects'].append(target)
+            logger.trace(f'Setting last step = {last_step}')
+
+        self._attempt_goal(scene)
         return scene
 
-    def get_ceiling_material(self) -> MaterialTuple:
-        return choose_random(self.ceiling_material or [
-            material_tuple for nested_list in CEILING_AND_WALL_GROUPINGS
-            for material_tuple in nested_list
-        ], MaterialTuple)
+    def _attempt_goal(self, scene):
+        try:
+            goal_data, target_list = self.get_goal_data(scene)
+            if goal_data:
+                scene['goal']['category'] = goal_data['category']
+                scene['goal']['description'] = goal_data['description']
+                scene['goal']['metadata'] = goal_data['metadata']
+                logger.trace(
+                    f'Setting {scene["goal"]["category"]} goal with '
+                    f'{len(target_list)} target(s): {scene["goal"]}'
+                )
+            for target in target_list:
+                scene['objects'].append(target)
+            self._delayed_goal = False
+        except ILEDelayException as e:
+            logger.trace("Goal failed and needs delay.", exc_info=e)
+            self._delayed_goal = True
 
-    @ile_config_setter()
+    def get_ceiling_material(self) -> MaterialTuple:
+        return (
+            choose_random(self.ceiling_material, MaterialTuple)
+            if self.ceiling_material else
+            random.choice(random.choice(materials.CEILING_AND_WALL_GROUPINGS))
+        )
+
+    @ile_config_setter(validator=ValidateOptions(
+        options=(materials.ALL_UNRESTRICTED_MATERIAL_LISTS_AND_STRINGS)
+    ))
     def set_ceiling_material(self, data: Any) -> None:
         self.ceiling_material = data
 
+    def get_excluded_shapes(self) -> List[str]:
+        return (
+            self.excluded_shapes if isinstance(self.excluded_shapes, list) else
+            [self.excluded_shapes]
+        ) if self.excluded_shapes else []
+
+    @ile_config_setter()
+    def set_excluded_shapes(self, data: Any) -> None:
+        self.excluded_shapes = data
+
     def get_floor_material(self) -> MaterialTuple:
         return choose_random(
-            self.floor_material or FLOOR_MATERIALS,
+            self.floor_material or materials.FLOOR_MATERIALS,
             MaterialTuple
         )
 
-    @ile_config_setter()
+    @ile_config_setter(validator=ValidateOptions(
+        options=(materials.ALL_UNRESTRICTED_MATERIAL_LISTS_AND_STRINGS)
+    ))
     def set_floor_material(self, data: Any) -> None:
         self.floor_material = data
 
-    def get_floor_physics(self) -> PhysicsConfig:
-        return self.floor_physics
-
-    # If not null, each nested property (except enable) must be a number.
-    @ile_config_setter(validator=ValidateNumber(props=[
-        'angularDrag', 'bounciness', 'drag', 'dynamicFriction' 'staticFriction'
-    ], min_value=0, max_value=1))
-    def set_floor_physics(self, data: Any) -> None:
-        self.floor_physics = data
-
     def get_goal_data(self, scene: Dict[str, Any]) -> Tuple[
-        str,
         Dict[str, Any],
         List[Dict[str, Any]]
     ]:
         if not self.goal:
-            return None, None, []
+            return None, []
 
         # Choose a random goal category (and target if needed) from the config.
         choice: GoalConfig = choose_random(self.goal)
         goal_metadata = {}
-        bounds_list = find_bounds(scene['objects'])
+        bounds_list = find_bounds(scene)
         target_list = []
 
         # Create the target(s) and add ID(s) to the goal's metadata.
         for prop in ['target', 'target_1', 'target_2']:
             config: InteractableObjectConfig = getattr(choice, prop)
             if config:
+                labels = getattr(config, 'labels') or []
+                labels = labels if isinstance(labels, list) else [labels]
+                if TARGET_LABEL not in labels:
+                    labels.append(TARGET_LABEL)
+                setattr(config, 'labels', labels)
                 instance = config.create_instance(
                     scene['roomDimensions'],
                     scene['performerStart'],
@@ -446,11 +471,21 @@ class GlobalSettingsComponent(ILEComponent):
                     'id': instance['id']
                 }
                 target_list.append(instance)
-                logger.debug(
+                logger.trace(
                     f'Creating goal "{prop}" from config = {vars(config)}'
                 )
 
-        return choice.category, goal_metadata, target_list
+        description = None
+        if choice.category.lower() == 'retrieval' and len(target_list):
+            description = (
+                f'Find and pick up the {target_list[0]["debug"]["goalString"]}'
+            )
+
+        return {
+            'category': choice.category.lower(),
+            'description': description,
+            'metadata': goal_metadata
+        }, target_list
 
     # If not null, category is required.
     @ile_config_setter(validator=ValidateNoNullProp(props=['category']))
@@ -471,14 +506,15 @@ class GlobalSettingsComponent(ILEComponent):
     ) -> Vector3d:
         return choose_position(
             self.performer_start_position,
-            util.PERFORMER_WIDTH,
-            util.PERFORMER_WIDTH,
+            geometry.PERFORMER_WIDTH,
+            geometry.PERFORMER_WIDTH,
             room_dimensions['x'],
             room_dimensions['z']
         )
 
-    # If not null, the X and Z properties are required.
-    @ile_config_setter(validator=ValidateNoNullProp(props=['x', 'z']))
+    # allow partial setting of start position.  I.E.  only setting X
+    @ile_config_setter(validator=ValidateNumber(
+        props=['x', 'y', 'z'], null_ok=True))
     def set_performer_start_position(self, data: Any) -> None:
         self.performer_start_position = VectorFloatConfig(
             data.x,
@@ -536,42 +572,60 @@ class GlobalSettingsComponent(ILEComponent):
     def set_room_shape(self, data: Any) -> None:
         self.room_shape = data
 
-    @ile_config_setter()
+    @ile_config_setter(validator=ValidateOptions(
+        options=(materials.ALL_UNRESTRICTED_MATERIAL_LISTS_AND_STRINGS)
+    ))
     def set_wall_back_material(self, data: Any) -> None:
         self.wall_back_material = data
 
-    @ile_config_setter()
+    @ile_config_setter(validator=ValidateOptions(
+        options=(materials.ALL_UNRESTRICTED_MATERIAL_LISTS_AND_STRINGS)
+    ))
     def set_wall_front_material(self, data: Any) -> None:
         self.wall_front_material = data
 
-    @ile_config_setter()
+    @ile_config_setter(validator=ValidateOptions(
+        options=(materials.ALL_UNRESTRICTED_MATERIAL_LISTS_AND_STRINGS)
+    ))
     def set_wall_left_material(self, data: Any) -> None:
         self.wall_left_material = data
 
-    @ile_config_setter()
+    @ile_config_setter(validator=ValidateOptions(
+        options=(materials.ALL_UNRESTRICTED_MATERIAL_LISTS_AND_STRINGS)
+    ))
     def set_wall_right_material(self, data: Any) -> None:
         self.wall_right_material = data
 
     def get_wall_material_data(self) -> Dict[str, MaterialTuple]:
         # All walls should use the same default material, so choose it now.
         material_choice = random.choice(random.choice(
-            CEILING_AND_WALL_GROUPINGS
+            materials.CEILING_AND_WALL_GROUPINGS
         ))
+        back = material_choice
+        if self.wall_back_material:
+            back = choose_material_tuple_from_material(self.wall_back_material)
+        front = material_choice
+        if self.wall_front_material:
+            front = choose_material_tuple_from_material(
+                self.wall_front_material)
+        left = material_choice
+        if self.wall_left_material:
+            left = choose_material_tuple_from_material(self.wall_left_material)
+        right = material_choice
+        if self.wall_right_material:
+            right = choose_material_tuple_from_material(
+                self.wall_right_material)
         return {
-            'back': choose_random(
-                self.wall_back_material or material_choice,
-                MaterialTuple
-            ),
-            'front': choose_random(
-                self.wall_front_material or material_choice,
-                MaterialTuple
-            ),
-            'left': choose_random(
-                self.wall_left_material or material_choice,
-                MaterialTuple
-            ),
-            'right': choose_random(
-                self.wall_right_material or material_choice,
-                MaterialTuple
-            )
+            'back': choose_random(back, MaterialTuple),
+            'front': choose_random(front, MaterialTuple),
+            'left': choose_random(left, MaterialTuple),
+            'right': choose_random(right, MaterialTuple)
         }
+
+    def get_num_delayed_actions(self) -> int:
+        return 1 if self._delayed_goal else 0
+
+    def run_delayed_actions(self, scene: Dict[str, Any]) -> Dict[str, Any]:
+        if self._delayed_goal:
+            self._attempt_goal(scene)
+        return scene

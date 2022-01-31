@@ -14,11 +14,7 @@ AGENT_GOAL_TEMPLATE = {
     'category': tags.tag_to_label(tags.SCENE.AGENTS),
     'description': '',
     'domainsInfo': {
-        'agents': [
-            tags.DOMAINS.AGENTS_2,
-            tags.DOMAINS.AGENTS_3,
-            tags.DOMAINS.AGENTS_7
-        ],
+        'agents': [],
         'objects': [],
         'places': []
     },

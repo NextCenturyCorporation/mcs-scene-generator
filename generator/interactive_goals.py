@@ -9,6 +9,7 @@ from . import exceptions, tags
 from .definitions import ObjectDefinition
 from .geometry import (
     MIN_OBJECTS_SEPARATION_DISTANCE,
+    ObjectBounds,
     calc_obj_pos,
     position_distance,
 )
@@ -103,10 +104,10 @@ class InteractiveGoal(ABC):
         self,
         definition_or_instance: Union[ObjectDefinition, Dict[str, Any]],
         performer_start: Dict[str, Dict[str, float]],
-        bounds_list: List[List[Dict[str, float]]],
+        bounds_list: List[ObjectBounds],
         is_target=False,
         room_dimensions: Dict[str, float] = None
-    ) -> Tuple[Dict[str, Any], List[List[Dict[str, float]]]]:
+    ) -> Tuple[Dict[str, Any], List[ObjectBounds]]:
         """Choose and return a location for the given object and the new
         bounds list."""
         def rotation_func():
@@ -138,14 +139,8 @@ class RetrievalGoal(InteractiveGoal):
     GOAL_TEMPLATE = {
         'category': tags.tag_to_label(tags.SCENE.RETRIEVAL),
         'domainsInfo': {
-            'objects': [
-                tags.DOMAINS.OBJECTS_1,
-                tags.DOMAINS.OBJECTS_3
-            ],
-            'places': [
-                tags.DOMAINS.PLACES_2,
-                tags.DOMAINS.PLACES_3
-            ],
+            'objects': [],
+            'places': [],
             'agents': []
         },
         'sceneInfo': {}

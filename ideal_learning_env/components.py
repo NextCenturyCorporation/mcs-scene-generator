@@ -11,6 +11,7 @@ class ILEComponent(ABC):
     def __init__(self, data: Dict[str, Any]):
         # Loop over each config property in this component and call its setter
         # to initialize and validate that property using the given data.
+        self._input_data = data
         for prop in get_type_hints(self):
             if prop.startswith('_'):
                 continue

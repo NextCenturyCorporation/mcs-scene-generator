@@ -4,7 +4,7 @@ import random
 import uuid
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
-from generator import SceneException, geometry, materials, tags
+from generator import ObjectBounds, SceneException, geometry, materials, tags
 from generator.separating_axis_theorem import sat_entry
 
 from .hypercubes import update_scene_objects
@@ -52,7 +52,7 @@ class ObjectConfigWithMaterial(ObjectConfig):
 
 
 # Debug logging
-SAVE_TRIALS_TO_FILE = True
+SAVE_TRIALS_TO_FILE = False
 TRIALS_FILENAME = 'temp.txt'
 
 EXPECTED = 'expected'
@@ -498,7 +498,7 @@ def _create_fuse_wall_object_list(
 def _create_goal_object_list(
     trial_list: List[List[Dict[str, Any]]],
     goal_object_config_list: List[ObjectConfigWithMaterial],
-    agent_start_bounds: List[Dict[str, float]],
+    agent_start_bounds: ObjectBounds,
     filename_prefix: str,
     unit_size: Tuple[float, float]
 ) -> List[Dict[str, Any]]:
@@ -582,7 +582,10 @@ def _create_goal_object_list(
             # We can't have the object's position on top of the agent's start
             # position or the agent and object will collide. This can happen
             # if the 2D icons overlap themselves in the original data.
-            if sat_entry(agent_start_bounds, show['boundingBox']):
+            if sat_entry(
+                agent_start_bounds.box_xz,
+                show['boundingBox'].box_xz
+            ):
                 raise SceneException(
                     f'Cannot convert {filename_prefix} because an object is '
                     f'on the agent\'s home in trial {index + 1}')
@@ -678,6 +681,10 @@ def _create_key_object(
         'z': KEY_OBJECT_SIZE[1]
     }
 
+    # The key probably shouldn't be a structural object, but keep it this way
+    # for Eval 4 so it's consistent with our released training data.
+    key_object['kinematic'] = True
+    key_object['structure'] = True
     key_object['hides'] = []
 
     return key_object
@@ -958,20 +965,19 @@ def _create_show(
                 (json_coords[1] + (json_size[1] / 2)) * unit_size[1]
             )
         },
+        'rotation': {'x': 0, 'y': 0, 'z': 0},
         'scale': {
             'x': object_size[0],
             'y': object_height[1],
             'z': object_size[1]
         }
     }
-    mcs_show['boundingBox'] = geometry.calc_obj_coords(
-        mcs_show['position']['x'],
-        mcs_show['position']['z'],
-        mcs_show['scale']['x'] / 2.0,
-        mcs_show['scale']['z'] / 2.0,
-        0,
-        0,
-        0
+    mcs_show['boundingBox'] = geometry.create_bounds(
+        dimensions=mcs_show['scale'],
+        offset={'x': 0, 'y': 0, 'z': 0},
+        position=mcs_show['position'],
+        rotation=mcs_show['rotation'],
+        standing_y=(mcs_show['scale']['y'] / 2.0)
     )
     return mcs_show
 
@@ -1174,14 +1180,20 @@ def _fix_key_location(
     )
     dimensions_x = KEY_OBJECT_ROTATION_Y[rotation_property]['dimensions_x']
     dimensions_z = KEY_OBJECT_ROTATION_Y[rotation_property]['dimensions_z']
-    this_show['boundingBox'] = geometry.calc_obj_coords(
-        this_show['position']['x'] - (dimensions_x / 2.0),
-        this_show['position']['z'] - (dimensions_z / 2.0),
-        dimensions_x / 2.0,
-        dimensions_z / 2.0,
-        0,
-        0,
-        0
+    this_show['boundingBox'] = geometry.create_bounds(
+        dimensions={
+            'x': dimensions_x,
+            'y': KEY_OBJECT_HEIGHT[1],
+            'z': dimensions_z
+        },
+        offset={'x': 0, 'y': 0, 'z': 0},
+        position={
+            'x': this_show['position']['x'] - (dimensions_x / 2.0),
+            'y': this_show['position']['y'],
+            'z': this_show['position']['z'] - (dimensions_z / 2.0)
+        },
+        rotation=this_show['rotation'],
+        standing_y=(KEY_OBJECT_HEIGHT[1] / 2.0)
     )
 
     # Adjust the key's height to above the agent when it starts moving.
@@ -1247,7 +1259,10 @@ def _move_agent_past_lock_location(
             lock_object['hides'][0]['stepBegin'] - 1
         ]
         for index_2, target_show in enumerate(agent_object['shows'][(index):]):
-            if sat_entry(target_show['boundingBox'], lock_bounds):
+            if sat_entry(
+                target_show['boundingBox'].box_xz,
+                lock_bounds.box_xz
+            ):
                 remove_list.append(index + index_2)
             else:
                 # Break once the movement exits the lock's position.
@@ -1337,7 +1352,7 @@ def _remove_intersecting_agent_steps(
                 )
                 if (
                     other_object_bounds and
-                    sat_entry(agent_bounds, other_object_bounds)
+                    sat_entry(agent_bounds.box_xz, other_object_bounds.box_xz)
                 ):
                     remove_step_list.append(step)
         agent_object['shows'] = [

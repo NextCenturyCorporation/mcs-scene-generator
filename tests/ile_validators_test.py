@@ -6,6 +6,8 @@ import pytest
 from ideal_learning_env import (
     ILEException,
     ILEValidator,
+    MinMaxFloat,
+    MinMaxInt,
     ValidateAnd,
     ValidateList,
     ValidateNoNullProp,
@@ -13,6 +15,7 @@ from ideal_learning_env import (
     ValidateOptions,
     ValidateOr,
     ValidateSpecific,
+    VectorFloatConfig,
     VectorIntConfig,
 )
 
@@ -36,7 +39,6 @@ def test_validate_no_null_prop():
     validator.validate('key', [{}])
     validator.validate('key', {'a': 'b'})
     validator.validate('key', [{'a': 'b'}])
-    validator.validate('key', VectorIntConfig())
 
 
 def test_validate_no_null_prop_dict_with_none():
@@ -74,6 +76,58 @@ def test_validate_number():
     assert validator.validate('key', 2)
     assert validator.validate('key', 2.5)
     assert validator.validate('key', 3)
+
+
+def test_validate_number_data_type_minmax():
+    validator = ValidateNumber(min_value=2, max_value=6)
+    assert validator.validate('key', MinMaxInt(2, 6))
+    assert validator.validate('key', MinMaxInt(3, 5))
+    assert validator.validate('key', MinMaxInt(4, 4))
+    assert validator.validate('key', MinMaxFloat(2, 6))
+    assert validator.validate('key', MinMaxFloat(2.1, 5.9))
+    assert validator.validate('key', MinMaxFloat(3.33, 3.33))
+
+
+def test_validate_number_data_type_minmax_with_max_above_max():
+    validator = ValidateNumber(min_value=2, max_value=6)
+    with pytest.raises(ILEException):
+        assert validator.validate('key', MinMaxInt(4, 7))
+
+
+def test_validate_number_data_type_minmax_with_max_below_min():
+    validator = ValidateNumber(min_value=2, max_value=6)
+    with pytest.raises(ILEException):
+        assert validator.validate('key', MinMaxInt(2, 1))
+
+
+def test_validate_number_data_type_minmax_with_min_above_max():
+    validator = ValidateNumber(min_value=2, max_value=6)
+    with pytest.raises(ILEException):
+        assert validator.validate('key', MinMaxInt(7, 6))
+
+
+def test_validate_number_data_type_minmax_with_min_below_min():
+    validator = ValidateNumber(min_value=2, max_value=6)
+    with pytest.raises(ILEException):
+        assert validator.validate('key', MinMaxInt(1, 4))
+
+
+def test_validate_number_data_type_vector():
+    validator = ValidateNumber(min_value=2, max_value=6)
+    assert validator.validate('key', VectorIntConfig(2, 4, 6))
+    assert validator.validate('key', VectorFloatConfig(2, 4, 6))
+
+
+def test_validate_number_data_type_vector_with_value_above_max():
+    validator = ValidateNumber(min_value=2, max_value=6)
+    with pytest.raises(ILEException):
+        assert validator.validate('key', VectorIntConfig(2, 4, 8))
+
+
+def test_validate_number_data_type_vector_with_value_below_min():
+    validator = ValidateNumber(min_value=2, max_value=6)
+    with pytest.raises(ILEException):
+        assert validator.validate('key', VectorIntConfig(1, 4, 6))
 
 
 def test_validate_number_negative_range():

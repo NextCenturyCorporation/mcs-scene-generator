@@ -5,11 +5,14 @@ from dataclasses import dataclass
 from typing import Any, Callable, Dict, List, NamedTuple, Tuple, Union
 
 from machine_common_sense.config_manager import Vector3d
+from shapely import geometry
 
 from .definitions import ChosenMaterial, ObjectDefinition, SizeChoice
 from .exceptions import SceneException
 from .materials import (
-    ALL_MATERIAL_TUPLES,
+    ALL_PRIMITIVE_MATERIAL_TUPLES,
+    ALL_UNRESTRICTED_MATERIAL_STRINGS,
+    ALL_UNRESTRICTED_MATERIAL_TUPLES,
     BLOCK_BLANK_MATERIALS,
     BLOCK_LETTER_MATERIALS,
     BLOCK_NUMBER_MATERIALS,
@@ -21,6 +24,7 @@ from .materials import (
     SOFA_3_MATERIALS,
     SOFA_CHAIR_1_MATERIALS,
     WOOD_MATERIALS,
+    MaterialTuple,
 )
 
 
@@ -94,6 +98,8 @@ class ObjectBaseSize():
     enclosed_area_list: ObjectInteractableArea = None
     open_area_list: List[ObjectInteractableArea] = None
     sideways: ObjectSidewaysSize = None
+    closed_dimensions: Vector3d = None
+    closed_offset: Vector3d = None
 
     def make(self, size_multiplier: Union[float, Vector3d]) -> SizeChoice:
         is_vector = isinstance(size_multiplier, Vector3d)
@@ -158,6 +164,8 @@ class ObjectBaseSize():
         } if self.sideways else None
         size = _choose_size_text(dimensions)
         return SizeChoice(
+            closedDimensions=self.closed_dimensions,
+            closedOffset=self.closed_offset,
             dimensions=dimensions,
             enclosedAreas=enclosedAreas,
             mass=mass,
@@ -188,6 +196,72 @@ _APPLE_2_SIZE = ObjectBaseSize(
     mass=0.5,
     offset=Vector3d(0, 0.002, 0),
     positionY=0.03
+)
+_BED_1_SIZE = ObjectBaseSize(
+    dimensions=Vector3d(1.299, 1.015, 2.108),
+    mass=20,
+    offset=Vector3d(0, 0.508, 0),
+    positionY=0,
+    open_area_list=[
+        ObjectInteractableArea(
+            dimensions=Vector3d(1.15, 0, 1.93),
+            position=Vector3d(0, 0.56, 0)
+        )
+    ]
+)
+_BED_2_SIZE = ObjectBaseSize(
+    dimensions=Vector3d(1.536, 1.096, 2.429),
+    mass=25,
+    offset=Vector3d(0, 0.546, 0),
+    positionY=0,
+    open_area_list=[
+        ObjectInteractableArea(
+            dimensions=Vector3d(1.43, 0, 2.27),
+            position=Vector3d(0, 0.82, 0)
+        )
+    ]
+)
+_BED_3_SIZE = ObjectBaseSize(
+    dimensions=Vector3d(1.475, 0.726, 2.113),
+    mass=25,
+    offset=Vector3d(0, 0.367, 0),
+    positionY=0,
+    open_area_list=[
+        ObjectInteractableArea(
+            dimensions=Vector3d(1.33, 0, 1.98),
+            position=Vector3d(0, 0.52, 0)
+        )
+    ]
+)
+_BED_4_SIZE = ObjectBaseSize(
+    dimensions=Vector3d(1.947, 1.751, 2.275),
+    mass=30,
+    offset=Vector3d(0, 0.875, 0),
+    positionY=0,
+    open_area_list=[
+        ObjectInteractableArea(
+            dimensions=Vector3d(1.78, 0, 2.14),
+            position=Vector3d(0, 0.85, 0)
+        )
+    ]
+)
+_BED_5_SIZE = ObjectBaseSize(
+    dimensions=Vector3d(1.261, 1.044, 2.371),
+    mass=20,
+    offset=Vector3d(0, 0.511, 0),
+    positionY=0,
+    open_area_list=[
+        ObjectInteractableArea(
+            dimensions=Vector3d(1.19, 0, 2.19),
+            position=Vector3d(0, 0.85, 0)
+        )
+    ]
+)
+_BED_6_SIZE = ObjectBaseSize(
+    dimensions=Vector3d(1.15, 2.2, 2.534),
+    mass=30,
+    offset=Vector3d(0, 1.1, 0),
+    positionY=0
 )
 # Coincidentally, all of the blocks have the same base size.
 _BLOCK_SIZE = ObjectBaseSize(
@@ -344,6 +418,18 @@ _CASE_1_SUITCASE_SIZE = ObjectBaseSize(
         )
     ]
 )
+_CASE_2_SIZE = ObjectBaseSize(
+    dimensions=Vector3d(0.78, 0.16, 0.48),
+    mass=5,
+    offset=Vector3d(0, 0.08, 0),
+    positionY=0,
+    enclosed_area_list=[
+        ObjectInteractableArea(
+            dimensions=Vector3d(0.7, 0.135, 0.4),
+            position=Vector3d(0, 0.0775, 0)
+        )
+    ]
+)
 _CASE_3_SIZE = ObjectBaseSize(
     dimensions=Vector3d(0.81, 0.21, 0.56),
     mass=5,
@@ -355,6 +441,12 @@ _CASE_3_SIZE = ObjectBaseSize(
             position=Vector3d(0, 0.105, 0)
         )
     ]
+)
+_CART_2_SIZE = ObjectBaseSize(
+    dimensions=Vector3d(0.42, 0.7, 0.51),
+    mass=2,
+    offset=Vector3d(0, 0.35, 0),
+    positionY=0.005
 )
 _CHAIR_1_SIZE = ObjectBaseSize(
     dimensions=Vector3d(0.54, 1.04, 0.46),
@@ -404,6 +496,96 @@ _CHAIR_4_OFFICE_SIZE = ObjectBaseSize(
         )
     ]
 )
+_CHAIR_5_SIZE = ObjectBaseSize(
+    dimensions=Vector3d(0.489, 0.864, 0.577),
+    mass=4,
+    offset=Vector3d(0, 0.416, 0),
+    positionY=0,
+    open_area_list=[
+        ObjectInteractableArea(
+            dimensions=Vector3d(0.378, 0, 0.448),
+            position=Vector3d(0, 0.383, 0.04)
+        )
+    ]
+)
+_CHAIR_6_SIZE = ObjectBaseSize(
+    dimensions=Vector3d(0.513, 0.984, 0.539),
+    mass=4,
+    offset=Vector3d(0, 0.492, 0),
+    positionY=0,
+    open_area_list=[
+        ObjectInteractableArea(
+            dimensions=Vector3d(0.414, 0, 0.392),
+            position=Vector3d(0, 0.492, 0.047)
+        )
+    ]
+)
+_CHAIR_7_SIZE = ObjectBaseSize(
+    dimensions=Vector3d(0.447, 0.891, 0.443),
+    mass=4,
+    offset=Vector3d(0, 0.446, 0),
+    positionY=0,
+    open_area_list=[
+        ObjectInteractableArea(
+            dimensions=Vector3d(0.413, 0, 0.309),
+            position=Vector3d(0, 0.425, 0.049)
+        )
+    ]
+)
+_CHAIR_8_SIZE = ObjectBaseSize(
+    dimensions=Vector3d(0.549, 0.781, 0.537),
+    mass=4,
+    offset=Vector3d(0, 0.391, 0),
+    positionY=0,
+    open_area_list=[
+        ObjectInteractableArea(
+            dimensions=Vector3d(0.5, 0, 0.395),
+            position=Vector3d(0, 0.389, 0.059)
+        )
+    ]
+)
+_CHANGING_TABLE_SIZE = ObjectBaseSize(
+    closed_dimensions=Vector3d(1.1, 0.96, 0.58),
+    closed_offset=Vector3d(0, 0.48, 0),
+    dimensions=Vector3d(1.1, 0.96, 0.89),
+    mass=50,
+    offset=Vector3d(0, 0.48, 0.155),
+    positionY=0,
+    enclosed_area_list=[
+        ObjectInteractableArea(
+            dimensions=Vector3d(0.68, 0.22, 0.41),
+            position=Vector3d(0.165, 0.47, -0.03),
+            area_id='_drawer_top'
+        ),
+        ObjectInteractableArea(
+            dimensions=Vector3d(0.68, 0.2, 0.41),
+            position=Vector3d(0.175, 0.19, -0.03),
+            area_id='_drawer_bottom'
+        )
+    ],
+    open_area_list=[
+        # Performer agent is too short to reach these areas effectively.
+        # ObjectInteractableArea(
+        #     dimensions=Vector3d(1, 0, 0.55),
+        #     position=Vector3d(0, 0.85, 0),
+        # ),
+        # ObjectInteractableArea(
+        #     dimensions=Vector3d(1.05, 0.2, 0.44),
+        #     position=Vector3d(0, 0.725, -0.05),
+        #     area_id='_shelf_top'
+        # ),
+        ObjectInteractableArea(
+            dimensions=Vector3d(0.32, 0.25, 0.44),
+            position=Vector3d(-0.365, 0.475, -0.05),
+            area_id='_shelf_middle'
+        ),
+        ObjectInteractableArea(
+            dimensions=Vector3d(0.32, 0.25, 0.44),
+            position=Vector3d(-0.365, 0.2, -0.05),
+            area_id='_shelf_bottom'
+        )
+    ]
+)
 _CHEST_1_CUBOID_SIZE = ObjectBaseSize(
     dimensions=Vector3d(0.83, 0.42, 0.55),
     mass=5,
@@ -440,6 +622,54 @@ _CHEST_3_CUBOID_SIZE = ObjectBaseSize(
         )
     ]
 )
+_CHEST_4_ROUNDED_LID_SIZE = ObjectBaseSize(
+    dimensions=Vector3d(0.72, 0.35, 0.34),
+    mass=5,
+    offset=Vector3d(0, 0.175, 0),
+    positionY=0,
+    enclosed_area_list=[
+        ObjectInteractableArea(
+            dimensions=Vector3d(0.64, 0.24, 0.24),
+            position=Vector3d(0, 0.16, 0)
+        )
+    ]
+)
+_CHEST_5_ROUNDED_LID_SIZE = ObjectBaseSize(
+    dimensions=Vector3d(0.46, 0.28, 0.42),
+    mass=5,
+    offset=Vector3d(0, 0.14, 0),
+    positionY=0,
+    enclosed_area_list=[
+        ObjectInteractableArea(
+            dimensions=Vector3d(0.34, 0.23, 0.28),
+            position=Vector3d(0, 0.135, -0.01)
+        )
+    ]
+)
+_CHEST_6_TRAPEZOID_LID_SIZE = ObjectBaseSize(
+    dimensions=Vector3d(0.5, 0.36, 0.38),
+    mass=5,
+    offset=Vector3d(0, 0.18, 0),
+    positionY=0,
+    enclosed_area_list=[
+        ObjectInteractableArea(
+            dimensions=Vector3d(0.37, 0.21, 0.245),
+            position=Vector3d(0, 0.15, -0.01)
+        )
+    ]
+)
+_CHEST_7_PIRATE_TREASURE_SIZE = ObjectBaseSize(
+    dimensions=Vector3d(0.59, 0.49, 0.42),
+    mass=5,
+    offset=Vector3d(0, 0.245, 0),
+    positionY=0,
+    enclosed_area_list=[
+        ObjectInteractableArea(
+            dimensions=Vector3d(0.38, 0.34, 0.26),
+            position=Vector3d(0, 0.185, 0)
+        )
+    ]
+)
 _CHEST_8_SEMICYLINDER_SIZE = ObjectBaseSize(
     dimensions=Vector3d(0.42, 0.32, 0.36),
     mass=5,
@@ -449,6 +679,18 @@ _CHEST_8_SEMICYLINDER_SIZE = ObjectBaseSize(
         ObjectInteractableArea(
             dimensions=Vector3d(0.36, 0.135, 0.28),
             position=Vector3d(0, 0.09, 0)
+        )
+    ]
+)
+_CHEST_9_TRAPEZOID_LID_SIZE = ObjectBaseSize(
+    dimensions=Vector3d(0.84, 0.41, 0.42),
+    mass=5,
+    offset=Vector3d(0, 0.205, 0),
+    positionY=0,
+    enclosed_area_list=[
+        ObjectInteractableArea(
+            dimensions=Vector3d(0.77, 0.28, 0.38),
+            position=Vector3d(0, 0.16, 0)
         )
     ]
 )
@@ -529,6 +771,12 @@ _PRIMITIVE_SIZE = ObjectBaseSize(
     mass=1,
     offset=Vector3d(0, 0.5, 0),
     positionY=0.5
+)
+_PRIMITIVE_ON_GROUND_SIZE = ObjectBaseSize(
+    dimensions=Vector3d(1, 1, 1),
+    mass=1,
+    offset=Vector3d(0, 0.5, 0),
+    positionY=0
 )
 _PRIMITIVE_TALL_NARROW_SIZE = ObjectBaseSize(
     dimensions=Vector3d(0.5, 1, 0.5),
@@ -642,6 +890,54 @@ _SOFA_3_SIZE = ObjectBaseSize(
         )
     ]
 )
+_SOFA_4_SIZE = ObjectBaseSize(
+    dimensions=Vector3d(1.594, 0.837, 1.007),
+    mass=30,
+    offset=Vector3d(0, 0.419, 0),
+    positionY=0,
+    open_area_list=[
+        ObjectInteractableArea(
+            dimensions=Vector3d(1.214, 0, 0.552),
+            position=Vector3d(0, 0.422, 0.049)
+        )
+    ]
+)
+_SOFA_5_SIZE = ObjectBaseSize(
+    dimensions=Vector3d(1.862, 0.902, 1),
+    mass=30,
+    offset=Vector3d(0, 0.451, 0),
+    positionY=0,
+    open_area_list=[
+        ObjectInteractableArea(
+            dimensions=Vector3d(1.444, 0, 0.639),
+            position=Vector3d(0, 0.496, 0.126)
+        )
+    ]
+)
+_SOFA_6_SIZE = ObjectBaseSize(
+    dimensions=Vector3d(1.692, 0.723, 0.916),
+    mass=30,
+    offset=Vector3d(0, 0.361, 0),
+    positionY=0,
+    open_area_list=[
+        ObjectInteractableArea(
+            dimensions=Vector3d(1.097, 0, 0.787),
+            position=Vector3d(0, 0.388, 0.057)
+        )
+    ]
+)
+_SOFA_7_SIZE = ObjectBaseSize(
+    dimensions=Vector3d(1.607, 0.848, 0.933),
+    mass=30,
+    offset=Vector3d(0, 0.424, 0),
+    positionY=0,
+    open_area_list=[
+        ObjectInteractableArea(
+            dimensions=Vector3d(1.294, 0, 0.762),
+            position=Vector3d(0, 0.459, 0.05)
+        )
+    ]
+)
 _SOFA_CHAIR_1_SIZE = ObjectBaseSize(
     dimensions=Vector3d(1.43, 1.15, 1.23),
     mass=30,
@@ -675,6 +971,54 @@ _SOFA_CHAIR_3_SIZE = ObjectBaseSize(
         ObjectInteractableArea(
             dimensions=Vector3d(0.975, 0, 0.65),
             position=Vector3d(0, 0.59, 0.15)
+        )
+    ]
+)
+_SOFA_CHAIR_4_SIZE = ObjectBaseSize(
+    dimensions=Vector3d(1, 0.857, 0.873),
+    mass=20,
+    offset=Vector3d(0, 0.429, 0),
+    positionY=0,
+    open_area_list=[
+        ObjectInteractableArea(
+            dimensions=Vector3d(0.5, 0, 0.736),
+            position=Vector3d(0, 0.393, 0.064)
+        )
+    ]
+)
+_SOFA_CHAIR_5_SIZE = ObjectBaseSize(
+    dimensions=Vector3d(0.957, 0.915, 1),
+    mass=20,
+    offset=Vector3d(0, 0.458, 0),
+    positionY=0,
+    open_area_list=[
+        ObjectInteractableArea(
+            dimensions=Vector3d(0.708, 0, 0.655),
+            position=Vector3d(0, 0.423, 0.132)
+        )
+    ]
+)
+_SOFA_CHAIR_6_SIZE = ObjectBaseSize(
+    dimensions=Vector3d(0.667, 0.637, 0.667),
+    mass=20,
+    offset=Vector3d(0, 0.318, 0),
+    positionY=0,
+    open_area_list=[
+        ObjectInteractableArea(
+            dimensions=Vector3d(0.5, 0, 0.446),
+            position=Vector3d(0, 0.27, 0.006)
+        )
+    ]
+)
+_SOFA_CHAIR_7_SIZE = ObjectBaseSize(
+    dimensions=Vector3d(0.691, 0.681, 0.634),
+    mass=20,
+    offset=Vector3d(0, 0.335, 0),
+    positionY=0,
+    open_area_list=[
+        ObjectInteractableArea(
+            dimensions=Vector3d(0.449, 0, 0.325),
+            position=Vector3d(0, 0.324, 0.087)
         )
     ]
 )
@@ -774,6 +1118,90 @@ _TABLE_11_AND_12_SIZE = ObjectBaseSize(
         )
     ]
 )
+_TABLE_13_SMALL_CIRCLE_SIZE = ObjectBaseSize(
+    dimensions=Vector3d(0.579, 0.622, 0.587),
+    mass=6,
+    offset=Vector3d(0, 0.311, 0),
+    positionY=0,
+    open_area_list=[
+        ObjectInteractableArea(
+            dimensions=Vector3d(0.3, 0, 0.3),
+            position=Vector3d(0, 0.52, 0)
+        )
+    ]
+)
+_TABLE_14_SMALL_RECT_SIZE = ObjectBaseSize(
+    dimensions=Vector3d(0.534, 0.59, 0.526),
+    mass=6,
+    offset=Vector3d(0, 0.295, 0),
+    positionY=0,
+    open_area_list=[
+        ObjectInteractableArea(
+            dimensions=Vector3d(0.5, 0, 0.5),
+            position=Vector3d(0, 0.485, 0)
+        )
+    ]
+)
+_TABLE_15_RECT_SIZE = ObjectBaseSize(
+    dimensions=Vector3d(1.334, 0.901, 0.791),
+    mass=15,
+    offset=Vector3d(0, 0.451, 0),
+    positionY=0,
+    open_area_list=[
+        ObjectInteractableArea(
+            dimensions=Vector3d(1.3, 0, 0.749),
+            position=Vector3d(0, 0.739, 0.02)
+        )
+    ]
+)
+_TABLE_16_CIRCLE_SIZE = ObjectBaseSize(
+    dimensions=Vector3d(1.058, 0.833, 1.054),
+    mass=15,
+    offset=Vector3d(0, 0.417, 0),
+    positionY=0,
+    open_area_list=[
+        ObjectInteractableArea(
+            dimensions=Vector3d(0.75, 0, 0.75),
+            position=Vector3d(0, 0.7, 0)
+        )
+    ]
+)
+_TOOLBOX_1_SIZE = ObjectBaseSize(
+    dimensions=Vector3d(0.51, 0.29, 0.21),
+    mass=5,
+    offset=Vector3d(0, 0.145, 0),
+    positionY=0,
+    enclosed_area_list=[
+        ObjectInteractableArea(
+            dimensions=Vector3d(0.5, 0.19, 0.19),
+            position=Vector3d(0, 0.1, 0)
+        )
+    ]
+)
+_TOOLBOX_2_SIZE = ObjectBaseSize(
+    dimensions=Vector3d(0.58, 0.33, 0.32),
+    mass=5,
+    offset=Vector3d(0, 0.165, 0),
+    positionY=0,
+    enclosed_area_list=[
+        ObjectInteractableArea(
+            dimensions=Vector3d(0.51, 0.3, 0.27),
+            position=Vector3d(0, 0.165, 0)
+        )
+    ]
+)
+_TOY_BUS_1_SIZE = ObjectBaseSize(
+    dimensions=Vector3d(0.28, 0.28, 0.52),
+    mass=0.5,
+    offset=Vector3d(0, 0.14, 0),
+    positionY=0.005
+)
+_TOY_CAR_2_SIZE = ObjectBaseSize(
+    dimensions=Vector3d(0.25, 0.2, 0.41),
+    mass=0.5,
+    offset=Vector3d(0, 0.1, 0),
+    positionY=0.005
+)
 _TOY_RACECAR_SIZE = ObjectBaseSize(
     dimensions=Vector3d(0.07, 0.06, 0.15),
     mass=0.5,
@@ -798,10 +1226,16 @@ _TOY_TROLLEY_SIZE = ObjectBaseSize(
     offset=Vector3d(0, 0.1, 0),
     positionY=0.005
 )
-_TOY_TRUCK_SIZE = ObjectBaseSize(
+_TOY_TRUCK_1_SIZE = ObjectBaseSize(
     dimensions=Vector3d(0.2, 0.18, 0.25),
     mass=1,
     offset=Vector3d(0, 0.09, 0),
+    positionY=0.1
+)
+_TOY_TRUCK_2_SIZE = ObjectBaseSize(
+    dimensions=Vector3d(0.14, 0.2, 0.28),
+    mass=1,
+    offset=Vector3d(0, 0.1, 0),
     positionY=0.005
 )
 _TROPHY_SIZE = ObjectBaseSize(
@@ -828,6 +1262,52 @@ _TV_SIZE = ObjectBaseSize(
     mass=5,
     offset=Vector3d(0, 0.5, 0),
     positionY=0.5,
+)
+_WARDROBE_SIZE = ObjectBaseSize(
+    closed_dimensions=Vector3d(1.07, 2.1, 0.49),
+    closed_offset=Vector3d(0, 1.05, 0),
+    dimensions=Vector3d(1.07, 2.1, 1),
+    mass=100,
+    offset=Vector3d(0, 1.05, 0.17),
+    positionY=0,
+    enclosed_area_list=[
+        # Performer agent is too short to reach these areas effectively.
+        # ObjectInteractableArea(
+        #     dimensions=Vector3d(0.49, 1.24, 0.46),
+        #     position=Vector3d(0.255, 1.165, 0.005),
+        #     area_id='_middle_shelf_right'
+        # ),
+        # ObjectInteractableArea(
+        #     dimensions=Vector3d(0.49, 0.98, 0.46),
+        #     position=Vector3d(-0.255, 1.295, 0.005),
+        #     area_id='_middle_shelf_left'
+        # ),
+        # ObjectInteractableArea(
+        #     dimensions=Vector3d(0.49, 0.24, 0.46),
+        #     position=Vector3d(-0.255, 0.665, 0.005),
+        #     area_id='_bottom_shelf_left'
+        # ),
+        ObjectInteractableArea(
+            dimensions=Vector3d(0.445, 0.16, 0.425),
+            position=Vector3d(-0.265, 0.42, 0.015),
+            area_id='_lower_drawer_top_left'
+        ),
+        ObjectInteractableArea(
+            dimensions=Vector3d(0.445, 0.16, 0.425),
+            position=Vector3d(0.265, 0.42, 0.015),
+            area_id='_lower_drawer_top_right'
+        ),
+        ObjectInteractableArea(
+            dimensions=Vector3d(0.445, 0.16, 0.425),
+            position=Vector3d(-0.265, 0.21, 0.015),
+            area_id='_lower_drawer_bottom_left'
+        ),
+        ObjectInteractableArea(
+            dimensions=Vector3d(0.445, 0.16, 0.425),
+            position=Vector3d(0.265, 0.21, 0.015),
+            area_id='_lower_drawer_bottom_right'
+        ),
+    ]
 )
 
 
@@ -867,6 +1347,95 @@ def _create_ball(args: _FunctionArgs) -> ObjectDefinition:
         chooseMaterialList=[item.copy() for item in args.chosen_material_list],
         chooseSizeList=[
             _PRIMITIVE_SIZE.make(size) for size in args.size_multiplier_list
+        ]
+    )
+
+
+def _create_bed_1(args: _FunctionArgs) -> ObjectDefinition:
+    return ObjectDefinition(
+        type='bed_1',
+        untrainedShape=True,
+        attributes=['receptacle'],
+        occluder=True,
+        shape=['bed'],
+        stackTarget=True,
+        chooseMaterialList=[item.copy() for item in args.chosen_material_list],
+        chooseSizeList=[
+            _BED_1_SIZE.make(size) for size in args.size_multiplier_list
+        ]
+    )
+
+
+def _create_bed_2(args: _FunctionArgs) -> ObjectDefinition:
+    return ObjectDefinition(
+        type='bed_2',
+        untrainedShape=True,
+        attributes=['receptacle'],
+        occluder=True,
+        shape=['bed'],
+        stackTarget=True,
+        chooseMaterialList=[item.copy() for item in args.chosen_material_list],
+        chooseSizeList=[
+            _BED_2_SIZE.make(size) for size in args.size_multiplier_list
+        ]
+    )
+
+
+def _create_bed_3(args: _FunctionArgs) -> ObjectDefinition:
+    return ObjectDefinition(
+        type='bed_3',
+        untrainedShape=True,
+        attributes=['receptacle'],
+        occluder=True,
+        shape=['bed'],
+        stackTarget=True,
+        chooseMaterialList=[item.copy() for item in args.chosen_material_list],
+        chooseSizeList=[
+            _BED_3_SIZE.make(size) for size in args.size_multiplier_list
+        ]
+    )
+
+
+def _create_bed_4(args: _FunctionArgs) -> ObjectDefinition:
+    return ObjectDefinition(
+        type='bed_4',
+        untrainedShape=True,
+        attributes=['receptacle'],
+        occluder=True,
+        shape=['bed'],
+        stackTarget=True,
+        chooseMaterialList=[item.copy() for item in args.chosen_material_list],
+        chooseSizeList=[
+            _BED_4_SIZE.make(size) for size in args.size_multiplier_list
+        ]
+    )
+
+
+def _create_bed_5(args: _FunctionArgs) -> ObjectDefinition:
+    return ObjectDefinition(
+        type='bed_5',
+        untrainedShape=True,
+        attributes=['receptacle'],
+        obstacle=True,
+        shape=['bed'],
+        stackTarget=True,
+        chooseMaterialList=[item.copy() for item in args.chosen_material_list],
+        chooseSizeList=[
+            _BED_5_SIZE.make(size) for size in args.size_multiplier_list
+        ]
+    )
+
+
+def _create_bed_6(args: _FunctionArgs) -> ObjectDefinition:
+    return ObjectDefinition(
+        type='bed_6',
+        untrainedShape=True,
+        attributes=[],
+        obstacle=True,
+        shape=['bed'],
+        chooseMaterialList=[item.copy() for item in args.chosen_material_list],
+        chooseSizeList=[
+            _BED_6_SIZE.make(size) for size in args.size_multiplier_list
         ]
     )
 
@@ -1134,6 +1703,21 @@ def _create_case_1(args: _FunctionArgs) -> ObjectDefinition:
     )
 
 
+def _create_case_2(args: _FunctionArgs) -> ObjectDefinition:
+    return ObjectDefinition(
+        type='case_2',
+        untrainedShape=True,
+        attributes=['receptacle', 'openable'],
+        occluder=True,
+        shape=['case'],
+        chooseMaterialList=[item.copy() for item in args.chosen_material_list],
+        chooseSizeList=[
+            _CASE_2_SIZE.make(size) for size in
+            args.size_multiplier_list
+        ]
+    )
+
+
 def _create_case_3(args: _FunctionArgs) -> ObjectDefinition:
     return ObjectDefinition(
         type='case_3',
@@ -1143,6 +1727,19 @@ def _create_case_3(args: _FunctionArgs) -> ObjectDefinition:
         chooseMaterialList=[item.copy() for item in args.chosen_material_list],
         chooseSizeList=[
             _CASE_3_SIZE.make(size) for size in args.size_multiplier_list
+        ]
+    )
+
+
+def _create_cart_2(args: _FunctionArgs) -> ObjectDefinition:
+    return ObjectDefinition(
+        type='cart_2',
+        untrainedShape=True,
+        attributes=['moveable', 'pickupable'],
+        shape=['cart'],
+        chooseMaterialList=[item.copy() for item in args.chosen_material_list],
+        chooseSizeList=[
+            _CART_2_SIZE.make(size) for size in args.size_multiplier_list
         ]
     )
 
@@ -1205,6 +1802,86 @@ def _create_chair_4(args: _FunctionArgs) -> ObjectDefinition:
     )
 
 
+def _create_chair_5(args: _FunctionArgs) -> ObjectDefinition:
+    return ObjectDefinition(
+        type='chair_5',
+        untrainedShape=True,
+        attributes=['moveable', 'receptacle'],
+        obstacle=True,
+        shape=['chair'],
+        chooseMaterialList=[
+            item.copy(2) for item in args.chosen_material_list
+        ],
+        chooseSizeList=[
+            _CHAIR_5_SIZE.make(size) for size in
+            args.size_multiplier_list
+        ]
+    )
+
+
+def _create_chair_6(args: _FunctionArgs) -> ObjectDefinition:
+    return ObjectDefinition(
+        type='chair_6',
+        untrainedShape=True,
+        attributes=['moveable', 'receptacle'],
+        obstacle=True,
+        shape=['chair'],
+        chooseMaterialList=[
+            item.copy(2) for item in args.chosen_material_list
+        ],
+        chooseSizeList=[
+            _CHAIR_6_SIZE.make(size) for size in
+            args.size_multiplier_list
+        ]
+    )
+
+
+def _create_chair_7(args: _FunctionArgs) -> ObjectDefinition:
+    return ObjectDefinition(
+        type='chair_7',
+        untrainedShape=True,
+        attributes=['moveable', 'receptacle'],
+        obstacle=True,
+        shape=['chair'],
+        chooseMaterialList=[item.copy() for item in args.chosen_material_list],
+        chooseSizeList=[
+            _CHAIR_7_SIZE.make(size) for size in
+            args.size_multiplier_list
+        ]
+    )
+
+
+def _create_chair_8(args: _FunctionArgs) -> ObjectDefinition:
+    return ObjectDefinition(
+        type='chair_8',
+        untrainedShape=True,
+        attributes=['moveable', 'receptacle'],
+        obstacle=True,
+        shape=['chair'],
+        chooseMaterialList=[
+            item.copy(2) for item in args.chosen_material_list
+        ],
+        chooseSizeList=[
+            _CHAIR_8_SIZE.make(size) for size in
+            args.size_multiplier_list
+        ]
+    )
+
+
+def _create_changing_table(args: _FunctionArgs) -> ObjectDefinition:
+    return ObjectDefinition(
+        type='changing_table',
+        attributes=['receptacle', 'openable'],
+        occluder=True,
+        shape=['changing table'],
+        chooseMaterialList=[item.copy() for item in args.chosen_material_list],
+        chooseSizeList=[
+            _CHANGING_TABLE_SIZE.make(size) for size in
+            args.size_multiplier_list
+        ]
+    )
+
+
 def _create_chest_1(args: _FunctionArgs) -> ObjectDefinition:
     return ObjectDefinition(
         type='chest_1',
@@ -1247,6 +1924,66 @@ def _create_chest_3(args: _FunctionArgs) -> ObjectDefinition:
     )
 
 
+def _create_chest_4(args: _FunctionArgs) -> ObjectDefinition:
+    return ObjectDefinition(
+        type='chest_4',
+        untrainedShape=True,
+        attributes=['receptacle', 'openable'],
+        occluder=True,
+        shape=['chest'],
+        chooseMaterialList=[item.copy() for item in args.chosen_material_list],
+        chooseSizeList=[
+            _CHEST_4_ROUNDED_LID_SIZE.make(size) for size in
+            args.size_multiplier_list
+        ]
+    )
+
+
+def _create_chest_5(args: _FunctionArgs) -> ObjectDefinition:
+    return ObjectDefinition(
+        type='chest_5',
+        untrainedShape=True,
+        attributes=['receptacle', 'openable'],
+        occluder=True,
+        shape=['chest'],
+        chooseMaterialList=[item.copy() for item in args.chosen_material_list],
+        chooseSizeList=[
+            _CHEST_5_ROUNDED_LID_SIZE.make(size) for size in
+            args.size_multiplier_list
+        ]
+    )
+
+
+def _create_chest_6(args: _FunctionArgs) -> ObjectDefinition:
+    return ObjectDefinition(
+        type='chest_6',
+        untrainedShape=True,
+        attributes=['receptacle', 'openable'],
+        occluder=True,
+        shape=['chest'],
+        chooseMaterialList=[item.copy() for item in args.chosen_material_list],
+        chooseSizeList=[
+            _CHEST_6_TRAPEZOID_LID_SIZE.make(size) for size in
+            args.size_multiplier_list
+        ]
+    )
+
+
+def _create_chest_7(args: _FunctionArgs) -> ObjectDefinition:
+    return ObjectDefinition(
+        type='chest_7',
+        untrainedShape=True,
+        attributes=['receptacle', 'openable'],
+        occluder=True,
+        shape=['chest'],
+        chooseMaterialList=[item.copy() for item in args.chosen_material_list],
+        chooseSizeList=[
+            _CHEST_7_PIRATE_TREASURE_SIZE.make(size) for size in
+            args.size_multiplier_list
+        ]
+    )
+
+
 def _create_chest_8(args: _FunctionArgs) -> ObjectDefinition:
     return ObjectDefinition(
         type='chest_8',
@@ -1261,13 +1998,28 @@ def _create_chest_8(args: _FunctionArgs) -> ObjectDefinition:
     )
 
 
+def _create_chest_9(args: _FunctionArgs) -> ObjectDefinition:
+    return ObjectDefinition(
+        type='chest_9',
+        untrainedShape=True,
+        attributes=['receptacle', 'openable'],
+        occluder=True,
+        shape=['chest'],
+        chooseMaterialList=[item.copy() for item in args.chosen_material_list],
+        chooseSizeList=[
+            _CHEST_9_TRAPEZOID_LID_SIZE.make(size) for size in
+            args.size_multiplier_list
+        ]
+    )
+
+
 def _create_crayon(args: _FunctionArgs) -> ObjectDefinition:
     color = args.type.replace('crayon_', '')
     return ObjectDefinition(
         # The type should be in the format of 'crayon_<color>'
         type=args.type,
         attributes=['moveable', 'pickupable'],
-        color=((['red'] if color == 'pink' else []) + [color]),
+        color=((['pink', 'red'] if color == 'pink' else []) + [color]),
         materials=[],
         salientMaterials=['wax'],
         shape=['crayon'],
@@ -1332,11 +2084,10 @@ def _create_cup_6(args: _FunctionArgs) -> ObjectDefinition:
 def _create_dog_on_wheels(args: _FunctionArgs) -> ObjectDefinition:
     return ObjectDefinition(
         type='dog_on_wheels',
+        untrainedShape=True,
         attributes=['moveable', 'pickupable'],
         shape=['dog'],
-        chooseMaterialList=[
-            item.copy(2) for item in args.chosen_material_list
-        ],
+        chooseMaterialList=[item.copy() for item in args.chosen_material_list],
         chooseSizeList=[
             _DOG_ON_WHEELS_SIZE.make(size) for size in
             args.size_multiplier_list
@@ -1384,27 +2135,27 @@ def _create_letter_l_narrow_tall(args: _FunctionArgs) -> ObjectDefinition:
         ]
     )
     definition.poleOffsetX = -0.2
-    definition.poly = [
-        {'x': 0.25, 'z': -0.5},
-        {'x': -0.25, 'z': -0.5},
-        {'x': -0.25, 'z': 0.5},
-        {'x': -0.15, 'z': 0.5},
-        {'x': -0.15, 'z': -0.4},
-        {'x': 0.25, 'z': -0.4}
-    ]
+    definition.poly = geometry.Polygon([
+        (0.25, -0.5),
+        (-0.25, -0.5),
+        (-0.25, 0.5),
+        (-0.15, 0.5),
+        (-0.15, -0.4),
+        (0.25, -0.4)
+    ])
     return definition
 
 
 def _create_letter_l_wide(args: _FunctionArgs) -> ObjectDefinition:
     definition = _create_primitive_non_cylinder(args)
-    definition.poly = [
-        {'x': 0.5, 'z': -0.5},
-        {'x': -0.5, 'z': -0.5},
-        {'x': -0.5, 'z': 0.5},
-        {'x': 0, 'z': 0.5},
-        {'x': 0, 'z': 0},
-        {'x': 0.5, 'z': 0}
-    ]
+    definition.poly = geometry.Polygon([
+        (0.5, -0.5),
+        (-0.5, -0.5),
+        (-0.5, 0.5),
+        (0, 0.5),
+        (0, 0),
+        (0.5, 0)
+    ])
     return definition
 
 
@@ -1419,14 +2170,14 @@ def _create_letter_l_wide_tall(args: _FunctionArgs) -> ObjectDefinition:
             args.size_multiplier_list
         ]
     )
-    definition.poly = [
-        {'x': 0.5, 'z': -1.0},
-        {'x': -0.5, 'z': -1.0},
-        {'x': -0.5, 'z': 1.0},
-        {'x': 0, 'z': 1.0},
-        {'x': 0, 'z': -0.5},
-        {'x': 0.5, 'z': -0.5}
-    ]
+    definition.poly = geometry.Polygon([
+        (0.5, -1.0),
+        (-0.5, -1.0),
+        (-0.5, 1.0),
+        (0, 1.0),
+        (0, -0.5),
+        (0.5, -0.5)
+    ])
     return definition
 
 
@@ -1483,6 +2234,22 @@ def _create_plate_4(args: _FunctionArgs) -> ObjectDefinition:
     )
 
 
+def _create_primitive_helper(
+    args: _FunctionArgs,
+    size_list: List[SizeChoice]
+) -> ObjectDefinition:
+    return ObjectDefinition(
+        type=args.type,
+        attributes=['physics'],
+        shape=[' '.join([
+            text for text in args.type.replace('_', ' ').split(' ')
+            if not text.isnumeric()
+        ])],
+        chooseMaterialList=[item.copy() for item in args.chosen_material_list],
+        chooseSizeList=size_list
+    )
+
+
 def _create_primitive_cylinder(args: _FunctionArgs) -> ObjectDefinition:
     size_list = [
         _PRIMITIVE_SIZE.make(size) for size in args.size_multiplier_list
@@ -1491,26 +2258,21 @@ def _create_primitive_cylinder(args: _FunctionArgs) -> ObjectDefinition:
         # Halve the Y scale here, but not its dimensions or other properties,
         # because Unity will automatically double a cylinder's height.
         size.scale.y *= 0.5
-    return ObjectDefinition(
-        type='cylinder',
-        attributes=['physics'],
-        shape=['cylinder'],
-        chooseMaterialList=[item.copy() for item in args.chosen_material_list],
-        chooseSizeList=size_list
-    )
+    return _create_primitive_helper(args, size_list)
 
 
 # Size data for non-cylinder primitive objects (cones, cubes, spheres, etc.)
 def _create_primitive_non_cylinder(args: _FunctionArgs) -> ObjectDefinition:
-    return ObjectDefinition(
-        type=args.type,
-        attributes=['physics'],
-        shape=[args.type.replace('_', ' ')],
-        chooseMaterialList=[item.copy() for item in args.chosen_material_list],
-        chooseSizeList=[
-            _PRIMITIVE_SIZE.make(size) for size in args.size_multiplier_list
-        ]
-    )
+    return _create_primitive_helper(args, [
+        _PRIMITIVE_SIZE.make(size) for size in args.size_multiplier_list
+    ])
+
+
+def _create_primitive_on_ground(args: _FunctionArgs) -> ObjectDefinition:
+    return _create_primitive_helper(args, [
+        _PRIMITIVE_ON_GROUND_SIZE.make(size)
+        for size in args.size_multiplier_list
+    ])
 
 
 def _create_soccer_ball(args: _FunctionArgs) -> ObjectDefinition:
@@ -1602,6 +2364,74 @@ def _create_sofa_3(args: _FunctionArgs) -> ObjectDefinition:
     )
 
 
+def _create_sofa_4(args: _FunctionArgs) -> ObjectDefinition:
+    return ObjectDefinition(
+        type='sofa_4',
+        untrainedShape=True,
+        attributes=['receptacle'],
+        color=['grey'],
+        materialCategory=[],
+        occluder=True,
+        salientMaterials=['fabric'],
+        shape=['sofa'],
+        stackTarget=True,
+        chooseSizeList=[
+            _SOFA_4_SIZE.make(size) for size in args.size_multiplier_list
+        ]
+    )
+
+
+def _create_sofa_5(args: _FunctionArgs) -> ObjectDefinition:
+    return ObjectDefinition(
+        type='sofa_5',
+        untrainedShape=True,
+        attributes=['receptacle'],
+        color=['white'],
+        materialCategory=[],
+        occluder=True,
+        salientMaterials=['fabric'],
+        shape=['sofa'],
+        stackTarget=True,
+        chooseSizeList=[
+            _SOFA_5_SIZE.make(size) for size in args.size_multiplier_list
+        ]
+    )
+
+
+def _create_sofa_6(args: _FunctionArgs) -> ObjectDefinition:
+    return ObjectDefinition(
+        type='sofa_6',
+        untrainedShape=True,
+        attributes=['receptacle'],
+        color=['brown'],
+        materialCategory=[],
+        occluder=True,
+        salientMaterials=['fabric'],
+        shape=['sofa'],
+        stackTarget=True,
+        chooseSizeList=[
+            _SOFA_6_SIZE.make(size) for size in args.size_multiplier_list
+        ]
+    )
+
+
+def _create_sofa_7(args: _FunctionArgs) -> ObjectDefinition:
+    return ObjectDefinition(
+        type='sofa_7',
+        untrainedShape=True,
+        attributes=['receptacle'],
+        color=['grey'],
+        materialCategory=[],
+        occluder=True,
+        salientMaterials=['fabric'],
+        shape=['sofa'],
+        stackTarget=True,
+        chooseSizeList=[
+            _SOFA_7_SIZE.make(size) for size in args.size_multiplier_list
+        ]
+    )
+
+
 def _create_sofa_chair_1(args: _FunctionArgs) -> ObjectDefinition:
     return ObjectDefinition(
         type='sofa_chair_1',
@@ -1610,7 +2440,7 @@ def _create_sofa_chair_1(args: _FunctionArgs) -> ObjectDefinition:
         materialCategory=['sofa_chair_1'],
         occluder=True,
         salientMaterials=['fabric'],
-        shape=['sofa'],
+        shape=['sofa chair'],
         stackTarget=True,
         chooseSizeList=[
             _SOFA_CHAIR_1_SIZE.make(size) for size in args.size_multiplier_list
@@ -1625,7 +2455,7 @@ def _create_sofa_chair_2(args: _FunctionArgs) -> ObjectDefinition:
         materialCategory=['sofa_2'],
         occluder=True,
         salientMaterials=['fabric'],
-        shape=['sofa'],
+        shape=['sofa chair'],
         stackTarget=True,
         chooseSizeList=[
             _SOFA_CHAIR_2_SIZE.make(size) for size in args.size_multiplier_list
@@ -1640,10 +2470,78 @@ def _create_sofa_chair_3(args: _FunctionArgs) -> ObjectDefinition:
         materialCategory=['sofa_3'],
         occluder=True,
         salientMaterials=['fabric'],
-        shape=['sofa'],
+        shape=['sofa chair'],
         stackTarget=True,
         chooseSizeList=[
             _SOFA_CHAIR_3_SIZE.make(size) for size in args.size_multiplier_list
+        ]
+    )
+
+
+def _create_sofa_chair_4(args: _FunctionArgs) -> ObjectDefinition:
+    return ObjectDefinition(
+        type='sofa_chair_4',
+        untrainedShape=True,
+        attributes=['receptacle'],
+        color=['brown'],
+        materialCategory=[],
+        occluder=True,
+        salientMaterials=['fabric'],
+        shape=['sofa chair'],
+        stackTarget=True,
+        chooseSizeList=[
+            _SOFA_CHAIR_4_SIZE.make(size) for size in args.size_multiplier_list
+        ]
+    )
+
+
+def _create_sofa_chair_5(args: _FunctionArgs) -> ObjectDefinition:
+    return ObjectDefinition(
+        type='sofa_chair_5',
+        untrainedShape=True,
+        attributes=['receptacle'],
+        color=['blue'],
+        materialCategory=[],
+        occluder=True,
+        salientMaterials=['fabric'],
+        shape=['sofa chair'],
+        stackTarget=True,
+        chooseSizeList=[
+            _SOFA_CHAIR_5_SIZE.make(size) for size in args.size_multiplier_list
+        ]
+    )
+
+
+def _create_sofa_chair_6(args: _FunctionArgs) -> ObjectDefinition:
+    return ObjectDefinition(
+        type='sofa_chair_6',
+        untrainedShape=True,
+        attributes=['receptacle'],
+        color=['brown'],
+        materialCategory=[],
+        occluder=True,
+        salientMaterials=['fabric'],
+        shape=['sofa chair'],
+        stackTarget=True,
+        chooseSizeList=[
+            _SOFA_CHAIR_6_SIZE.make(size) for size in args.size_multiplier_list
+        ]
+    )
+
+
+def _create_sofa_chair_7(args: _FunctionArgs) -> ObjectDefinition:
+    return ObjectDefinition(
+        type='sofa_chair_7',
+        untrainedShape=True,
+        attributes=['receptacle'],
+        color=['white'],
+        materialCategory=[],
+        occluder=True,
+        salientMaterials=['fabric'],
+        shape=['sofa chair'],
+        stackTarget=True,
+        chooseSizeList=[
+            _SOFA_CHAIR_7_SIZE.make(size) for size in args.size_multiplier_list
         ]
     )
 
@@ -1716,7 +2614,7 @@ def _create_table_4(args: _FunctionArgs) -> ObjectDefinition:
 def _create_table_5(args: _FunctionArgs) -> ObjectDefinition:
     return ObjectDefinition(
         type='table_5',
-        attributes=['receptacle'],
+        attributes=['moveable', 'receptacle'],
         occluder=True,
         shape=['table'],
         stackTarget=True,
@@ -1733,7 +2631,7 @@ def _create_table_5(args: _FunctionArgs) -> ObjectDefinition:
 def _create_table_7(args: _FunctionArgs) -> ObjectDefinition:
     return ObjectDefinition(
         type='table_7',
-        attributes=['receptacle'],
+        attributes=['moveable', 'receptacle'],
         obstacle=True,
         shape=['table'],
         stackTarget=True,
@@ -1750,7 +2648,7 @@ def _create_table_7(args: _FunctionArgs) -> ObjectDefinition:
 def _create_table_8(args: _FunctionArgs) -> ObjectDefinition:
     return ObjectDefinition(
         type='table_8',
-        attributes=['receptacle'],
+        attributes=['moveable', 'receptacle'],
         obstacle=True,
         shape=['table'],
         stackTarget=True,
@@ -1767,7 +2665,7 @@ def _create_table_8(args: _FunctionArgs) -> ObjectDefinition:
 def _create_table_11(args: _FunctionArgs) -> ObjectDefinition:
     return ObjectDefinition(
         type='table_11',
-        attributes=['receptacle'],
+        attributes=['moveable', 'receptacle'],
         occluder=True,
         shape=['table'],
         stackTarget=True,
@@ -1782,7 +2680,7 @@ def _create_table_11(args: _FunctionArgs) -> ObjectDefinition:
 def _create_table_12(args: _FunctionArgs) -> ObjectDefinition:
     return ObjectDefinition(
         type='table_12',
-        attributes=['receptacle'],
+        attributes=['moveable', 'receptacle'],
         occluder=True,
         shape=['table'],
         stackTarget=True,
@@ -1790,6 +2688,128 @@ def _create_table_12(args: _FunctionArgs) -> ObjectDefinition:
         chooseSizeList=[
             _TABLE_11_AND_12_SIZE.make(size) for size in
             args.size_multiplier_list
+        ]
+    )
+
+
+def _create_table_13(args: _FunctionArgs) -> ObjectDefinition:
+    return ObjectDefinition(
+        type='table_13',
+        untrainedShape=True,
+        attributes=['moveable', 'receptacle'],
+        obstacle=True,
+        shape=['table'],
+        stackTarget=True,
+        chooseMaterialList=[item.copy() for item in args.chosen_material_list],
+        chooseSizeList=[
+            _TABLE_13_SMALL_CIRCLE_SIZE.make(size) for size in
+            args.size_multiplier_list
+        ]
+    )
+
+
+def _create_table_14(args: _FunctionArgs) -> ObjectDefinition:
+    return ObjectDefinition(
+        type='table_14',
+        untrainedShape=True,
+        attributes=['moveable', 'receptacle'],
+        obstacle=True,
+        shape=['table'],
+        stackTarget=True,
+        chooseMaterialList=[item.copy() for item in args.chosen_material_list],
+        chooseSizeList=[
+            _TABLE_14_SMALL_RECT_SIZE.make(size) for size in
+            args.size_multiplier_list
+        ]
+    )
+
+
+def _create_table_15(args: _FunctionArgs) -> ObjectDefinition:
+    return ObjectDefinition(
+        type='table_15',
+        untrainedShape=True,
+        attributes=['moveable', 'receptacle'],
+        obstacle=True,
+        shape=['table'],
+        stackTarget=True,
+        chooseMaterialList=[
+            item.copy(2) for item in args.chosen_material_list
+        ],
+        chooseSizeList=[
+            _TABLE_15_RECT_SIZE.make(size) for size in
+            args.size_multiplier_list
+        ]
+    )
+
+
+def _create_table_16(args: _FunctionArgs) -> ObjectDefinition:
+    return ObjectDefinition(
+        type='table_16',
+        untrainedShape=True,
+        attributes=['moveable', 'receptacle'],
+        obstacle=True,
+        shape=['table'],
+        stackTarget=True,
+        chooseMaterialList=[item.copy() for item in args.chosen_material_list],
+        chooseSizeList=[
+            _TABLE_16_CIRCLE_SIZE.make(size) for size in
+            args.size_multiplier_list
+        ]
+    )
+
+
+def _create_toolbox_1(args: _FunctionArgs) -> ObjectDefinition:
+    return ObjectDefinition(
+        type='toolbox_1',
+        untrainedShape=True,
+        attributes=['receptacle', 'openable'],
+        occluder=True,
+        shape=['toolbox'],
+        chooseMaterialList=[item.copy() for item in args.chosen_material_list],
+        chooseSizeList=[
+            _TOOLBOX_1_SIZE.make(size) for size in
+            args.size_multiplier_list
+        ]
+    )
+
+
+def _create_toolbox_2(args: _FunctionArgs) -> ObjectDefinition:
+    return ObjectDefinition(
+        type='toolbox_2',
+        untrainedShape=True,
+        attributes=['receptacle', 'openable'],
+        occluder=True,
+        shape=['toolbox'],
+        chooseMaterialList=[item.copy() for item in args.chosen_material_list],
+        chooseSizeList=[
+            _TOOLBOX_2_SIZE.make(size) for size in
+            args.size_multiplier_list
+        ]
+    )
+
+
+def _create_toy_bus_1(args: _FunctionArgs) -> ObjectDefinition:
+    return ObjectDefinition(
+        type='bus_1',
+        untrainedShape=True,
+        attributes=['moveable', 'pickupable'],
+        shape=['bus'],
+        chooseMaterialList=[item.copy() for item in args.chosen_material_list],
+        chooseSizeList=[
+            _TOY_BUS_1_SIZE.make(size) for size in args.size_multiplier_list
+        ]
+    )
+
+
+def _create_toy_car_2(args: _FunctionArgs) -> ObjectDefinition:
+    return ObjectDefinition(
+        type='car_2',
+        untrainedShape=True,
+        attributes=['moveable', 'pickupable'],
+        shape=['car'],
+        chooseMaterialList=[item.copy() for item in args.chosen_material_list],
+        chooseSizeList=[
+            _TOY_CAR_2_SIZE.make(size) for size in args.size_multiplier_list
         ]
     )
 
@@ -1843,16 +2863,30 @@ def _create_toy_trolley(args: _FunctionArgs) -> ObjectDefinition:
     )
 
 
-def _create_toy_truck(args: _FunctionArgs) -> ObjectDefinition:
+def _create_toy_truck_1(args: _FunctionArgs) -> ObjectDefinition:
     return ObjectDefinition(
         type='truck_1',
+        untrainedShape=True,
         attributes=['moveable', 'pickupable'],
         shape=['truck'],
         chooseMaterialList=[
             item.copy(2) for item in args.chosen_material_list
         ],
         chooseSizeList=[
-            _TOY_TRUCK_SIZE.make(size) for size in args.size_multiplier_list
+            _TOY_TRUCK_1_SIZE.make(size) for size in args.size_multiplier_list
+        ]
+    )
+
+
+def _create_toy_truck_2(args: _FunctionArgs) -> ObjectDefinition:
+    return ObjectDefinition(
+        type='truck_2',
+        untrainedShape=True,
+        attributes=['moveable', 'pickupable'],
+        shape=['truck'],
+        chooseMaterialList=[item.copy() for item in args.chosen_material_list],
+        chooseSizeList=[
+            _TOY_TRUCK_2_SIZE.make(size) for size in args.size_multiplier_list
         ]
     )
 
@@ -1899,66 +2933,56 @@ def _create_tv(args: _FunctionArgs) -> ObjectDefinition:
     )
 
 
+def _create_wardrobe(args: _FunctionArgs) -> ObjectDefinition:
+    return ObjectDefinition(
+        type='wardrobe',
+        attributes=['receptacle', 'openable'],
+        occluder=True,
+        shape=['wardrobe'],
+        chooseMaterialList=[item.copy() for item in args.chosen_material_list],
+        chooseSizeList=[
+            _WARDROBE_SIZE.make(size) for size in args.size_multiplier_list
+        ]
+    )
+
+
 class TypeDetailsTuple(NamedTuple):
     definition_function: Callable[[_FunctionArgs], ObjectDefinition]
-    material_restrictions: List[Tuple[str, List[str]]]
+    material_restrictions: List[MaterialTuple]
 
 
 """Given a type, returns details that include a function to create and any
     material restrictions.  If materials restrictions is None, the shape can
     be any material."""
 _TYPES_TO_DETAILS: Dict[str, TypeDetailsTuple] = {
-    # primitives
-    'circle_frustum': TypeDetailsTuple(
-        _create_primitive_non_cylinder,
-        None
-    ), 'cone': TypeDetailsTuple(
-        _create_primitive_non_cylinder,
-        None
-    ), 'cube': TypeDetailsTuple(
-        _create_primitive_non_cylinder,
-        None
-    ), 'cylinder': TypeDetailsTuple(
-        _create_primitive_cylinder,
-        None
-    ), 'letter_l_narrow': TypeDetailsTuple(
-        _create_letter_l_narrow_tall,
-        None
-    ), 'letter_l_wide': TypeDetailsTuple(
-        _create_letter_l_wide,
-        None
-    ), 'letter_l_wide_tall': TypeDetailsTuple(
-        _create_letter_l_wide_tall,
-        None
-    ), 'pyramid': TypeDetailsTuple(
-        _create_primitive_non_cylinder,
-        None
-    ), 'sphere': TypeDetailsTuple(
-        _create_primitive_non_cylinder,
-        None
-    ), 'square_frustum': TypeDetailsTuple(
-        _create_primitive_non_cylinder,
-        None
-    ), 'triangle': TypeDetailsTuple(
-        _create_primitive_non_cylinder,
-        None
-    ), 'tube_narrow': TypeDetailsTuple(
-        _create_primitive_non_cylinder,
-        None
-    ), 'tube_wide': TypeDetailsTuple(
-        _create_primitive_non_cylinder,
-        None
-        # non-primitives
-    ), 'apple_1': TypeDetailsTuple(
+    'apple_1': TypeDetailsTuple(
         _create_apple_1,
-        None
+        []  # No material
     ), 'apple_2': TypeDetailsTuple(
         _create_apple_2,
-        None
+        []  # No material
     ), 'ball': TypeDetailsTuple(
         _create_ball,
         (BLOCK_BLANK_MATERIALS + METAL_MATERIALS +
          PLASTIC_MATERIALS + RUBBER_MATERIALS + WOOD_MATERIALS)
+    ), 'bed_1': TypeDetailsTuple(
+        _create_bed_1,
+        WOOD_MATERIALS
+    ), 'bed_2': TypeDetailsTuple(
+        _create_bed_2,
+        WOOD_MATERIALS
+    ), 'bed_3': TypeDetailsTuple(
+        _create_bed_3,
+        WOOD_MATERIALS
+    ), 'bed_4': TypeDetailsTuple(
+        _create_bed_4,
+        WOOD_MATERIALS
+    ), 'bed_5': TypeDetailsTuple(
+        _create_bed_5,
+        WOOD_MATERIALS
+    ), 'bed_6': TypeDetailsTuple(
+        _create_bed_6,
+        WOOD_MATERIALS
     ), 'block_blank_blue_cube': TypeDetailsTuple(
         _create_block_blank_cube,
         BLOCK_BLANK_MATERIALS + WOOD_MATERIALS
@@ -2052,11 +3076,14 @@ _TYPES_TO_DETAILS: Dict[str, TypeDetailsTuple] = {
     ), 'bowl_6': TypeDetailsTuple(
         _create_bowl_6,
         METAL_MATERIALS + WOOD_MATERIALS + PLASTIC_MATERIALS
-    ), 'cake': TypeDetailsTuple(
-        _create_cake,
-        None
+    ), 'bus_1': TypeDetailsTuple(
+        _create_toy_bus_1,
+        BLOCK_BLANK_MATERIALS + WOOD_MATERIALS
     ), 'car_1': TypeDetailsTuple(
         _create_toy_sedan,
+        BLOCK_BLANK_MATERIALS + WOOD_MATERIALS
+    ), 'car_2': TypeDetailsTuple(
+        _create_toy_car_2,
         BLOCK_BLANK_MATERIALS + WOOD_MATERIALS
     ), 'cart_1': TypeDetailsTuple(
         _create_cart,
@@ -2064,9 +3091,15 @@ _TYPES_TO_DETAILS: Dict[str, TypeDetailsTuple] = {
     ), 'case_1': TypeDetailsTuple(
         _create_case_1,
         METAL_MATERIALS + PLASTIC_MATERIALS
+    ), 'case_2': TypeDetailsTuple(
+        _create_case_2,
+        METAL_MATERIALS + PLASTIC_MATERIALS
     ), 'case_3': TypeDetailsTuple(
         _create_case_3,
-        None
+        METAL_MATERIALS + PLASTIC_MATERIALS
+    ), 'cart_2': TypeDetailsTuple(
+        _create_cart_2,
+        METAL_MATERIALS + PLASTIC_MATERIALS + WOOD_MATERIALS
     ), 'chair_1': TypeDetailsTuple(
         _create_chair_1,
         METAL_MATERIALS + PLASTIC_MATERIALS + WOOD_MATERIALS
@@ -2079,6 +3112,21 @@ _TYPES_TO_DETAILS: Dict[str, TypeDetailsTuple] = {
     ), 'chair_4': TypeDetailsTuple(
         _create_chair_4,
         METAL_MATERIALS + PLASTIC_MATERIALS + WOOD_MATERIALS
+    ), 'chair_5': TypeDetailsTuple(
+        _create_chair_5,
+        METAL_MATERIALS + PLASTIC_MATERIALS + WOOD_MATERIALS
+    ), 'chair_6': TypeDetailsTuple(
+        _create_chair_6,
+        METAL_MATERIALS + PLASTIC_MATERIALS + WOOD_MATERIALS
+    ), 'chair_7': TypeDetailsTuple(
+        _create_chair_7,
+        METAL_MATERIALS + PLASTIC_MATERIALS + WOOD_MATERIALS
+    ), 'chair_8': TypeDetailsTuple(
+        _create_chair_8,
+        METAL_MATERIALS + PLASTIC_MATERIALS + WOOD_MATERIALS
+    ), 'changing_table': TypeDetailsTuple(
+        _create_changing_table,
+        WOOD_MATERIALS
     ), 'chest_1': TypeDetailsTuple(
         _create_chest_1,
         METAL_MATERIALS + PLASTIC_MATERIALS + WOOD_MATERIALS
@@ -2088,27 +3136,42 @@ _TYPES_TO_DETAILS: Dict[str, TypeDetailsTuple] = {
     ), 'chest_3': TypeDetailsTuple(
         _create_chest_3,
         METAL_MATERIALS + PLASTIC_MATERIALS + WOOD_MATERIALS
+    ), 'chest_4': TypeDetailsTuple(
+        _create_chest_4,
+        METAL_MATERIALS + PLASTIC_MATERIALS + WOOD_MATERIALS
+    ), 'chest_5': TypeDetailsTuple(
+        _create_chest_5,
+        METAL_MATERIALS + PLASTIC_MATERIALS + WOOD_MATERIALS
+    ), 'chest_6': TypeDetailsTuple(
+        _create_chest_6,
+        METAL_MATERIALS + PLASTIC_MATERIALS + WOOD_MATERIALS
+    ), 'chest_7': TypeDetailsTuple(
+        _create_chest_7,
+        METAL_MATERIALS + PLASTIC_MATERIALS + WOOD_MATERIALS
     ), 'chest_8': TypeDetailsTuple(
         _create_chest_8,
         METAL_MATERIALS + PLASTIC_MATERIALS + WOOD_MATERIALS
+    ), 'chest_9': TypeDetailsTuple(
+        _create_chest_9,
+        METAL_MATERIALS + PLASTIC_MATERIALS + WOOD_MATERIALS
     ), 'crayon_black': TypeDetailsTuple(
         _create_crayon,
-        None
+        []  # No material
     ), 'crayon_blue': TypeDetailsTuple(
         _create_crayon,
-        None
+        []  # No material
     ), 'crayon_green': TypeDetailsTuple(
         _create_crayon,
-        None
+        []  # No material
     ), 'crayon_pink': TypeDetailsTuple(
         _create_crayon,
-        None
+        []  # No material
     ), 'crayon_red': TypeDetailsTuple(
         _create_crayon,
-        None
+        []  # No material
     ), 'crayon_yellow': TypeDetailsTuple(
         _create_crayon,
-        None
+        []  # No material
     ), 'crib': TypeDetailsTuple(
         _create_crib,
         WOOD_MATERIALS
@@ -2129,10 +3192,10 @@ _TYPES_TO_DETAILS: Dict[str, TypeDetailsTuple] = {
         BLOCK_BLANK_MATERIALS + WOOD_MATERIALS
     ), 'foam_floor_tiles': TypeDetailsTuple(
         _create_foam_floor_tiles,
-        None
+        []  # No material
     ), 'pacifier': TypeDetailsTuple(
         _create_pacifier,
-        None
+        []  # No material
     ), 'plate_1': TypeDetailsTuple(
         _create_plate_1,
         METAL_MATERIALS + PLASTIC_MATERIALS + WOOD_MATERIALS
@@ -2147,13 +3210,13 @@ _TYPES_TO_DETAILS: Dict[str, TypeDetailsTuple] = {
         BLOCK_BLANK_MATERIALS + WOOD_MATERIALS
     ), 'shelf_1': TypeDetailsTuple(
         _create_shelf_1,
-        None
+        METAL_MATERIALS + PLASTIC_MATERIALS + WOOD_MATERIALS
     ), 'shelf_2': TypeDetailsTuple(
         _create_shelf_2,
-        None
+        METAL_MATERIALS + PLASTIC_MATERIALS + WOOD_MATERIALS
     ), 'soccer_ball': TypeDetailsTuple(
         _create_soccer_ball,
-        None
+        []  # No material
     ), 'sofa_1': TypeDetailsTuple(
         _create_sofa_1,
         SOFA_1_MATERIALS
@@ -2163,6 +3226,18 @@ _TYPES_TO_DETAILS: Dict[str, TypeDetailsTuple] = {
     ), 'sofa_3': TypeDetailsTuple(
         _create_sofa_3,
         SOFA_3_MATERIALS
+    ), 'sofa_4': TypeDetailsTuple(
+        _create_sofa_4,
+        []  # No material
+    ), 'sofa_5': TypeDetailsTuple(
+        _create_sofa_5,
+        []  # No material
+    ), 'sofa_6': TypeDetailsTuple(
+        _create_sofa_6,
+        []  # No material
+    ), 'sofa_7': TypeDetailsTuple(
+        _create_sofa_7,
+        []  # No material
     ), 'sofa_chair_1': TypeDetailsTuple(
         _create_sofa_chair_1,
         SOFA_CHAIR_1_MATERIALS
@@ -2172,6 +3247,18 @@ _TYPES_TO_DETAILS: Dict[str, TypeDetailsTuple] = {
     ), 'sofa_chair_3': TypeDetailsTuple(
         _create_sofa_chair_3,
         SOFA_3_MATERIALS
+    ), 'sofa_chair_4': TypeDetailsTuple(
+        _create_sofa_chair_4,
+        []  # No material
+    ), 'sofa_chair_5': TypeDetailsTuple(
+        _create_sofa_chair_5,
+        []  # No material
+    ), 'sofa_chair_6': TypeDetailsTuple(
+        _create_sofa_chair_6,
+        []  # No material
+    ), 'sofa_chair_7': TypeDetailsTuple(
+        _create_sofa_chair_7,
+        []  # No material
     ), 'suitcase_1': TypeDetailsTuple(
         _create_case_1,
         METAL_MATERIALS + PLASTIC_MATERIALS
@@ -2202,27 +3289,85 @@ _TYPES_TO_DETAILS: Dict[str, TypeDetailsTuple] = {
     ), 'table_12': TypeDetailsTuple(
         _create_table_12,
         METAL_MATERIALS + PLASTIC_MATERIALS + WOOD_MATERIALS
+    ), 'table_13': TypeDetailsTuple(
+        _create_table_13,
+        METAL_MATERIALS + PLASTIC_MATERIALS + WOOD_MATERIALS
+    ), 'table_14': TypeDetailsTuple(
+        _create_table_14,
+        METAL_MATERIALS + PLASTIC_MATERIALS + WOOD_MATERIALS
+    ), 'table_15': TypeDetailsTuple(
+        _create_table_15,
+        METAL_MATERIALS + PLASTIC_MATERIALS + WOOD_MATERIALS
+    ), 'table_16': TypeDetailsTuple(
+        _create_table_16,
+        METAL_MATERIALS + PLASTIC_MATERIALS + WOOD_MATERIALS
+    ), 'toolbox_1': TypeDetailsTuple(
+        _create_toolbox_1,
+        METAL_MATERIALS + PLASTIC_MATERIALS
+    ), 'toolbox_2': TypeDetailsTuple(
+        _create_toolbox_2,
+        METAL_MATERIALS + PLASTIC_MATERIALS
     ), 'train_1': TypeDetailsTuple(
         _create_toy_train,
         BLOCK_BLANK_MATERIALS + WOOD_MATERIALS
     ), 'trolley_1': TypeDetailsTuple(
         _create_toy_trolley,
-        None
+        BLOCK_BLANK_MATERIALS + WOOD_MATERIALS
     ), 'trophy': TypeDetailsTuple(
         _create_trophy,
-        BLOCK_BLANK_MATERIALS + WOOD_MATERIALS
+        []  # No material
     ), 'truck_1': TypeDetailsTuple(
-        _create_toy_truck,
+        _create_toy_truck_1,
+        BLOCK_BLANK_MATERIALS + WOOD_MATERIALS
+    ), 'truck_2': TypeDetailsTuple(
+        _create_toy_truck_2,
         BLOCK_BLANK_MATERIALS + WOOD_MATERIALS
     ), 'turtle_on_wheels': TypeDetailsTuple(
         _create_turtle_on_wheels,
         BLOCK_BLANK_MATERIALS + WOOD_MATERIALS
     ), 'tv_2': TypeDetailsTuple(
-        _create_tv, None
+        _create_tv,
+        []  # No material
+    ), 'wardrobe': TypeDetailsTuple(
+        _create_wardrobe,
+        WOOD_MATERIALS
     )
-    # TODO MCS-906 missing: changing_table, wardrobe, gift_box_1,
-    # cube_hollow_narrow, cube_hollow_wide, hash, letter_x, lock_wall
 }
+
+
+_PRIMITIVE_TUPLES = [
+    ('circle_frustum', _create_primitive_non_cylinder),
+    ('cone', _create_primitive_non_cylinder),
+    ('cube', _create_primitive_non_cylinder),
+    ('cube_hollow_narrow', _create_primitive_on_ground),
+    ('cube_hollow_wide', _create_primitive_on_ground),
+    ('cylinder', _create_primitive_cylinder),
+    ('decagon_cylinder', _create_primitive_cylinder),
+    ('double_cone', _create_primitive_non_cylinder),
+    ('dumbbell_1', _create_primitive_non_cylinder),
+    ('dumbbell_2', _create_primitive_non_cylinder),
+    ('hash', _create_primitive_on_ground),
+    ('hex_cylinder', _create_primitive_cylinder),
+    ('hex_tube_narrow', _create_primitive_non_cylinder),
+    ('hex_tube_wide', _create_primitive_non_cylinder),
+    ('letter_l_narrow', _create_letter_l_narrow_tall),
+    ('letter_l_wide', _create_letter_l_wide),
+    ('letter_l_wide_tall', _create_letter_l_wide_tall),
+    ('letter_x', _create_primitive_on_ground),
+    ('lock_wall', _create_primitive_non_cylinder),
+    ('pyramid', _create_primitive_non_cylinder),
+    ('sphere', _create_primitive_non_cylinder),
+    ('square_frustum', _create_primitive_non_cylinder),
+    ('tie_fighter', _create_primitive_non_cylinder),
+    ('triangle', _create_primitive_non_cylinder),
+    ('tube_narrow', _create_primitive_non_cylinder),
+    ('tube_wide', _create_primitive_non_cylinder)
+]
+for primitive_type, primitive_function in _PRIMITIVE_TUPLES:
+    _TYPES_TO_DETAILS[primitive_type] = TypeDetailsTuple(
+        primitive_function,
+        ALL_PRIMITIVE_MATERIAL_TUPLES
+    )
 
 
 _MATERIAL_TO_VALID_TYPE = {"_all_types": []}
@@ -2256,13 +3401,29 @@ def get_type_from_material(material: str) -> str:
         return None
 
 
-def get_material_restriction(shape: str) -> List[str]:
+def get_material_restriction_strings(shape: str) -> List[str]:
     """Return the list of materials that are valid for the given shape.
     If no restrictions are present, return all materials"""
+    if shape is None:
+        return ALL_UNRESTRICTED_MATERIAL_STRINGS
     if shape in _TYPES_TO_DETAILS:
         details = _TYPES_TO_DETAILS[shape]
         if details is None or details.material_restrictions is None:
-            return ALL_MATERIAL_TUPLES
+            return ALL_UNRESTRICTED_MATERIAL_STRINGS
+        else:
+            return [mat[0] for mat in details.material_restrictions]
+    return []
+
+
+def get_material_restriction_tuples(shape: str) -> List[MaterialTuple]:
+    """Return the list of materials that are valid for the given shape.
+    If no restrictions are present, return all materials"""
+    if shape is None:
+        return ALL_UNRESTRICTED_MATERIAL_TUPLES
+    if shape in _TYPES_TO_DETAILS:
+        details = _TYPES_TO_DETAILS[shape]
+        if details is None or details.material_restrictions is None:
+            return ALL_UNRESTRICTED_MATERIAL_TUPLES
         else:
             return details.material_restrictions
     return []
@@ -2274,7 +3435,9 @@ def has_material_restriction(shape: str) -> bool:
 
 
 def is_valid_shape_material(
-        shape: str, material: Union[str, Tuple[str, List[str]]]) -> bool:
+    shape: str,
+    material: Union[str, MaterialTuple]
+) -> bool:
     """returns whether shape and material combination are valid"""
     if shape in _TYPES_TO_DETAILS:
         if _TYPES_TO_DETAILS[shape] is None:
@@ -2282,6 +3445,8 @@ def is_valid_shape_material(
         restrictions = _TYPES_TO_DETAILS[shape].material_restrictions
         if restrictions is None:
             return True
+        if restrictions == []:
+            return material is None
         if not isinstance(material, Tuple):
             return any(material == mat_tuple[0] for mat_tuple in restrictions)
         if material not in restrictions:

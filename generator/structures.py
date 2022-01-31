@@ -3,7 +3,9 @@ import math
 import uuid
 from typing import Any, Dict, List
 
-from .geometry import calc_obj_coords
+from shapely import affinity
+
+from .geometry import ObjectBounds, create_bounds
 from .materials import MaterialTuple
 
 ANGLE_BRACE_TEMPLATE = {
@@ -165,7 +167,7 @@ PLATFORM_TEMPLATE = {
 
 RAMP_TEMPLATE = {
     'id': 'ramp_',
-    'type': 'cube',
+    'type': 'triangle',
     'debug': {
         'color': [],
         'info': []
@@ -179,6 +181,38 @@ RAMP_TEMPLATE = {
         'position': {
             'x': 0,
             'y': 0.5,
+            'z': 0
+        },
+        'rotation': {
+            'x': 0,
+            'y': 0,
+            'z': 0
+        },
+        'scale': {
+            'x': 1,
+            'y': 1,
+            'z': 1
+        }
+    }]
+}
+
+DOOR_TEMPLATE = {
+    'id': 'door_',
+    'type': 'door_4',
+    'debug': {
+        'color': [],
+        'info': []
+    },
+    'mass': 100,
+    'materials': [],
+    'kinematic': True,
+    'structure': True,
+    'openable': True,
+    'shows': [{
+        'stepBegin': 0,
+        'position': {
+            'x': 0,
+            'y': 0,
             'z': 0
         },
         'rotation': {
@@ -225,7 +259,7 @@ def create_angle_brace(
     position_y_modifier: float = 0,
     rotation_x: int = 0,
     rotation_z: int = 0,
-    bounding_rect: List[Dict[str, float]] = None
+    bounds: ObjectBounds = None
 ) -> Dict[str, Any]:
     """Create and return an instance of an L-shaped angle brace. Please note
     that its side is twice as long as its bottom, and that it's facing to the
@@ -251,7 +285,7 @@ def create_angle_brace(
         [angle_brace],
         material_tuple,
         ['angle_brace'],
-        bounding_rect
+        bounds
     )[0]
 
 
@@ -264,7 +298,7 @@ def create_interior_wall(
     material_tuple: MaterialTuple,
     position_y_modifier: float = 0,
     thickness: float = 0.1,
-    bounding_rect: List[Dict[str, float]] = None
+    bounds: ObjectBounds = None
 ) -> Dict[str, Any]:
     """Create and return an instance of an interior room wall."""
     wall = copy.deepcopy(INTERIOR_WALL_TEMPLATE)
@@ -288,7 +322,7 @@ def create_interior_wall(
         [wall],
         material_tuple,
         ['wall'],
-        bounding_rect
+        bounds
     )[0]
 
 
@@ -316,9 +350,14 @@ def create_l_occluder(
         'z': scale_front_z
     }
     front['shows'][0]['position'] = {
-        'x': position_x,
+        'x': position_x * (-1 if flip else 1),
         'y': position_y_modifier + (scale_y / 2.0),
         'z': position_z
+    }
+    front['shows'][0]['rotation'] = {
+        'x': 0,
+        'y': rotation_y,
+        'z': 0
     }
 
     side['shows'][0]['scale'] = {
@@ -327,19 +366,43 @@ def create_l_occluder(
         'z': scale_side_z
     }
     side['shows'][0]['position'] = {
-        'x': (position_x + (scale_side_x / 2.0) - (scale_front_x / 2.0)),
+        'x': (
+            (position_x + (scale_side_x / 2.0) - (scale_front_x / 2.0))
+        ) * (-1 if flip else 1),
         'y': position_y_modifier + (scale_y / 2.0),
         'z': (position_z + (scale_side_z / 2.0) + (scale_front_z / 2.0))
     }
 
-    for part in [front, side]:
-        part['shows'][0]['rotation'] = {
+    if rotation_y:
+        # To rotate the side part of the L-shaped occluder:
+        # 1st, create its bounds using its current position and no rotation.
+        side_bounds = create_bounds(
+            dimensions=side['shows'][0]['scale'],
+            offset={'x': 0, 'y': 0, 'z': 0},
+            position=side['shows'][0]['position'],
+            rotation=side['shows'][0]['rotation'],
+            standing_y=(side['shows'][0]['scale']['y'] / 2.0)
+        )
+        # 2nd, rotate its polygon using the front's center as the origin.
+        rotated_polygon = affinity.rotate(
+            side_bounds.polygon_xz,
+            # In shapely, positive rotation values are counter-clockwise.
+            -rotation_y,
+            origin=(
+                front['shows'][0]['position']['x'],
+                front['shows'][0]['position']['z']
+            )
+        )
+        # 3rd, update its position using the rotated polygon's center.
+        center_coords = rotated_polygon.centroid.coords[0]
+        side['shows'][0]['position']['x'] = center_coords[0]
+        side['shows'][0]['position']['z'] = center_coords[1]
+        # 4th, finally, update its rotation to the correct value.
+        side['shows'][0]['rotation'] = {
             'x': 0,
             'y': rotation_y,
             'z': 0
         }
-        if flip:
-            part['shows'][0]['position']['x'] *= -1
 
     return finalize_structural_object(occluder, material_tuple, ['occluder'])
 
@@ -353,7 +416,7 @@ def create_platform(
     scale_z: float,
     material_tuple: MaterialTuple,
     position_y_modifier: float = 0,
-    bounding_rect: List[Dict[str, float]] = None
+    bounds: ObjectBounds = None
 ) -> Dict[str, Any]:
     """Create and return an instance of a platform."""
     platform = copy.deepcopy(PLATFORM_TEMPLATE)
@@ -376,7 +439,7 @@ def create_platform(
         [platform],
         material_tuple,
         ['platform'],
-        bounding_rect
+        bounds
     )[0]
 
 
@@ -389,16 +452,12 @@ def create_ramp(
     length: float,
     material_tuple: MaterialTuple,
     position_y_modifier: float = 0,
-    thickness: float = 0.1,
-    bounding_rect: List[Dict[str, float]] = None
+    bounds: ObjectBounds = None
 ) -> Dict[str, Any]:
     """Create and return an instance of a ramp. Its height is derived from the
-    given angle and length. The angle must be in degress up from the ground."""
-    scale_y = (length / math.sin(math.radians(90 - angle)))
-    height = (
-        length * math.sin(math.radians(angle)) /
-        math.sin(math.radians(90 - angle))
-    ) - thickness
+    given angle and length.  Length is the length along the ground in a single
+    dimension.  The angle must be in degress up from the ground."""
+    height = length * (math.tan(math.radians(angle)))
     ramp = copy.deepcopy(RAMP_TEMPLATE)
     ramp['shows'][0]['position'] = {
         'x': position_x,
@@ -406,35 +465,70 @@ def create_ramp(
         'z': position_z
     }
     ramp['shows'][0]['rotation'] = {
-        # Use 90 - angle here because it will show reversed in Unity.
-        'x': 90 - angle,
+        'x': 0,
         'y': rotation_y,
         'z': 0
     }
     ramp['shows'][0]['scale'] = {
         'x': width,
-        'y': scale_y,
-        'z': thickness
+        'y': height,
+        'z': length
     }
     return finalize_structural_object(
         [ramp],
         material_tuple,
         ['ramp', f'ramp_{angle}_degree'],
-        bounding_rect,
+        bounds,
         override_scale={
             'x': ramp['shows'][0]['scale']['x'],
             'y': ramp['shows'][0]['scale']['y'],
-            # Use the Y scale for the Z axis since the ramp will be angled.
-            'z': ramp['shows'][0]['scale']['y']
+            'z': ramp['shows'][0]['scale']['z']
         }
+    )[0]
+
+
+def create_door(
+    position_x: float,
+    position_z: float,
+    rotation_y: float,
+    scale_x: float,
+    scale_y: float,
+    scale_z: float,
+    material_tuple: MaterialTuple,
+    bounds: ObjectBounds = None
+) -> Dict[str, Any]:
+    """Create and return an instance of an interior door."""
+
+    door = copy.deepcopy(DOOR_TEMPLATE)
+    door['id'] += str(uuid.uuid4())
+    door['shows'][0]['position'] = {
+        'x': position_x,
+        'y': 0,
+        'z': position_z
+    }
+    door['shows'][0]['rotation'] = {
+        'x': 0,
+        'y': rotation_y,
+        'z': 0
+    }
+    door['shows'][0]['scale'] = {
+        'x': scale_x,
+        'y': scale_y,
+        'z': scale_z
+    }
+    return finalize_structural_object(
+        [door],
+        material_tuple,
+        ['door'],
+        bounds
     )[0]
 
 
 def finalize_structural_object(
     instance_list: List[Dict[str, Any]],
-    material_tuple: MaterialTuple,
-    name_list: List[str],
-    bounding_rect: List[Dict[str, float]] = None,
+    material_tuple: MaterialTuple = None,
+    name_list: List[str] = None,
+    bounds: ObjectBounds = None,
     override_scale: Dict[str, float] = None
 ) -> List[Dict[str, Any]]:
     """Finalize and return each of the instances of structural objects."""
@@ -442,23 +536,20 @@ def finalize_structural_object(
     for instance in instance_list:
         scale = override_scale or instance['shows'][0]['scale']
         instance['id'] += common_id
-        instance['shows'][0]['boundingBox'] = (
-            bounding_rect or calc_obj_coords(
-                instance['shows'][0]['position']['x'],
-                instance['shows'][0]['position']['z'],
-                scale['x'] / 2.0,
-                scale['z'] / 2.0,
-                0,
-                0,
-                instance['shows'][0]['rotation']['y']
-            )
+        instance['shows'][0]['boundingBox'] = bounds or create_bounds(
+            dimensions=scale,
+            offset={'x': 0, 'y': 0, 'z': 0},
+            position=instance['shows'][0]['position'],
+            rotation=instance['shows'][0]['rotation'],
+            standing_y=(scale['y'] / 2.0)
         )
         instance['debug']['dimensions'] = instance['shows'][0]['scale'].copy()
         instance['mass'] = _calculate_mass(instance['debug']['dimensions'])
-        instance['materials'] = [material_tuple.material]
-        instance['debug']['color'] = material_tuple.color
-        instance['debug']['info'] = _calculate_info(
-            material_tuple.color,
-            name_list
-        )
+        if material_tuple:
+            instance['materials'] = [material_tuple.material]
+            instance['debug']['color'] = material_tuple.color
+            instance['debug']['info'] = _calculate_info(
+                material_tuple.color,
+                name_list or []
+            )
     return instance_list

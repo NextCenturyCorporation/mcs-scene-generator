@@ -1,8 +1,8 @@
 import copy
-import uuid
 from typing import List, Union
 
 from machine_common_sense.config_manager import Vector3d
+from shapely import geometry
 
 from .base_objects import create_variable_definition_from_base
 from .definitions import (
@@ -15,10 +15,6 @@ from .definitions import (
 from .intuitive_physics_objects import (
     INTUITIVE_PHYSICS_OBJECT_CHOSEN_MATERIAL_LIST,
 )
-
-POLE_MOVE_AMOUNT = 0.1
-POLE_WAIT_TIME = 1
-
 
 _VISIBLE_SUPPORT = create_variable_definition_from_base(
     type='cube',
@@ -110,11 +106,11 @@ _TRIANGLE_90_45_45_ISOSCELES = create_variable_definition_from_base(
 _TRIANGLE_90_45_45_ISOSCELES.rotation = Vector3d(0, -90, 0)
 _TRIANGLE_90_45_45_ISOSCELES.prettyName = 'triangle_isosceles'
 _TRIANGLE_90_45_45_ISOSCELES.poleOffsetX = -0.45
-_TRIANGLE_90_45_45_ISOSCELES.poly = [
-    {'x': 0.5, 'z': -0.5},
-    {'x': -0.5, 'z': -0.5},
-    {'x': -0.5, 'z': 0.5}
-]
+_TRIANGLE_90_45_45_ISOSCELES.poly = geometry.Polygon([
+    (0.5, -0.5),
+    (-0.5, -0.5),
+    (-0.5, 0.5)
+])
 
 
 _TRIANGLE_90_60_30_TALL = create_variable_definition_from_base(
@@ -132,11 +128,11 @@ _TRIANGLE_90_60_30_TALL = create_variable_definition_from_base(
 _TRIANGLE_90_60_30_TALL.rotation = Vector3d(0, -90, 0)
 _TRIANGLE_90_60_30_TALL.prettyName = 'triangle_tall'
 _TRIANGLE_90_60_30_TALL.poleOffsetX = -0.45
-_TRIANGLE_90_60_30_TALL.poly = [
-    {'x': 0.5, 'z': -0.5},
-    {'x': -0.5, 'z': -0.5},
-    {'x': -0.5, 'z': 0.5}
-]
+_TRIANGLE_90_60_30_TALL.poly = geometry.Polygon([
+    (0.5, -0.5),
+    (-0.5, -0.5),
+    (-0.5, 0.5)
+])
 
 
 _TRIANGLE_90_60_30_WIDE = create_variable_definition_from_base(
@@ -154,11 +150,11 @@ _TRIANGLE_90_60_30_WIDE = create_variable_definition_from_base(
 _TRIANGLE_90_60_30_WIDE.rotation = Vector3d(0, -90, 0)
 _TRIANGLE_90_60_30_WIDE.prettyName = 'triangle_wide'
 _TRIANGLE_90_60_30_WIDE.poleOffsetX = -0.45
-_TRIANGLE_90_60_30_WIDE.poly = [
-    {'x': 0.5, 'z': -0.5},
-    {'x': -0.5, 'z': -0.5},
-    {'x': -0.5, 'z': 0.5}
-]
+_TRIANGLE_90_60_30_WIDE.poly = geometry.Polygon([
+    (0.5, -0.5),
+    (-0.5, -0.5),
+    (-0.5, 0.5)
+])
 
 
 _CIRCLE_FRUSTUM = create_variable_definition_from_base(
@@ -296,62 +292,6 @@ _SQUARE_FRUSTUM = create_variable_definition_from_base(
 )
 
 
-_POLE = {
-    "id": "pole_",
-    "type": "cylinder",
-    "debug": {
-        "color": ["magenta", "cyan"],
-        "dimensions": {
-            "x": 0.2,
-            "y": 10,
-            "z": 0.2
-        },
-        "info": [],
-        "role": "structural",
-        "shape": ["pole"],
-        "size": "medium"
-    },
-    "kinematic": True,
-    "structure": True,
-    "mass": 50,
-    "materials": ["Custom/Materials/Magenta"],
-    "shows": [{
-        "stepBegin": 0,
-        "position": {
-            "x": 0,
-            "y": 5,
-            "z": 0
-        },
-        "scale": {
-            "x": 0.2,
-            "y": 5,
-            "z": 0.2
-        }
-    }],
-    "moves": [{
-        "stepBegin": 0,
-        "stepEnd": 0,
-        "vector": {
-            "x": 0,
-            "y": POLE_MOVE_AMOUNT,
-            "z": 0
-        }
-    }, {
-        "stepBegin": 0,
-        "stepEnd": 0,
-        "vector": {
-            "x": 0,
-            "y": -POLE_MOVE_AMOUNT,
-            "z": 0
-        }
-    }],
-    "changeMaterials": [{
-        "stepBegin": 0,
-        "materials": ["Custom/Materials/Cyan"]
-    }]
-}
-
-
 _ASYMMETRIC_TARGET_LIST = [
     _LETTER_L_WIDE,
     _LETTER_L_WIDE_TALL,
@@ -377,14 +317,6 @@ def _get(prop: str) -> Union[ObjectDefinition, List[ObjectDefinition]]:
     """Returns a deep copy of the global property with the given name
     (normally either an object definition or an object definition list)."""
     return copy.deepcopy(globals()['_' + prop])
-
-
-def create_pole_template(show_step: int) -> List[ObjectDefinition]:
-    pole = _get('POLE')
-    pole['id'] = pole['id'] + str(uuid.uuid4())
-    pole['shows'][0]['stepBegin'] = show_step
-    pole['moves'][0]['stepBegin'] = show_step
-    return pole
 
 
 def get_asymmetric_target_definition_dataset(

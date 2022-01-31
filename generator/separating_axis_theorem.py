@@ -24,7 +24,9 @@
 # https://github.com/JuantAldea/Separating-Axis-Theorem/blob/master/python/separation_axis_theorem.py
 
 # Rewriting things to handle our dict format
-from typing import Dict, List
+from typing import Dict, List, Union
+
+from machine_common_sense.config_manager import Vector3d
 
 
 def normalize(v):
@@ -93,8 +95,17 @@ def separating_axis_theorem(vertices_a, vertices_b):
     return True
 
 
-def sat_entry(rect_a: List[Dict[str, float]], rect_b: List[Dict[str, float]]):
+def sat_entry(
+    rect_a: List[Union[Dict[str, float], Vector3d]],
+    rect_b: List[Union[Dict[str, float], Vector3d]]
+) -> bool:
     """takes our dict points and converts them to this format"""
-    vertices_a = [(rect_a[i]['x'], rect_a[i]['z']) for i in range(len(rect_a))]
-    vertices_b = [(rect_b[i]['x'], rect_b[i]['z']) for i in range(len(rect_b))]
+    vertices_a = [
+        (corner_a.x, corner_a.z) if isinstance(corner_a, Vector3d) else
+        (corner_a['x'], corner_a['z']) for corner_a in rect_a
+    ]
+    vertices_b = [
+        (corner_b.x, corner_b.z) if isinstance(corner_b, Vector3d) else
+        (corner_b['x'], corner_b['z']) for corner_b in rect_b
+    ]
     return separating_axis_theorem(vertices_a, vertices_b)

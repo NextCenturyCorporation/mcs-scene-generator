@@ -1,10 +1,10 @@
-import json
 import os
 
 import shapely
+from machine_common_sense.config_manager import Vector3d
 from shapely import affinity
 
-from generator import RetrievalGoal, definitions, geometry, util
+from generator import RetrievalGoal, definitions, geometry, scene_saver
 from hypercube import (
     InteractiveContainerEvaluation4HypercubeFactory,
     InteractiveContainerEvaluationHypercubeFactory,
@@ -120,16 +120,17 @@ def get_object(object_id, object_list, optional=False):
 
 def delete_scene_debug_files(scene_dict, descriptor):
     for scene_id in scene_dict.keys():
-        filename = 'temp_' + descriptor + '_' + scene_id + '.json'
-        os.remove(filename)
+        os.remove(f'temp_{descriptor}_{scene_id.upper()}_debug.json')
 
 
 def save_scene_debug_files(scene_dict, descriptor):
     for scene_id, scene_data in scene_dict.items():
         scene, _ = scene_data
-        filename = 'temp_' + descriptor + '_' + scene_id + '.json'
-        with open(filename, 'w') as output_file:
-            json.dump(scene, output_file)
+        scene_saver.save_scene_files(
+            scene,
+            f'temp_{descriptor}',
+            only_debug_file=True
+        )
 
 
 def test_generate_wall():
@@ -176,14 +177,10 @@ def test_generate_wall():
     assert 'rotates' not in wall
     assert 'teleports' not in wall
 
-    player_rect = geometry.find_performer_rect(geometry.ORIGIN)
-    player_poly = geometry.rect_to_poly(player_rect)
-    wall_poly = geometry.rect_to_poly(wall['shows'][0]['boundingBox'])
+    player_poly = geometry.find_performer_bounds(geometry.ORIGIN).polygon_xz
+    wall_poly = wall['shows'][0]['boundingBox'].polygon_xz
     assert not wall_poly.intersects(player_poly)
-    assert geometry.rect_within_room(
-        wall['shows'][0]['boundingBox'],
-        ROOM_DIMENSIONS
-    )
+    assert wall['shows'][0]['boundingBox'].is_within_room(ROOM_DIMENSIONS)
 
 
 def test_generate_wall_multiple():
@@ -203,14 +200,18 @@ def test_generate_wall_multiple():
         geometry.ORIGIN_LOCATION,
         [wall_1['shows'][0]['boundingBox']]
     )
-    wall_1_poly = geometry.rect_to_poly(wall_1['shows'][0]['boundingBox'])
-    wall_2_poly = geometry.rect_to_poly(wall_2['shows'][0]['boundingBox'])
+    wall_1_poly = wall_1['shows'][0]['boundingBox'].polygon_xz
+    wall_2_poly = wall_2['shows'][0]['boundingBox'].polygon_xz
     assert not wall_1_poly.intersects(wall_2_poly)
 
 
 def test_generate_wall_with_bounds_list():
-    bounds = [{'x': 4, 'y': 0, 'z': 4}, {'x': 4, 'y': 0, 'z': 1},
-              {'x': 1, 'y': 0, 'z': 1}, {'x': 1, 'y': 0, 'z': 4}]
+    bounds = geometry.ObjectBounds(box_xz=[
+        Vector3d(**{'x': 4, 'y': 0, 'z': 4}),
+        Vector3d(**{'x': 4, 'y': 0, 'z': 1}),
+        Vector3d(**{'x': 1, 'y': 0, 'z': 1}),
+        Vector3d(**{'x': 1, 'y': 0, 'z': 4})
+    ], max_y=0, min_y=0)
     hypercube = InteractiveSingleSceneFactory(RetrievalGoal(''))._build(
         BODY_TEMPLATE,
         {'container': None, 'obstacle': None, 'occluder': None}
@@ -221,14 +222,18 @@ def test_generate_wall_with_bounds_list():
         geometry.ORIGIN_LOCATION,
         [bounds]
     )
-    poly = geometry.rect_to_poly(bounds)
-    wall_poly = geometry.rect_to_poly(wall['shows'][0]['boundingBox'])
+    poly = bounds.polygon_xz
+    wall_poly = wall['shows'][0]['boundingBox'].polygon_xz
     assert not wall_poly.intersects(poly)
 
 
 def test_generate_wall_with_target_list():
-    bounds = [{'x': 4, 'y': 0, 'z': 4}, {'x': 4, 'y': 0, 'z': 3},
-              {'x': 3, 'y': 0, 'z': 3}, {'x': 3, 'y': 0, 'z': 4}]
+    bounds = geometry.ObjectBounds(box_xz=[
+        Vector3d(**{'x': 4, 'y': 0, 'z': 4}),
+        Vector3d(**{'x': 4, 'y': 0, 'z': 3}),
+        Vector3d(**{'x': 3, 'y': 0, 'z': 3}),
+        Vector3d(**{'x': 3, 'y': 0, 'z': 4})
+    ], max_y=0, min_y=0)
     target = {'shows': [{'boundingBox': bounds}]}
     hypercube = InteractiveSingleSceneFactory(RetrievalGoal(''))._build(
         BODY_TEMPLATE,
@@ -241,7 +246,7 @@ def test_generate_wall_with_target_list():
         [bounds],
         [target]
     )
-    wall_poly = geometry.rect_to_poly(wall['shows'][0]['boundingBox'])
+    wall_poly = wall['shows'][0]['boundingBox'].polygon_xz
     assert not geometry.does_fully_obstruct_target(
         geometry.ORIGIN, target, wall_poly)
 
@@ -448,7 +453,7 @@ def verify_obstacle(obstacle, target, object_list, performer_start):
             f'target={target}\nobstacle={obstacle}')
         return False
 
-    if dimensions['y'] < (util.PERFORMER_CAMERA_Y / 2.0):
+    if dimensions['y'] < geometry.PERFORMER_HALF_WIDTH:
         print(
             f'[ERROR] OBSTACLE SHOULD BE TALL ENOUGH SO THE PERFORMER CANNOT '
             f'SIMPLY WALK OVER IT:\ntarget={target}\nobstacle={obstacle}')
@@ -500,7 +505,7 @@ def verify_occluder(occluder, target, object_list, performer_start):
             f'target={target}\noccluder={occluder}')
         return False
 
-    if dimensions['y'] < (util.PERFORMER_CAMERA_Y / 2.0):
+    if dimensions['y'] < geometry.PERFORMER_HALF_WIDTH:
         print(
             f'[ERROR] OCCLUDER SHOULD BE TALL ENOUGH SO THE PERFORMER CANNOT '
             f'SIMPLY WALK OVER IT:\ntarget={target}\noccluder={occluder}')
@@ -747,9 +752,9 @@ def verify_scene(hypercube, scene, index, ignore_parent=False,
             f'[ERROR] performer_start SHOULD BE THE SAME: '
             f'{scene["performerStart"]} != {hypercube._performer_start}')
         return False
-    performer_start_poly = geometry.rect_to_poly(
-        geometry.find_performer_rect(hypercube._performer_start['position'])
-    )
+    performer_start_poly = geometry.find_performer_bounds(
+        hypercube._performer_start['position']
+    ).polygon_xz
     for instance in scene['objects']:
         object_poly = geometry.get_bounding_polygon(instance)
         if object_poly.intersects(performer_start_poly):
@@ -1473,6 +1478,23 @@ def test_obstacle_hypercube():
                     get_position(obstacle_1)
                 )
 
+                expected_distance = geometry.MAX_REACH_DISTANCE - min(
+                    obstacle_1['debug']['dimensions']['x'],
+                    obstacle_1['debug']['dimensions']['z']
+                )
+                target_poly = target['shows'][0]['boundingBox'].polygon_xz
+                obstacle_poly = (
+                    obstacle_1['shows'][0]['boundingBox'].polygon_xz
+                )
+                actual_distance = target_poly.distance(obstacle_poly)
+                if actual_distance <= expected_distance:
+                    print(
+                        f'[ERROR] OBSTACLE SHOULD BE AT LEAST '
+                        f'{expected_distance} AWAY FROM TARGET BUT IS '
+                        f'{actual_distance}:\n{target=}\n{obstacle_1=}'
+                    )
+                    return False
+
             # Verify target is between obstacle and performer start.
             if i in ['b', 'd']:
                 assert verify_target_obstruct_location(
@@ -1607,6 +1629,20 @@ def test_occluder_hypercube():
                     get_position(occluder_data_1.instance_list[index]),
                     get_position(occluder_1)
                 )
+
+                expected_distance = geometry.MAX_REACH_DISTANCE
+                target_poly = target['shows'][0]['boundingBox'].polygon_xz
+                occluder_poly = (
+                    occluder_1['shows'][0]['boundingBox'].polygon_xz
+                )
+                actual_distance = target_poly.distance(occluder_poly)
+                if actual_distance > expected_distance:
+                    print(
+                        f'[ERROR] OCCLUDER SHOULD BE AT MOST '
+                        f'{expected_distance} AWAY FROM TARGET BUT IS '
+                        f'{actual_distance}:\n{target=}\n{occluder_1=}'
+                    )
+                    return False
 
             # Verify target is between occluder 1 and performer start.
             if i in ['b', 'd', 'f', 'h', 'j', 'l']:

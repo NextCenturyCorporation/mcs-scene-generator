@@ -1,0 +1,9 @@
+# Only able to Pass for the first steps.
+freezes:
+    - begin: 1
+      end:
+          - 5
+          - 10
+          - 25
+          - 50
+          - 100

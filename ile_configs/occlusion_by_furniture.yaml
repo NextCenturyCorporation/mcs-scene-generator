@@ -1,0 +1,41 @@
+# Add a Retrieval goal with a soccer ball as the target object.
+goal:
+    category: retrieval
+    target:
+        shape: soccer_ball
+        scale:
+            min: 1.0
+            max: 3.0
+
+# Only the target can be a soccer ball.
+excluded_shapes: soccer_ball
+
+# Generate many obstacles and/or occluders (usually large interactable objects
+# like furniture) and zero or more context (distractor) objects.
+# One obstacle/occluder will always begin either in front of (50%) or behind
+# (50%) the target, randomized for each scene.
+keyword_objects:
+    - keyword:
+        - obstacles
+        - occluders
+      num: 1
+      keyword_location:
+          keyword:
+              - occlude
+              - behind
+          relative_object_label: target
+    - keyword:
+        - obstacles
+        - occluders
+      num:
+          min: 4
+          max: 9
+    - keyword: context
+      num:
+          min: 0
+          max: 10
+
+# Override default to avoid randomly generating any structures. Remove this if
+# you want to have randomly generated structures.
+random_structural_objects:
+    - num: 0

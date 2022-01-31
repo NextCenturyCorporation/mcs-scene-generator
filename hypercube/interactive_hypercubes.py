@@ -3,20 +3,25 @@ import logging
 import random
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
+from machine_common_sense.config_manager import Vector3d
+
 from generator import (
+    MAX_TRIES,
     DefinitionDataset,
     InteractiveGoal,
+    ObjectBounds,
     ObjectDefinition,
     RetrievalGoal,
     SceneException,
     base_objects,
     containers,
+    definitions,
     geometry,
+    instances,
     materials,
     specific_objects,
     structures,
     tags,
-    util,
 )
 from generator.separating_axis_theorem import sat_entry
 
@@ -44,10 +49,10 @@ from .object_data import (
 
 ROOM_DIMENSIONS = geometry.DEFAULT_ROOM_DIMENSIONS
 # Add or subtract the performer width to ensure it can move behind any object.
-ROOM_X_MIN = -(ROOM_DIMENSIONS['x'] / 2.0) + util.PERFORMER_WIDTH
-ROOM_Z_MIN = -(ROOM_DIMENSIONS['x'] / 2.0) + util.PERFORMER_WIDTH
-ROOM_X_MAX = (ROOM_DIMENSIONS['x'] / 2.0) - util.PERFORMER_WIDTH
-ROOM_Z_MAX = (ROOM_DIMENSIONS['x'] / 2.0) - util.PERFORMER_WIDTH
+ROOM_X_MIN = -(ROOM_DIMENSIONS['x'] / 2.0) + geometry.PERFORMER_WIDTH
+ROOM_Z_MIN = -(ROOM_DIMENSIONS['x'] / 2.0) + geometry.PERFORMER_WIDTH
+ROOM_X_MAX = (ROOM_DIMENSIONS['x'] / 2.0) - geometry.PERFORMER_WIDTH
+ROOM_Z_MAX = (ROOM_DIMENSIONS['x'] / 2.0) - geometry.PERFORMER_WIDTH
 
 
 LAST_STEP = 2500
@@ -254,7 +259,7 @@ class InteractiveHypercube(Hypercube):
                 logging.exception(
                     f'{self.get_name()} _initialize_each_hypercube_object')
 
-            if tries >= util.MAX_TRIES:
+            if tries >= MAX_TRIES:
                 raise SceneException(
                     f'{self.get_name()} cannot successfully initialize scenes '
                     f'-- please redo.')
@@ -277,7 +282,7 @@ class InteractiveHypercube(Hypercube):
         large_container_data_list: List[ReceptacleData],
         goal: InteractiveGoal,
         performer_start: Dict[str, Dict[str, float]],
-        bounds_list: List[List[Dict[str, float]]],
+        bounds_list: List[ObjectBounds],
         plans_to_locations: Dict[ObjectLocationPlan, List[Dict[str, Any]]]
     ) -> None:
         """Generate and assign locations to the given confusor, obstacle, and
@@ -392,7 +397,7 @@ class InteractiveHypercube(Hypercube):
         container_data_list: List[ReceptacleData],
         goal: InteractiveGoal,
         performer_start: Dict[str, Dict[str, float]],
-        bounds_list: List[List[Dict[str, float]]]
+        bounds_list: List[ObjectBounds]
     ) -> None:
         """Generate and assign locations to the given container receptacle
         objects, if needed. Will update the given bounds_list."""
@@ -419,7 +424,7 @@ class InteractiveHypercube(Hypercube):
         target_data: TargetData,
         target_or_receptacle_definition: ObjectDefinition,
         confusor_data_list: List[ObjectData],
-        bounds_list: List[List[Dict[str, float]]]
+        bounds_list: List[ObjectBounds]
     ) -> Dict[ObjectLocationPlan, List[Dict[str, Any]]]:
         """Generate and assign front and back locations to the given target and
         confusor objects, if needed. Will update the given bounds_list. Return
@@ -544,7 +549,7 @@ class InteractiveHypercube(Hypercube):
         target_or_receptacle_definition: ObjectDefinition,
         target_location: Dict[str, Any],
         performer_start: Dict[str, Dict[str, float]],
-        bounds_list: List[List[Dict[str, float]]],
+        bounds_list: List[ObjectBounds],
         debug_label: str,
         location_function: Callable,
         indexes: List[float],
@@ -601,7 +606,7 @@ class InteractiveHypercube(Hypercube):
         confusor_data_list: List[ObjectData],
         goal: InteractiveGoal,
         performer_start: Dict[str, Dict[str, float]],
-        bounds_list: List[List[Dict[str, float]]]
+        bounds_list: List[ObjectBounds]
     ) -> Dict[ObjectLocationPlan, List[Dict[str, Any]]]:
         """Generate and assign locations to the given target, as well as the
         given target's receptacle and confusor objects if needed. Will update
@@ -768,9 +773,11 @@ class InteractiveHypercube(Hypercube):
         )
 
         if not confusor_data.trained_definition:
-            confusor_data.trained_definition = util.get_similar_definition(
-                target_definition,
-                trained_dataset
+            confusor_data.trained_definition = (
+                definitions.get_similar_definition(
+                    target_definition,
+                    trained_dataset
+                )
             )
             if not confusor_data.trained_definition:
                 raise SceneException(
@@ -779,9 +786,11 @@ class InteractiveHypercube(Hypercube):
                     f'target={target_definition}')
 
         if not confusor_data.untrained_definition:
-            confusor_data.untrained_definition = util.get_similar_definition(
-                target_definition,
-                untrained_dataset
+            confusor_data.untrained_definition = (
+                definitions.get_similar_definition(
+                    target_definition,
+                    untrained_dataset
+                )
             )
             if not confusor_data.untrained_definition:
                 raise SceneException(
@@ -800,7 +809,7 @@ class InteractiveHypercube(Hypercube):
     ) -> Dict[str, Any]:
         """Choose and return a small context object definition for the given
         target and confusor objects from the given definition list."""
-        return util.choose_distractor_definition([
+        return specific_objects.choose_distractor_definition([
             object_data.trained_definition.shape for object_data
             in target_confusor_data_list
         ] + [
@@ -1080,7 +1089,7 @@ class InteractiveHypercube(Hypercube):
         wall_material: str,
         wall_colors: List[str],
         performer_start: Dict[str, Dict[str, float]],
-        bounds_list: List[List[Dict[str, float]]],
+        bounds_list: List[ObjectBounds],
         keep_unobstructed_list: List[Dict[str, Any]] = None
     ) -> Optional[Dict[str, Any]]:
         """Create and return a randomly positioned interior wall with the
@@ -1089,12 +1098,12 @@ class InteractiveHypercube(Hypercube):
         objects in keep_unobstructed_list."""
 
         tries = 0
-        performer_rect = geometry.find_performer_rect(
+        performer_bounds = geometry.find_performer_bounds(
             performer_start['position']
         )
-        performer_poly = geometry.rect_to_poly(performer_rect)
+        performer_poly = performer_bounds.polygon_xz
 
-        while tries < util.MAX_TRIES:
+        while tries < MAX_TRIES:
             rotation = random.choice((0, 90, 180, 270))
             x_position = geometry.random_position_x(ROOM_DIMENSIONS)
             z_position = geometry.random_position_z(ROOM_DIMENSIONS)
@@ -1119,35 +1128,32 @@ class InteractiveHypercube(Hypercube):
             ):
                 continue
 
-            wall_rect = geometry.calc_obj_coords(
-                x_position,
-                z_position,
-                x_width / 2.0,
-                WALL_DEPTH / 2.0,
-                0,
-                0,
-                rotation
+            wall_bounds = geometry.create_bounds(
+                dimensions={'x': x_width, 'y': WALL_HEIGHT, 'z': WALL_DEPTH},
+                offset={'x': 0, 'y': 0, 'z': 0},
+                position={'x': x_position, 'y': 0, 'z': z_position},
+                rotation={'x': 0, 'y': rotation, 'z': 0},
+                standing_y=(WALL_HEIGHT / 2.0)
             )
-            wall_poly = geometry.rect_to_poly(wall_rect)
+            wall_poly = wall_bounds.polygon_xz
 
             # Ensure parallel walls are not too close one another.
-            boundary_rect = geometry.calc_obj_coords(
-                x_position,
-                z_position,
-                (x_width + WALL_SEPARATION) / 2.0,
-                (WALL_DEPTH + WALL_SEPARATION) / 2.0,
-                0,
-                0,
-                rotation
-            )
+            boundary_rect = ObjectBounds(box_xz=[
+                Vector3d(
+                    corner.x + WALL_SEPARATION,
+                    0,
+                    corner.z + WALL_SEPARATION
+                ) for corner in wall_bounds.box_xz
+            ], max_y=wall_bounds.max_y, min_y=wall_bounds.min_y)
 
             is_too_close = any(
-                sat_entry(boundary_rect, bounds) for bounds in bounds_list
+                sat_entry(boundary_rect.box_xz, bounds.box_xz)
+                for bounds in bounds_list
             )
 
             is_ok = (
+                wall_bounds.is_within_room(ROOM_DIMENSIONS) and
                 not wall_poly.intersects(performer_poly) and
-                geometry.rect_within_room(wall_rect, ROOM_DIMENSIONS) and
                 not is_too_close
             )
 
@@ -1169,7 +1175,7 @@ class InteractiveHypercube(Hypercube):
 
             tries += 1
 
-        if tries < util.MAX_TRIES:
+        if tries < MAX_TRIES:
             interior_wall = structures.create_interior_wall(
                 x_position,
                 z_position,
@@ -1178,7 +1184,7 @@ class InteractiveHypercube(Hypercube):
                 WALL_HEIGHT,
                 materials.MaterialTuple(wall_material, wall_colors),
                 thickness=WALL_DEPTH,
-                bounding_rect=wall_rect
+                bounds=wall_bounds
             )
             return interior_wall
 
@@ -1188,11 +1194,11 @@ class InteractiveHypercube(Hypercube):
         self,
         goal: InteractiveGoal,
         performer_start: Dict[str, float],
-        existing_bounds_list: List[List[Dict[str, float]]],
+        existing_bounds_list: List[ObjectBounds],
         target_validation_list: List[Dict[str, float]],
         start_index: int = None,
         end_index: int = None
-    ) -> Tuple[List[Dict[str, Any]], List[List[Dict[str, float]]]]:
+    ) -> Tuple[List[Dict[str, Any]], List[ObjectBounds]]:
         """Create and return each of the goal's targets between the start_index
         and the end_index. Used if the goal needs more targets than are defined
         by the hypercube's plan. Changes the bounds_list."""
@@ -1213,7 +1219,7 @@ class InteractiveHypercube(Hypercube):
 
         for i in range(valid_start_index, valid_end_index):
             definition = goal.choose_target_definition(i)
-            for _ in range(util.MAX_TRIES):
+            for _ in range(MAX_TRIES):
                 location, possible_bounds_list = goal.choose_location(
                     definition,
                     performer_start,
@@ -1234,8 +1240,11 @@ class InteractiveHypercube(Hypercube):
                     f'{self.get_name()} cannot find suitable location '
                     f'target={definition}')
             bounds_list = possible_bounds_list
-            instance = util.instantiate_object(definition, location)
-            target_list.append(instance)
+            target_instance = instances.instantiate_object(
+                definition,
+                location
+            )
+            target_list.append(target_instance)
 
         return target_list, bounds_list
 
@@ -1252,7 +1261,7 @@ class InteractiveHypercube(Hypercube):
         location_front = None
         location_back = None
 
-        for _ in range(util.MAX_TRIES):
+        for _ in range(MAX_TRIES):
             location_front = self._identify_front(
                 self._goal,
                 self._performer_start,
@@ -1285,7 +1294,7 @@ class InteractiveHypercube(Hypercube):
         existing_definition: ObjectDefinition,
         existing_location: Dict[str, Any],
         performer_start: Dict[str, Dict[str, float]],
-        bounds_list: List[List[Dict[str, float]]],
+        bounds_list: List[ObjectBounds],
         adjacent: bool = False,
         behind: bool = False,
         obstruct: bool = False,
@@ -1336,12 +1345,12 @@ class InteractiveHypercube(Hypercube):
         object_definition: ObjectDefinition,
         existing_location: Dict[str, Any],
         performer_start: Dict[str, Dict[str, float]],
-        bounds_list: List[List[Dict[str, float]]]
+        bounds_list: List[ObjectBounds]
     ) -> Dict[str, Any]:
         """Generate and return a new location for the given object far away
         from the given location."""
 
-        for _ in range(util.MAX_TRIES):
+        for _ in range(MAX_TRIES):
             bounds_list_copy = copy.deepcopy(bounds_list)
             location_far = geometry.calc_obj_pos(
                 performer_start['position'],
@@ -1390,14 +1399,14 @@ class InteractiveHypercube(Hypercube):
         definition: ObjectDefinition,
         goal: InteractiveGoal,
         performer_start: Dict[str, float],
-        bounds_list: List[List[Dict[str, float]]],
+        bounds_list: List[ObjectBounds],
         target_choice: int = None,
         target_location: Dict[str, Any] = None,
         second_definition: ObjectDefinition = None
     ) -> Dict[str, Any]:
         """Generate a random location and return it twice."""
 
-        for _ in range(util.MAX_TRIES):
+        for _ in range(MAX_TRIES):
             location_random, _ = goal.choose_location(
                 identify_larger_definition(definition, second_definition)
                 if second_definition else definition,
@@ -1425,15 +1434,14 @@ class InteractiveHypercube(Hypercube):
                     # will only be for critical objects (specifically targets,
                     # confusors, containers, obstacles, occluders).
                     for bounds in bounds_list:
-                        bounds_poly = geometry.get_bounding_polygon({
-                            'boundingBox': bounds
-                        })
+                        bounds_poly = bounds.polygon_xz
                         # Also validate the second object definition, if given.
-                        second_rect = geometry.generate_object_bounds(
-                            vars(second_definition.dimensions),
-                            vars(second_definition.offset),
-                            location_random['position'],
-                            location_random['rotation']
+                        second_bounds = geometry.create_bounds(
+                            dimensions=vars(second_definition.dimensions),
+                            offset=vars(second_definition.offset),
+                            position=location_random['position'],
+                            rotation=location_random['rotation'],
+                            standing_y=second_definition.positionY
                         )
                         # This location should not completely obstruct or be
                         # obstructed by any critical object's location.
@@ -1447,14 +1455,12 @@ class InteractiveHypercube(Hypercube):
                             geometry.get_bounding_polygon(location_random)
                         ) or geometry.does_fully_obstruct_target(
                             performer_start['position'],
-                            {'boundingBox': second_rect},
+                            {'boundingBox': second_bounds},
                             bounds_poly
                         ) or geometry.does_fully_obstruct_target(
                             performer_start['position'],
                             {'boundingBox': bounds},
-                            geometry.get_bounding_polygon({
-                                'boundingBox': second_rect
-                            })
+                            second_bounds.polygon_xz
                         ):
                             # Failed
                             location_random = None
@@ -1495,7 +1501,7 @@ class InteractiveHypercube(Hypercube):
         def rotation_func():
             return performer_start['rotation']['y']
 
-        for _ in range(util.MAX_TRIES):
+        for _ in range(MAX_TRIES):
             location_front = geometry.get_location_in_front_of_performer(
                 performer_start,
                 definition,
@@ -1529,7 +1535,7 @@ class InteractiveHypercube(Hypercube):
         def rotation_func():
             return performer_start['rotation']['y']
 
-        for _ in range(util.MAX_TRIES):
+        for _ in range(MAX_TRIES):
             location_back = geometry.get_location_in_back_of_performer(
                 performer_start,
                 definition,
@@ -1570,7 +1576,7 @@ class InteractiveHypercube(Hypercube):
                 critical_object_data_list
             )
 
-            for _ in range(util.MAX_TRIES):
+            for _ in range(MAX_TRIES):
                 location, bounds_list = self._goal.choose_location(
                     definition,
                     self._performer_start,
@@ -1602,8 +1608,11 @@ class InteractiveHypercube(Hypercube):
                     f'small context object {definition}')
 
             self._bounds_list = bounds_list
-            instance = util.instantiate_object(definition, location)
-            self._small_context_object_list.append(instance)
+            small_context_instance = instances.instantiate_object(
+                definition,
+                location
+            )
+            self._small_context_object_list.append(small_context_instance)
 
     def _initialize_interior_walls(self) -> None:
         """Create this hypercube's interior walls. Changes the
@@ -1729,7 +1738,7 @@ class InteractiveHypercube(Hypercube):
             except SceneException:
                 logging.exception(
                     f'{self.get_name()} _assign_each_object_location')
-            if tries >= util.MAX_TRIES:
+            if tries >= MAX_TRIES:
                 raise SceneException(
                     f'{self.get_name()} cannot successfully assign each '
                     f'object to a location -- please redo.')
@@ -1782,7 +1791,7 @@ class InteractiveHypercube(Hypercube):
         self,
         object_instance: Dict[str, Any],
         performer_start: Dict[str, Dict[str, float]],
-        bounds_list: List[List[Dict[str, float]]]
+        bounds_list: List[ObjectBounds]
     ) -> Dict[str, Any]:
         """Create and return a receptacle object, moving the given object into
         the new receptacle. Changes the bounds_list."""
@@ -1807,7 +1816,7 @@ class InteractiveHypercube(Hypercube):
                     room_dimensions=ROOM_DIMENSIONS
                 )
                 if location:
-                    receptacle_instance = util.instantiate_object(
+                    receptacle_instance = instances.instantiate_object(
                         receptacle_definition,
                         location
                     )
@@ -1825,7 +1834,7 @@ class InteractiveHypercube(Hypercube):
         self,
         object_instance: Dict[str, Any],
         performer_start: Dict[str, Dict[str, float]],
-        bounds_list: List[List[Dict[str, float]]]
+        bounds_list: List[ObjectBounds]
     ) -> Dict[str, Any]:
         """Create and return a receptacle object, moving the given object onto
         the new receptacle. Changes the bounds_list."""

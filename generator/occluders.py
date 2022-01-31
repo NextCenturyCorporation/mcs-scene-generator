@@ -2,7 +2,13 @@ import copy
 import uuid
 from typing import Any, Dict, List, Tuple
 
-from .util import MAX_TRIES, MIN_RANDOM_INTERVAL, random_real
+from .geometry import (
+    MAX_TRIES,
+    MIN_RANDOM_INTERVAL,
+    create_bounds,
+    random_real,
+)
+from .materials import MaterialTuple
 
 # Default occluder height of 1.8 enables seeing a falling object for 8+ frames.
 OCCLUDER_HEIGHT = 1.8
@@ -10,15 +16,22 @@ OCCLUDER_HEIGHT_TALL = 3
 OCCLUDER_POSITION_Z = 1
 OCCLUDER_THICKNESS = 0.1
 
-OCCLUDER_MIN_SCALE_X = 0.5
-OCCLUDER_MAX_SCALE_X = 1.4
-OCCLUDER_SEPARATION_X = 0.5
+# This buffer should handle any minor variability in the speed of rolling
+# objects (in intuitive physics move across scenes) due to difference in shape.
 OCCLUDER_BUFFER = 0.1
+OCCLUDER_BUFFER_MULTIPLE_EXIT = 0.4 + OCCLUDER_BUFFER
+OCCLUDER_BUFFER_EXIT_AND_STOP = 0.4 + OCCLUDER_BUFFER_MULTIPLE_EXIT
+# An occluder must have a maximum width to hide the current largest possible
+# intuitive physics object, measured diagonally, rounded up (1.3 in Eval 4).
+# Remember to add the OCCLUDER_BUFFER!
+OCCLUDER_MAX_SCALE_X = 1.3
+OCCLUDER_MIN_SCALE_X = 0.4
+# Minimum separation between two adjacent occluders.
+OCCLUDER_SEPARATION_X = 0.5
 
 # The max X position so an occluder is seen within the camera's view.
 # ONLY INTENDED FOR USE IN INTUITIVE PHYSICS HYPERCUBES.
 OCCLUDER_MAX_X = 3
-OCCLUDER_DEFAULT_MAX_X = OCCLUDER_MAX_X - (OCCLUDER_MIN_SCALE_X / 2)
 
 # Each occluder will take up to 40 steps to move, rotate, and wait before it
 # can move again.
@@ -396,8 +409,8 @@ def calculate_separation_distance(
 
 
 def create_occluder(
-    wall_material: Tuple[str, List[str]],
-    pole_material: Tuple[str, List[str]],
+    wall_material: MaterialTuple,
+    pole_material: MaterialTuple,
     x_position: float,
     occluder_width: float,
     last_step: int = None,
@@ -516,15 +529,15 @@ def create_occluder(
     occluder[WALL]['id'] = occluder[WALL]['id'] + occluder_id
     occluder[POLE]['id'] = occluder[POLE]['id'] + occluder_id
 
-    occluder[WALL]['materials'] = [wall_material[0]]
-    occluder[POLE]['materials'] = [pole_material[0]]
+    occluder[WALL]['materials'] = [wall_material.material]
+    occluder[POLE]['materials'] = [pole_material.material]
 
-    occluder[WALL]['debug']['color'] = wall_material[1]
-    occluder[POLE]['debug']['color'] = pole_material[1]
+    occluder[WALL]['debug']['color'] = wall_material.color
+    occluder[POLE]['debug']['color'] = pole_material.color
 
     # Just set the occluder's info to its color for now.
-    occluder[WALL]['debug']['info'] = wall_material[1]
-    occluder[POLE]['debug']['info'] = pole_material[1]
+    occluder[WALL]['debug']['info'] = wall_material.color
+    occluder[POLE]['debug']['info'] = pole_material.color
 
     adjust_movement_and_rotation_to_scale(
         occluder,
@@ -556,6 +569,36 @@ def create_occluder(
             rotate = occluder[WALL]['rotates'][action_index]
             rotate['repeat'] = True
             rotate['stepWait'] = rotate_interval
+
+    for part in [WALL, POLE]:
+        dimensions_x = occluder[part]['shows'][0]['scale']['x']
+        dimensions_y = occluder[part]['shows'][0]['scale']['y']
+        dimensions_z = occluder[part]['shows'][0]['scale']['z']
+        if part == POLE:
+            # Unity automatically doubles a cylinder's height.
+            dimensions_y *= 2
+            # The create_bounds function will adjust for the Y rotation but not
+            # the Z, so swap the X and Y dimensions if the pole is sideways.
+            if (
+                sideways_back or sideways_front or
+                sideways_left or sideways_right
+            ):
+                temp = dimensions_x
+                dimensions_x = dimensions_y
+                dimensions_y = temp
+        occluder[part]['shows'][0]['boundingBox'] = create_bounds(
+            dimensions={
+                'x': dimensions_x,
+                'y': dimensions_y,
+                'z': dimensions_z
+            },
+            offset={'x': 0, 'y': 0, 'z': 0},
+            position=occluder[part]['shows'][0]['position'],
+            rotation=occluder[part]['shows'][0]['rotation'],
+            standing_y=(dimensions_y / 2.0)
+        )
+        # The occluder's bounding box should occupy the entire vertical space.
+        occluder[part]['shows'][0]['boundingBox'].extend_bottom_to_ground()
 
     return occluder
 
@@ -609,7 +652,7 @@ def generate_occluder_position(
 
     for _ in range(MAX_TRIES):
         # Choose a random position.
-        x_position = random_real(-max_x, max_x, MIN_RANDOM_INTERVAL)
+        x_position = random_real(-max_x, max_x)
 
         # Ensure the new occluder isn't too close to an existing occluder.
         too_close = False

@@ -8,8 +8,8 @@ from generator import (
     ObjectInteractableArea,
     definitions,
     geometry,
+    instances,
     specific_objects,
-    util,
 )
 from generator.containers import (
     can_contain,
@@ -74,7 +74,7 @@ def test_put_object_in_container():
         print(f'\nOBJECT={obj_def}')
         obj_location = geometry.calc_obj_pos(
             {'x': 1, 'y': 0, 'z': 1}, [], obj_def)
-        obj = util.instantiate_object(obj_def, obj_location)
+        obj = instances.instantiate_object(obj_def, obj_location)
         obj_bounds = obj['shows'][0]['boundingBox']
 
         containments = get_valid_containments(obj_def)
@@ -93,7 +93,7 @@ def test_put_object_in_container():
             area_index, rotations = containment
             container_location = geometry.calc_obj_pos(
                 {'x': -1, 'y': 0, 'z': -1}, [], container_def)
-            container = util.instantiate_object(
+            container = instances.instantiate_object(
                 container_def, container_location)
 
             put_object_in_container(obj, container, area_index, rotations[0])
@@ -126,14 +126,14 @@ def test_put_objects_in_container():
     for obj_a_def in PICKUPABLE_DEFINITIONS:
         print(f'\nOBJECT_A={obj_a_def}')
         obj_a_location = geometry.calc_obj_pos(geometry.ORIGIN, [], obj_a_def)
-        obj_a = util.instantiate_object(obj_a_def, obj_a_location)
+        obj_a = instances.instantiate_object(obj_a_def, obj_a_location)
         obj_a_bounds = obj_a['shows'][0]['boundingBox']
 
         for obj_b_def in PICKUPABLE_DEFINITIONS:
             print(f'\nOBJECT_B={obj_b_def}')
             obj_b_location = geometry.calc_obj_pos(
                 geometry.ORIGIN, [], obj_b_def)
-            obj_b = util.instantiate_object(obj_b_def, obj_b_location)
+            obj_b = instances.instantiate_object(obj_b_def, obj_b_location)
             obj_b_bounds = obj_b['shows'][0]['boundingBox']
 
             containments = get_valid_containments(obj_a_def, obj_b_def)
@@ -156,7 +156,7 @@ def test_put_objects_in_container():
                 area_index, rotations, orientation = containment
                 container_location = geometry.calc_obj_pos(
                     geometry.ORIGIN, [], container_def)
-                container = util.instantiate_object(
+                container = instances.instantiate_object(
                     container_def, container_location)
 
                 put_objects_in_container(obj_a, obj_b,

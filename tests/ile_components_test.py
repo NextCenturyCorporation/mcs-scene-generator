@@ -241,7 +241,7 @@ def test_ile_component_update():
         ],
         'list_int_prop': [12, 34, 56, 78],
         'list_vector_prop': [
-            {'x': 0, 'y': 0, 'z': 0},
+            {'x': None, 'y': None, 'z': None},
             {'x': 1, 'y': 2, 'z': 3}
         ],
         'union_int_prop': [78, 56, 34, 12],
@@ -268,7 +268,7 @@ def test_ile_component_update():
         ],
         'list_int_prop': [87, 65, 43, 21],
         'list_vector_prop': [
-            {'x': 0, 'y': 0, 'z': 0},
+            {'x': None, 'y': None, 'z': None},
             {'x': 9, 'y': 8, 'z': 7}
         ],
         'union_int_prop': [21, 43, 65, 87],
@@ -288,7 +288,7 @@ def test_ile_component_update():
         ],
         'list_int_prop': [123, 456],
         'list_vector_prop': [
-            {'x': 0, 'y': 0, 'z': 0},
+            {'x': None, 'y': None, 'z': None},
             {'x': 4, 'y': 5, 'z': 6}
         ],
         'union_int_prop': [456, 123],

@@ -70,4 +70,7 @@ def test_intuitive_physics_all_objects_diagonal_size():
             assert math.sqrt(
                 definition.dimensions.x**2 +
                 definition.dimensions.z**2
-            ) <= (occluders.OCCLUDER_MAX_SCALE_X + definitions.MAX_SIZE_DIFF)
+            ) <= (
+                occluders.OCCLUDER_MAX_SCALE_X + occluders.OCCLUDER_BUFFER +
+                definitions.MAX_SIZE_DIFF
+            )

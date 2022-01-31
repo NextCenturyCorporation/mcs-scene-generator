@@ -1,5 +1,7 @@
 import pytest
 
+from generator.geometry import ObjectBounds
+from generator.materials import MaterialTuple
 from generator.occluders import (
     DEFAULT_INTUITIVE_PHYSICS_ROOM_DIMENSIONS,
     OCCLUDER_HEIGHT,
@@ -10,10 +12,52 @@ from generator.occluders import (
     generate_sideways_pole_position_x,
 )
 
-TEST_MATERIAL_POLE = ('test_material_pole', ['brown'])
-TEST_MATERIAL_WALL = ('test_material_wall', ['white'])
+TEST_MATERIAL_POLE = MaterialTuple('test_material_pole', ['brown'])
+TEST_MATERIAL_WALL = MaterialTuple('test_material_wall', ['white'])
 
 DEFAULT_ROOM_Y = DEFAULT_INTUITIVE_PHYSICS_ROOM_DIMENSIONS['y']
+
+
+def verify_bounds(
+    bounds: ObjectBounds,
+    position_x: float,
+    position_y: float,
+    position_z: float,
+    scale_x: float,
+    scale_y: float,
+    scale_z: float
+):
+    points = [{
+        'x': position_x - (scale_x / 2.0),
+        'y': 0,
+        'z': position_z - (scale_z / 2.0)
+    }, {
+        'x': position_x - (scale_x / 2.0),
+        'y': 0,
+        'z': position_z + (scale_z / 2.0)
+    }, {
+        'x': position_x + (scale_x / 2.0),
+        'y': 0,
+        'z': position_z + (scale_z / 2.0)
+    }, {
+        'x': position_x + (scale_x / 2.0),
+        'y': 0,
+        'z': position_z - (scale_z / 2.0)
+    }]
+    actual_points = [vars(actual) for actual in bounds.box_xz]
+    previous_points = points
+    for actual in actual_points:
+        next_points = []
+        for expected in previous_points:
+            if actual != pytest.approx(expected):
+                next_points.append(expected)
+        previous_points = next_points
+    if len(previous_points):
+        pytest.fail(
+            f'BOUNDS MISMATCH:\nEXPECTED={points}\nACTUAL={actual_points}'
+        )
+    assert bounds.max_y == position_y + (scale_y / 2.0)
+    assert bounds.min_y == 0
 
 
 def verify_pole(
@@ -43,6 +87,15 @@ def verify_pole(
     assert pole['shows'][0]['scale']['x'] == scale_x
     assert pole['shows'][0]['scale']['y'] == scale_y
     assert pole['shows'][0]['scale']['z'] == scale_z
+    verify_bounds(
+        pole['shows'][0]['boundingBox'],
+        position_x,
+        position_y,
+        position_z,
+        scale_x,
+        scale_y * 2,
+        scale_z
+    )
 
     assert len(pole['moves']) == (2 if no_last_step else 3)
     assert pole['moves'][0]['stepBegin'] == 1
@@ -83,6 +136,16 @@ def verify_pole_sideways(
     assert pole['shows'][0]['scale']['x'] == scale_x
     assert pole['shows'][0]['scale']['y'] == scale_y
     assert pole['shows'][0]['scale']['z'] == scale_z
+    if rotation_y % 90 == 0:
+        verify_bounds(
+            pole['shows'][0]['boundingBox'],
+            position_x,
+            position_y,
+            position_z,
+            (scale_y * 2) if rotation_y % 180 == 0 else scale_z,
+            scale_x,
+            scale_z if rotation_y % 180 == 0 else (scale_y * 2)
+        )
 
     assert len(pole['moves']) == (2 if no_last_step else 3)
     assert pole['moves'][0]['stepBegin'] == 1
@@ -124,6 +187,16 @@ def verify_wall(
     assert wall['shows'][0]['scale']['x'] == scale_x
     assert wall['shows'][0]['scale']['y'] == scale_y
     assert wall['shows'][0]['scale']['z'] == scale_z
+    if rotation_y % 90 == 0:
+        verify_bounds(
+            wall['shows'][0]['boundingBox'],
+            position_x,
+            position_y,
+            position_z,
+            scale_x if rotation_y % 180 == 0 else scale_z,
+            scale_y,
+            scale_z if rotation_y % 180 == 0 else scale_x
+        )
 
     move_2_step_end = move_2_step_begin + 5
     move_3_step_end = move_3_step_begin + 5

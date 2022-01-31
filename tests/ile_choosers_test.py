@@ -3,7 +3,7 @@ import copy
 import pytest
 from machine_common_sense.config_manager import Vector3d
 
-from generator import MaterialTuple, base_objects, materials
+from generator import MaterialTuple, base_objects
 from ideal_learning_env import (
     MinMax,
     MinMaxFloat,
@@ -13,6 +13,7 @@ from ideal_learning_env import (
     choose_position,
     choose_random,
     choose_rotation,
+    choose_scale,
 )
 from ideal_learning_env.choosers import choose_shape_material
 from ideal_learning_env.defs import ILEException
@@ -46,7 +47,21 @@ def test_choose_position():
         VectorFloatConfig(1, 2, 3),
         VectorFloatConfig(4, 5, 6)
     ])
-    assert result == Vector3d(1, 2, 3) or result == Vector3d(4, 5, 6)
+    assert result in [Vector3d(1, 2, 3), Vector3d(4, 5, 6)]
+
+    assert choose_position(VectorFloatConfig(1, None, 3)) == Vector3d(1, 0, 3)
+    pos = choose_position(
+        VectorFloatConfig(
+            1,
+            None,
+            None),
+        room_x=4,
+        room_z=4,
+        object_x=.5,
+        object_z=0.5)
+    assert pos.x == 1
+    assert pos.y == 0
+    assert -1.75 <= pos.z <= 1.75
 
 
 def test_choose_position_random():
@@ -230,9 +245,55 @@ def test_choose_rotation_random():
     assert result.z == 0
 
 
+def test_choose_scale():
+    assert choose_scale(None, 'sofa_1') == 1
+    assert choose_scale(1.5, 'sofa_1') == 1.5
+    assert choose_scale([0.5, 1.5], 'sofa_1') in [0.5, 1.5]
+    assert (
+        choose_scale(VectorFloatConfig(1, 1.5, 2), 'sofa_1') ==
+        Vector3d(1, 1.5, 2)
+    )
+    result = choose_scale([
+        VectorFloatConfig(1, 1.5, 2),
+        VectorFloatConfig(3, 3, 3)
+    ], 'sofa_1')
+    assert result == Vector3d(1, 1.5, 2) or result == Vector3d(3, 3, 3)
+    result = choose_scale(MinMaxFloat(1.4, 1.6), 'sofa_1')
+    assert 1.4 <= result <= 1.6
+    result = choose_scale([
+        MinMaxFloat(1.4, 1.6),
+        MinMaxFloat(3.4, 3.6),
+    ], 'sofa_1')
+    assert (1.4 <= result <= 1.6) or (3.4 <= result <= 3.6)
+
+
+def test_choose_scale_soccer_ball():
+    result = choose_scale(None, 'soccer_ball')
+    assert 1 <= result <= 3
+    result = choose_scale(0.5, 'soccer_ball')
+    assert 1 <= result <= 3
+    assert choose_scale(1.5, 'soccer_ball') == 1.5
+    assert choose_scale([0.5, 1.5], 'soccer_ball') == 1.5
+    assert choose_scale([1, 2, 3], 'soccer_ball') in [1, 2, 3]
+    result = choose_scale(VectorFloatConfig(1, 1.5, 2), 'soccer_ball')
+    assert 1 <= result <= 3
+    result = choose_scale([
+        VectorFloatConfig(1, 1.5, 2),
+        VectorFloatConfig(3, 3, 3)
+    ], 'soccer_ball')
+    assert result == Vector3d(3, 3, 3)
+    result = choose_scale(MinMaxFloat(1.4, 1.6), 'soccer_ball')
+    assert 1.4 <= result <= 1.6
+    result = choose_scale([
+        MinMaxFloat(1.4, 1.6),
+        MinMaxFloat(3.4, 3.6),
+    ], 'soccer_ball')
+    assert 1.4 <= result <= 1.6
+
+
 def test_choose_shape_material_both_none():
     expected_shape = 'car_1'
-    expected_material = ("AI2-THOR/Materials/Wood/WhiteWood", ["white"]),
+    expected_material = ("AI2-THOR/Materials/Wood/WhiteWood", ["white"])
     base_objects.FULL_TYPE_LIST = [expected_shape]
     func = base_objects._TYPES_TO_DETAILS[expected_shape].definition_function
     base_objects._TYPES_TO_DETAILS[expected_shape] = (
@@ -248,15 +309,14 @@ def test_choose_shape_material_both_none():
 def test_choose_shape_material_material_none_non_restricted():
     shape, mat = choose_shape_material('soccer_ball', None)
     assert shape == 'soccer_ball'
-    assert mat is not None
-    assert mat in materials.ALL_MATERIAL_TUPLES
+    assert mat is None
 
 
 def test_choose_shape_material_material_none_restricted():
-    shape, mat = choose_shape_material('ball', None)
-    assert shape == 'ball'
+    shape, mat = choose_shape_material('sphere', None)
+    assert shape == 'sphere'
     assert mat is not None
-    assert mat in base_objects.get_material_restriction(shape)
+    assert mat in base_objects.get_material_restriction_tuples(shape)
 
 
 def test_choose_shape_material_shape_none():
@@ -282,10 +342,10 @@ def test_choose_shape_material_neither_none_restricted():
 
 
 def test_choose_shape_material_neither_none_non_restricted():
-    shape_input = "apple_1"
+    shape_input = "sphere"
     mat_input = "AI2-THOR/Materials/Fabrics/BedroomCarpet"
     shape, mat = choose_shape_material(shape_input, mat_input)
-    assert shape == "apple_1"
+    assert shape == "sphere"
     assert mat[0] == "AI2-THOR/Materials/Fabrics/BedroomCarpet"
     assert mat[1] == ['blue']
 

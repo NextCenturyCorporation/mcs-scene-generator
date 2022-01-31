@@ -24,6 +24,7 @@ def test_action_restrictions_defaults():
     component = ActionRestrictionsComponent({})
     assert component.passive_scene is None
     assert component.freezes is None
+    assert component.swivels is None
     assert component.teleports is None
 
     scene = component.update_ile_scene(prior_scene())
@@ -307,6 +308,559 @@ def test_action_restrictions_freeze_empty_list():
     goal = scene['goal']
     assert isinstance(goal, dict)
     assert not hasattr(goal, 'action_list')
+
+
+def test_action_restrictions_swivel_start():
+    start_step = 2
+    component = ActionRestrictionsComponent({
+        'swivels': [
+            {
+                'begin': start_step
+            }]
+    })
+    svls = component.get_swivels()
+    assert isinstance(svls, list)
+    assert svls[0].begin == start_step
+    assert svls[0].end is None
+
+    scene = component.update_ile_scene(prior_scene(100))
+    goal = scene['goal']
+    assert isinstance(goal, dict)
+    al = goal['action_list']
+    assert isinstance(al, list)
+    assert len(al) == 100
+    for idx, inner in enumerate(al):
+        assert isinstance(inner, list)
+        # Minux 1 for ordinal to index fix.
+        if idx >= start_step - 1:
+            assert len(inner) == 4
+            assert inner[0] == 'LookDown'
+            assert inner[1] == 'LookUp'
+            assert inner[2] == 'RotateLeft'
+            assert inner[3] == 'RotateRight'
+        else:
+            assert len(inner) == 0
+
+
+def test_action_restrictions_swivel_start_end():
+    start_step = 3
+    end_step = 7
+    component = ActionRestrictionsComponent({
+        'swivels': [
+            {
+                'begin': start_step,
+                'end': end_step
+            }]
+    })
+    svls = component.get_swivels()
+    assert isinstance(svls, list)
+    assert svls[0].begin == start_step
+    assert svls[0].end == end_step
+
+    scene = component.update_ile_scene(prior_scene())
+    goal = scene['goal']
+    assert isinstance(goal, dict)
+    al = goal['action_list']
+    assert isinstance(al, list)
+    assert len(al) == end_step - 1
+
+    for idx, inner in enumerate(al):
+        assert isinstance(inner, list)
+        if start_step - 1 <= idx < end_step - 1:
+            assert len(inner) == 4
+            assert inner[0] == 'LookDown'
+            assert inner[1] == 'LookUp'
+            assert inner[2] == 'RotateLeft'
+            assert inner[3] == 'RotateRight'
+        else:
+            assert len(inner) == 0
+
+
+def test_action_restrictions_swivel_choice():
+    component = ActionRestrictionsComponent({
+        'swivels': [[
+            {
+                'begin': 1,
+                'end': 2
+            },
+            {
+                'begin': 3,
+                'end': 4
+            },
+            {
+                'begin': 5,
+                'end': 6
+            }
+        ]]
+    })
+    svls = component.get_swivels()
+    assert isinstance(svls, list)
+    choice = [1, 3, 5].index(svls[0].begin)
+    # Choice is the index of the choice used so we can test consistency
+    start = [1, 3, 5][choice]
+    end = [2, 4, 6][choice]
+    assert svls[0].begin == start
+    assert svls[0].end == end
+
+    scene = component.update_ile_scene(prior_scene())
+    goal = scene['goal']
+    assert isinstance(goal, dict)
+    al = goal['action_list']
+    assert isinstance(al, list)
+    choice = [1, 3, 5].index(len(al))
+    start = [1, 3, 5][choice]
+    end = [2, 4, 6][choice]
+
+    assert len(al) == start
+    for idx, inner in enumerate(al):
+        assert isinstance(inner, list)
+        if start - 1 <= idx < end - 1:
+            assert len(inner) == 4
+            assert inner[0] == 'LookDown'
+            assert inner[1] == 'LookUp'
+            assert inner[2] == 'RotateLeft'
+            assert inner[3] == 'RotateRight'
+        else:
+            assert len(inner) == 0
+
+
+def test_action_restrictions_swivel_ok_overlap():
+    start_step = 5
+    mid = 7
+    end_step = 9
+    component = ActionRestrictionsComponent({
+        'swivels': [
+            {
+                'begin': start_step,
+                'end': mid
+            }, {
+                'begin': mid,
+                'end': end_step
+            }]
+    })
+    svls = component.get_swivels()
+    assert isinstance(svls, list)
+    assert svls[0].begin == start_step
+    assert svls[0].end == mid
+    assert svls[1].begin == mid
+    assert svls[1].end == end_step
+
+    scene = component.update_ile_scene(prior_scene())
+    goal = scene['goal']
+    assert isinstance(goal, dict)
+    al = goal['action_list']
+    assert isinstance(al, list)
+    assert len(al) == end_step - 1
+    for idx, inner in enumerate(al):
+        assert isinstance(inner, list)
+        if start_step - 1 <= idx < end_step - 1:
+            assert len(inner) == 4
+            assert inner[0] == 'LookDown'
+            assert inner[1] == 'LookUp'
+            assert inner[2] == 'RotateLeft'
+            assert inner[3] == 'RotateRight'
+        else:
+            assert len(inner) == 0
+
+
+def test_action_restrictions_swivel_gap():
+    start_step = 3
+    mid1 = 5
+    mid2 = 9
+    end_step = 13
+    component = ActionRestrictionsComponent({
+        'swivels': [
+            {
+                'begin': start_step,
+                'end': mid1
+            }, {
+                'begin': mid2,
+                'end': end_step
+            }]
+    })
+    svls = component.get_swivels()
+    assert isinstance(svls, list)
+    assert svls[0].begin == start_step
+    assert svls[0].end == mid1
+    assert svls[1].begin == mid2
+    assert svls[1].end == end_step
+
+    scene = component.update_ile_scene(prior_scene())
+    goal = scene['goal']
+    assert isinstance(goal, dict)
+    al = goal['action_list']
+    assert isinstance(al, list)
+    assert len(al) == end_step - 1
+    for idx, inner in enumerate(al):
+        assert isinstance(inner, list)
+        if start_step - 1 <= idx < mid1 - 1 or mid2 - 1 <= idx < end_step - 1:
+            assert len(inner) == 4
+            assert inner[0] == 'LookDown'
+            assert inner[1] == 'LookUp'
+            assert inner[2] == 'RotateLeft'
+            assert inner[3] == 'RotateRight'
+        else:
+            assert len(inner) == 0
+
+
+def test_action_restrictions_swivel_bad_overlap():
+    start_step = 3
+    mid = 7
+    end_step = 11
+    component = ActionRestrictionsComponent({
+        'swivels': [
+            {
+                'begin': start_step,
+                'end': mid + 1
+            }, {
+                'begin': mid - 1,
+                'end': end_step
+            }]
+    })
+    svls = component.get_swivels()
+    assert isinstance(svls, list)
+    assert svls[0].begin == start_step
+    assert svls[0].end == mid + 1
+    assert svls[1].begin == mid - 1
+    assert svls[1].end == end_step
+
+    with pytest.raises(ILEException):
+        component.update_ile_scene(prior_scene())
+
+
+def test_action_restrictions_swivel_just_end():
+    end_step = 4
+    component = ActionRestrictionsComponent({
+        'swivels': [
+            {
+                'end': end_step
+            }]
+    })
+    svls = component.get_swivels()
+    assert isinstance(svls, list)
+    assert svls[0].begin is None
+    assert svls[0].end == end_step
+
+    scene = component.update_ile_scene(prior_scene())
+    goal = scene['goal']
+    assert isinstance(goal, dict)
+    al = goal['action_list']
+    assert isinstance(al, list)
+    assert len(al) == end_step - 1
+    for idx, inner in enumerate(al):
+        assert isinstance(inner, list)
+        # minux 2 is 1 for ordinal to index and 1 for exclusiveness of end
+        if idx <= end_step - 2:
+            assert len(inner) == 4
+            assert inner[0] == 'LookDown'
+            assert inner[1] == 'LookUp'
+            assert inner[2] == 'RotateLeft'
+            assert inner[3] == 'RotateRight'
+        else:
+            assert len(inner) == 0
+
+
+def test_action_restrictions_swivel_missing_start_and_end():
+    component = ActionRestrictionsComponent({
+        'swivels': [
+            {}]
+    })
+    svls = component.get_swivels()
+    assert isinstance(svls, list)
+    assert svls[0].begin is None
+    assert svls[0].end is None
+
+    with pytest.raises(ILEConfigurationException):
+        component.update_ile_scene(prior_scene())
+
+
+def test_action_restrictions_swivel_empty_list():
+    component = ActionRestrictionsComponent({
+        'swivels': [
+        ]
+    })
+    svls = component.get_swivels()
+    assert isinstance(svls, list)
+    scene = component.update_ile_scene(prior_scene())
+    goal = scene['goal']
+    assert isinstance(goal, dict)
+    assert not hasattr(goal, 'action_list')
+
+
+def test_action_restrictions_swivel_then_freeze_ok():
+    start = 2
+    end = 3
+    fstart = 5
+    fend = 8
+
+    component = ActionRestrictionsComponent({
+        'freezes': [
+            {
+                'begin': fstart,
+                'end': fend
+            }
+        ],
+        'swivels': [
+            {
+                'begin': start,
+                'end': end
+            }
+        ]
+    })
+
+    fzs = component.get_freezes()
+    assert isinstance(fzs, list)
+    assert fzs[0].begin == fstart
+    assert fzs[0].end == fend
+
+    svls = component.get_swivels()
+    assert isinstance(svls, list)
+    assert svls[0].begin == start
+    assert svls[0].end == end
+
+    scene = component.update_ile_scene(prior_scene())
+    goal = scene['goal']
+    assert isinstance(goal, dict)
+    al = goal['action_list']
+    assert isinstance(al, list)
+    assert len(al) == fend - 1
+    for idx, inner in enumerate(al):
+        assert isinstance(inner, list)
+        if start - 1 <= idx < end - 1:
+            assert len(inner) == 4
+            assert inner[0] == 'LookDown'
+            assert inner[1] == 'LookUp'
+            assert inner[2] == 'RotateLeft'
+            assert inner[3] == 'RotateRight'
+        elif fstart - 1 <= idx < fend - 1:
+            assert len(inner) == 1
+            assert inner[0] == 'Pass'
+        else:
+            assert len(inner) == 0
+
+
+def test_action_restrictions_freeze_then_swivel_ok():
+    fstart = 2
+    fend = 3
+    start = 5
+    end = 8
+
+    component = ActionRestrictionsComponent({
+        'freezes': [
+            {
+                'begin': fstart,
+                'end': fend
+            }
+        ],
+        'swivels': [
+            {
+                'begin': start,
+                'end': end
+            }
+        ]
+    })
+
+    fzs = component.get_freezes()
+    assert isinstance(fzs, list)
+    assert fzs[0].begin == fstart
+    assert fzs[0].end == fend
+
+    svls = component.get_swivels()
+    assert isinstance(svls, list)
+    assert svls[0].begin == start
+    assert svls[0].end == end
+
+    scene = component.update_ile_scene(prior_scene())
+    goal = scene['goal']
+    assert isinstance(goal, dict)
+    al = goal['action_list']
+    assert isinstance(al, list)
+    assert len(al) == end - 1
+    for idx, inner in enumerate(al):
+        assert isinstance(inner, list)
+        if start - 1 <= idx < end - 1:
+            assert len(inner) == 4
+            assert inner[0] == 'LookDown'
+            assert inner[1] == 'LookUp'
+            assert inner[2] == 'RotateLeft'
+            assert inner[3] == 'RotateRight'
+        elif fstart - 1 <= idx < fend - 1:
+            assert len(inner) == 1
+            assert inner[0] == 'Pass'
+        else:
+            assert len(inner) == 0
+
+
+def test_action_restrictions_freeze_then_swivel_ok_overlap():
+    start_step = 2
+    mid = 3
+    end_step = 5
+
+    component = ActionRestrictionsComponent({
+        'freezes': [
+            {
+                'begin': start_step,
+                'end': mid
+            }
+        ],
+        'swivels': [
+            {
+                'begin': mid,
+                'end': end_step
+            }
+        ]
+    })
+
+    fzs = component.get_freezes()
+    assert isinstance(fzs, list)
+    assert fzs[0].begin == start_step
+    assert fzs[0].end == mid
+
+    svls = component.get_swivels()
+    assert isinstance(svls, list)
+    assert svls[0].begin == mid
+    assert svls[0].end == end_step
+
+    scene = component.update_ile_scene(prior_scene())
+    goal = scene['goal']
+    assert isinstance(goal, dict)
+    al = goal['action_list']
+    assert isinstance(al, list)
+    assert len(al) == end_step - 1
+    for idx, inner in enumerate(al):
+        assert isinstance(inner, list)
+        print(inner)
+        if start_step - 1 <= idx < mid - 1:
+            assert len(inner) == 1
+            assert inner[0] == 'Pass'
+        elif mid - 1 <= idx < end_step - 1:
+            assert len(inner) == 4
+            assert inner[0] == 'LookDown'
+            assert inner[1] == 'LookUp'
+            assert inner[2] == 'RotateLeft'
+            assert inner[3] == 'RotateRight'
+        else:
+            assert len(inner) == 0
+
+
+def test_action_restrictions_swivel_then_freeze_ok_overlap():
+    start_step = 2
+    mid = 3
+    end_step = 6
+
+    component = ActionRestrictionsComponent({
+        'freezes': [
+            {
+                'begin': mid,
+                'end': end_step
+            }
+        ],
+        'swivels': [
+            {
+                'begin': start_step,
+                'end': mid
+            }
+        ]
+    })
+
+    fzs = component.get_freezes()
+    assert isinstance(fzs, list)
+    assert fzs[0].begin == mid
+    assert fzs[0].end == end_step
+
+    svls = component.get_swivels()
+    assert isinstance(svls, list)
+    assert svls[0].begin == start_step
+    assert svls[0].end == mid
+
+    scene = component.update_ile_scene(prior_scene())
+    goal = scene['goal']
+    assert isinstance(goal, dict)
+    al = goal['action_list']
+    assert isinstance(al, list)
+    assert len(al) == end_step - 1
+    for idx, inner in enumerate(al):
+        assert isinstance(inner, list)
+        print(inner)
+        if mid - 1 <= idx < end_step - 1:
+            assert len(inner) == 1
+            assert inner[0] == 'Pass'
+        elif start_step - 1 <= idx < mid - 1:
+            assert len(inner) == 4
+            assert inner[0] == 'LookDown'
+            assert inner[1] == 'LookUp'
+            assert inner[2] == 'RotateLeft'
+            assert inner[3] == 'RotateRight'
+        else:
+            assert len(inner) == 0
+
+
+def test_action_restrictions_swivel_then_freeze_bad_overlap():
+    start_step = 3
+    mid = 7
+    end_step = 11
+
+    component = ActionRestrictionsComponent({
+        'freezes': [
+            {
+                'begin': mid - 1,
+                'end': end_step
+            }
+        ],
+        'swivels': [
+            {
+                'begin': start_step,
+                'end': mid + 1
+            }
+        ]
+    })
+
+    fzs = component.get_freezes()
+    assert isinstance(fzs, list)
+    assert fzs[0].begin == mid - 1
+    assert fzs[0].end == end_step
+
+    svls = component.get_swivels()
+    assert isinstance(svls, list)
+    assert svls[0].begin == start_step
+    assert svls[0].end == mid + 1
+
+    with pytest.raises(ILEException):
+        component.update_ile_scene(prior_scene())
+
+
+def test_action_restrictions_freeze_then_swivel_bad_overlap():
+    start_step = 3
+    mid = 7
+    end_step = 11
+
+    component = ActionRestrictionsComponent({
+        'freezes': [
+            {
+                'begin': start_step,
+                'end': mid + 1
+            }
+        ],
+        'swivels': [
+            {
+                'begin': mid - 1,
+                'end': end_step
+            }
+        ]
+    })
+
+    fzs = component.get_freezes()
+    assert isinstance(fzs, list)
+    assert fzs[0].begin == start_step
+    assert fzs[0].end == mid + 1
+
+    svls = component.get_swivels()
+    assert isinstance(svls, list)
+    assert svls[0].begin == mid - 1
+    assert svls[0].end == end_step
+
+    with pytest.raises(ILEException):
+        component.update_ile_scene(prior_scene())
 
 
 def test_action_restriction_teleport_missing_step():
@@ -608,9 +1162,129 @@ def test_action_restriction_freeze_teleport_combined():
             teleport_pos = 'EndHabituation,xPosition=1,zPosition=2,yRotation=45'  # noqa: E501
             assert len(inner) == 1
             assert inner[0] == teleport_pos
-        elif start - 1 <= idx < end:
+        elif start - 1 <= idx < end - 1:
             assert len(inner) == 1
             assert inner[0] == 'Pass'
+        else:
+            assert len(inner) == 0
+
+
+def test_action_restriction_swivel_teleport_combined():
+    tstep = 2
+    start = 5
+    end = 8
+    component = ActionRestrictionsComponent({
+        'teleports': [{
+            'step': tstep,
+            'position_x': 1,
+            'position_z': 2,
+            'rotation_y': 45
+        }],
+        'swivels': [
+            {
+                'begin': start,
+                'end': end
+            }
+        ]
+    })
+
+    tps = component.get_teleports()
+    assert isinstance(tps, list)
+    assert tps[0].step == tstep
+    assert tps[0].position_x == 1
+    assert tps[0].position_z == 2
+    assert tps[0].rotation_y == 45
+
+    svls = component.get_swivels()
+    assert svls[0].begin == start
+    assert svls[0].end == end
+
+    scene = component.update_ile_scene(prior_scene())
+    goal = scene['goal']
+    assert isinstance(goal, dict)
+    al = goal['action_list']
+    assert isinstance(al, list)
+    assert len(al) == max(end - 1, tstep)
+    for idx, inner in enumerate(al):
+        assert isinstance(inner, list)
+        if tstep - 1 == idx:
+            teleport_pos = 'EndHabituation,xPosition=1,zPosition=2,yRotation=45'  # noqa: E501
+            assert len(inner) == 1
+            assert inner[0] == teleport_pos
+        elif start - 1 <= idx < end - 1:
+            assert len(inner) == 4
+            assert inner[0] == 'LookDown'
+            assert inner[1] == 'LookUp'
+            assert inner[2] == 'RotateLeft'
+            assert inner[3] == 'RotateRight'
+        else:
+            assert len(inner) == 0
+
+
+def test_action_restriction_freeze_swivel_teleport_combined():
+    tstep = 2
+    fstart = 4
+    fend = 6
+    start = 7
+    end = 9
+    component = ActionRestrictionsComponent({
+        'teleports': [{
+            'step': tstep,
+            'position_x': 1,
+            'position_z': 2,
+            'rotation_y': 45
+        }],
+        'freezes': [
+            {
+                'begin': fstart,
+                'end': fend
+            }
+        ],
+        'swivels': [
+            {
+                'begin': start,
+                'end': end
+            }
+        ]
+    })
+
+    tps = component.get_teleports()
+    assert isinstance(tps, list)
+    assert tps[0].step == tstep
+    assert tps[0].position_x == 1
+    assert tps[0].position_z == 2
+    assert tps[0].rotation_y == 45
+
+    fzs = component.get_freezes()
+    assert fzs[0].begin == fstart
+    assert fzs[0].end == fend
+
+    svls = component.get_swivels()
+    assert svls[0].begin == start
+    assert svls[0].end == end
+
+    scene = component.update_ile_scene(prior_scene())
+    goal = scene['goal']
+    assert isinstance(goal, dict)
+    al = goal['action_list']
+    assert isinstance(al, list)
+    assert len(al) == end - 1
+
+    for idx, inner in enumerate(al):
+        assert isinstance(inner, list)
+        if tstep - 1 == idx:
+            teleport_pos = 'EndHabituation,xPosition=1,zPosition=2,yRotation=45'  # noqa: E501
+            assert len(inner) == 1
+            assert inner[0] == teleport_pos
+        elif fstart - 1 <= idx < fend - 1:
+            assert len(inner) == 1
+            assert inner[0] == 'Pass'
+        elif start - 1 <= idx < end - 1:
+            assert len(inner) == 4
+            assert inner[0] == 'LookDown'
+            assert inner[1] == 'LookUp'
+            assert inner[2] == 'RotateLeft'
+            assert inner[3] == 'RotateRight'
         else:
             assert len(inner) == 0
 
@@ -643,6 +1317,39 @@ def test_action_restriction_freeze_teleport_overwrite_error():
     fzs = component.get_freezes()
     assert fzs[0].begin == step
     assert fzs[0].end == step + 3
+
+    with pytest.raises(ILEException):
+        component.update_ile_scene(prior_scene())
+
+
+def test_action_restriction_swivel_teleport_overwrite_error():
+    step = 2
+
+    component = ActionRestrictionsComponent({
+        'teleports': [{
+            'step': step,
+            'position_x': 1,
+            'position_z': 2,
+            'rotation_y': 45
+        }],
+        'swivels': [
+            {
+                'begin': step,
+                'end': step + 3
+            }
+        ]
+    })
+
+    tps = component.get_teleports()
+    assert isinstance(tps, list)
+    assert tps[0].step == step
+    assert tps[0].position_x == 1
+    assert tps[0].position_z == 2
+    assert tps[0].rotation_y == 45
+
+    svls = component.get_swivels()
+    assert svls[0].begin == step
+    assert svls[0].end == step + 3
 
     with pytest.raises(ILEException):
         component.update_ile_scene(prior_scene())
@@ -704,6 +1411,29 @@ def test_action_restriction_passive_freeze_error():
     fzs = component.get_freezes()
     assert fzs[0].begin == step
     assert fzs[0].end == step + 3
+
+    with pytest.raises(ILEConfigurationException):
+        component.update_ile_scene(prior_scene(100))
+
+
+def test_action_restriction_passive_swivel_error():
+    step = 2
+
+    component = ActionRestrictionsComponent({
+        'passive_scene': True,
+        'swivels': [
+            {
+                'begin': step,
+                'end': step + 3
+            }
+        ]
+    })
+
+    assert component.get_passive_scene()
+
+    svls = component.get_swivels()
+    assert svls[0].begin == step
+    assert svls[0].end == step + 3
 
     with pytest.raises(ILEConfigurationException):
         component.update_ile_scene(prior_scene(100))

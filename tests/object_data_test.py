@@ -1,4 +1,4 @@
-from generator import base_objects, definitions, specific_objects, util
+from generator import base_objects, definitions, instances, specific_objects
 from hypercube import (
     ObjectData,
     ObjectLocationPlan,
@@ -112,10 +112,13 @@ def create_assign_location_test_data():
         None, None, None, None, None, None, None, None
     ]
     data.trained_definition = SOCCER_BALL
-    data.trained_template = util.instantiate_object(data.trained_definition, {
-        'position': {'x': 0, 'y': 0, 'z': 0},
-        'rotation': {'x': 0, 'y': 0, 'z': 0}
-    })
+    data.trained_template = instances.instantiate_object(
+        data.trained_definition,
+        {
+            'position': {'x': 0, 'y': 0, 'z': 0},
+            'rotation': {'x': 0, 'y': 0, 'z': 0}
+        }
+    )
     return data
 
 

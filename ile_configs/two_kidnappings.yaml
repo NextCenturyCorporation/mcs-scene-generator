@@ -1,0 +1,19 @@
+# Kidnap on steps 501 and 550: instantly move to the center of the room and
+# change facing to one of the listed rotation options.
+teleports:
+    - step: 501
+      position_x: 0
+      position_z: 0
+      rotation_y:
+          - 60
+          - 120
+          - 240
+          - 300
+    - step: 550
+      position_x: 0
+      position_z: 0
+      rotation_y:
+          - 0
+          - 90
+          - 180
+          - 270

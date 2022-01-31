@@ -7,25 +7,16 @@ import pdoc
 
 from ile import ILE_COMPONENTS
 
+ILE_SIMPLE_CONFIG = 'ile_configs/auto_generated_null_template.yaml'
+
 ILE_API_FILENAME = 'ILE_API.md'
 ILE_API_HEADER = """# ILE API
 
-[How to Run the ILE](./README.md#ile-scene-generator)
+[How to Use the ILE](./README.md)
 
-#### Table of Content:
+#### Table of Content
 - [Classes](#Classes)
 - [Options](#Options)
-
-#### Example Configuration Files:
-- [Simple](./ile_config.yaml)
-- [Advanced](./ile_config_advanced.yaml)
-
-#### Noteworthy Configuration Options:
-- The [goal](#goal) option, if you want to set a goal for your scenes,
-like "find and pickup the soccer ball" (by default, there is no goal: the
-scenes can be used for undirected exploration).
-- The [last_step](#last_step) option, if you want to force your scenes to end
-after a specific number of actions/steps.
 
 ## Classes
 
@@ -39,12 +30,10 @@ ILE_API_MIDDLE = """
 You may set the following options in your ILE (YAML) config file:
 
 """
+
 ILE_COMPONENT_NAME = 'ideal_learning_env.components.ILEComponent'
-ILE_EXAMPLE_CONFIG_FILENAME_SIMPLE = 'ile_config.yaml'
-ILE_EXAMPLE_CONFIG_FILENAME_ADVANCED = 'ile_config_advanced.yaml'
-# pdoc needs a list of all unique module (file) names, rather than the classes.
+
 REGEX_TO_MATCH_SIMPLE_EXAMPLE = "Simple Example:\n```\n\s*?((.|\n)*?)\n\s*?```"  # noqa: E501, W605
-REGEX_TO_MATCH_ADVANCED_EXAMPLE = "Advanced Example:\n```\n\s*?((.|\n)*?)\n\s*?```"  # noqa: E501, W605
 
 
 def retrieve_all_types(typing: Type) -> List[Type]:
@@ -120,14 +109,9 @@ def main():
         for var in variables:
             ile_api.write(f'#### {var.name}\n\n{var.docstring}\n\n')
     # Auto-generate and save the example YAML configuration files.
-    with open(ILE_EXAMPLE_CONFIG_FILENAME_SIMPLE, 'w') as ile_config:
+    with open(ILE_SIMPLE_CONFIG, 'w') as ile_config:
         for var in variables:
             match = re.search(REGEX_TO_MATCH_SIMPLE_EXAMPLE, var.docstring)
-            if match:
-                ile_config.write(f'{match.group(1)}\n')
-    with open(ILE_EXAMPLE_CONFIG_FILENAME_ADVANCED, 'w') as ile_config:
-        for var in variables:
-            match = re.search(REGEX_TO_MATCH_ADVANCED_EXAMPLE, var.docstring)
             if match:
                 ile_config.write(f'{match.group(1)}\n')
 

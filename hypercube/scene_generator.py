@@ -118,14 +118,13 @@ class SceneGenerator():
                     '02'
                 )
 
-                scene_copy = copy.deepcopy(scene)
-                scene_copy['debug']['hypercubeNumber'] = hypercube_index
-                scene_copy['debug']['sceneNumber'] = scene_index
-                scene_copy['debug']['evaluation'] = eval_name
-                scene_copy['debug']['training'] = hypercube_factory.training
+                scene['debug']['hypercubeNumber'] = hypercube_index
+                scene['debug']['sceneNumber'] = scene_index
+                scene['debug']['evaluation'] = eval_name
+                scene['debug']['training'] = hypercube_factory.training
 
                 save_scene_files(
-                    scene_copy,
+                    scene,
                     filename,
                     no_scene_id=bool(eval_name)
                 )

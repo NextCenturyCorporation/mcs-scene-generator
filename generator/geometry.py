@@ -1,23 +1,28 @@
+import copy
 import logging
 import math
 import random
+from dataclasses import dataclass
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
-import shapely
+from machine_common_sense.config_manager import Vector3d
 from shapely import affinity, geometry
 
 from .definitions import DefinitionDataset, ObjectDefinition
 from .separating_axis_theorem import sat_entry
-from .util import (
-    MAX_REACH_DISTANCE,
-    MAX_TRIES,
-    PERFORMER_CAMERA_Y,
-    PERFORMER_HALF_WIDTH,
-    random_real,
-)
 
+MAX_TRIES = 50
+
+MAX_REACH_DISTANCE = 1.0
+MOVE_DISTANCE = 0.1
+
+PERFORMER_CAMERA_Y = 0.762
+PERFORMER_HALF_WIDTH = 0.27
+PERFORMER_HEIGHT = PERFORMER_HALF_WIDTH * 4
 PERFORMER_MASS = 2
+PERFORMER_WIDTH = PERFORMER_HALF_WIDTH * 2.0
 
+MIN_RANDOM_INTERVAL = 0.05
 POSITION_DIGITS = 2
 VALID_ROTATIONS = (0, 45, 90, 135, 180, 225, 270, 315)
 
@@ -48,6 +53,105 @@ ORIGIN_LOCATION = {
 }
 
 
+@dataclass
+class ObjectBounds():
+    """The bounds of a specific object, including its 2D bounding box, 2D
+    polygon, and Y range."""
+    box_xz: List[Vector3d]
+    max_y: float
+    min_y: float
+    polygon_xz: geometry.Polygon = None
+
+    def __post_init__(self):
+        self._update_poly()
+
+    def _update_poly(self) -> None:
+        points = [(point.x, point.z) for point in self.box_xz]
+        self.polygon_xz = geometry.Polygon(points)
+
+    def extend_bottom_to_ground(self) -> None:
+        """Extend the bottom of this bounds to the ground."""
+        # We're not currently saving any height data in the box or polygon,
+        # so just update the min_y for now.
+        self.min_y = 0
+
+    def is_within_room(self, room_dimensions: Dict[str, float]) -> bool:
+        """Return whether this bounds in within the given room dimensions."""
+        room_max_x = room_dimensions['x'] / 2.0
+        room_max_z = room_dimensions['z'] / 2.0
+        return all((
+            -room_max_x <= point.x <= room_max_x and
+            -room_max_z <= point.z <= room_max_z
+        ) for point in self.box_xz)
+
+
+def __dict_to_vector(data: Dict[str, float]) -> Vector3d:
+    return Vector3d(data['x'], data['y'], data['z'])
+
+
+def create_bounds(
+    # TODO MCS-697 MCS-698 Use Vector3d instead of Dict
+    dimensions: Dict[str, float],
+    offset: Optional[Dict[str, float]],
+    position: Dict[str, float],
+    rotation: Dict[str, float],
+    standing_y: float
+) -> ObjectBounds:
+    """Creates and returns an ObjectBounds for the object with the given size
+    properties in the given location."""
+    # TODO MCS-697 MCS-698 Use class props directly instead of converting
+    dimensions = __dict_to_vector(dimensions)
+    offset = __dict_to_vector(offset) if offset else Vector3d()
+    position = __dict_to_vector(position)
+    rotation = __dict_to_vector(rotation)
+
+    radian_amount = math.pi * (2 - rotation.y / 180.0)
+
+    rotate_sin = math.sin(radian_amount)
+    rotate_cos = math.cos(radian_amount)
+    x_plus = (dimensions.x / 2.0) + offset.x
+    x_minus = -(dimensions.x / 2.0) + offset.x
+    z_plus = (dimensions.z / 2.0) + offset.z
+    z_minus = -(dimensions.z / 2.0) + offset.z
+
+    a = Vector3d(
+        position.x + x_plus * rotate_cos - z_plus * rotate_sin,
+        0,
+        position.z + x_plus * rotate_sin + z_plus * rotate_cos
+    )
+    b = Vector3d(
+        position.x + x_plus * rotate_cos - z_minus * rotate_sin,
+        0,
+        position.z + x_plus * rotate_sin + z_minus * rotate_cos
+    )
+    c = Vector3d(
+        position.x + x_minus * rotate_cos - z_minus * rotate_sin,
+        0,
+        position.z + x_minus * rotate_sin + z_minus * rotate_cos
+    )
+    d = Vector3d(
+        position.x + x_minus * rotate_cos - z_plus * rotate_sin,
+        0,
+        position.z + x_minus * rotate_sin + z_plus * rotate_cos
+    )
+
+    y_min = position.y - standing_y
+    y_max = y_min + dimensions.y
+    return ObjectBounds(box_xz=[a, b, c, d], max_y=y_max, min_y=y_min)
+
+
+def random_real(a: float, b: float,
+                step: float = MIN_RANDOM_INTERVAL) -> float:
+    """Return a random real number N where a <= N <= b and N - a is
+    divisible by step."""
+    steps = int((b - a) / step)
+    try:
+        n = random.randint(0, steps)
+    except ValueError as e:
+        raise ValueError(f'bad args to random_real: ({a}, {b}, {step})', e)
+    return a + (n * step)
+
+
 def random_position_x(room_dimensions: Dict[str, float]) -> float:
     room_max_x = room_dimensions['x'] / 2.0
     return round(random.uniform(-room_max_x, room_max_x), POSITION_DIGITS)
@@ -62,93 +166,9 @@ def random_rotation() -> float:
     return random.choice(VALID_ROTATIONS)
 
 
-def dot_prod_dict(v1: Dict[Any, float], v2: Dict[Any, float]) -> float:
-    return sum(v1[key] * v2.get(key, 0) for key in v1)
-
-
-def collision(test_rect: List[Dict[str, float]], test_point: Dict[str, float]):
-    # assuming test_rect is an array4 points in order... Clockwise or CCW does
-    # not matter
-    # points are {x,y,z}
-    #
-    # From https://math.stackexchange.com/a/190373
-    A = test_rect[0]
-    B = test_rect[1]
-    C = test_rect[2]
-
-    vectorAB = {
-        'x': B['x'] - A['x'],
-        'y': B['y'] - A['y'],
-        'z': B['z'] - A['z']}
-    vectorBC = {
-        'x': C['x'] - B['x'],
-        'y': C['y'] - B['y'],
-        'z': C['z'] - B['z']}
-
-    vectorAM = {
-        'x': test_point['x'] - A['x'],
-        'y': test_point['y'] - A['y'],
-        'z': test_point['z'] - A['z']}
-    vectorBM = {
-        'x': test_point['x'] - B['x'],
-        'y': test_point['y'] - B['y'],
-        'z': test_point['z'] - B['z']}
-
-    return (
-        0 <=
-        dot_prod_dict(vectorAB, vectorAM) <=
-        dot_prod_dict(vectorAB, vectorAB)
-    ) & (
-        0 <=
-        dot_prod_dict(vectorBC, vectorBM) <=
-        dot_prod_dict(vectorBC, vectorBC)
-    )
-
-
-def calc_obj_coords(position_x: float, position_z: float, delta_x: float,
-                    delta_z: float, offset_x: float,
-                    offset_z: float, rotation: float) \
-        -> List[Dict[str, float]]:
-    """Returns an array of points that are the coordinates of the
-    rectangle """
-    radian_amount = math.pi * (2 - rotation / 180.0)
-
-    rotate_sin = math.sin(radian_amount)
-    rotate_cos = math.cos(radian_amount)
-    x_plus = delta_x + offset_x
-    x_minus = -delta_x + offset_x
-    z_plus = delta_z + offset_z
-    z_minus = -delta_z + offset_z
-
-    a = {'x': position_x + x_plus * rotate_cos - z_plus * rotate_sin,
-         'y': 0, 'z': position_z + x_plus * rotate_sin + z_plus * rotate_cos}
-    b = {'x': position_x + x_plus * rotate_cos - z_minus * rotate_sin,
-         'y': 0, 'z': position_z + x_plus * rotate_sin + z_minus * rotate_cos}
-    c = {'x': position_x + x_minus * rotate_cos - z_minus * rotate_sin,
-         'y': 0, 'z': position_z + x_minus * rotate_sin + z_minus * rotate_cos}
-    d = {'x': position_x + x_minus * rotate_cos - z_plus * rotate_sin,
-         'y': 0, 'z': position_z + x_minus * rotate_sin + z_plus * rotate_cos}
-
-    return [a, b, c, d]
-
-
-def rect_within_room(
-    rect: List[Dict[str, float]],
-    room_dimensions: Dict[str, float]
-) -> bool:
-    """Return True iff the passed rectangle is entirely within the bounds of
-    the room."""
-    room_max_x = room_dimensions['x'] / 2.0
-    room_max_z = room_dimensions['z'] / 2.0
-    return all((
-        -room_max_x <= point['x'] <= room_max_x and
-        -room_max_z <= point['z'] <= room_max_z
-    ) for point in rect)
-
-
 def calc_obj_pos(
     performer_position: Dict[str, float],
-    other_rects: List[List[Dict[str, float]]],
+    bounds_list: List[ObjectBounds],
     # TODO MCS-697 Define an ObjectInstance class extending ObjectDefinition.
     definition_or_instance: Union[ObjectDefinition, Dict[str, Any]],
     x_func: Callable[[Dict[str, float]], float] = random_position_x,
@@ -173,11 +193,6 @@ def calc_obj_pos(
         position_y = definition_or_instance.positionY
         rotation = vars(definition_or_instance.rotation)
 
-    dx = dimensions['x'] / 2.0
-    dz = dimensions['z'] / 2.0
-    offset_x = offset['x']
-    offset_z = offset['z']
-
     tries = 0
     while tries < MAX_TRIES:
         rotation_x = rotation['x']
@@ -192,12 +207,17 @@ def calc_obj_pos(
             new_z = z_func(room_dimensions or DEFAULT_ROOM_DIMENSIONS)
 
         if new_x is not None and new_z is not None:
-            rect = calc_obj_coords(
-                new_x, new_z, dx, dz, offset_x, offset_z, rotation_y)
+            bounds = create_bounds(
+                dimensions=dimensions,
+                offset=offset,
+                position={'x': new_x, 'y': position_y, 'z': new_z},
+                rotation={'x': rotation_x, 'y': rotation_y, 'z': rotation_z},
+                standing_y=position_y
+            )
             if validate_location_rect(
-                rect,
+                bounds,
                 performer_position,
-                other_rects,
+                bounds_list,
                 room_dimensions or DEFAULT_ROOM_DIMENSIONS
             ):
                 break
@@ -211,9 +231,9 @@ def calc_obj_pos(
                 'y': position_y,
                 'z': new_z
             },
-            'boundingBox': rect
+            'boundingBox': bounds
         }
-        other_rects.append(rect)
+        bounds_list.append(bounds)
         return object_location
 
     logging.debug(f'could not place object: {definition_or_instance}')
@@ -396,6 +416,111 @@ def get_location_in_back_of_performer(
     )
 
 
+def generate_location_on_object(
+    # TODO MCS-697 Define an ObjectInstance class extending ObjectDefinition.
+    object_definition_or_instance: Union[ObjectDefinition, Dict[str, Any]],
+    # TODO MCS-697 Define an ObjectInstance class extending ObjectDefinition.
+    static_instance: Dict[str, Any],
+    performer_start: Dict[str, Dict[str, float]],
+    bounds_list: List[ObjectBounds],
+    room_dimensions: Dict[str, float] = None,
+    center: bool = False
+) -> Dict[str, Any]:
+    """Creates a location for the object to place it on top of the static object.
+
+    Returns:
+        Dict[str, Any]: Location dict or None if it cannot be determined.
+    """
+    # TODO MCS-697 Define an ObjectInstance class extending ObjectDefinition.
+    if isinstance(object_definition_or_instance, dict):
+        debug = object_definition_or_instance['debug']
+        dimensions = debug['dimensions']
+        offset = debug.get('offset', {'x': 0, 'y': 0, 'z': 0})
+        position_y = debug.get('positionY', 0)
+        rotation = debug.get('rotation', {'x': 0, 'y': 0, 'z': 0})
+        if debug.get('closedDimensions'):
+            dimensions = debug.get('closedDimensions')
+        if debug.get('closedOffset'):
+            offset = debug.get('closedOffset')
+    else:
+        dimensions = vars(object_definition_or_instance.dimensions)
+        offset = vars(object_definition_or_instance.offset)
+        position_y = object_definition_or_instance.positionY
+        rotation = vars(object_definition_or_instance.rotation)
+        if object_definition_or_instance.closedDimensions:
+            dimensions = vars(object_definition_or_instance.closedDimensions)
+        if object_definition_or_instance.closedOffset:
+            offset = vars(object_definition_or_instance.closedOffset)
+
+    if not isinstance(static_instance, dict):
+        raise Exception(
+            "Generate_location_on_object() must be passed a static instance")
+
+    # determine bounds of static object
+    static_bounds = (
+        static_instance['shows'][0]['boundingBox']
+    )
+    xy_bounds = static_bounds.box_xz
+
+    location = None
+    for _ in range(MAX_TRIES):
+        # determine x,z of object in static bounds
+        if center:
+            x, z = static_bounds.polygon_xz.centroid.coords[0]
+        else:
+            # Create some basic bounds to limit where we place the object
+            # We will test more precisely later
+            buffer = min(dimensions['x'], dimensions['z'])
+            xmax = max(xy_bounds[0].x, xy_bounds[1].x,
+                       xy_bounds[2].x, xy_bounds[3].x) - buffer
+            xmin = min(xy_bounds[0].x, xy_bounds[1].x,
+                       xy_bounds[2].x, xy_bounds[3].x) + buffer
+            zmax = max(xy_bounds[0].z, xy_bounds[1].z,
+                       xy_bounds[2].z, xy_bounds[3].z) - buffer
+            zmin = min(xy_bounds[0].z, xy_bounds[1].z,
+                       xy_bounds[2].z, xy_bounds[3].z) + buffer
+            if xmin > xmax or zmin > zmax:
+                raise Exception(
+                    "Object with keyword location 'on_top' or "
+                    "'on_center' too large to fit on base object.")
+            x = random.uniform(xmin, xmax)
+            z = random.uniform(zmin, zmax)
+
+        # set y position
+        y = static_bounds.max_y + position_y
+        obj_position = {'x': x, 'y': y, 'z': z}
+
+        # determine new bounds for object
+        object_bounds = create_bounds(
+            dimensions=dimensions,
+            offset=offset,
+            position=obj_position,
+            rotation=rotation,
+            standing_y=position_y
+        )
+
+        # only continue if the object is within the bounds of the static object
+        if static_bounds.polygon_xz.contains(object_bounds.polygon_xz):
+            location = {
+                'position': obj_position,
+                'rotation': {
+                    'x': rotation['x'],
+                    'y': rotation['y'],
+                    'z': rotation['z']
+                },
+                'boundingBox': object_bounds
+            }
+
+            if validate_location_rect(
+                object_bounds,
+                performer_start['position'],
+                bounds_list + [static_bounds],
+                room_dimensions or DEFAULT_ROOM_DIMENSIONS
+            ):
+                break
+    return location
+
+
 def generate_location_in_line_with_object(
     # TODO MCS-697 Define an ObjectInstance class extending ObjectDefinition.
     object_definition_or_instance: Union[ObjectDefinition, Dict[str, Any]],
@@ -403,7 +528,7 @@ def generate_location_in_line_with_object(
     static_definition_or_instance: Union[ObjectDefinition, Dict[str, Any]],
     static_location: Dict[str, Any],
     performer_start: Dict[str, Dict[str, float]],
-    bounds_list: List[List[Dict[str, float]]],
+    bounds_list: List[ObjectBounds],
     adjacent: bool = False,
     behind: bool = False,
     obstruct: bool = False,
@@ -445,18 +570,21 @@ def generate_location_in_line_with_object(
     if isinstance(static_definition_or_instance, dict):
         static_debug = static_definition_or_instance['debug']
         static_dimensions = static_debug['dimensions']
-        static_offset = static_debug.get('offset', {'x': 0, 'z': 0})
+        static_offset = static_debug.get('offset', {'x': 0, 'y': 0, 'z': 0})
+        static_position_y = static_debug.get('positionY', 0)
     else:
         static_dimensions = vars(static_definition_or_instance.dimensions)
         static_offset = vars(static_definition_or_instance.offset)
+        static_position_y = static_definition_or_instance.positionY
 
     static_x = (static_location['position']['x'] + static_offset['x'])
     static_z = (static_location['position']['z'] + static_offset['z'])
-    static_rect = generate_object_bounds(
-        static_dimensions,
-        static_offset,
-        static_location['position'],
-        static_location['rotation']
+    static_bounds = create_bounds(
+        dimensions=static_dimensions,
+        offset=static_offset,
+        position=static_location['position'],
+        rotation=static_location['rotation'],
+        standing_y=static_position_y
     )
 
     # The distance needs to be at least the min dimensions of the two objects
@@ -489,10 +617,9 @@ def generate_location_in_line_with_object(
     # between the two objects added together with a gap in between them, unless
     # obstruct=True or unreachable=True, then use the distance between the
     # static object's location and the performer's start location. Subtract the
-    # diagonal_distance_between_objects to account for the objects' dimensions.
+    # min_distance_between_objects to account for the objects' dimensions.
     max_distance = (
-        distance_from_performer_start_to_object -
-        diagonal_distance_between_objects
+        distance_from_performer_start_to_object - min_distance_between_objects
     ) if (obstruct or unreachable) else diagonal_distance_between_objects
 
     # Find the angle drawn between the static object and the performer start.
@@ -521,32 +648,30 @@ def generate_location_in_line_with_object(
             line = affinity.translate(line, static_x, static_z)
             x = line.coords[1][0] - offset['x']
             z = line.coords[1][1] - offset['z']
-            object_rect = calc_obj_coords(
-                x,
-                z,
-                dimensions['x'] / 2.0,
-                dimensions['z'] / 2.0,
-                offset['x'],
-                offset['z'],
-                static_location['rotation']['y']
+            object_bounds = create_bounds(
+                dimensions=dimensions,
+                offset=offset,
+                position={'x': x, 'y': position_y, 'z': z},
+                rotation=static_location['rotation'],
+                standing_y=position_y
             )
-
             # Ensure the location is within the room and doesn't overlap with
             # any existing object location or the performer start location.
             successful = validate_location_rect(
-                object_rect,
+                object_bounds,
                 performer_start['position'],
-                bounds_list + [static_rect],
+                bounds_list + [static_bounds],
                 room_dimensions or DEFAULT_ROOM_DIMENSIONS
             )
 
             if successful and obstruct:
-                object_poly = get_bounding_polygon({
-                    'boundingBox': object_rect
-                })
-                # If obstruct=True, ensure the location will obstruct the
-                # static object.
-                if not does_fully_obstruct_target(
+                object_poly = object_bounds.polygon_xz
+                static_poly = static_bounds.polygon_xz
+                # If obstruct=True, ensure the location is fairly close to the
+                # static object and will completely obstruct it from view.
+                if object_poly.distance(static_poly) > MAX_REACH_DISTANCE:
+                    successful = False
+                if successful and not does_fully_obstruct_target(
                     performer_start['position'],
                     static_location,
                     object_poly
@@ -554,15 +679,11 @@ def generate_location_in_line_with_object(
                     successful = False
 
             if successful and unreachable:
-                object_poly = get_bounding_polygon({
-                    'boundingBox': object_rect
-                })
-                static_poly = get_bounding_polygon({
-                    'boundingBox': static_rect
-                })
+                object_poly = object_bounds.polygon_xz
+                static_poly = static_bounds.polygon_xz
                 # If unreachable=True, ensure the location is far enough away
                 # from the static object so that the performer cannot reach it.
-                reachable_distance = object_poly.distance(static_poly) + max(
+                reachable_distance = object_poly.distance(static_poly) + min(
                     (dimensions['x'] / 2.0),
                     (dimensions['z'] / 2.0)
                 )
@@ -584,7 +705,7 @@ def generate_location_in_line_with_object(
                         'y': 450 - performer_angle,
                         'z': rotation['z']
                     },
-                    'boundingBox': object_rect
+                    'boundingBox': object_bounds
                 }
                 break
             else:
@@ -629,7 +750,7 @@ def retrieve_obstacle_occluder_definition_list(
         dimensions = definition.dimensions
         if definition.closedDimensions:
             dimensions = definition.closedDimensions
-        cannot_walk_over = dimensions.y >= (PERFORMER_CAMERA_Y / 2.0)
+        cannot_walk_over = dimensions.y >= PERFORMER_HALF_WIDTH
         cannot_walk_into = definition.mass > PERFORMER_MASS
         # Only need a larger Y dimension if the object is an occluder.
         if cannot_walk_over and cannot_walk_into and (
@@ -644,26 +765,13 @@ def retrieve_obstacle_occluder_definition_list(
 
 
 def get_bounding_polygon(
-        object_or_location: Dict[str, Any]) -> geometry.Polygon:
+    object_or_location: Dict[str, Any]
+) -> geometry.Polygon:
     if 'boundingBox' in object_or_location:
-        bounding_box: List[Dict[str, float]
-                           ] = object_or_location['boundingBox']
-        poly = rect_to_poly(bounding_box)
-    else:
-        show = object_or_location['shows'][0]
-        if 'boundingBox' in show:
-            bounding_box: List[Dict[str, float]] = show['boundingBox']
-            poly = rect_to_poly(bounding_box)
-        else:
-            # TODO I think we need to consider the affect of the object's
-            # offsets on its poly here
-            x = show['position']['x']
-            z = show['position']['z']
-            dx = object_or_location['debug']['dimensions']['x'] / 2.0
-            dz = object_or_location['debug']['dimensions']['z'] / 2.0
-            poly = geometry.box(x - dx, z - dz, x + dx, z + dz)
-            poly = shapely.affinity.rotate(poly, -show['rotation']['y'])
-    return poly
+        return object_or_location['boundingBox'].polygon_xz
+    show = object_or_location['shows'][0]
+    if 'boundingBox' in show:
+        return show['boundingBox'].polygon_xz
 
 
 def are_adjacent(obj_a: Dict[str, Any], obj_b: Dict[str, Any],
@@ -674,38 +782,30 @@ def are_adjacent(obj_a: Dict[str, Any], obj_b: Dict[str, Any],
     return actual_distance <= distance
 
 
-def rect_to_poly(rect: List[Dict[str, Any]]) -> geometry.Polygon:
-    points = [(point['x'], point['z']) for point in rect]
-    return geometry.Polygon(points)
-
-
-def find_performer_rect(
-        performer_position: Dict[str, float]) -> List[Dict[str, float]]:
-    return [
-        {'x': performer_position['x'] - PERFORMER_HALF_WIDTH,
-         'z': performer_position['z'] - PERFORMER_HALF_WIDTH},
-        {'x': performer_position['x'] - PERFORMER_HALF_WIDTH,
-         'z': performer_position['z'] + PERFORMER_HALF_WIDTH},
-        {'x': performer_position['x'] + PERFORMER_HALF_WIDTH,
-         'z': performer_position['z'] + PERFORMER_HALF_WIDTH},
-        {'x': performer_position['x'] + PERFORMER_HALF_WIDTH,
-         'z': performer_position['z'] - PERFORMER_HALF_WIDTH}
-    ]
-
-
-def generate_object_bounds(dimensions: Dict[str, float],
-                           offset: Dict[str, float],
-                           position: Dict[str, float],
-                           rotation: Dict[str, float]) \
-        -> List[Dict[str, float]]:
-    """Returns the bounds for the object with the given properties."""
-    x = position['x']
-    z = position['z']
-    dx = dimensions['x'] / 2.0
-    dz = dimensions['z'] / 2.0
-    offset_x = offset['x'] if offset else 0.0
-    offset_z = offset['z'] if offset else 0.0
-    return calc_obj_coords(x, z, dx, dz, offset_x, offset_z, rotation['y'])
+def find_performer_bounds(
+    performer_position: Dict[str, float]
+) -> ObjectBounds:
+    return ObjectBounds(
+        box_xz=[Vector3d(
+            performer_position['x'] - PERFORMER_HALF_WIDTH,
+            0,
+            performer_position['z'] - PERFORMER_HALF_WIDTH
+        ), Vector3d(
+            performer_position['x'] - PERFORMER_HALF_WIDTH,
+            0,
+            performer_position['z'] + PERFORMER_HALF_WIDTH
+        ), Vector3d(
+            performer_position['x'] + PERFORMER_HALF_WIDTH,
+            0,
+            performer_position['z'] + PERFORMER_HALF_WIDTH
+        ), Vector3d(
+            performer_position['x'] + PERFORMER_HALF_WIDTH,
+            0,
+            performer_position['z'] - PERFORMER_HALF_WIDTH
+        )],
+        max_y=performer_position['y'] + PERFORMER_HEIGHT,
+        min_y=performer_position['y']
+    )
 
 
 def does_fully_obstruct_target(performer_start_position: Dict[str, float],
@@ -746,37 +846,38 @@ def _does_obstruct_target_helper(performer_start_position: Dict[str, float],
     obstructing_points = 0
     performer_start_coordinates = (
         performer_start_position['x'],
-        performer_start_position['z'])
-    bounds = target_or_location.get('boundingBox', target_or_location.get(
-        'shows',
-        [{'boundingBox': []}]
-    )[0]['boundingBox'])
+        performer_start_position['z']
+    )
+    bounds = (
+        target_or_location.get('boundingBox') or
+        target_or_location['shows'][0]['boundingBox']
+    )
 
-    target_poly = rect_to_poly(bounds)
+    target_poly = bounds.polygon_xz
     target_center = target_poly.centroid.coords[0]
-    points = bounds + [{'x': target_center[0], 'z': target_center[1]}]
+    points = bounds.box_xz + [Vector3d(target_center[0], 0, target_center[1])]
 
     if not fully:
-        for index, next_point in enumerate(bounds):
-            previous_point = bounds[(index - 1) if (index > 0) else -1]
+        for index, next_point in enumerate(bounds.box_xz):
+            previous_point = bounds.box_xz[(index - 1) if (index > 0) else -1]
             line_full = geometry.LineString([
-                (previous_point['x'], previous_point['z']),
-                (next_point['x'], next_point['z'])
+                (previous_point.x, previous_point.z),
+                (next_point.x, next_point.z)
             ])
-            line_full_center = line_full.centroid.coords[0]
-            center_point = {'x': line_full_center[0], 'z': line_full_center[1]}
+            full_center = line_full.centroid.coords[0]
+            center_point = Vector3d(full_center[0], 0, full_center[1])
             points.append(center_point)
             for point_1, point_2 in [
                 (previous_point, center_point), (center_point, next_point)
             ]:
                 line = geometry.LineString([
-                    (point_1['x'], point_1['z']), (point_2['x'], point_2['z'])
+                    (point_1.x, point_1.z), (point_2.x, point_2.z)
                 ])
                 line_center = line.centroid.coords[0]
-                points.append({'x': line_center[0], 'z': line_center[1]})
+                points.append(Vector3d(line_center[0], 0, line_center[1]))
 
     for point in points:
-        target_corner_coordinates = (point['x'], point['z'])
+        target_corner_coordinates = (point.x, point.z)
         line_to_target = geometry.LineString([
             performer_start_coordinates,
             target_corner_coordinates
@@ -787,16 +888,57 @@ def _does_obstruct_target_helper(performer_start_position: Dict[str, float],
 
 
 def validate_location_rect(
-    location_rect: List[Dict[str, float]],
+    location_bounds: ObjectBounds,
     performer_start_position: Dict[str, float],
-    rect_list: List[List[Dict[str, float]]],
+    bounds_list: List[ObjectBounds],
     room_dimensions: Dict[str, float]
 ) -> bool:
     """Returns if the given location rect is valid using the given performer
     start position and rect list corresponding to other positioned objects."""
-    performer_start_rect = find_performer_rect(performer_start_position)
-    return (
-        rect_within_room(location_rect, room_dimensions) and
-        not sat_entry(location_rect, performer_start_rect) and
-        not any(sat_entry(location_rect, rect) for rect in rect_list)
+    if not location_bounds.is_within_room(room_dimensions):
+        return False
+    performer_agent_bounds = find_performer_bounds(performer_start_position)
+    for bounds in [performer_agent_bounds] + bounds_list:
+        # If one bounds is completely above/below another: no collision.
+        if (
+            location_bounds.min_y >= bounds.max_y or
+            location_bounds.max_y <= bounds.min_y
+        ):
+            continue
+        # If one bounds intersects with another: collision! Invalid.
+        if sat_entry(location_bounds.box_xz, bounds.box_xz):
+            return False
+    return True
+
+
+def move_to_location(
+    object_instance: Dict[str, Any],
+    object_location: Dict[str, Any]
+) -> Dict[str, Any]:
+    """Move the given object to the given location and return the object."""
+    location = copy.deepcopy(object_location)
+    location['position']['x'] -= object_instance['debug']['offset']['x']
+    location['position']['z'] -= object_instance['debug']['offset']['z']
+    object_instance['shows'][0]['position'] = location['position']
+    object_instance['shows'][0]['rotation'] = location['rotation']
+    object_instance['shows'][0]['boundingBox'] = create_bounds(
+        dimensions=object_instance['debug']['dimensions'],
+        offset=object_instance['debug']['offset'],
+        position=location['position'],
+        rotation=location['rotation'],
+        standing_y=object_instance['debug']['positionY']
     )
+    return object_instance
+
+
+def generate_floor_area_bounds(area_x: float, area_z: float) -> ObjectBounds:
+    """Generate and return an ObjectBounds for a floor area (a hole or lava)
+    with the given coordinates."""
+    points = [
+        Vector3d(area_x - 0.5, 0, area_z - 0.5),
+        Vector3d(area_x + 0.5, 0, area_z - 0.5),
+        Vector3d(area_x + 0.5, 0, area_z + 0.5),
+        Vector3d(area_x - 0.5, 0, area_z + 0.5)
+    ]
+    # Just use an arbitrarily high number for the max_y.
+    return ObjectBounds(box_xz=points, max_y=100, min_y=0)

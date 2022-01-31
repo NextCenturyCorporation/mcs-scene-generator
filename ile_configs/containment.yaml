@@ -1,0 +1,35 @@
+# Add a Retrieval goal with a soccer ball as the target object.
+goal:
+    category: retrieval
+    target:
+        shape: soccer_ball
+        scale: 1.0
+        # Target is either positioned inside a container (50%), in front of it
+        # (25%), or behind it (25%), randomized for each scene.
+        keyword_location:
+            keyword:
+                - in
+                - in
+                - between
+                - behind
+            container_label: keywords_containers
+            relative_object_label: keywords_containers
+
+# Only the target can be a soccer ball.
+excluded_shapes: soccer_ball
+
+# Generate many containers and zero or more context (distractor) objects.
+keyword_objects:
+    - keyword: containers
+      num:
+          min: 5
+          max: 10
+    - keyword: context
+      num:
+          min: 0
+          max: 10
+
+# Override default to avoid randomly generating any structures. Remove this if
+# you want to have randomly generated structures.
+random_structural_objects:
+    - num: 0

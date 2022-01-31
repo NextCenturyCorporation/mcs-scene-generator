@@ -1,0 +1,38 @@
+# Add a Retrieval goal with a soccer ball as the target object.
+goal:
+    category: retrieval
+    target:
+        shape: soccer_ball
+        scale:
+            min: 1.0
+            max: 3.0
+        # Target is either positioned on top of the platform (50%), in front of
+        # it (25%), or behind it (25%), randomized for each scene.
+        keyword_location:
+            keyword:
+                - on_top
+                - on_top
+                - between
+                - behind
+            relative_object_label: platform_next_to_ramp
+
+# Only the target can be a soccer ball.
+excluded_shapes: soccer_ball
+
+# Only generate medium or large rooms.
+room_dimensions:
+    x:
+        min: 6
+        max: 14
+    y: 4
+    z:
+        min: 6
+        max: 14
+
+# Generate a ramp leading up to a platform.
+shortcut_ramp_to_platform: True
+
+# Override default to avoid randomly generating any additional structures
+# besides the ramp and platform.
+random_structural_objects:
+    - num: 0

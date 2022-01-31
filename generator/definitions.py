@@ -107,6 +107,8 @@ class SizeChoice(_DefinitionChoice):
 
     def __init__(
         self,
+        closedDimensions: Vector3d = None,
+        closedOffset: Vector3d = None,
         dimensions: Vector3d = None,
         enclosedAreas: List[Dict[str, Any]] = None,
         mass: float = 1,
@@ -119,6 +121,8 @@ class SizeChoice(_DefinitionChoice):
         untrainedShape: bool = None,
         untrainedSize: bool = None
     ):
+        self.closedDimensions = closedDimensions
+        self.closedOffset = closedOffset
         self.dimensions = dimensions
         self.enclosedAreas = enclosedAreas or []
         self.mass = mass
@@ -165,7 +169,7 @@ class TypeChoice(_DefinitionChoice):
     difference: str = None
     poleOffsetX: float = None
     poleOffsetY: float = None
-    poly: List[Dict[str, float]] = None
+    poly = None
     prettyName: str = None
 
     DEBUG_PROPS = [
@@ -237,7 +241,7 @@ class ObjectDefinition(
         openAreas: List[Dict[str, Any]] = None,
         poleOffsetX: float = None,
         poleOffsetY: float = None,
-        poly: List[Dict[str, float]] = None,
+        poly=None,
         positionY: float = 0,
         prettyName: str = None,
         rotation: Vector3d = None,
@@ -387,8 +391,8 @@ def finalize_object_definition(
     """Finalize and return the given object definition by randomly choosing
     a material category, size, and type from the definition's corresponding
     choice lists, or using the given choice lists. Does NOT set the object
-    defintion's "materials" property. Not needed if the definition doesn't have
-    any choice lists."""
+    definition's "materials" property. Not needed if the definition doesn't
+    have any choice lists."""
     definition_copy = copy.deepcopy(object_definition)
 
     # Assign the type choice BEFORE the material and size choices.
@@ -494,8 +498,7 @@ def retrieve_complete_definition_list(
 
 def _generate_materials_lists(
     material_category_list: List[str],
-    # TODO MCS-813 Should be MaterialTuple
-    previous_materials_lists: List[Tuple[str, List[str]]]
+    previous_materials_lists: List[materials.MaterialTuple]
 ):
     if len(material_category_list) == 0:
         return previous_materials_lists
@@ -633,6 +636,13 @@ def is_similar_except_in_color(
         material_2 = definition_or_instance_2.materials or []
         color_2 = definition_or_instance_2.color or []
 
+    # Special cases for specific object types.
+    for type_prefix in ['apple', 'crayon']:
+        if type_1.startswith(type_prefix):
+            type_1 = type_prefix
+        if type_2.startswith(type_prefix):
+            type_2 = type_prefix
+
     size_list = _create_size_list(
         definition_or_instance_1,
         definition_or_instance_2,
@@ -677,6 +687,13 @@ def is_similar_except_in_shape(
         type_2 = definition_or_instance_2.type
         material_2 = definition_or_instance_2.materials or []
         color_2 = definition_or_instance_2.color or []
+
+    # Special cases for specific object types.
+    for type_prefix in ['apple', 'crayon']:
+        if type_1.startswith(type_prefix):
+            type_1 = type_prefix
+        if type_2.startswith(type_prefix):
+            type_2 = type_prefix
 
     size_list = _create_size_list(
         definition_or_instance_1,
@@ -723,6 +740,13 @@ def is_similar_except_in_size(
         material_2 = definition_or_instance_2.materials or []
         color_2 = definition_or_instance_2.color or []
 
+    # Special cases for specific object types.
+    for type_prefix in ['apple', 'crayon']:
+        if type_1.startswith(type_prefix):
+            type_1 = type_prefix
+        if type_2.startswith(type_prefix):
+            type_2 = type_prefix
+
     size_list = _create_size_list(
         definition_or_instance_1,
         definition_or_instance_2,
@@ -738,6 +762,39 @@ def is_similar_except_in_size(
             (size_1 - MAX_SIZE_DIFF) > size_2
         ) for size_1, size_2 in size_list])
     )
+
+
+def get_similar_definition(
+    target_object: Union[ObjectDefinition, Dict[str, Any]],
+    definition_dataset: DefinitionDataset,
+    # We should only ever set unshuffled to True in a unit test.
+    unshuffled: bool = False
+) -> Optional[ObjectDefinition]:
+    """Get an object definition similar to obj but different in one of
+    type, dimensions, or color. It is possible but unlikely that no such
+    definition can be found, in which case it returns None.
+    """
+
+    choices = ['color', 'size', 'shape']
+    if not unshuffled:
+        random.shuffle(choices)
+
+    for choice in choices:
+        if choice == 'color':
+            similarity_function = is_similar_except_in_color
+        elif choice == 'shape':
+            similarity_function = is_similar_except_in_shape
+        elif choice == 'size':
+            similarity_function = is_similar_except_in_size
+
+        # Just find and return the first similar definition, since this
+        # function may otherwise take a very long time to run.
+        for definition in definition_dataset.definitions():
+            if similarity_function(target_object, definition):
+                definition.difference = choice
+                return definition
+
+    return None
 
 
 _object_definition = ObjectDefinition()
@@ -936,10 +993,6 @@ class DefinitionDataset():
     ) -> DefinitionDataset:
         """Return a copy of this dataset containing only definitions that are
         untrained using the given tag."""
-
-        # TODO FIXME MCS-635
-        if untrained_tag == tags.SCENE.UNTRAINED_SHAPE:
-            return self.filter_on_trained()
 
         trained_tag_list = [tag for tag in [
             tags.SCENE.UNTRAINED_CATEGORY,

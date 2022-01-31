@@ -8,21 +8,25 @@ from abc import ABC, abstractmethod
 from types import SimpleNamespace
 from typing import Any, Dict, List, Optional, Tuple
 
+from machine_common_sense.config_manager import Vector3d
 from shapely import affinity
 
 from generator import (
+    MAX_TRIES,
     DefinitionDataset,
     ImmutableObjectDefinition,
+    ObjectBounds,
     ObjectDefinition,
     SceneException,
     geometry,
     gravity_support_objects,
+    instances,
     intuitive_physics_objects,
     materials,
+    mechanisms,
     occluders,
     specific_objects,
     tags,
-    util,
 )
 
 from .hypercubes import (
@@ -74,26 +78,17 @@ STEP_OFFSCREEN_X = 0.03
 
 MIN_OFFSCREEN_Y = 4.94
 STEP_OFFSCREEN_Y = 0.02
+MAX_TARGET_Y = 6.5
 
 # Assume the target object will be at most 1.0 wide, and then add some space
 # for the no-support position, so each object is always in view of the camera.
 # Restrict the max X to 0.5 at request of the psychology team.
 GRAVITY_SUPPORT_MAX_ONSCREEN_X = 0.5
 
-GRAVITY_SUPPORT_MOVE = 0.25
-GRAVITY_SUPPORT_WAIT = 5
-GRAVITY_SUPPORT_WIND = 400
-GRAVITY_SUPPORT_MOVEMENT = {
-    "stepBegin": 0,
-    "stepEnd": 0,
-    "vector": {
-        "x": 0,
-        "y": -GRAVITY_SUPPORT_MOVE,
-        "z": 0
-    }
-}
-POLE_ACTIVE = ['active']
-POLE_INACTIVE = ['inactive']
+GRAVITY_SUPPORT_WIND_FORCE_X = 400
+
+# Set the wind wait step to be the same as the placer wait step.
+GRAVITY_SUPPORT_WIND_WAIT_STEP = mechanisms.PLACER_WAIT_STEP
 
 MOVEMENT_JSON_FILENAME = 'movements.json'
 
@@ -170,10 +165,10 @@ def choose_move_across_object_position(
     object_list: List[Dict[str, Any]],
     min_z: float = MIN_TARGET_Z,
     max_z: float = MAX_TARGET_Z
-) -> float:
+) -> Optional[Dict[str, float]]:
     """Return a new X/Y/Z position for a move-across object with the given
     side and Y position that is not too close to an existing object."""
-    while True:
+    for _ in range(MAX_TRIES):
         position_z = choose_position_z(min_z, max_z)
         # Don't be too close to any existing object.
         for instance in object_list:
@@ -186,6 +181,9 @@ def choose_move_across_object_position(
                 break
         if position_z is not None:
             break
+
+    if position_z is None:
+        return None
 
     position_x = retrieve_off_screen_position_x(position_z)
 
@@ -247,11 +245,14 @@ def retrieve_off_screen_position_y(position_z: float) -> float:
 def validate_in_view(
     occluder_x: float,
     min_x: float = -occluders.OCCLUDER_MAX_X,
-    max_x: float = occluders.OCCLUDER_MAX_X
+    max_x: float = occluders.OCCLUDER_MAX_X,
+    occluder_size_x: float = (
+        occluders.OCCLUDER_MAX_SCALE_X + occluders.OCCLUDER_BUFFER
+    )
 ) -> bool:
     """Return whether the given X position is within view of the camera."""
-    min_position_x = min_x + (occluders.OCCLUDER_MAX_SCALE_X / 2.0)
-    max_position_x = max_x - (occluders.OCCLUDER_MAX_SCALE_X / 2.0)
+    min_position_x = min_x + (occluder_size_x / 2.0)
+    max_position_x = max_x - (occluder_size_x / 2.0)
     return occluder_x >= min_position_x and occluder_x <= max_position_x
 
 
@@ -312,37 +313,31 @@ class TargetVariations(ObjectVariations):
         self._is_fall_down = is_fall_down
 
         object_id = None
-        object_materials_list = None
 
-        instances = {}
+        object_instances = {}
         for name, definition in name_to_definition.items():
             adjusted_location = self._adjust_location(definition, location)
             # Instantiate each variation from the common target definition.
-            instances[name] = util.instantiate_object(
+            object_instances[name] = instances.instantiate_object(
                 definition,
-                adjusted_location,
-                object_materials_list
+                adjusted_location
             )
-            instances[name]['shows'][0]['boundingBox'] = (
-                geometry.generate_object_bounds(
-                    vars(definition.dimensions),
-                    vars(definition.offset),
-                    instances[name]['shows'][0]['position'],
-                    instances[name]['shows'][0]['rotation']
+            object_instances[name]['shows'][0]['boundingBox'] = (
+                geometry.create_bounds(
+                    dimensions=vars(definition.dimensions),
+                    offset=vars(definition.offset),
+                    position=object_instances[name]['shows'][0]['position'],
+                    rotation=object_instances[name]['shows'][0]['rotation'],
+                    standing_y=definition.positionY
                 )
             )
             # Ensure each instance uses the same ID and materials/colors.
             if not object_id:
-                object_id = instances[name]['id']
-            if not object_materials_list:
-                object_materials_list = [(
-                    instances[name]['materials'][0],
-                    instances[name]['debug']['color']
-                )]
-            instances[name]['id'] = object_id
-            instances[name]['debug']['role'] = tags.ROLES.TARGET
+                object_id = object_instances[name]['id']
+            object_instances[name]['id'] = object_id
+            object_instances[name]['debug']['role'] = tags.ROLES.TARGET
 
-        super().__init__(instances)
+        super().__init__(object_instances)
 
     def _adjust_location(
         self,
@@ -358,7 +353,11 @@ class TargetVariations(ObjectVariations):
                 'z': 0
             }
         # If the object's a cylinder, rotate it a little to be at an angle.
-        if definition.type == 'cylinder' and self._is_fall_down:
+        if self._is_fall_down and definition.type in [
+            'cylinder', 'decagon_cylinder', 'double_cone', 'dumbbell_1',
+            'dumbbell_2', 'hex_cylinder', 'hex_tube_narrow', 'hex_tube_wide',
+            'tie_fighter', 'tube_narrow', 'tube_wide'
+        ]:
             location_copy['rotation']['y'] = random.choice([45, -45])
         return location_copy
 
@@ -567,11 +566,13 @@ class IntuitivePhysicsHypercube(Hypercube, ABC):
                 skip = False
                 for step in (step_list + [toss_stop['landStep']]):
                     occluder_x = object_x_to_occluder_x(
-                        toss_stop['xDistanceByStep'][step],
+                        toss_stop['xDistanceByStep'][step]
+                        if step < len(toss_stop['xDistanceByStep']) else
+                        toss_stop['xDistanceByStep'][-1],
                         position_z
                     )
                     if occluder_x is None or not (
-                        self._validate_in_view(occluder_x, position['x'])
+                        self._validate_in_view(occluder_x)
                     ):
                         skip = True
                         break
@@ -654,9 +655,7 @@ class IntuitivePhysicsHypercube(Hypercube, ABC):
             occluder_x = object_x_to_occluder_x(position_x, position_z)
 
             # If OK, add this step and corresponding X position to the list.
-            if occluder_x is not None and (
-                self._validate_in_view(occluder_x, starting_x)
-            ):
+            if occluder_x is not None and self._validate_in_view(occluder_x):
                 step_position_option_list.append((
                     step,
                     round(position_x, 4),
@@ -691,9 +690,9 @@ class IntuitivePhysicsHypercube(Hypercube, ABC):
                 for _, previous_occluder_position_x in occluder_position_list:
                     too_close = occluders.calculate_separation_distance(
                         previous_occluder_position_x,
-                        occluders.OCCLUDER_MAX_SCALE_X,
+                        self._get_occluder_max_scale_x(),
                         occluder_x,
-                        occluders.OCCLUDER_MAX_SCALE_X
+                        self._get_occluder_max_scale_x()
                     ) < 0
                     if too_close:
                         break
@@ -747,8 +746,8 @@ class IntuitivePhysicsHypercube(Hypercube, ABC):
         occluder_min_size_x = min(
             # Add a buffer to the occluder's minimum scale to handle minor
             # changes in size or distance-by-step with switched objects.
-            paired_size_x + occluders.OCCLUDER_BUFFER,
-            occluders.OCCLUDER_MAX_SCALE_X
+            paired_size_x + self._get_occluder_buffer(),
+            self._get_occluder_max_scale_x()
         )
 
         # Use an X position so that the object will be hidden behind the
@@ -759,10 +758,9 @@ class IntuitivePhysicsHypercube(Hypercube, ABC):
         )
 
         # Choose a random size.
-        occluder_size_x = util.random_real(
+        occluder_size_x = geometry.random_real(
             occluder_min_size_x,
-            occluders.OCCLUDER_MAX_SCALE_X,
-            util.MIN_RANDOM_INTERVAL
+            self._get_occluder_max_scale_x()
         )
 
         return occluder_position_x, occluder_size_x
@@ -1098,14 +1096,12 @@ class IntuitivePhysicsHypercube(Hypercube, ABC):
         behind the moving objects, positioned near the room's back wall."""
 
         def random_x(room_dimensions: Dict[str, float]) -> float:
-            return util.random_real(-BACKGROUND_MAX_X, BACKGROUND_MAX_X,
-                                    util.MIN_RANDOM_INTERVAL)
+            return geometry.random_real(-BACKGROUND_MAX_X, BACKGROUND_MAX_X)
 
         def random_z(room_dimensions: Dict[str, float]) -> float:
             # Choose Z values so each background object is positioned between
             # moving objects and the back wall of the room.
-            return util.random_real(BACKGROUND_MIN_Z, BACKGROUND_MAX_Z,
-                                    util.MIN_RANDOM_INTERVAL)
+            return geometry.random_real(BACKGROUND_MIN_Z, BACKGROUND_MAX_Z)
 
         background_count = random.choices((0, 1, 2, 3, 4, 5),
                                           (50, 10, 10, 10, 10, 10))[0]
@@ -1123,7 +1119,7 @@ class IntuitivePhysicsHypercube(Hypercube, ABC):
                                                  random_x, random_z)
                 if location:
                     # Ensure entire bounds is within background
-                    for point in location['boundingBox']:
+                    for point in location['boundingBox'].box_xz:
                         x = point['x']
                         z = point['z']
                         if (
@@ -1134,9 +1130,12 @@ class IntuitivePhysicsHypercube(Hypercube, ABC):
                             location = None
                             del background_bounds_list[-1]
                             break
-            background_object = util.instantiate_object(background_definition,
-                                                        location)
+            background_object = instances.instantiate_object(
+                background_definition,
+                location
+            )
             background_object_list.append(background_object)
+            background_bounds_list.append(location['boundingBox'])
 
         return background_object_list
 
@@ -1145,17 +1144,27 @@ class IntuitivePhysicsHypercube(Hypercube, ABC):
         occluder_wall_material_list: List[List[Tuple]]
     ) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
         """Generate and return fall-down objects and occluders."""
-        object_list = self._generate_fall_down_object_list()
-        occluder_list = self._generate_fall_down_paired_occluder_list(
-            occluder_wall_material_list
-        )
-        self._generate_occluder_list(
-            self._get_fall_down_occluder_count() -
-            int(len(occluder_list) / 2),
-            occluder_list,
-            occluder_wall_material_list,
-            True
-        )
+        object_list = None
+        occluder_list = None
+        latest_exception = None
+        for _ in range(MAX_TRIES):
+            try:
+                object_list = self._generate_fall_down_object_list()
+                occluder_list = self._generate_fall_down_paired_occluder_list(
+                    occluder_wall_material_list
+                )
+                self._generate_occluder_list(
+                    self._get_fall_down_occluder_count() -
+                    int(len(occluder_list) / 2),
+                    occluder_list,
+                    occluder_wall_material_list,
+                    True
+                )
+                break
+            except SceneException as e:
+                latest_exception = e
+        if not object_list or not occluder_list:
+            raise latest_exception
         return object_list, occluder_list
 
     def _generate_fall_down_object_list(self) -> List[Dict[str, Any]]:
@@ -1169,15 +1178,17 @@ class IntuitivePhysicsHypercube(Hypercube, ABC):
             OBJECT_FALL_TIME
         )
         show_step = random.randint(EARLIEST_ACTION_STEP, latest_action_step)
+        occluder_default_max_x = occluders.OCCLUDER_MAX_X - (
+            self._get_occluder_max_scale_x() / 2.0
+        )
 
         for i in range(self._get_fall_down_object_count()):
             successful = False
-            for _ in range(util.MAX_TRIES):
+            for _ in range(MAX_TRIES):
                 # Ensure the random X position is within the camera's view.
-                x_position = util.random_real(
-                    -occluders.OCCLUDER_DEFAULT_MAX_X,
-                    occluders.OCCLUDER_DEFAULT_MAX_X,
-                    util.MIN_RANDOM_INTERVAL
+                x_position = geometry.random_real(
+                    -occluder_default_max_x,
+                    occluder_default_max_x
                 )
 
                 z_position = choose_position_z()
@@ -1188,12 +1199,12 @@ class IntuitivePhysicsHypercube(Hypercube, ABC):
                 for instance in object_list:
                     too_close = occluders.calculate_separation_distance(
                         object_x_to_occluder_x(x_position, z_position),
-                        occluders.OCCLUDER_MAX_SCALE_X,
+                        self._get_occluder_max_scale_x(),
                         object_x_to_occluder_x(
                             instance['shows'][0]['position']['x'],
                             instance['shows'][0]['position']['z']
                         ),
-                        occluders.OCCLUDER_MAX_SCALE_X
+                        self._get_occluder_max_scale_x()
                     ) < 0
                     if too_close:
                         break
@@ -1239,13 +1250,13 @@ class IntuitivePhysicsHypercube(Hypercube, ABC):
         paired_object = paired_variations.get(VARIATIONS.TRAINED)
         paired_x = paired_object['shows'][0]['position']['x']
         paired_size = paired_variations.get_max_size_x()
+        occluder_max_size_x = self._get_occluder_max_scale_x()
         occluder_min_size_x = min(
             # Add a buffer to the occluder's minimum scale to handle minor
             # changes in size or position-by-step with switched objects.
-            paired_size + occluders.OCCLUDER_BUFFER,
-            occluders.OCCLUDER_MAX_SCALE_X
+            paired_size + self._get_occluder_buffer(),
+            occluder_max_size_x
         )
-        occluder_max_size_x = occluders.OCCLUDER_MAX_SCALE_X
 
         # Adjust the X position using the sight angle from the camera
         # to the object so an occluder will properly hide the object.
@@ -1280,10 +1291,9 @@ class IntuitivePhysicsHypercube(Hypercube, ABC):
         if occluder_max_size_x <= occluder_min_size_x:
             x_scale = occluder_min_size_x
         else:
-            x_scale = util.random_real(
+            x_scale = geometry.random_real(
                 occluder_min_size_x,
-                occluder_max_size_x,
-                util.MIN_RANDOM_INTERVAL
+                occluder_max_size_x
             )
 
         # Choose a left or right sideways pole based on its X position.
@@ -1355,18 +1365,32 @@ class IntuitivePhysicsHypercube(Hypercube, ABC):
         occluder_wall_material_list: List[List[Tuple]]
     ) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
         """Generate and return move-across objects and occluders."""
+        object_list = None
+        occluder_list = None
+        latest_exception = None
         object_list = self._generate_move_across_object_list(
             self._last_step - occluders.OCCLUDER_MOVEMENT_TIME
         )
-        occluder_list = self._generate_move_across_paired_occluder_list(
-            object_list, occluder_wall_material_list)
-        self._generate_occluder_list(
-            self._get_move_across_occluder_count() -
-            int(len(occluder_list) / 2),
-            occluder_list,
-            occluder_wall_material_list,
-            False
-        )
+        for _ in range(MAX_TRIES):
+            try:
+                occluder_list = (
+                    self._generate_move_across_paired_occluder_list(
+                        object_list,
+                        occluder_wall_material_list
+                    )
+                )
+                self._generate_occluder_list(
+                    self._get_move_across_occluder_count() -
+                    int(len(occluder_list) / 2),
+                    occluder_list,
+                    occluder_wall_material_list,
+                    False
+                )
+                break
+            except SceneException as e:
+                latest_exception = e
+        if not object_list or not occluder_list:
+            raise latest_exception
         return object_list, occluder_list
 
     def _generate_move_across_object_list(
@@ -1384,12 +1408,14 @@ class IntuitivePhysicsHypercube(Hypercube, ABC):
 
         for i in range(object_count):
             move_dict = None
-            for _ in range(util.MAX_TRIES):
+            for _ in range(MAX_TRIES):
                 # Choose the object's position and define its location.
                 object_position = choose_move_across_object_position(
                     left_side,
                     object_list
                 )
+                if object_position is None:
+                    continue
                 object_location = {
                     'position': object_position
                 }
@@ -1536,12 +1562,11 @@ class IntuitivePhysicsHypercube(Hypercube, ABC):
     ) -> List[Dict[str, Any]]:
         """Generate and return a single occluder."""
         successful = False
-        for _ in range(util.MAX_TRIES):
+        for _ in range(MAX_TRIES):
             # Choose a random size.
-            x_scale = util.random_real(
+            x_scale = geometry.random_real(
                 occluders.OCCLUDER_MIN_SCALE_X,
-                occluders.OCCLUDER_MAX_SCALE_X,
-                util.MIN_RANDOM_INTERVAL
+                self._get_occluder_max_scale_x()
             )
             x_position = occluders.generate_occluder_position(x_scale,
                                                               occluder_list)
@@ -1586,9 +1611,25 @@ class IntuitivePhysicsHypercube(Hypercube, ABC):
                     f'within existing occluder_list={occluder_list}')
             occluder_list.extend(occluder)
 
+    def _get_occluder_buffer(self) -> int:
+        """Return the occluder buffer to use."""
+        if self._does_have_stop_move():
+            # Increase the buffer for any hypercubes with the stop movement
+            # due to greater variability in the speed of rolling objects.
+            return occluders.OCCLUDER_BUFFER_EXIT_AND_STOP
+        if not (self._does_have_deep_move() or self._does_have_toss_move()):
+            # Decrease the buffer for any hypercubes with only normal movement
+            # since we do not need to cross reference multiple movement.
+            return occluders.OCCLUDER_BUFFER
+        return occluders.OCCLUDER_BUFFER_MULTIPLE_EXIT
+
+    def _get_occluder_height(self) -> int:
+        """Return the occluder height to use."""
+        return occluders.OCCLUDER_HEIGHT
+
     def _get_occluder_max_scale_x(self) -> float:
         """Return the occluder's max scale X."""
-        return occluders.OCCLUDER_MAX_SCALE_X
+        return occluders.OCCLUDER_MAX_SCALE_X + self._get_occluder_buffer()
 
     def _init_each_object_definition_list(self, is_fall_down: bool) -> None:
         """Set each object definition list needed by this hypercube, used in
@@ -1604,10 +1645,6 @@ class IntuitivePhysicsHypercube(Hypercube, ABC):
         self._untrained_size_dataset = definition_dataset.filter_on_untrained(
             tags.SCENE.UNTRAINED_SIZE
         )
-
-    def _get_occluder_height(self) -> int:
-        """Return the occluder height to use."""
-        return occluders.OCCLUDER_HEIGHT
 
     def _identify_targets_and_non_targets(
         self,
@@ -1696,9 +1733,18 @@ class IntuitivePhysicsHypercube(Hypercube, ABC):
 
             scene['goal']['sceneInfo'][tags.SCENE.ID] = [scene_id]
 
-    def _validate_in_view(self, occluder_x: float, starting_x: float) -> bool:
+    def _validate_in_view(
+        self,
+        occluder_x: float,
+        occluder_size_x: float = None
+    ) -> bool:
         """Return whether the given X position is within view of the camera."""
-        return validate_in_view(occluder_x)
+        return validate_in_view(
+            occluder_x,
+            occluder_size_x=(
+                occluder_size_x or self._get_occluder_max_scale_x()
+            )
+        )
 
     def is_fall_down(self) -> bool:
         """Return if this is a fall-down hypercube."""
@@ -1717,13 +1763,7 @@ class CollisionsHypercube(IntuitivePhysicsHypercube):
     GOAL_TEMPLATE = {
         'category': tags.tag_to_label(tags.SCENE.INTUITIVE_PHYSICS),
         'domainsInfo': {
-            'objects': [
-                tags.DOMAINS.OBJECTS_1,
-                tags.DOMAINS.OBJECTS_2,
-                tags.DOMAINS.OBJECTS_3,
-                tags.DOMAINS.OBJECTS_4,
-                tags.DOMAINS.OBJECTS_5
-            ],
+            'objects': [],
             'places': [],
             'agents': []
         },
@@ -1977,20 +2017,28 @@ class CollisionsHypercube(IntuitivePhysicsHypercube):
         )
 
     # Override
-    def _validate_in_view(self, occluder_x: float, starting_x: float) -> bool:
+    def _validate_in_view(
+        self,
+        occluder_x: float,
+        occluder_size_x: float = None
+    ) -> bool:
         """Return whether the given X position is within view of the camera."""
         # Add a buffer because we will expand the size of the occluder.
-        return validate_in_view(occluder_x, -STRICT_BOUNDS, STRICT_BOUNDS)
+        return validate_in_view(
+            occluder_x,
+            -STRICT_BOUNDS,
+            STRICT_BOUNDS,
+            occluder_size_x=(
+                occluder_size_x or self._get_occluder_max_scale_x()
+            )
+        )
 
 
 class GravitySupportHypercube(IntuitivePhysicsHypercube):
     GOAL_TEMPLATE = {
         'category': tags.tag_to_label(tags.SCENE.INTUITIVE_PHYSICS),
         'domainsInfo': {
-            'objects': [
-                tags.DOMAINS.OBJECTS_3,
-                tags.DOMAINS.OBJECTS_10
-            ],
+            'objects': [],
             'places': [],
             'agents': []
         },
@@ -2047,28 +2095,21 @@ class GravitySupportHypercube(IntuitivePhysicsHypercube):
             self._target,
             structural_object_material_list
         )
-        factor = 1.0 / GRAVITY_SUPPORT_MOVE
+        # Adjust the target's starting Y position by the visible support's size
+        # so the target ends its movement directly above the visible support.
+        start_height = (
+            MAX_TARGET_Y - 0.5 +
+            self._visible_support['debug']['dimensions']['y']
+        )
 
-        # Add the "attached-to-pole" movement to all target variations.
         for instance in self._target.all():
-            # Adjust target Y position with visible support object Y size.
-            instance['shows'][0]['position']['y'] = (
-                round(instance['shows'][0]['position']['y'] * factor) / factor
-            ) + self._visible_support['debug']['dimensions']['y'] + 0.005 + (
-                instance['debug']['dimensions']['y'] / 2.0
+            # Add downward movement and other properties to target.
+            mechanisms.place_object(
+                instance=instance,
+                activation_step=instance['shows'][0]['stepBegin'],
+                start_height=start_height,
+                end_height=self._visible_support['debug']['dimensions']['y']
             )
-            self._update_object_movement(
-                instance,
-                instance['shows'][0]['position']['y'],
-                instance['debug']['dimensions']['y'],
-                self._visible_support['debug']['dimensions']['y']
-            )
-            # Enable gravity physics once "attached-to-pole" movement is done.
-            instance['togglePhysics'] = [{
-                'stepBegin': (
-                    instance['moves'][-1]['stepEnd'] + 1 + GRAVITY_SUPPORT_WAIT
-                )
-            }]
 
         self._pole = self._create_pole(self._target, self._visible_support)
 
@@ -2142,7 +2183,8 @@ class GravitySupportHypercube(IntuitivePhysicsHypercube):
                     GRAVITY_SUPPORT_MAX_ONSCREEN_X * 100,
                     5
                 ) / 100.0,
-                'y': retrieve_off_screen_position_y(target_z_position),
+                # The target's Y position will be adjusted later.
+                'y': 0,
                 'z': target_z_position
             }
         }
@@ -2157,17 +2199,11 @@ class GravitySupportHypercube(IntuitivePhysicsHypercube):
         reversed_instance = target_variations.get(VARIATIONS.ASYMMETRIC_RIGHT)
         reversed_instance['shows'][0]['rotation']['y'] += 180
 
-        # Choose target object step to appear.
+        # Choose step to appear and start downward movement.
         show_step = random.randint(1, 21)
 
         for instance in target_variations.all():
             instance['shows'][0]['stepBegin'] = show_step
-            # Will update the movement once the visible support is made.
-            instance['moves'] = [
-                copy.deepcopy(GRAVITY_SUPPORT_MOVEMENT)
-            ]
-            # Ignore gravity physics before pole disconnects.
-            instance['kinematic'] = True
 
         return target_variations
 
@@ -2183,18 +2219,7 @@ class GravitySupportHypercube(IntuitivePhysicsHypercube):
         target_asymmetric_right = target_variations.get(
             VARIATIONS.ASYMMETRIC_RIGHT
         )
-
-        # Create a pole template to use with all target variations.
-        pole_template = gravity_support_objects.create_pole_template(
-            # Assume all target variations will have the same show step.
-            target_symmetric['shows'][0]['stepBegin']
-        )
-        # The pole will descend and then ascend in scripted movement.
-        pole_template['moves'] = [
-            copy.deepcopy(GRAVITY_SUPPORT_MOVEMENT),
-            copy.deepcopy(GRAVITY_SUPPORT_MOVEMENT)
-        ]
-        pole_template['moves'][1]['vector']['y'] *= -1
+        pole_id = 'placer_' + str(uuid.uuid4())
 
         # Create a pole variation for all target variations.
         pole_instances = {}
@@ -2203,39 +2228,20 @@ class GravitySupportHypercube(IntuitivePhysicsHypercube):
             (VARIATIONS.ASYMMETRIC_LEFT, target_asymmetric_left, 1),
             (VARIATIONS.ASYMMETRIC_RIGHT, target_asymmetric_right, -1)
         ]:
-            pole_copy = copy.deepcopy(pole_template)
-            # Use the target's position for the pole's position.
-            target_position = target['shows'][0]['position']
-            pole_copy['shows'][0]['position']['x'] = target_position['x']
-            pole_copy['shows'][0]['position']['z'] = target_position['z']
-            # Add the scripted pole movement config.
-            pole_instances[name] = self._update_object_movement(
-                pole_copy,
-                target['shows'][0]['position']['y'],
-                target['debug']['dimensions']['y'],
-                visible_support['debug']['dimensions']['y']
-            )
             target_definition = target_variations._definitions[name]
-            # Adjust the pole Y position using the target Y position and size.
-            target_y_top = target['shows'][0]['position']['y'] + (
-                target['debug']['dimensions']['y'] / 2.0
-            ) - (
-                target['debug']['dimensions']['y'] *
-                (target_definition.poleOffsetY or 0)
+            pole_instances[name] = mechanisms.create_placer(
+                placed_object_position=target['shows'][0]['position'],
+                placed_object_scale=target['shows'][0]['scale'],
+                placed_object_dimensions=target['debug']['dimensions'],
+                placed_object_offset_y=target['debug']['positionY'],
+                activation_step=target['shows'][0]['stepBegin'],
+                end_height=visible_support['debug']['dimensions']['y'],
+                max_height=MAX_TARGET_Y,
+                placed_object_pole_offset_y=target_definition.poleOffsetY
             )
-            pole_instances[name]['shows'][0]['position']['y'] = (
-                target_y_top + pole_instances[name]['shows'][0]['scale']['y']
-            )
-            pole_inactive_step = target['togglePhysics'][0]['stepBegin']
-            # The pole must change colors once it begins to rise.
-            pole_instances[name]['changeMaterials'][0]['stepBegin'] = (
-                pole_inactive_step
-            )
-            # The pole must record its state.
-            pole_instances[name]['states'] = (
-                [POLE_ACTIVE] * (pole_inactive_step + 1) +
-                [POLE_INACTIVE] * (self._last_step - pole_inactive_step)
-            )
+            # Each pole variation should have the same ID.
+            pole_instances[name]['id'] = pole_id
+
             # Update the pole's position with the asymmetric offset, if any.
             # The pole is normally positioned over the middle of the target,
             # but may be adjusted with asymmetric shapes like triangles or Ls.
@@ -2280,37 +2286,7 @@ class GravitySupportHypercube(IntuitivePhysicsHypercube):
                 'z': target_symmetric['shows'][0]['position']['z']
             }
         }
-        return util.instantiate_object(definition, location)
-
-    def _update_object_movement(
-        self,
-        instance: Dict[str, Any],
-        falling_object_y_position: float,
-        falling_object_y_scale: float,
-        support_object_y_scale: float
-    ) -> Dict[str, Any]:
-        # Find the Y distance between the falling and support objects.
-        move_y_total = falling_object_y_position - support_object_y_scale - (
-            falling_object_y_scale / 2.0
-        )
-        # Find the Y distance in steps. Assume this will always divide evenly.
-        move_step_total = int(move_y_total / GRAVITY_SUPPORT_MOVE)
-        # Assume the show step was set in the instance previously.
-        show_step = instance['shows'][0]['stepBegin']
-        # Move the falling object from its starting position down to be just
-        # above the support object.
-        instance['moves'][0]['stepBegin'] = show_step
-        instance['moves'][0]['stepEnd'] = show_step + move_step_total - 1
-        # If the falling object is the pole, make it rise again afterward.
-        if len(instance['moves']) > 1:
-            instance['moves'][1]['stepBegin'] = (
-                instance['moves'][0]['stepEnd'] + 1 +
-                (2 * GRAVITY_SUPPORT_WAIT)
-            )
-            instance['moves'][1]['stepEnd'] = (
-                instance['moves'][1]['stepBegin'] + move_step_total - 1
-            )
-        return instance
+        return instances.instantiate_object(definition, location)
 
     def _get_scene_ids(self) -> List[str]:
         return [
@@ -2372,8 +2348,11 @@ class GravitySupportHypercube(IntuitivePhysicsHypercube):
         no_support_multiplier = 0.5 + (random.randint(1, 10) / 20.0)
 
         # Choose the height of the invisible support in the implausible
-        # full-support scenes (evenly divisible by GRAVITY_SUPPORT_MOVE).
-        implausible_support_y = random.randint(1, (1 / GRAVITY_SUPPORT_MOVE))
+        # full-support scenes (evenly divisible by PLACER_MOVE_AMOUNT).
+        implausible_support_y = random.randint(
+            1,
+            (1 / mechanisms.PLACER_MOVE_AMOUNT)
+        )
 
         # Initialize scenes.
         scenes = {}
@@ -2576,10 +2555,8 @@ class GravitySupportHypercube(IntuitivePhysicsHypercube):
         target_asymmetric_definition: ObjectDefinition,
         flip: bool
     ) -> float:
-        # Assume each asymmetric defintion has a poly property.
-        target_asymmetric_poly = geometry.rect_to_poly(
-            target_asymmetric_definition.poly
-        )
+        # Assume each asymmetric definition has a poly property.
+        target_asymmetric_poly = target_asymmetric_definition.poly
 
         # Make the polygon bigger based on the definition's dimensions/scale.
         target_asymmetric_poly = affinity.scale(
@@ -2615,11 +2592,16 @@ class GravitySupportHypercube(IntuitivePhysicsHypercube):
 
         # Adjust the position of each asymmetric object for its center of mass.
         pole_asymmetric['shows'][0]['position']['x'] -= asymmetric_center
-        target_asymmetric['shows'][0]['position']['x'] -= asymmetric_center
-        target_asymmetric['shows'][0]['boundingBox'] = [{
-            'x': corner['x'] - asymmetric_center, 'y': corner['y'],
-            'z': corner['z']
-        } for corner in target_asymmetric['shows'][0]['boundingBox']]
+        target_asymmetric_show = target_asymmetric['shows'][0]
+        target_asymmetric_show['position']['x'] -= asymmetric_center
+        target_asymmetric_show['boundingBox'] = ObjectBounds(
+            box_xz=[
+                Vector3d(corner.x - asymmetric_center, corner.y, corner.z)
+                for corner in target_asymmetric_show['boundingBox'].box_xz
+            ],
+            max_y=target_asymmetric_show['boundingBox'].max_y,
+            min_y=target_asymmetric_show['boundingBox'].min_y
+        )
 
     def _place_invisible_support_on_floor(
         self,
@@ -2656,7 +2638,7 @@ class GravitySupportHypercube(IntuitivePhysicsHypercube):
         is_positive: bool
     ) -> None:
         wind_step = instance['togglePhysics'][0]['stepBegin'] + 1 + (
-            2 * GRAVITY_SUPPORT_WAIT
+            2 * GRAVITY_SUPPORT_WIND_WAIT_STEP
         )
         instance['forces'] = [{
             'stepBegin': wind_step,
@@ -2664,7 +2646,7 @@ class GravitySupportHypercube(IntuitivePhysicsHypercube):
             'vector': {
                 'x': (
                     (1 if is_positive else -1) * instance['mass'] *
-                    GRAVITY_SUPPORT_WIND
+                    GRAVITY_SUPPORT_WIND_FORCE_X
                 ),
                 'y': 0,
                 'z': 0
@@ -2680,7 +2662,7 @@ class GravitySupportHypercube(IntuitivePhysicsHypercube):
     ) -> None:
         invisible_support = copy.deepcopy(self._visible_support)
         invisible_support['id'] = 'invisible_support'
-        height = implausible_support_y * GRAVITY_SUPPORT_MOVE
+        height = implausible_support_y * mechanisms.PLACER_MOVE_AMOUNT
         invisible_support['debug']['dimensions']['y'] = height
         invisible_support['shows'][0]['scale']['y'] = height
         invisible_support['shows'][0]['position']['y'] = (
@@ -2704,9 +2686,7 @@ class ObjectPermanenceHypercube(IntuitivePhysicsHypercube):
     GOAL_TEMPLATE = {
         'category': tags.tag_to_label(tags.SCENE.INTUITIVE_PHYSICS),
         'domainsInfo': {
-            'objects': [
-                tags.DOMAINS.OBJECTS_4
-            ],
+            'objects': [],
             'places': [],
             'agents': []
         },
@@ -3282,9 +3262,7 @@ class SpatioTemporalContinuityHypercube(IntuitivePhysicsHypercube):
     GOAL_TEMPLATE = {
         'category': tags.tag_to_label(tags.SCENE.INTUITIVE_PHYSICS),
         'domainsInfo': {
-            'objects': [
-                tags.DOMAINS.OBJECTS_4
-            ],
+            'objects': [],
             'places': [],
             'agents': []
         },
@@ -3595,6 +3573,7 @@ class ObjectPermanenceHypercubeEval4(ObjectPermanenceHypercube):
 
         toss_stop = paired_object['debug']['movement']['tossStop']
         step = paired_object['debug']['movement']['stepList'][index]
+        land_step = toss_stop['landStep']
 
         # Retrieve the occluder X position of both the implausible event step
         # and the land step for the toss-and-stop-on-screen movement.
@@ -3604,37 +3583,46 @@ class ObjectPermanenceHypercubeEval4(ObjectPermanenceHypercube):
                 paired_position['z']
             ),
             object_x_to_occluder_x(
-                toss_stop['xDistanceByStep'][toss_stop['landStep']],
+                toss_stop['xDistanceByStep'][land_step]
+                if land_step < len(toss_stop['xDistanceByStep']) else
+                toss_stop['xDistanceByStep'][-1],
                 paired_position['z']
             )
         ]
+        x_list_debug = {
+            'pairedPosition': x_list[0],
+            'tossLandPosition': x_list[1]
+        }
 
         # Then retrieve the occluder X position of the stop step for each
         # stop-on-screen movement.
         for move_name in ['moveStop', 'deepStop', 'tossStop']:
             movement = paired_object['debug']['movement'][move_name]
+            stop_step = movement['stopStep'] if (
+                movement['stopStep'] < len(movement['xDistanceByStep'])
+            ) else -1
             occluder_x = object_x_to_occluder_x(
-                movement['xDistanceByStep'][step],
-                movement['zDistanceByStep'][step]
+                movement['xDistanceByStep'][stop_step],
+                movement['zDistanceByStep'][stop_step]
                 if 'zDistanceByStep' in movement else paired_position['z']
             )
             if occluder_x is not None:
                 x_list.append(occluder_x)
+                x_list_debug[move_name + 'Position'] = occluder_x
 
         # Sort the list to identify the bounds of the occluder so that it hides
         # the implausible event step, land step, and all stop steps.
         x_list = sorted(x_list)
-        x_1 = x_list[0] - (paired_size_x / 2.0) - occluders.OCCLUDER_BUFFER
-        x_2 = x_list[-1] + (paired_size_x / 2.0) + occluders.OCCLUDER_BUFFER
+        x_1 = x_list[0] - ((paired_size_x + self._get_occluder_buffer()) / 2.0)
+        x_2 = x_list[-1] + (
+            (paired_size_x + self._get_occluder_buffer()) / 2.0
+        )
 
         occluder_size_x = x_2 - x_1
         occluder_position_x = x_2 - (occluder_size_x / 2.0)
 
         # Ensure the occluder is within the camera view.
-        if (
-            not self._validate_in_view(x_list[0], paired_position['x']) or
-            not self._validate_in_view(x_list[-1], paired_position['x'])
-        ):
+        if not self._validate_in_view(occluder_position_x, occluder_size_x):
             raise SceneException(
                 f'Occluder from {x_list[0]} to {x_list[-1]} out of bounds at '
                 f'step {step} with original occluder X '
@@ -3642,8 +3630,11 @@ class ObjectPermanenceHypercubeEval4(ObjectPermanenceHypercube):
                 f'moveStop {paired_object["movement"]["moveStop"]}\n'
                 f'deepStop {paired_object["movement"]["deepStop"]}\n'
                 f'tossStop {paired_object["movement"]["tossStop"]}\n'
+                f'{occluder_position_x=} and {occluder_size_x=}'
             )
 
+        paired_object['debug']['movement']['occluderPosition'] = x_list_debug
+        paired_object['debug']['movement']['diagonalSize'] = paired_size_x
         return occluder_position_x, occluder_size_x
 
     # Override
@@ -3683,18 +3674,19 @@ class ObjectPermanenceHypercubeEval4(ObjectPermanenceHypercube):
 
         super()._init_each_object_definition_list(is_fall_down)
 
-        # Don't use balls/spheres in Eval 4 OP/STC hypercubes.
+        # Don't use balls/spheres or cylinders in Eval 4 OP hypercubes.
+        # They don't stop in sync with other objects in "stop" movement scenes.
         self._trained_dataset = self._trained_dataset.filter_on_type(
-            cannot_be=['ball', 'sphere']
+            cannot_be=['ball', 'cylinder', 'sphere']
         )
         self._untrained_shape_dataset = (
             self._untrained_shape_dataset.filter_on_type(
-                cannot_be=['ball', 'sphere']
+                cannot_be=['ball', 'cylinder', 'sphere']
             )
         )
         self._untrained_size_dataset = (
             self._untrained_size_dataset.filter_on_type(
-                cannot_be=['ball', 'sphere']
+                cannot_be=['ball', 'cylinder', 'sphere']
             )
         )
 

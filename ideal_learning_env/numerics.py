@@ -77,9 +77,9 @@ class VectorFloatConfig(ConverterClass):
     ```
     """
 
-    x: Union[float, List[float], MinMaxFloat] = 0.0
-    y: Union[float, List[float], MinMaxFloat] = 0.0
-    z: Union[float, List[float], MinMaxFloat] = 0.0
+    x: Union[float, List[float], MinMaxFloat] = None
+    y: Union[float, List[float], MinMaxFloat] = None
+    z: Union[float, List[float], MinMaxFloat] = None
 
     # Override
     def convert_value(self) -> Vector3d:
@@ -111,9 +111,9 @@ class VectorIntConfig(ConverterClass):
     ```
     """
 
-    x: Union[int, List[int], MinMaxInt] = 0
-    y: Union[int, List[int], MinMaxInt] = 0
-    z: Union[int, List[int], MinMaxInt] = 0
+    x: Union[int, List[int], MinMaxInt] = None
+    y: Union[int, List[int], MinMaxInt] = None
+    z: Union[int, List[int], MinMaxInt] = None
 
     # Override
     def convert_value(self) -> Vector3d:

@@ -39,13 +39,3 @@ def test_does_have_definitions():
 
     output = gravity_support_objects.get_visible_support_object_definition()
     assert isinstance(output, ObjectDefinition)
-
-
-def test_create_pole_template():
-    pole = gravity_support_objects.create_pole_template(1)
-    assert pole['shows'][0]['stepBegin'] == 1
-    assert pole['moves'][0]['stepBegin'] == 1
-
-    pole = gravity_support_objects.create_pole_template(100)
-    assert pole['shows'][0]['stepBegin'] == 100
-    assert pole['moves'][0]['stepBegin'] == 100

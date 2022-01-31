@@ -2,7 +2,7 @@ from enum import Enum, auto
 from typing import Any, Dict, List, Optional, Tuple
 
 from .definitions import ObjectDefinition
-from .geometry import ORIGIN, generate_object_bounds
+from .geometry import ORIGIN, create_bounds
 
 
 def put_object_in_container(
@@ -41,11 +41,12 @@ def put_object_in_container(
     # if it had a boundingBox, it's not valid any more
     instance.pop('boundingBox', None)
 
-    instance['shows'][0]['boundingBox'] = generate_object_bounds(
-        instance['debug']['dimensions'],
-        instance['debug'].get('offset'),
-        instance['shows'][0]['position'],
-        instance['shows'][0]['rotation']
+    instance['shows'][0]['boundingBox'] = create_bounds(
+        dimensions=instance['debug']['dimensions'],
+        offset=instance['debug'].get('offset'),
+        position=instance['shows'][0]['position'],
+        rotation=instance['shows'][0]['rotation'],
+        standing_y=instance['debug'].get('positionY', 0)
     )
 
     if 'isParentOf' not in container['debug']:
@@ -124,24 +125,26 @@ def put_objects_in_container(
         (area['dimensions']['y'] / 2.0) + object_a['debug'].get('positionY', 0)
     shows_b['position']['y'] += - \
         (area['dimensions']['y'] / 2.0) + object_b['debug'].get('positionY', 0)
-    shows_a['rotation'] = {'y': rotation_a}
-    shows_b['rotation'] = {'y': rotation_b}
+    shows_a['rotation'] = {'x': 0, 'y': rotation_a, 'z': 0}
+    shows_b['rotation'] = {'x': 0, 'y': rotation_b, 'z': 0}
 
     # any boundingBox they may have had is not valid any more
     shows_a.pop('boundingBox', None)
     shows_b.pop('boundingBox', None)
 
-    shows_a['boundingBox'] = generate_object_bounds(
-        object_a['debug']['dimensions'],
-        object_a['debug'].get('offset'),
-        shows_a['position'],
-        shows_a['rotation']
+    shows_a['boundingBox'] = create_bounds(
+        dimensions=object_a['debug']['dimensions'],
+        offset=object_a['debug'].get('offset'),
+        position=shows_a['position'],
+        rotation=shows_a['rotation'],
+        standing_y=object_a['debug'].get('positionY', 0)
     )
-    shows_b['boundingBox'] = generate_object_bounds(
-        object_b['debug']['dimensions'],
-        object_b['debug'].get('offset'),
-        shows_b['position'],
-        shows_b['rotation']
+    shows_b['boundingBox'] = create_bounds(
+        dimensions=object_b['debug']['dimensions'],
+        offset=object_b['debug'].get('offset'),
+        position=shows_b['position'],
+        rotation=shows_b['rotation'],
+        standing_y=object_b['debug'].get('positionY', 0)
     )
 
     if 'isParentOf' not in container['debug']:

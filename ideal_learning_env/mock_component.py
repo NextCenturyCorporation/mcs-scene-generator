@@ -127,6 +127,6 @@ class MockComponent(ILEComponent):
     # Override
     def update_ile_scene(self, scene: Dict[str, Any]) -> Dict[str, Any]:
         for prop, attr in vars(self).items():
-            if attr is not None:
+            if attr is not None and not prop.startswith('_'):
                 scene[prop] = self.__get_scene_data(attr)
         return scene

@@ -1,9 +1,15 @@
 import copy
 
+from machine_common_sense.config_manager import Vector3d
+
+from generator import ObjectBounds
 from generator.scene_saver import (
+    _convert_non_serializable_data,
     _strip_debug_data,
     _strip_debug_misleading_data,
     _strip_debug_object_data,
+    _truncate_floats_in_dict,
+    _truncate_floats_in_list,
     find_next_filename,
 )
 
@@ -41,7 +47,10 @@ def create_test_object():
         },
         'shows': [{
             'stepBegin': 0,
-            'boundingBox': 'dummy'
+            'boundingBox': ObjectBounds(box_xz=[
+                Vector3d(2, 0, 3), Vector3d(2.5, 0, 3),
+                Vector3d(2.5, 0, 3.5), Vector3d(2, 0, 3.5)
+            ], max_y=1, min_y=0)
         }]
     }
 
@@ -83,6 +92,24 @@ def test_find_next_filename():
     )
     assert filename == 'tests/file2'
     assert index == 2
+
+
+def test_convert_non_serializable_data():
+    scene = {'objects': [create_test_object()]}
+    expected_object = create_test_object()
+    expected_object['shows'][0]['boundingBox'] = [
+        {'x': 2, 'y': 0, 'z': 3},
+        {'x': 2.5, 'y': 0, 'z': 3},
+        {'x': 2.5, 'y': 0, 'z': 3.5},
+        {'x': 2, 'y': 0, 'z': 3.5},
+        {'x': 2, 'y': 1, 'z': 3},
+        {'x': 2.5, 'y': 1, 'z': 3},
+        {'x': 2.5, 'y': 1, 'z': 3.5},
+        {'x': 2, 'y': 1, 'z': 3.5}
+    ]
+    del expected_object['debug']['boundsAtStep']
+    _convert_non_serializable_data(scene)
+    assert scene == {'objects': [expected_object]}
 
 
 def test_strip_debug_data():
@@ -208,3 +235,73 @@ def test_strip_debug_object_data():
     }
     _strip_debug_object_data(obj)
     assert obj == expected
+
+
+def test_truncate_floats_in_dict():
+    data = {'x': 1, 'y': 0.5, 'z': 987654321.123456789, 'tag': 'foobar'}
+    _truncate_floats_in_dict(data)
+    assert data['x'] == 1
+    assert data['y'] == 0.5
+    assert data['z'] == 987654321.1235
+    assert data['tag'] == 'foobar'
+
+
+def test_truncate_floats_in_dict_recursively():
+    nested_data = {'x': 1, 'y': 0.5, 'z': 987654321.123456789, 'tag': 'foobar'}
+    data = {'number': 0.987654321, 'nested': nested_data}
+    _truncate_floats_in_dict(data)
+    assert data['number'] == 0.9877
+    assert data['nested']['x'] == 1
+    assert data['nested']['y'] == 0.5
+    assert data['nested']['z'] == 987654321.1235
+    assert data['nested']['tag'] == 'foobar'
+
+
+def test_truncate_floats_in_list():
+    data = [1, 0.5, 987654321.123456789, 'foobar']
+    _truncate_floats_in_list(data)
+    assert data[0] == 1
+    assert data[1] == 0.5
+    assert data[2] == 987654321.1235
+    assert data[3] == 'foobar'
+
+
+def test_truncate_floats_in_list_recursively():
+    nested_data = [1, 0.5, 987654321.123456789, 'foobar']
+    data = [0.987654321, nested_data]
+    _truncate_floats_in_list(data)
+    assert data[0] == 0.9877
+    assert data[1][0] == 1
+    assert data[1][1] == 0.5
+    assert data[1][2] == 987654321.1235
+    assert data[1][3] == 'foobar'
+
+
+def test_truncate_floats_advanced():
+    nested_a = [1.11111111]
+    nested_b = {'number': 2.22222222, 'nested': nested_a}
+    nested_c = [3.33333333, nested_b]
+    nested_d = {'number': 4.44444444, 'nested': nested_c}
+    nested_e = {'number': 5.55555555}
+    nested_f = [6.66666666, nested_e]
+    nested_g = {'number': 7.77777777, 'nested': nested_f}
+    nested_h = [8.88888888, nested_g]
+    data = [nested_d, nested_h]
+    _truncate_floats_in_list(data)
+    assert nested_a == [1.1111]
+    assert nested_b == {'number': 2.2222, 'nested': [1.1111]}
+    assert nested_c == [3.3333, {'number': 2.2222, 'nested': [1.1111]}]
+    assert nested_d == {
+        'number': 4.4444,
+        'nested': [3.3333, {'number': 2.2222, 'nested': [1.1111]}]
+    }
+    assert nested_e == {'number': 5.5556}
+    assert nested_f == [6.6667, {'number': 5.5556}]
+    assert nested_g == {
+        'number': 7.7778,
+        'nested': [6.6667, {'number': 5.5556}]
+    }
+    assert nested_h == [
+        8.8889,
+        {'number': 7.7778, 'nested': [6.6667, {'number': 5.5556}]}
+    ]

@@ -1,20 +1,39 @@
 import copy
 
-import pytest
 from machine_common_sense.config_manager import Vector3d
 
-from generator import ObjectDefinition, base_objects, specific_objects
+from generator import (
+    DefinitionDataset,
+    ObjectDefinition,
+    base_objects,
+    specific_objects,
+)
 from generator.definitions import (
     create_dataset,
     do_materials_match,
+    get_similar_definition,
     is_similar_except_in_color,
     is_similar_except_in_shape,
     is_similar_except_in_size,
 )
-from generator.util import get_similar_definition
 
 DATASET = specific_objects.get_interactable_definition_dataset(unshuffled=True)
+ALL_DEFINITIONS = [
+    # Just use a few variations (colors) of each object for faster testing.
+    definition_variations[:2]
+    for definition_selections in DATASET._definition_groups
+    for definition_variations in definition_selections
+]
+# Reassign the dataset to use the filtered definition list for faster testing.
+DATASET = DefinitionDataset([ALL_DEFINITIONS])
 DEFINITIONS = DATASET.definitions(unshuffled=True)
+
+
+# TODO MCS-1012 Add new shapes/textures that are similar to these objects.
+SIMILARITY_EXCEPTIONS = [
+    'sofa_4', 'sofa_5', 'sofa_6', 'sofa_7',
+    'sofa_chair_4', 'sofa_chair_5', 'sofa_chair_6', 'sofa_chair_7'
+]
 
 
 def test_do_materials_match():
@@ -260,7 +279,6 @@ def test_is_similar_except_in_size():
     assert not is_similar_except_in_size(definition_1, definition_8)
 
 
-@pytest.mark.skip(reason="FIXME MCS-880 Taking a long time")
 def test_is_similar_except_in_color_all_objects():
     for definition_1 in DEFINITIONS:
         x_size_1 = definition_1.dimensions.x
@@ -271,8 +289,15 @@ def test_is_similar_except_in_color_all_objects():
                 x_size_2 = definition_2.dimensions.x
                 y_size_2 = definition_2.dimensions.y
                 z_size_2 = definition_2.dimensions.z
+                type_1 = definition_1.type
+                type_2 = definition_2.type
+                for type_prefix in ['apple', 'crayon']:
+                    if type_1.startswith(type_prefix):
+                        type_1 = type_prefix
+                    if type_2.startswith(type_prefix):
+                        type_2 = type_prefix
                 expected = (
-                    definition_1.type == definition_2.type and
+                    type_1 == type_2 and
                     not do_materials_match(
                         definition_1.materials or [],
                         definition_2.materials or [],
@@ -293,7 +318,6 @@ def test_is_similar_except_in_color_all_objects():
                 assert bool(actual) == expected
 
 
-@pytest.mark.skip(reason="FIXME MCS-880 Taking a long time")
 def test_is_similar_except_in_shape_all_objects():
     for definition_1 in DEFINITIONS:
         x_size_1 = definition_1.dimensions.x
@@ -304,8 +328,15 @@ def test_is_similar_except_in_shape_all_objects():
                 x_size_2 = definition_2.dimensions.x
                 y_size_2 = definition_2.dimensions.y
                 z_size_2 = definition_2.dimensions.z
+                type_1 = definition_1.type
+                type_2 = definition_2.type
+                for type_prefix in ['apple', 'crayon']:
+                    if type_1.startswith(type_prefix):
+                        type_1 = type_prefix
+                    if type_2.startswith(type_prefix):
+                        type_2 = type_prefix
                 expected = (
-                    definition_1.type != definition_2.type and
+                    type_1 != type_2 and
                     do_materials_match(
                         definition_1.materials or [],
                         definition_2.materials or [],
@@ -326,7 +357,6 @@ def test_is_similar_except_in_shape_all_objects():
                 assert bool(actual) == expected
 
 
-@pytest.mark.skip(reason="Taking a long time")
 def test_is_similar_except_in_size_all_objects():
     for definition_1 in DEFINITIONS:
         x_size_1 = definition_1.dimensions.x
@@ -337,8 +367,15 @@ def test_is_similar_except_in_size_all_objects():
                 x_size_2 = definition_2.dimensions.x
                 y_size_2 = definition_2.dimensions.y
                 z_size_2 = definition_2.dimensions.z
+                type_1 = definition_1.type
+                type_2 = definition_2.type
+                for type_prefix in ['apple', 'crayon']:
+                    if type_1.startswith(type_prefix):
+                        type_1 = type_prefix
+                    if type_2.startswith(type_prefix):
+                        type_2 = type_prefix
                 expected = (
-                    definition_1.type == definition_2.type and
+                    type_1 == type_2 and
                     do_materials_match(
                         definition_1.materials or [],
                         definition_2.materials or [],
@@ -416,10 +453,15 @@ def test_similarity_soccer_ball():
     assert get_similar_definition(soccer_ball, white_dataset) == white_copy
 
 
-@pytest.mark.skip(reason="FIXME MCS-880 Taking a long time")
 def test_get_similar_definition():
+    failed = False
     for definition in DEFINITIONS:
+        if definition.type in SIMILARITY_EXCEPTIONS:
+            continue
         result = get_similar_definition(definition, DATASET, unshuffled=True)
         if not result:
             print(f'NO SIMILAR DEF {definition}')
-    assert False
+            failed = True
+        else:
+            result.difference = None
+    assert not failed

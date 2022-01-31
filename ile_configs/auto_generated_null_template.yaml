@@ -1,0 +1,47 @@
+ceiling_material: null
+check_valid_path: false
+doors:
+    - num: 0
+excluded_shapes: null
+floor_material: null
+floor_material_override:
+    - num: 0
+freezes: null
+goal: null
+holes:
+    - num: 0
+keyword_objects: null
+last_step: null
+lava:
+    - num: 0
+num_random_interactable_objects: null
+performer_start_position: null
+performer_start_rotation: null
+placers:
+    - num: 0
+random_structural_objects: null
+room_dimensions: null
+room_shape: null
+shortcut_bisecting_platform: False
+shortcut_ramp_to_platform: False
+specific_interactable_objects: null
+structural_droppers:
+  num: 0
+structural_moving_occluders:
+  num: 0
+structural_occluding_walls:
+  num: 0
+structural_platforms:
+  num: 0
+structural_ramps:
+  num: 0
+structural_throwers:
+  num: 0
+structural_walls:
+  num: 0
+swivels: null
+teleports: null
+wall_back_material: null
+wall_front_material: null
+wall_left_material: null
+wall_right_material: null

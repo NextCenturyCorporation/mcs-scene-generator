@@ -200,8 +200,7 @@ def verify_hypercube_variations(
 
         if untrained_shape:
             assert not untrained_shape['debug'].get('untrainedSize', False)
-            # TODO FIXME MCS-635
-            # assert untrained_shape['debug'].get('untrainedShape', False)
+            assert untrained_shape['debug'].get('untrainedShape', False)
             assert definitions.is_similar_except_in_shape(
                 trained_default,
                 untrained_shape,
@@ -218,10 +217,9 @@ def verify_hypercube_variations(
             assert not (
                 untrained_different_shape['debug'].get('untrainedSize', False)
             )
-            # TODO FIXME MCS-635
-            # assert (
-            #   untrained_different_shape['debug'].get('untrainedShape', False)
-            # )
+            assert (
+                untrained_different_shape['debug'].get('untrainedShape', False)
+            )
             assert definitions.is_similar_except_in_shape(
                 untrained_shape,
                 untrained_different_shape,
@@ -432,7 +430,9 @@ def verify_object_fall_down(instance, name):
 
 def verify_object_fall_down_position(instance, name, bigger=False):
     # Verify object X and Y and Z position.
-    max_x = occluders.OCCLUDER_DEFAULT_MAX_X + (0.5 if bigger else 0)
+    max_x = occluders.OCCLUDER_MAX_X - (occluders.OCCLUDER_BUFFER / 2.0) + (
+        0.5 if bigger else 0
+    )
     x_position = instance['shows'][0]['position']['x']
     if -max_x > x_position or x_position > max_x:
         print(f'[ERROR] {name} X POSITION SHOULD BE BETWEEN {-max_x} AND '
@@ -639,7 +639,7 @@ def verify_object_list_move_across(target_list, distractor_list):
 def verify_occluder(occluder_wall, occluder_pole, sideways=False):
     # Verify occluder wall scale.
     min_scale = occluders.OCCLUDER_MIN_SCALE_X
-    max_scale = occluders.OCCLUDER_MAX_SCALE_X
+    max_scale = occluders.OCCLUDER_MAX_SCALE_X + occluders.OCCLUDER_BUFFER
     if min_scale > occluder_wall['shows'][0]['scale']['x'] > max_scale:
         print(f'[ERROR] OCCLUDER WALL X SCALE SHOULD BE BETWEEN {min_scale} '
               f'AND {max_scale}\nOCCLUDER_WALL={occluder_wall}')

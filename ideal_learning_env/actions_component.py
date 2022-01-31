@@ -73,8 +73,9 @@ class ActionRestrictionsComponent(ILEComponent):
     (bool): Determine if scene should be considered passive and the
     performer agent should be restricted to only use the `"Pass"` action.
     If true, ILE will raise an exception if last_step is not set or either
-    `freezes` or `teleports` has any entries.
+    `freezes`, `swivels` or `teleports` has any entries.
     """
+
     freezes: List[Union[StepBeginEnd, List[StepBeginEnd]]] = None
     """
     (list of [StepBeginEnd](#StepBeginEnd) dicts): When a freeze
@@ -82,25 +83,14 @@ class ActionRestrictionsComponent(ILEComponent):
     range of steps.  User should try to avoid freeze overlaps, but if using
     ranges and choices, the ILE will retry on overlaps.  This field must be
     blank or an empty array if `passive_scene` is `true`.
-    """
-    teleports: List[Union[TeleportConfig, List[TeleportConfig]]] = None
-    """
-    (list of [TeleportConfig](#TeleportConfig) dicts): When a
-    kidnap/teleport will occur and where the player agent should be teleported.
-    This field must contain either both position fields or the `rotation_y`
-    field or an exception will be thrown.  This field must be blank or an empty
-    array if `passive_scene` is `true`.
 
     Simple Example:
     ```
-    passive_scene: false
     freezes: null
-    teleports: null
     ```
 
     Advanced Example:
     ```
-    passive_scene: false
     freezes:
       -
         begin: 1
@@ -111,6 +101,53 @@ class ActionRestrictionsComponent(ILEComponent):
           min: 16
           max: 26
 
+    ```
+    """
+
+    swivels: List[Union[StepBeginEnd, List[StepBeginEnd]]] = None
+    """
+    (list of [StepBeginEnd](#StepBeginEnd) dicts): When a swivel
+    action should occur.  A swivel forces the performer agent to only
+    `"['LookDown', 'LookUp', 'RotateLeft', 'RotateRight']"` for a
+    range of steps.  User should try to avoid swivel (and freeze) overlaps
+    but if using ranges and choices, the ILE will retry on overlaps.
+    This field must be blank or an empty array if `passive_scene` is `true`.
+
+    Simple Example:
+    ```
+    swivels: null
+    ```
+
+    Advanced Example:
+    ```
+    swivels:
+      -
+        begin: 7
+        end: 9
+      -
+        begin: [16, 18, 20]
+        end:
+          min: 26
+          max: 30
+
+    ```
+    """
+
+    teleports: List[Union[TeleportConfig, List[TeleportConfig]]] = None
+    """
+    (list of [TeleportConfig](#TeleportConfig) dicts): When a
+    kidnap/teleport will occur and where the player agent should be teleported.
+    This field must contain either both position fields or the `rotation_y`
+    field or an exception will be thrown.  This field must be blank or an empty
+    array if `passive_scene` is `true`.
+
+    Simple Example:
+    ```
+    teleports: null
+    ```
+
+    Advanced Example:
+    ```
     teleports:
       -
         step: 5
@@ -130,6 +167,7 @@ class ActionRestrictionsComponent(ILEComponent):
         rotation_y: [30, 120, 270]
     ```
     """
+
     @ile_config_setter()
     def set_passive_scene(self, data: Any) -> None:
         self.passive_scene = data
@@ -149,6 +187,17 @@ class ActionRestrictionsComponent(ILEComponent):
         return [choose_random(f) for f in (self.freezes or [])]
 
     @ile_config_setter(validator=ValidateNumber(
+        props=['begin', 'end'], min_value=1,
+        null_ok=True))
+    def set_swivels(self, data: Any) -> None:
+        self.swivels = data
+
+    def get_swivels(self) -> List[
+        StepBeginEnd
+    ]:
+        return [choose_random(s) for s in (self.swivels or [])]
+
+    @ile_config_setter(validator=ValidateNumber(
         props=['step'], min_value=1))
     @ile_config_setter(validator=ValidateNumber(
         props=['rotation_y'], min_value=0,
@@ -163,24 +212,29 @@ class ActionRestrictionsComponent(ILEComponent):
 
     # Override
     def update_ile_scene(self, scene: Dict[str, Any]) -> Dict[str, Any]:
-        logger.debug('Running action restriction component...')
+        logger.info('Configuring action restrictions for the scene...')
 
         scene['objects'] = scene.get('objects', [])
         goal = scene.get('goal', {})
         total_steps = goal.get('last_step')
         freezes = sorted(self.get_freezes(), key=lambda x: x.begin)
+        swivels = sorted(self.get_swivels(), key=lambda x: x.begin)
         teleports = sorted(self.get_teleports(), key=lambda x: x.step)
-        self._restriction_validation(freezes, teleports, total_steps)
+        self._restriction_validation(freezes, swivels, teleports, total_steps)
         passive = self.get_passive_scene()
         if passive:
             goal['action_list'] = [['Pass']] * total_steps
-            logger.debug('Setting whole scene as passive')
+            logger.trace('Setting whole scene as passive')
         if freezes:
             self._add_freezes(goal, freezes)
-            logger.debug(f'Adding {len(freezes)} freezes to scene')
+            logger.trace(f'Adding {len(freezes)} freezes to scene')
+        if swivels:
+            self._add_swivels(goal, swivels)
+            logger.trace(
+                f'Adding {len(swivels)} swivels to scene')
         if teleports:
             self._add_teleports(goal, teleports, passive)
-            logger.debug(f'Adding {len(teleports)} teleports to scene')
+            logger.trace(f'Adding {len(teleports)} teleports to scene')
         return scene
 
     def _add_teleports(self, goal, teleports, passive):
@@ -197,7 +251,8 @@ class ActionRestrictionsComponent(ILEComponent):
                 al += ([[]] * (step - length))
             if al[step - 1] != [] and not passive:
                 raise ILEException(
-                    f"Cannot teleport during freeze at step={step - 1}")
+                    f"Cannot teleport during freeze or swivel "
+                    f"at step={step - 1}")
             al[step - 1] = [cmd]
 
     def _add_freezes(self, goal, freezes):
@@ -218,14 +273,67 @@ class ActionRestrictionsComponent(ILEComponent):
                 raise ILEException(f"Freezes overlapped at {limit}")
             if f.begin >= f.end:
                 raise ILEException(
-                    f"Freezes has begin >= end ({f.begin} >= {f.end}")
+                    f"Freezes has begin >= end ({f.begin} >= {f.end})")
             num_free = f.begin - limit
             num_limited = f.end - f.begin
             al += ([[]] * (num_free))
             al += ([['Pass']] * (num_limited))
             limit = f.end
 
-    def _restriction_validation(self, freezes, teleports, total_steps):
+    def _add_swivels(self, goal, swivels):
+        swivel_actions = ['LookDown', 'LookUp', 'RotateLeft', 'RotateRight']
+        goal['action_list'] = goal.get('action_list', [])
+        al = goal['action_list']
+
+        # check if actions already exist in action list
+        # at the start
+        al_length = len(al)
+        no_actions = al_length == 0
+
+        limit = 1
+        for s in swivels:
+            s.begin = 1 if s.begin is None else s.begin
+            if s.end is None:
+                if goal['last_step'] is None:
+                    raise ILEConfigurationException(
+                        "Configuration error.  A swivel without an 'end' "
+                        "requires 'last_step' to be set.")
+                else:
+                    # Add one so we include the last step.  End is exclusive.
+                    s.end = goal['last_step'] + 1
+            if (limit > s.begin):
+                raise ILEException(f"Swivels overlapped at {limit}")
+            if s.begin >= s.end:
+                raise ILEException(
+                    f"Swivels has begin >= end ({s.begin} >= {s.end})")
+
+            if(no_actions or s.begin > al_length):
+                num_free = s.begin - \
+                    limit if no_actions else (s.begin - al_length - 1)
+                num_limited = s.end - s.begin
+                al += ([[]] * (num_free))
+                al += ([swivel_actions] * (num_limited))
+
+            else:
+                step = s.begin
+
+                while(step < s.end):
+                    if(len(al) >= step):
+                        if(al[step - 1] != []):
+                            raise ILEException(
+                                f"Swivels with begin {s.begin} and end "
+                                f"{s.end} overlap with existing action "
+                                f"in action_list")
+                        al[step - 1] = swivel_actions
+                    else:
+                        al += swivel_actions
+
+                    step = step + 1
+
+            limit = s.end
+
+    def _restriction_validation(
+            self, freezes, swivels, teleports, total_steps):
         if self.get_passive_scene():
             if not total_steps or total_steps <= 0:
                 raise ILEConfigurationException(
@@ -237,13 +345,25 @@ class ActionRestrictionsComponent(ILEComponent):
                     "Error with action restriction "
                     "configuration. When 'passive_scene'=true"
                     "'freezes' can not be used")
+            if self.swivels:
+                raise ILEConfigurationException(
+                    "Error with action restriction "
+                    "configuration. When 'passive_scene'=true"
+                    "'swivels' can not be used")
         if freezes:
             for f in freezes:
                 if not f.begin and not f.end:
                     raise ILEConfigurationException(
                         "Error with action restriction "
                         "configuration.  'freezes' entries must have "
-                        "atleast one of 'begin' or 'end' fields.")
+                        "at least one of 'begin' or 'end' fields.")
+        if swivels:
+            for s in swivels:
+                if not s.begin and not s.end:
+                    raise ILEConfigurationException(
+                        "Error with action restriction "
+                        "configuration. 'swivels' entries must have "
+                        "at least one of 'begin' or 'end' fields.")
         if teleports:
             for t in teleports:
                 if (t.position_x and not t.position_z) or (

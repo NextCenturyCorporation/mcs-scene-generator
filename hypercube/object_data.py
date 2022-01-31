@@ -2,7 +2,7 @@ import copy
 from types import SimpleNamespace
 from typing import Any, Dict, List, Optional, Tuple
 
-from generator import ObjectDefinition, geometry, util
+from generator import ObjectBounds, ObjectDefinition, geometry, instances
 
 from .interactive_plans import ObjectLocationPlan, ObjectPlan
 
@@ -49,35 +49,15 @@ class ObjectData():
         location: Dict[str, Any],
         object_location: ObjectLocationPlan,
         indexes: List[int] = None
-    ) -> List[List[Dict[str, float]]]:
+    ) -> List[ObjectBounds]:
         # Create a copy of the trained shape template at the given location.
         trained_instance = copy.deepcopy(self.trained_template)
-        util.move_to_location(
-            trained_instance,
-            location,
-            geometry.generate_object_bounds(
-                vars(self.trained_definition.dimensions),
-                vars(self.trained_definition.offset),
-                location['position'],
-                location['rotation']
-            ),
-            self.trained_definition
-        )
+        geometry.move_to_location(trained_instance, location)
 
         # Create a copy of the untrained shape template at the given location.
         if self.untrained_template:
             untrained_instance = copy.deepcopy(self.untrained_template)
-            util.move_to_location(
-                untrained_instance,
-                location,
-                geometry.generate_object_bounds(
-                    vars(self.untrained_definition.dimensions),
-                    vars(self.untrained_definition.offset),
-                    location['position'],
-                    location['rotation']
-                ),
-                self.untrained_definition
-            )
+            geometry.move_to_location(untrained_instance, location)
 
         is_trained_needed = False
         is_untrained_needed = False
@@ -122,7 +102,7 @@ class ObjectData():
     def assign_location_back(
         self,
         location: Dict[str, Any]
-    ) -> List[List[Dict[str, float]]]:
+    ) -> List[ObjectBounds]:
         """Assign the given location (by creating a new instance of the object)
         to each scene in which this object's location plan is BACK."""
         return self._assign_location(location, ObjectLocationPlan.BACK)
@@ -131,7 +111,7 @@ class ObjectData():
         self,
         location: Dict[str, Any],
         indexes: List[int]
-    ) -> List[List[Dict[str, float]]]:
+    ) -> List[ObjectBounds]:
         """Assign the given location (by creating a new instance of the object)
         to each scene with one of the given indexes in which this object's
         location plan is BETWEEN."""
@@ -145,7 +125,7 @@ class ObjectData():
         self,
         location: Dict[str, Any],
         indexes: List[int]
-    ) -> List[List[Dict[str, float]]]:
+    ) -> List[ObjectBounds]:
         """Assign the given location (by creating a new instance of the object)
         to each scene with one of the given indexes in which this object's
         location plan is CLOSE."""
@@ -159,7 +139,7 @@ class ObjectData():
         self,
         location: Dict[str, Any],
         indexes: List[int]
-    ) -> List[List[Dict[str, float]]]:
+    ) -> List[ObjectBounds]:
         """Assign the given location (by creating a new instance of the object)
         to each scene with one of the given indexes in which this object's
         location plan is FAR."""
@@ -172,7 +152,7 @@ class ObjectData():
     def assign_location_front(
         self,
         location: Dict[str, Any]
-    ) -> List[List[Dict[str, float]]]:
+    ) -> List[ObjectBounds]:
         """Assign the given location (by creating a new instance of the object)
         to each scene in which this object's location plan is FRONT."""
         return self._assign_location(location, ObjectLocationPlan.FRONT)
@@ -180,7 +160,7 @@ class ObjectData():
     def assign_location_random(
         self,
         location: Dict[str, Any]
-    ) -> List[List[Dict[str, float]]]:
+    ) -> List[ObjectBounds]:
         """Assign the given location (by creating a new instance of the object)
         to each scene in which this object's location plan is RANDOM."""
         return self._assign_location(location, ObjectLocationPlan.RANDOM)
@@ -314,11 +294,11 @@ class ObjectData():
 
     def recreate_both_templates(self) -> None:
         """Recreate both templates in this data."""
-        self.trained_template = util.instantiate_object(
+        self.trained_template = instances.instantiate_object(
             self.trained_definition,
             geometry.ORIGIN_LOCATION
         )
-        self.untrained_template = util.instantiate_object(
+        self.untrained_template = instances.instantiate_object(
             self.untrained_definition,
             geometry.ORIGIN_LOCATION
         ) if self.untrained_definition else None

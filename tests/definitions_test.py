@@ -114,7 +114,7 @@ def test_create_dataset():
         assert definition.dimensions == Vector3d(3, 3, 3)
         assert definition.mass == 3
 
-    assert len(dataset._definition_groups[1][1]) == 39
+    assert len(dataset._definition_groups[1][1]) == 40
     for definition in dataset._definition_groups[1][1]:
         assert definition.type == 'd'
         assert definition.materialCategory == ['wood']
@@ -130,7 +130,7 @@ def test_create_dataset():
         assert definition.dimensions == Vector3d(4, 4, 4)
         assert definition.mass == 4
 
-    assert len(dataset._definition_groups[1][3]) == 39
+    assert len(dataset._definition_groups[1][3]) == 40
     for definition in dataset._definition_groups[1][3]:
         assert definition.type == 'd'
         assert definition.materialCategory == ['wood']
@@ -154,7 +154,7 @@ def test_definition_dataset_choose_random_definition():
 def test_definition_dataset_definitions():
     dataset = create_interesting_dataset()
     definitions = dataset.definitions(unshuffled=True)
-    assert len(definitions) == 102
+    assert len(definitions) == 104
     for definition in definitions:
         assert isinstance(definition, ObjectDefinition)
 
@@ -507,11 +507,11 @@ def test_retrieve_complete_definition_list_choose_material():
     assert len(actual[0][0]) == 10
     assert len(actual[0][1]) == 7
     assert len(actual[0][2]) == 2
-    assert len(actual[0][3]) == 39
+    assert len(actual[0][3]) == 40
     assert len(actual[0][4]) == 10
     assert len(actual[0][5]) == 7
     assert len(actual[0][6]) == 2
-    assert len(actual[0][7]) == 39
+    assert len(actual[0][7]) == 40
 
     for definition in actual[0][0]:
         assert definition.type == 'metal_thing'

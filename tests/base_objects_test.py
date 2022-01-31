@@ -1,6 +1,6 @@
 from machine_common_sense.config_manager import Vector3d
 
-from generator import ChosenMaterial, ObjectDefinition, base_objects
+from generator import ChosenMaterial, ObjectDefinition, base_objects, materials
 
 
 def test_all_types_exist():
@@ -179,6 +179,28 @@ def test_create_variable_definition_from_base_cylinder():
     assert cylinder.chooseSizeList[3].scale == Vector3d(0.5, 0.5, 0.5)
 
 
+def test_create_variable_definition_from_base_primitive_shape_number():
+    definition = base_objects.create_variable_definition_from_base(
+        type='dumbbell_2',
+        size_multiplier_list=[1],
+        chosen_material_list=[ChosenMaterial.PLASTIC]
+    )
+    assert isinstance(definition, ObjectDefinition)
+    assert definition.type == 'dumbbell_2'
+    assert definition.shape == ['dumbbell']
+
+
+def test_create_variable_definition_from_base_primitive_shape_whitespace():
+    definition = base_objects.create_variable_definition_from_base(
+        type='circle_frustum',
+        size_multiplier_list=[1],
+        chosen_material_list=[ChosenMaterial.PLASTIC]
+    )
+    assert isinstance(definition, ObjectDefinition)
+    assert definition.type == 'circle_frustum'
+    assert definition.shape == ['circle frustum']
+
+
 def test_create_variable_definition_from_base_multiple_material_category():
     table_1 = base_objects.create_variable_definition_from_base(
         type='table_1',
@@ -211,3 +233,28 @@ def test_create_soccer_ball():
     assert ball.salientMaterials == ['rubber']
     assert ball.scale == Vector3d(1, 1, 1)
     assert ball.shape == ['ball']
+
+
+def test_is_valid_shape_material_with_primitives():
+    # Test the most common primitive shapes, for simplicity.
+    for shape in ['cube', 'cylinder', 'sphere']:
+        for material_tuple in materials.ALL_PRIMITIVE_MATERIAL_TUPLES:
+            assert base_objects.is_valid_shape_material(shape, material_tuple)
+
+
+def test_is_valid_shape_material_with_primitives_invalid_materials():
+    # Test the most common primitive shapes, for simplicity.
+    for shape in ['cube', 'cylinder', 'sphere']:
+        for material_tuple in (
+            materials.BLOCK_LETTER_MATERIALS +
+            materials.BLOCK_NUMBER_MATERIALS +
+            materials.BLOCK_LETTER_MATERIALS +
+            materials.SOFA_1_MATERIALS +
+            materials.SOFA_CHAIR_1_MATERIALS +
+            materials.SOFA_2_MATERIALS +
+            materials.SOFA_3_MATERIALS
+        ):
+            assert not base_objects.is_valid_shape_material(
+                shape,
+                material_tuple
+            )

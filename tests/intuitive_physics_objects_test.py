@@ -101,9 +101,7 @@ def test_intuitive_physics_move_across_basic_objects_untrained_shapes():
             only_diagonal_size=True
         )
         print(f'{definition_1.type} {definition_1.scale}')
-        # TODO: We want at least two possible untrained objects.
-        # assert len(filtered_dataset.definitions()) >= 2
-        assert len(filtered_dataset.definitions()) >= 1
+        assert len(filtered_dataset.definitions()) >= 2
 
 
 def test_intuitive_physics_fall_down_basic_objects_untrained_shapes():
@@ -121,9 +119,7 @@ def test_intuitive_physics_fall_down_basic_objects_untrained_shapes():
             only_diagonal_size=True
         )
         print(f'{definition_1.type} {definition_1.scale}')
-        # TODO: We want at least two possible untrained objects.
-        # assert len(filtered_dataset.definitions()) >= 2
-        assert len(filtered_dataset.definitions()) >= 1
+        assert len(filtered_dataset.definitions()) >= 2
 
 
 def test_intuitive_physics_move_across_complex_objects_untrained_shapes():

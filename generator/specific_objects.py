@@ -12,6 +12,7 @@ from .base_objects import (
 from .definitions import (
     ChosenMaterial,
     DefinitionDataset,
+    ImmutableObjectDefinition,
     ObjectDefinition,
     get_dataset,
 )
@@ -61,16 +62,86 @@ _BLOCK_NUMBER = create_variable_definition_from_base(
 )
 
 
+_CART_2 = create_variable_definition_from_base(
+    type='cart_2',
+    size_multiplier_list=[0.5, 1, 1.5, 2],
+    chosen_material_list=[ChosenMaterial.METAL, ChosenMaterial.PLASTIC]
+)
+
+
+_DOG_ON_WHEELS = create_variable_definition_from_base(
+    type='dog_on_wheels',
+    size_multiplier_list=[1, 1.5, 2, 2.5],
+    chosen_material_list=[ChosenMaterial.BLOCK_WOOD, ChosenMaterial.WOOD]
+)
+
+
 _DUCK_ON_WHEELS = create_variable_definition_from_base(
     type='duck_on_wheels',
-    size_multiplier_list=[0.5, 1, 2],
+    size_multiplier_list=[1, 1.5, 2, 2.5],
+    chosen_material_list=[ChosenMaterial.BLOCK_WOOD, ChosenMaterial.WOOD]
+)
+
+
+_TOY_BUS = create_variable_definition_from_base(
+    type='bus_1',
+    size_multiplier_list=[0.5, 1, 1.5],
+    chosen_material_list=[ChosenMaterial.BLOCK_WOOD, ChosenMaterial.WOOD]
+)
+
+
+_TOY_CAR_2 = create_variable_definition_from_base(
+    type='car_2',
+    size_multiplier_list=[1, 1.5, 2],
     chosen_material_list=[ChosenMaterial.BLOCK_WOOD, ChosenMaterial.WOOD]
 )
 
 
 _TOY_RACECAR = create_variable_definition_from_base(
     type='racecar_red',
-    size_multiplier_list=[0.75, 1.5, 3],
+    size_multiplier_list=[1, 1.5, 2, 2.5],
+    chosen_material_list=[ChosenMaterial.BLOCK_WOOD, ChosenMaterial.WOOD]
+)
+
+
+_TOY_SEDAN = create_variable_definition_from_base(
+    type='car_1',
+    size_multiplier_list=[1, 1.5, 2, 2.5],
+    chosen_material_list=[ChosenMaterial.BLOCK_WOOD, ChosenMaterial.WOOD]
+)
+
+
+_TOY_TRAIN = create_variable_definition_from_base(
+    type='train_1',
+    size_multiplier_list=[1, 1.5, 2, 2.5],
+    chosen_material_list=[ChosenMaterial.BLOCK_WOOD, ChosenMaterial.WOOD]
+)
+
+
+_TOY_TROLLEY = create_variable_definition_from_base(
+    type='trolley_1',
+    size_multiplier_list=[1, 1.5, 2, 2.5],
+    chosen_material_list=[ChosenMaterial.BLOCK_WOOD, ChosenMaterial.WOOD]
+)
+
+
+_TOY_TRUCK_1 = create_variable_definition_from_base(
+    type='truck_1',
+    size_multiplier_list=[1, 1.5, 2, 2.5],
+    chosen_material_list=[ChosenMaterial.BLOCK_WOOD, ChosenMaterial.WOOD]
+)
+
+
+_TOY_TRUCK_2 = create_variable_definition_from_base(
+    type='truck_2',
+    size_multiplier_list=[1, 1.5, 2, 2.5],
+    chosen_material_list=[ChosenMaterial.BLOCK_WOOD, ChosenMaterial.WOOD]
+)
+
+
+_TURTLE_ON_WHEELS = create_variable_definition_from_base(
+    type='turtle_on_wheels',
+    size_multiplier_list=[1, 1.5, 2, 2.5],
     chosen_material_list=[ChosenMaterial.BLOCK_WOOD, ChosenMaterial.WOOD]
 )
 
@@ -108,20 +179,6 @@ _CRAYON = ObjectDefinition(
             size_multiplier_list=[1]
         )
     ]
-)
-
-
-_TURTLE_ON_WHEELS = create_variable_definition_from_base(
-    type='turtle_on_wheels',
-    size_multiplier_list=[0.5, 1, 2],
-    chosen_material_list=[ChosenMaterial.BLOCK_WOOD, ChosenMaterial.WOOD]
-)
-
-
-_TOY_SEDAN = create_variable_definition_from_base(
-    type='car_1',
-    size_multiplier_list=[0.75, 1.5, 3],
-    chosen_material_list=[ChosenMaterial.BLOCK_WOOD, ChosenMaterial.WOOD]
 )
 
 
@@ -202,6 +259,48 @@ _PLATE = ObjectDefinition(
         ChosenMaterial.PLASTIC.copy(),
         ChosenMaterial.WOOD.copy()
     ]
+)
+
+
+_BED_1_OCCLUDER = create_variable_definition_from_base(
+    type='bed_1',
+    size_multiplier_list=[1],
+    chosen_material_list=[ChosenMaterial.WOOD]
+)
+
+
+_BED_2_OCCLUDER = create_variable_definition_from_base(
+    type='bed_2',
+    size_multiplier_list=[1],
+    chosen_material_list=[ChosenMaterial.WOOD]
+)
+
+
+_BED_3_OCCLUDER = create_variable_definition_from_base(
+    type='bed_3',
+    size_multiplier_list=[1],
+    chosen_material_list=[ChosenMaterial.WOOD]
+)
+
+
+_BED_4_OCCLUDER = create_variable_definition_from_base(
+    type='bed_4',
+    size_multiplier_list=[1],
+    chosen_material_list=[ChosenMaterial.WOOD]
+)
+
+
+_BED_5_OBSTACLE = create_variable_definition_from_base(
+    type='bed_5',
+    size_multiplier_list=[1],
+    chosen_material_list=[ChosenMaterial.WOOD]
+)
+
+
+_BED_6_OBSTACLE = create_variable_definition_from_base(
+    type='bed_6',
+    size_multiplier_list=[1],
+    chosen_material_list=[ChosenMaterial.WOOD]
 )
 
 
@@ -323,7 +422,7 @@ _BOOKCASE_SIDELESS = ObjectDefinition(
 )
 
 
-_CART = create_variable_definition_from_base(
+_CART_1 = create_variable_definition_from_base(
     type='cart_1',
     size_multiplier_list=[0.5, 1],
     chosen_material_list=[ChosenMaterial.METAL]
@@ -406,6 +505,50 @@ _CHAIR_4_OFFICE = create_variable_definition_from_base(
 )
 
 
+_CHAIR_5 = create_variable_definition_from_base(
+    type='chair_5',
+    size_multiplier_list=[1],
+    chosen_material_list=[
+        ChosenMaterial.METAL,
+        ChosenMaterial.PLASTIC,
+        ChosenMaterial.WOOD
+    ]
+)
+
+
+_CHAIR_6 = create_variable_definition_from_base(
+    type='chair_6',
+    size_multiplier_list=[1],
+    chosen_material_list=[
+        ChosenMaterial.METAL,
+        ChosenMaterial.PLASTIC,
+        ChosenMaterial.WOOD
+    ]
+)
+
+
+_CHAIR_7 = create_variable_definition_from_base(
+    type='chair_7',
+    size_multiplier_list=[1],
+    chosen_material_list=[
+        ChosenMaterial.METAL,
+        ChosenMaterial.PLASTIC,
+        ChosenMaterial.WOOD
+    ]
+)
+
+
+_CHAIR_8 = create_variable_definition_from_base(
+    type='chair_8',
+    size_multiplier_list=[1],
+    chosen_material_list=[
+        ChosenMaterial.METAL,
+        ChosenMaterial.PLASTIC,
+        ChosenMaterial.WOOD
+    ]
+)
+
+
 _BLOCK_BLANK_CUBE_NOT_PICKUPABLE = create_variable_definition_from_base(
     type='block_blank_wood_cube',
     attributes_overrides=['moveable'],
@@ -418,120 +561,6 @@ _BLOCK_BLANK_CYLINDER_NOT_PICKUPABLE = create_variable_definition_from_base(
     size_multiplier_list=[2, Vector3d(2, 4, 2), Vector3d(4, 2, 4)],
     chosen_material_list=[ChosenMaterial.BLOCK_WOOD, ChosenMaterial.WOOD]
 )
-
-
-# TODO Update this to use ObjectDefinition if needed in the future.
-# _CHANGING_TABLE = {
-#     "type": "changing_table",
-#     "shape": ["changing table"],
-#     "size": "huge",
-#     "mass": 50,
-#     "materialCategory": ["wood"],
-#     "salientMaterials": ["wood"],
-#     "attributes": ["receptacle", "openable", "occluder"],
-#     "enclosedAreas": [{
-#         # Remove the top drawer for now.
-#         #        "id": "_drawer_top",
-#         #        "position": {
-#         #            "x": 0.165,
-#         #            "y": 0.47,
-#         #            "z": -0.03
-#         #        },
-#         #        "dimensions": {
-#         #            "x": 0.68,
-#         #            "y": 0.22,
-#         #            "z": 0.41
-#         #            }
-#         #    }, {
-#         "id": "_drawer_bottom",
-#         "position": {
-#             "x": 0.175,
-#             "y": 0.19,
-#             "z": -0.03
-#         },
-#         "dimensions": {
-#             "x": 0.68,
-#             "y": 0.2,
-#             "z": 0.41
-#         }
-#     }],
-#     "openAreas": [{
-#         # Remove the top shelves for now.
-#         #        "id": "",
-#         #        "position": {
-#         #            "x": 0,
-#         #            "y": 0.85,
-#         #            "z": 0
-#         #        },
-#         #        "dimensions": {
-#         #            "x": 1,
-#         #            "y": 0,
-#         #            "z": 0.55
-#         #            }
-#         #    }, {
-#         #        "id": "_shelf_top",
-#         #        "position": {
-#         #            "x": 0,
-#         #            "y": 0.725,
-#         #            "z": -0.05
-#         #        },
-#         #        "dimensions": {
-#         #            "x": 1.05,
-#         #            "y": 0.2,
-#         #            "z": 0.44
-#         #            }
-#         #    }, {
-#         #        "id": "_shelf_middle",
-#         #        "position": {
-#         #            "x": -0.365,
-#         #            "y": 0.475,
-#         #            "z": -0.05
-#         #        },
-#         #        "dimensions": {
-#         #            "x": 0.32,
-#         #            "y": 0.25,
-#         #            "z": 0.44
-#         #            }
-#         #    }, {
-#         "id": "_shelf_bottom",
-#         "position": {
-#             "x": -0.365,
-#             "y": 0.2,
-#             "z": -0.05
-#         },
-#         "dimensions": {
-#             "x": 0.32,
-#             "y": 0.25,
-#             "z": 0.44
-#         }
-#     }],
-#     "dimensions": {
-#         "x": 1.1,
-#         "y": 0.96,
-#         "z": 0.89
-#     },
-#     "offset": {
-#         "x": 0,
-#         "y": 0.48,
-#         "z": 0.155
-#     },
-#     "closedDimensions": {
-#         "x": 1.1,
-#         "y": 0.96,
-#         "z": 0.58
-#     },
-#     "closedOffset": {
-#         "x": 0,
-#         "y": 0.48,
-#         "z": 0
-#     },
-#     "positionY": 0,
-#     "scale": {
-#         "x": 1,
-#         "y": 1,
-#         "z": 1
-#     }
-# }
 
 
 _CRIB = create_variable_definition_from_base(
@@ -723,6 +752,74 @@ _TABLE_12_X_LEGS = create_variable_definition_from_base(
 )
 
 
+_TABLE_13_SMALL_CIRCLE = create_variable_definition_from_base(
+    type='table_13',
+    size_multiplier_list=[1, Vector3d(2, 1, 2), 2, Vector3d(3, 2, 3)],
+    chosen_material_list=[
+        ChosenMaterial.METAL,
+        ChosenMaterial.PLASTIC,
+        ChosenMaterial.WOOD
+    ]
+)
+
+
+_TABLE_14_SMALL_RECT = create_variable_definition_from_base(
+    type='table_14',
+    size_multiplier_list=[
+        1,
+        Vector3d(2, 1, 1),
+        Vector3d(1, 1, 2),
+        2,
+        Vector3d(3, 2, 2),
+        Vector3d(2, 2, 3)
+    ],
+    chosen_material_list=[
+        ChosenMaterial.METAL,
+        ChosenMaterial.PLASTIC,
+        ChosenMaterial.WOOD
+    ]
+)
+
+
+_TABLE_15_RECT = create_variable_definition_from_base(
+    type='table_15',
+    size_multiplier_list=[
+        0.75,
+        Vector3d(1, 0.75, 0.75),
+        Vector3d(0.75, 0.75, 1),
+        1,
+        Vector3d(1.25, 1, 1),
+        Vector3d(1, 1, 1.25),
+        1.25,
+        Vector3d(1, 1.25, 1.25),
+        Vector3d(1.25, 1.25, 1)
+    ],
+    chosen_material_list=[
+        ChosenMaterial.METAL,
+        ChosenMaterial.PLASTIC,
+        ChosenMaterial.WOOD
+    ]
+)
+
+
+_TABLE_16_CIRCLE = create_variable_definition_from_base(
+    type='table_16',
+    size_multiplier_list=[
+        0.75,
+        Vector3d(1, 0.75, 1),
+        1,
+        Vector3d(1.25, 1, 1.25),
+        1.25,
+        Vector3d(1, 1.25, 1)
+    ],
+    chosen_material_list=[
+        ChosenMaterial.METAL,
+        ChosenMaterial.PLASTIC,
+        ChosenMaterial.WOOD
+    ]
+)
+
+
 _TV = create_variable_definition_from_base(
     type='tv_2',
     size_multiplier_list=[0.5, 1, 1.5, 2]
@@ -820,6 +917,30 @@ _SOFA_3 = create_variable_definition_from_base(
 )
 
 
+_SOFA_4 = create_variable_definition_from_base(
+    type='sofa_4',
+    size_multiplier_list=[1]
+)
+
+
+_SOFA_5 = create_variable_definition_from_base(
+    type='sofa_5',
+    size_multiplier_list=[1]
+)
+
+
+_SOFA_6 = create_variable_definition_from_base(
+    type='sofa_6',
+    size_multiplier_list=[1]
+)
+
+
+_SOFA_7 = create_variable_definition_from_base(
+    type='sofa_7',
+    size_multiplier_list=[1]
+)
+
+
 _SOFA_CHAIR_BABY_SCALED = ObjectDefinition(
     chooseTypeList=[
         create_variable_definition_from_base(
@@ -874,132 +995,44 @@ _SOFA_CHAIR_3 = create_variable_definition_from_base(
 )
 
 
-# TODO Update this to use ObjectDefinition if needed in the future.
-# _WARDROBE = {
-#     "type": "wardrobe",
-#     "shape": ["wardrobe"],
-#     "size": "huge",
-#     "mass": 50,
-#     "materialCategory": ["wood"],
-#     "salientMaterials": ["wood"],
-#     "attributes": ["receptacle", "openable", "occluder"],
-#     "enclosedAreas": [{
-#         # Remove the top drawers and shelves for now.
-#         #        "id": "_middle_shelf_right",
-#         #        "position": {
-#         #            "x": 0.255,
-#         #            "y": 1.165,
-#         #            "z": 0.005
-#         #        },
-#         #        "dimensions": {
-#         #            "x": 0.49,
-#         #            "y": 1.24,
-#         #            "z": 0.46
-#         #        }
-#         #    }, {
-#         #        "id": "_middle_shelf_left",
-#         #        "position": {
-#         #            "x": -0.255,
-#         #            "y": 1.295,
-#         #            "z": 0.005
-#         #        },
-#         #        "dimensions": {
-#         #            "x": 0.49,
-#         #            "y": 0.98,
-#         #            "z": 0.46
-#         #        }
-#         #    }, {
-#         #        "id": "_bottom_shelf_left",
-#         #        "position": {
-#         #            "x": -0.255,
-#         #            "y": 0.665,
-#         #            "z": 0.005
-#         #        },
-#         #        "dimensions": {
-#         #            "x": 0.49,
-#         #            "y": 0.24,
-#         #            "z": 0.46
-#         #        }
-#         #    }, {
-#         #        "id": "_lower_drawer_top_left",
-#         #        "position": {
-#         #            "x": -0.265,
-#         #            "y": 0.42,
-#         #            "z": 0.015
-#         #        },
-#         #        "dimensions": {
-#         #            "x": 0.445,
-#         #            "y": 0.16
-#         #            "z": 0.425
-#         #        }
-#         #    }, {
-#         #        "id": "_lower_drawer_top_right",
-#         #        "position": {
-#         #            "x": 0.265,
-#         #            "y": 0.42,
-#         #            "z": 0.015
-#         #        },
-#         #        "dimensions": {
-#         #            "x": 0.445,
-#         #            "y": 0.16
-#         #            "z": 0.425
-#         #        }
-#         #    }, {
-#         "id": "_lower_drawer_bottom_left",
-#         "position": {
-#             "x": -0.265,
-#             "y": 0.21,
-#             "z": 0.015
-#         },
-#         "dimensions": {
-#             "x": 0.445,
-#             "y": 0.16,
-#             "z": 0.425
-#         }
-#     }, {
-#         "id": "_lower_drawer_bottom_right",
-#         "position": {
-#             "x": 0.265,
-#             "y": 0.21,
-#             "z": 0.015
-#         },
-#         "dimensions": {
-#             "x": 0.445,
-#             "y": 0.16,
-#             "z": 0.425
-#         }
-#     }],
-#     "dimensions": {
-#         "x": 1.07,
-#         "y": 2.1,
-#         "z": 1
-#     },
-#     "offset": {
-#         "x": 0,
-#         "y": 1.05,
-#         "z": 0.17
-#     },
-#     "closedDimensions": {
-#         "x": 1.07,
-#         "y": 2.1,
-#         "z": 0.49
-#     },
-#     "closedOffset": {
-#         "x": 0,
-#         "y": 1.05,
-#         "z": 0
-#     },
-#     "positionY": 0,
-#     "scale": {
-#         "x": 1,
-#         "y": 1,
-#         "z": 1
-#     }
-# }
+_SOFA_CHAIR_4 = create_variable_definition_from_base(
+    type='sofa_chair_4',
+    size_multiplier_list=[1]
+)
+
+
+_SOFA_CHAIR_5 = create_variable_definition_from_base(
+    type='sofa_chair_5',
+    size_multiplier_list=[1]
+)
+
+
+_SOFA_CHAIR_6 = create_variable_definition_from_base(
+    type='sofa_chair_6',
+    size_multiplier_list=[1]
+)
+
+
+_SOFA_CHAIR_7 = create_variable_definition_from_base(
+    type='sofa_chair_7',
+    size_multiplier_list=[1]
+)
 
 
 _CASE_1_SUITCASE = create_variable_definition_from_base(
     type='case_1',
+    size_multiplier_list=[
+        # Too little to fit a soccer ball inside
+        1, 1.25, 1.5,
+        # Big enough to fit a soccer ball inside
+        2, 2.25, 2.5
+    ],
+    chosen_material_list=[ChosenMaterial.METAL, ChosenMaterial.PLASTIC]
+)
+
+
+_CASE_2 = create_variable_definition_from_base(
+    type='case_2',
     size_multiplier_list=[
         # Too little to fit a soccer ball inside
         1, 1.25, 1.5,
@@ -1070,6 +1103,70 @@ _CHEST_3_CUBOID = create_variable_definition_from_base(
 )
 
 
+_CHEST_4_ROUNDED_LID = create_variable_definition_from_base(
+    type='chest_4',
+    size_multiplier_list=[
+        # Too little to fit a soccer ball inside
+        0.6, 0.8,
+        # Big enough to fit a soccer ball inside
+        1.2, 1.4, 1.6
+    ],
+    chosen_material_list=[
+        ChosenMaterial.METAL,
+        ChosenMaterial.PLASTIC,
+        ChosenMaterial.WOOD
+    ]
+)
+
+
+_CHEST_5_ROUNDED_LID = create_variable_definition_from_base(
+    type='chest_5',
+    size_multiplier_list=[
+        # Too little to fit a soccer ball inside
+        0.6, 0.8,
+        # Big enough to fit a soccer ball inside
+        1.2, 1.4, 1.6
+    ],
+    chosen_material_list=[
+        ChosenMaterial.METAL,
+        ChosenMaterial.PLASTIC,
+        ChosenMaterial.WOOD
+    ]
+)
+
+
+_CHEST_6_TRAPEZOID_LID = create_variable_definition_from_base(
+    type='chest_6',
+    size_multiplier_list=[
+        # Too little to fit a soccer ball inside
+        0.6, 0.8,
+        # Big enough to fit a soccer ball inside
+        1.2, 1.4, 1.6
+    ],
+    chosen_material_list=[
+        ChosenMaterial.METAL,
+        ChosenMaterial.PLASTIC,
+        ChosenMaterial.WOOD
+    ]
+)
+
+
+_CHEST_7_PIRATE_TREASURE = create_variable_definition_from_base(
+    type='chest_7',
+    size_multiplier_list=[
+        # Too little to fit a soccer ball inside
+        0.4, 0.6,
+        # Big enough to fit a soccer ball inside
+        1, 1.2, 1.4
+    ],
+    chosen_material_list=[
+        ChosenMaterial.METAL,
+        ChosenMaterial.PLASTIC,
+        ChosenMaterial.WOOD
+    ]
+)
+
+
 _CHEST_8_SEMICYLINDER = create_variable_definition_from_base(
     type='chest_8',
     size_multiplier_list=[
@@ -1083,6 +1180,46 @@ _CHEST_8_SEMICYLINDER = create_variable_definition_from_base(
         ChosenMaterial.PLASTIC,
         ChosenMaterial.WOOD
     ]
+)
+
+
+_CHEST_9_TRAPEZOID_LID = create_variable_definition_from_base(
+    type='chest_9',
+    size_multiplier_list=[
+        # Too little to fit a soccer ball inside
+        0.4, 0.6,
+        # Big enough to fit a soccer ball inside
+        1, 1.2, 1.4
+    ],
+    chosen_material_list=[
+        ChosenMaterial.METAL,
+        ChosenMaterial.PLASTIC,
+        ChosenMaterial.WOOD
+    ]
+)
+
+
+_TOOLBOX_1 = create_variable_definition_from_base(
+    type='toolbox_1',
+    size_multiplier_list=[
+        # Too little to fit a soccer ball inside
+        0.8, 1,
+        # Big enough to fit a soccer ball inside
+        1.4, 1.6, 1.8
+    ],
+    chosen_material_list=[ChosenMaterial.METAL, ChosenMaterial.PLASTIC]
+)
+
+
+_TOOLBOX_2 = create_variable_definition_from_base(
+    type='toolbox_2',
+    size_multiplier_list=[
+        # Too little to fit a soccer ball inside
+        0.4, 0.6,
+        # Big enough to fit a soccer ball inside
+        1, 1.2, 1.4
+    ],
+    chosen_material_list=[ChosenMaterial.METAL, ChosenMaterial.PLASTIC]
 )
 
 
@@ -1212,35 +1349,58 @@ _CHEST_8_SEMICYLINDER = create_variable_definition_from_base(
 # }
 
 
+_PICKUPABLE_BALLS = [_BALL_PLASTIC, _BALL_NON_PLASTIC, create_soccer_ball()]
+_PICKUPABLE_BLOCKS = [
+    _BLOCK_BLANK_CUBE,
+    _BLOCK_BLANK_CYLINDER,
+    _BLOCK_LETTER,
+    _BLOCK_NUMBER
+]
+_PICKUPABLE_FURNITURE = [
+    _CHAIR_1_BABY_SCALED,
+    _CHAIR_2_STOOL_CIRCLE_BABY_SCALED,
+    _TABLE_1_RECT_BABY_SCALED,
+    _TABLE_3_CIRCLE_BABY_SCALED,
+    _SHELF_1_CUBBY_BABY_SCALED
+]
+_PICKUPABLE_MISC = [
+    _APPLE,
+    _BOWL,
+    _CUP,
+    _PLATE,
+    _CRAYON,
+    _PACIFIER
+]
+_PICKUPABLE_TOYS = [
+    _DOG_ON_WHEELS,
+    _DUCK_ON_WHEELS,
+    _TOY_BUS,
+    _TOY_CAR_2,
+    _TOY_RACECAR,
+    _TOY_SEDAN,
+    _TOY_TRAIN,
+    _TOY_TROLLEY,
+    _TOY_TRUCK_1,
+    _TOY_TRUCK_2,
+    _TURTLE_ON_WHEELS
+]
+
+
+# 25% balls, 25% blocks, 50% toys
+_THROWABLES = [
+    _PICKUPABLE_BALLS,
+    _PICKUPABLE_BLOCKS,
+    _PICKUPABLE_TOYS,
+    _PICKUPABLE_TOYS
+]
+
+
 _PICKUPABLES = [
-    # Arbitrary division: balls
-    [_BALL_PLASTIC, _BALL_NON_PLASTIC, create_soccer_ball()],
-    # Arbitrary division: blocks
-    [_BLOCK_BLANK_CUBE, _BLOCK_BLANK_CYLINDER, _BLOCK_LETTER, _BLOCK_NUMBER],
-    # Arbitrary division: toys
-    [
-        _TOY_SEDAN,
-        _TOY_RACECAR,
-        _DUCK_ON_WHEELS,
-        _TURTLE_ON_WHEELS
-    ],
-    # Arbitrary division: misc objects
-    [
-        _APPLE,
-        _BOWL,
-        _CUP,
-        _PLATE,
-        _CRAYON,
-        _PACIFIER
-    ],
-    # Arbitrary division: baby furniture
-    [
-        _CHAIR_1_BABY_SCALED,
-        _CHAIR_2_STOOL_CIRCLE_BABY_SCALED,
-        _TABLE_1_RECT_BABY_SCALED,
-        _TABLE_3_CIRCLE_BABY_SCALED,
-        _SHELF_1_CUBBY_BABY_SCALED
-    ]
+    _PICKUPABLE_BALLS,
+    _PICKUPABLE_BLOCKS,
+    _PICKUPABLE_FURNITURE,
+    _PICKUPABLE_MISC,
+    _PICKUPABLE_TOYS
 ]
 
 
@@ -1277,21 +1437,43 @@ _NOT_PICKUPABLES = [
     [
         _BLOCK_BLANK_CUBE_NOT_PICKUPABLE,
         _BLOCK_BLANK_CYLINDER_NOT_PICKUPABLE,
-        _CART,
+        _CART_1,
+        _CART_2,
         _CRIB,
         _TV
-    ]
+    ],
+    # Eval 4 novel objects
+    [_BED_1_OCCLUDER, _BED_2_OCCLUDER, _BED_3_OCCLUDER, _BED_4_OCCLUDER],
+    [_BED_5_OBSTACLE, _BED_5_OBSTACLE],
+    [_CHAIR_5, _CHAIR_6, _CHAIR_7, _CHAIR_8],
+    [_SOFA_4, _SOFA_5, _SOFA_6, _SOFA_7],
+    [_SOFA_CHAIR_4, _SOFA_CHAIR_5, _SOFA_CHAIR_6, _SOFA_CHAIR_7],
+    [
+        _TABLE_13_SMALL_CIRCLE,
+        _TABLE_14_SMALL_RECT,
+        _TABLE_15_RECT,
+        _TABLE_16_CIRCLE
+    ],
     # Don't use containers here as possible occluders or context objects
 ]
 
 
 _CONTAINERS = [
     [_CASE_1_SUITCASE],
+    [_CASE_3],
     [_CHEST_1_CUBOID],
     [_CHEST_2_SEMICYLINDER],
-    [_CASE_3],
     [_CHEST_3_CUBOID],
-    [_CHEST_8_SEMICYLINDER]
+    [_CHEST_8_SEMICYLINDER],
+    # Eval 4 novel containers
+    [_CASE_2],
+    [_CHEST_4_ROUNDED_LID],
+    [_CHEST_5_ROUNDED_LID],
+    [_CHEST_6_TRAPEZOID_LID],
+    [_CHEST_7_PIRATE_TREASURE],
+    [_CHEST_9_TRAPEZOID_LID],
+    [_TOOLBOX_1],
+    [_TOOLBOX_2],
 ]
 
 
@@ -1419,6 +1601,14 @@ def get_interactable_definition_dataset(
     return get_dataset(_get('ALL'), 'ALL', unshuffled=unshuffled)
 
 
+def get_throwable_definition_dataset(
+    # We should only ever set unshuffled to True in a unit test.
+    unshuffled: bool = False
+) -> DefinitionDataset:
+    """Returns an immutable dataset of all interactable definitions."""
+    return get_dataset(_get('THROWABLES'), 'THROWABLES', unshuffled=unshuffled)
+
+
 def get_non_pickupable_definition_dataset(
     # We should only ever set unshuffled to True in a unit test.
     unshuffled: bool = False
@@ -1477,3 +1667,30 @@ def get_stack_target_definition_dataset(
         'STACK_TARGETS',
         unshuffled=unshuffled
     )
+
+
+DISTRACTOR_DATASET = None
+
+
+def choose_distractor_definition(
+    shapes_list: List[List[str]]
+) -> ObjectDefinition:
+    """Choose and return a distractor definition for the given objects."""
+    # Use the final shape, since it should always be the most descriptive.
+    invalid_shape_list = [shapes[-1] for shapes in shapes_list]
+
+    # Save the distractor dataset for future use once it's made.
+    global DISTRACTOR_DATASET
+    if not DISTRACTOR_DATASET:
+        # Distractors should always be both trained and pickupable.
+        DISTRACTOR_DATASET = (
+            get_pickupable_definition_dataset().filter_on_trained()
+        )
+
+    def _filter_data_callback(definition: ImmutableObjectDefinition) -> bool:
+        # Distractors cannot have the same shape as an existing object from the
+        # given list so we don't unintentionally generate a new confusor.
+        return definition.shape[-1] not in invalid_shape_list
+
+    dataset = DISTRACTOR_DATASET.filter_on_custom(_filter_data_callback)
+    return dataset.choose_random_definition()

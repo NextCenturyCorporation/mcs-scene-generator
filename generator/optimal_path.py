@@ -10,8 +10,8 @@ from shapely.geometry import LineString, Point, Polygon
 from shapely.ops import unary_union
 
 from .exceptions import SceneException
-from .geometry import DEFAULT_ROOM_DIMENSIONS
-from .util import (
+from .geometry import (
+    DEFAULT_ROOM_DIMENSIONS,
     MAX_REACH_DISTANCE,
     MOVE_DISTANCE,
     PERFORMER_CAMERA_Y,

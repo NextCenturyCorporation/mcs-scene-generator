@@ -1,0 +1,5 @@
+# Override defaults to avoid randomly generating any objects.
+keyword_objects:
+    - num: 0
+random_structural_objects:
+    - num: 0

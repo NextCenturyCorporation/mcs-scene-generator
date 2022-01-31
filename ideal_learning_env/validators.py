@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from typing import Any, List, Type, Union
 
 from .defs import ILEException
-from .numerics import MinMax
+from .numerics import MinMax, VectorFloatConfig, VectorIntConfig
 
 INDENTATION = '    '
 NEWLINE = '\n'
@@ -174,11 +174,6 @@ class ValidateNumber(ValidateNested):
                 raise ILEException(
                     f'The property "{prop}" must be a number but is null'
                 )
-        if not isinstance(data, (float, int, list, MinMax)):
-            raise ILEException(
-                f'The property "{prop}" must be a single number, list of '
-                f'numbers, or MinMax, but is a {type(data).__name__}'
-            )
         if isinstance(data, (float, int)):
             if self.min_value is not None and data < self.min_value:
                 raise ILEException(
@@ -190,6 +185,29 @@ class ValidateNumber(ValidateNested):
                     f'The property "{prop}" must be less than or equal to '
                     f'{self.max_value} but is {data}'
                 )
+        elif isinstance(data, MinMax):
+            if self.min_value is not None:
+                if data.min < self.min_value or data.max < self.min_value:
+                    raise ILEException(
+                        f'The property "{prop}" must have min and max values '
+                        f'that are greater than or equal to {self.min_value} '
+                        f'but is {data}'
+                    )
+            if self.max_value is not None and data.max > self.max_value:
+                if data.min > self.max_value or data.max > self.max_value:
+                    raise ILEException(
+                        f'The property "{prop}" must have min and max values '
+                        f'that are less than or equal to {self.max_value} '
+                        f'but is {data}'
+                    )
+        elif isinstance(data, (VectorFloatConfig, VectorIntConfig)):
+            for key, value in [('x', data.x), ('y', data.y), ('z', data.z)]:
+                self.validate(f'{prop}.{key}', value)
+        elif not isinstance(data, list):
+            raise ILEException(
+                f'The property "{prop}" must be a single number, list of '
+                f'numbers, or MinMax, but is a {type(data).__name__}'
+            )
         return True
 
 

@@ -329,35 +329,8 @@ CELLS = SimpleNamespace(
 # MCS core domains
 DOMAINS = SimpleNamespace(
     OBJECTS='objects',
-    OBJECTS_1='objects have depth and move in 3D space',
-    OBJECTS_2='objects move separately from one another except on contact',
-    OBJECTS_3='objects change motion on contact and do not pass through one another',  # noqa: E501
-    OBJECTS_4='objects persist and can be tracked briefly over occlusion',
-    OBJECTS_5='unseen objects can cause visible outcomes',
-    OBJECTS_6='occluded objects are the same if their visible surfaces align',
-    OBJECTS_7='objects are connected if their visible parts move together',
-    OBJECTS_8='objects belong to kinds with distinctive forms and functions',
-    OBJECTS_9='learn object labels from language',
-    OBJECTS_10='objects fall if not supported under center of mass',
-
     PLACES='places',
-    PLACES_1='observed agents navigate to goal by path of least resistance',
-    PLACES_2='keep track of location',
-    PLACES_3='ability to learn the layout of their environment',
-    PLACES_4='navigate by encoding distances and directions of stable surfaces',  # noqa: E501
-
     AGENTS='agents',
-    AGENTS_1='agents can change object motion',
-    AGENTS_2='agents have goals',
-    AGENTS_3='agents act efficiently',
-    AGENTS_4='unseen agents can cause visible outcomes',
-    AGENTS_5='judge amount of effort agent expends to cause outcomes',
-    AGENTS_6='infer if agents help or hinder and adjust their positive or negative behavior',  # noqa: E501
-    AGENTS_7='learn which agents to reach for',
-    AGENTS_8='understand what agents can or cannot see',
-    AGENTS_9='understand simple dispositions and preferences of agents',
-    AGENTS_10='anticipate actions based on credibility of referential behavior',  # noqa: E501
-    AGENTS_11='help others in response to salient cues of need'
 )
 
 # Interactive scene hypercube object locations

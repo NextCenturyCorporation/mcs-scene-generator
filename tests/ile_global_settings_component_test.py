@@ -1,27 +1,35 @@
 import math
 
 import pytest
-from machine_common_sense.config_manager import PhysicsConfig
 
+from generator import geometry, materials
 from ideal_learning_env import (
     GlobalSettingsComponent,
     GoalConfig,
     ILEException,
+    ILESharedConfiguration,
     InteractableObjectConfig,
+    SpecificInteractableObjectsComponent,
     VectorFloatConfig,
     VectorIntConfig,
 )
+from ideal_learning_env.object_services import ObjectRepository
 
 
 def create_new_scene():
     return {'debug': {}, 'goal': {}, 'objects': []}
 
 
+@pytest.fixture(autouse=True)
+def run_before_test():
+    ObjectRepository.get_instance().clear()
+
+
 def test_global_settings():
     component = GlobalSettingsComponent({})
     assert component.ceiling_material is None
+    assert component.excluded_shapes is None
     assert component.floor_material is None
-    assert component.floor_physics is None
     assert component.goal is None
     assert component.last_step is None
     assert component.performer_start_position is None
@@ -35,8 +43,8 @@ def test_global_settings():
 
     scene = component.update_ile_scene(create_new_scene())
     assert isinstance(scene['ceilingMaterial'], str)
+    assert ILESharedConfiguration.get_instance().get_excluded_shapes() == []
     assert isinstance(scene['floorMaterial'], str)
-    assert scene.get('floorProperties') is None
     assert scene['goal'].get('last_step') is None
     assert scene['goal'].get('category') is None
     assert scene['goal'].get('metadata') is None
@@ -69,18 +77,27 @@ def test_global_settings():
     assert scene['debug']['wallColors']
 
 
+def test_global_settings_partial_start_position():
+    component = GlobalSettingsComponent({"performer_start_position": {"y": 0}})
+    assert component.performer_start_position == VectorFloatConfig(
+        None, 0, None)
+    scene = component.update_ile_scene(create_new_scene())
+    position = scene['performerStart']['position']
+
+    half_width = geometry.PERFORMER_WIDTH / 2.0
+    dim = scene['roomDimensions']
+    ext_x = dim['x'] / 2.0 - half_width
+    ext_z = dim['z'] / 2.0 - half_width
+    assert -ext_x <= position['x'] <= ext_x
+    assert position['y'] == 0
+    assert -ext_z <= position['z'] <= ext_z
+
+
 def test_global_settings_configured():
     component = GlobalSettingsComponent({
         'ceiling_material': 'Custom/Materials/GreyDrywallMCS',
+        'excluded_shapes': ['ball', 'pacifier'],
         'floor_material': 'Custom/Materials/GreyCarpetMCS',
-        'floor_physics': {
-            'enable': True,
-            'angularDrag': 0.5,
-            'bounciness': 0,
-            'drag': 0,
-            'dynamicFriction': 0,
-            'staticFriction': 0
-        },
         'goal': {
             'category': 'retrieval',
             'target': {
@@ -98,15 +115,8 @@ def test_global_settings_configured():
         'wall_right_material': 'Custom/Materials/RedDrywallMCS'
     })
     assert component.ceiling_material == 'Custom/Materials/GreyDrywallMCS'
+    assert component.excluded_shapes == ['ball', 'pacifier']
     assert component.floor_material == 'Custom/Materials/GreyCarpetMCS'
-    assert component.floor_physics == PhysicsConfig(
-        enable=True,
-        angularDrag=0.5,
-        bounciness=0,
-        drag=0,
-        dynamicFriction=0,
-        staticFriction=0
-    )
     assert component.goal == GoalConfig(
         category='retrieval',
         target=InteractableObjectConfig(shape='soccer_ball')
@@ -123,16 +133,16 @@ def test_global_settings_configured():
 
     scene = component.update_ile_scene(create_new_scene())
     assert scene['ceilingMaterial'] == 'Custom/Materials/GreyDrywallMCS'
+    assert ILESharedConfiguration.get_instance().get_excluded_shapes() == [
+        'ball', 'pacifier'
+    ]
     assert scene['floorMaterial'] == 'Custom/Materials/GreyCarpetMCS'
-    assert scene['floorProperties'] == {
-        'enable': True,
-        'angularDrag': 0.5,
-        'bounciness': 0,
-        'drag': 0,
-        'dynamicFriction': 0,
-        'staticFriction': 0
-    }
+    assert scene['goal']['category'] == 'retrieval'
+    assert scene['goal']['description'] == (
+        'Find and pick up the tiny light black white rubber ball'
+    )
     assert scene['goal']['last_step'] == 1000
+    assert scene['goal']['metadata']['target']['id']
     assert scene['performerStart'] == {
         'position': {'x': -1, 'y': 0, 'z': 1},
         'rotation': {'x': -10, 'y': 90, 'z': 0}
@@ -144,6 +154,9 @@ def test_global_settings_configured():
         'left': 'Custom/Materials/GreenDrywallMCS',
         'right': 'Custom/Materials/RedDrywallMCS'
     }
+
+    # Cleanup
+    ILESharedConfiguration.get_instance().set_excluded_shapes([])
 
 
 def test_global_settings_fail_ceiling_material():
@@ -157,105 +170,6 @@ def test_global_settings_fail_floor_material():
     with pytest.raises(ILEException):
         GlobalSettingsComponent({
             'floor_material': ''
-        })
-
-
-def test_global_settings_fail_floor_physics_angular_drag_above_max():
-    with pytest.raises(ILEException):
-        GlobalSettingsComponent({
-            'floor_physics': {
-                'angularDrag': 1.1
-            }
-        })
-
-
-def test_global_settings_fail_floor_physics_angular_drag_below_min():
-    with pytest.raises(ILEException):
-        GlobalSettingsComponent({
-            'floor_physics': {
-                'angularDrag': -0.1
-            }
-        })
-
-
-def test_global_settings_fail_floor_physics_bounciness_above_max():
-    with pytest.raises(ILEException):
-        GlobalSettingsComponent({
-            'floor_physics': {
-                'bounciness': 1.1
-            }
-        })
-
-
-def test_global_settings_fail_floor_physics_bounciness_below_min():
-    with pytest.raises(ILEException):
-        GlobalSettingsComponent({
-            'floor_physics': {
-                'bounciness': -0.1
-            }
-        })
-
-
-def test_global_settings_fail_floor_physics_drag_above_max():
-    with pytest.raises(ILEException):
-        GlobalSettingsComponent({
-            'floor_physics': {
-                'drag': 1.1
-            }
-        })
-
-
-def test_global_settings_fail_floor_physics_drag_below_min():
-    with pytest.raises(ILEException):
-        GlobalSettingsComponent({
-            'floor_physics': {
-                'drag': -0.1
-            }
-        })
-
-
-def test_global_settings_fail_floor_physics_dynamic_friction_above_max():
-    with pytest.raises(ILEException):
-        GlobalSettingsComponent({
-            'floor_physics': {
-                'dynamicFriction': 1.1
-            }
-        })
-
-
-def test_global_settings_fail_floor_physics_dynamic_friction_below_min():
-    with pytest.raises(ILEException):
-        GlobalSettingsComponent({
-            'floor_physics': {
-                'dynamicFriction': -0.1
-            }
-        })
-
-
-def test_global_settings_fail_floor_physics_enable_is_not_bool():
-    with pytest.raises(ILEException):
-        GlobalSettingsComponent({
-            'floor_physics': {
-                'enable': 1
-            }
-        })
-
-
-def test_global_settings_fail_floor_physics_static_friction_above_max():
-    with pytest.raises(ILEException):
-        GlobalSettingsComponent({
-            'floor_physics': {
-                'staticFriction': 1.1
-            }
-        })
-
-
-def test_global_settings_fail_floor_physics_static_friction_below_min():
-    with pytest.raises(ILEException):
-        GlobalSettingsComponent({
-            'floor_physics': {
-                'staticFriction': -0.1
-            }
         })
 
 
@@ -288,28 +202,6 @@ def test_global_settings_fail_last_step_zero():
     with pytest.raises(ILEException):
         GlobalSettingsComponent({
             'last_step': 0
-        })
-
-
-def test_global_settings_fail_performer_start_position_x_is_none():
-    with pytest.raises(ILEException):
-        GlobalSettingsComponent({
-            'performer_start_position': {
-                'x': None,
-                'y': 0,
-                'z': 0
-            }
-        })
-
-
-def test_global_settings_fail_performer_start_position_z_is_none():
-    with pytest.raises(ILEException):
-        GlobalSettingsComponent({
-            'performer_start_position': {
-                'x': 0,
-                'y': 0,
-                'z': None
-            }
         })
 
 
@@ -510,3 +402,128 @@ def test_global_settings_room_shape_square():
         scene = component.update_ile_scene(create_new_scene())
         dimensions = scene['roomDimensions']
         assert dimensions['x'] == dimensions['z']
+
+
+def test_target_delayed():
+    label = "after_object"
+    scene = create_new_scene()
+
+    data = {
+        "goal": {
+            "category": "retrieval",
+            "target": {
+                "shape": "soccer_ball",
+                "keyword_location": {
+                        "keyword": "adjacent",
+                        "relative_object_label": label
+                }
+            }
+        },
+        "specific_interactable_objects": {
+            "num": 1,
+            "labels": label
+        }
+    }
+
+    component = GlobalSettingsComponent(data)
+
+    scene = component.update_ile_scene(scene)
+    objects = scene['objects']
+    assert isinstance(objects, list)
+    assert len(objects) == 0
+    assert component.get_num_delayed_actions() == 1
+
+    object_comp = SpecificInteractableObjectsComponent(data)
+    scene = object_comp.update_ile_scene(scene)
+    assert len(objects) == 1
+
+    scene = component.run_delayed_actions(scene)
+    objects = scene['objects']
+    assert isinstance(objects, list)
+    assert len(objects) == 2
+    component.get_num_delayed_actions() == 0
+    assert objects[1]['type'] == "soccer_ball"
+
+
+def test_global_settings_ceiling_material_fail_restricted_material():
+    with pytest.raises(ILEException):
+        GlobalSettingsComponent({
+            'ceiling_material': materials.SOFA_1_MATERIALS[0].material
+        })
+
+
+def test_global_settings_ceiling_material_fail_lava_material():
+    with pytest.raises(ILEException):
+        GlobalSettingsComponent({
+            'ceiling_material': materials.LAVA_MATERIALS[0].material
+        })
+
+
+def test_global_settings_floor_material_fail_restricted_material():
+    with pytest.raises(ILEException):
+        GlobalSettingsComponent({
+            'floor_material': materials.SOFA_1_MATERIALS[0].material
+        })
+
+
+def test_global_settings_floor_material_fail_lava_material():
+    with pytest.raises(ILEException):
+        GlobalSettingsComponent({
+            'floor_material': materials.LAVA_MATERIALS[0].material
+        })
+
+
+def test_global_settings_wall_back_material_fail_restricted_material():
+    with pytest.raises(ILEException):
+        GlobalSettingsComponent({
+            'wall_back_material': materials.SOFA_1_MATERIALS[0].material
+        })
+
+
+def test_global_settings_wall_back_material_fail_lava_material():
+    with pytest.raises(ILEException):
+        GlobalSettingsComponent({
+            'wall_back_material': materials.LAVA_MATERIALS[0].material
+        })
+
+
+def test_global_settings_wall_front_material_fail_restricted_material():
+    with pytest.raises(ILEException):
+        GlobalSettingsComponent({
+            'wall_front_material': materials.SOFA_1_MATERIALS[0].material
+        })
+
+
+def test_global_settings_wall_front_material_fail_lava_material():
+    with pytest.raises(ILEException):
+        GlobalSettingsComponent({
+            'wall_front_material': materials.LAVA_MATERIALS[0].material
+        })
+
+
+def test_global_settings_wall_left_material_fail_restricted_material():
+    with pytest.raises(ILEException):
+        GlobalSettingsComponent({
+            'wall_left_material': materials.SOFA_1_MATERIALS[0].material
+        })
+
+
+def test_global_settings_wall_left_material_fail_lava_material():
+    with pytest.raises(ILEException):
+        GlobalSettingsComponent({
+            'wall_left_material': materials.LAVA_MATERIALS[0].material
+        })
+
+
+def test_global_settings_wall_right_material_fail_restricted_material():
+    with pytest.raises(ILEException):
+        GlobalSettingsComponent({
+            'wall_right_material': materials.SOFA_1_MATERIALS[0].material
+        })
+
+
+def test_global_settings_wall_right_material_fail_lava_material():
+    with pytest.raises(ILEException):
+        GlobalSettingsComponent({
+            'wall_right_material': materials.LAVA_MATERIALS[0].material
+        })

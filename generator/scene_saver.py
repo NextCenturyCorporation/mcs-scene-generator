@@ -12,6 +12,24 @@ sys.path.insert(1, '../pretty_json')
 from pretty_json import PrettyJsonEncoder, PrettyJsonNoIndent
 
 
+def _convert_non_serializable_data(scene: Dict[str, Any]) -> None:
+    """Convert all non-JSON-serializable data from the given scene."""
+    # Convert the boundingBox from an ObjectBounds into a serializable dict.
+    for instance in scene['objects']:
+        if 'boundsAtStep' in instance['debug']:
+            del instance['debug']['boundsAtStep']
+        for show in instance['shows']:
+            show['boundingBox'] = [{
+                'x': corner.x,
+                'y': show['boundingBox'].min_y,
+                'z': corner.z
+            } for corner in show['boundingBox'].box_xz] + [{
+                'x': corner.x,
+                'y': show['boundingBox'].max_y,
+                'z': corner.z
+            } for corner in show['boundingBox'].box_xz]
+
+
 def _json_no_indent(data: Dict[str, Any], prop_list: List[str]) -> None:
     """Wrap the given data with PrettyJsonNoIndent for the encoder."""
     for prop in prop_list:
@@ -57,12 +75,36 @@ def _strip_debug_object_data(instance: Dict[str, Any]) -> None:
             show.pop('boundingBox', None)
 
 
-def _write_scene_file(filename: str, scene: Dict[str, Any]) -> None:
+def _truncate_floats_in_dict(data: Dict[str, Any]) -> None:
+    """Truncate all the floats in the given dict."""
+    for prop in data:
+        if isinstance(data[prop], float):
+            data[prop] = round(data[prop], 4)
+        if isinstance(data[prop], list):
+            _truncate_floats_in_list(data[prop])
+        if isinstance(data[prop], dict):
+            _truncate_floats_in_dict(data[prop])
+
+
+def _truncate_floats_in_list(data: List[Any]) -> None:
+    """Truncate all the floats in the given list."""
+    for i in range(len(data)):
+        if isinstance(data[i], float):
+            data[i] = round(data[i], 4)
+        if isinstance(data[i], list):
+            _truncate_floats_in_list(data[i])
+        if isinstance(data[i], dict):
+            _truncate_floats_in_dict(data[i])
+
+
+def _ready_scene_for_writing(scene: Dict[str, Any]) -> None:
+    _strip_debug_misleading_data(scene)
+    _convert_non_serializable_data(scene)
+    _truncate_floats_in_dict(scene)
+
     # Use PrettyJsonNoIndent on some of the lists and dicts in the
     # output scene because the indentation from the normal Python JSON
     # module spaces them out far too much.
-    scene = copy.deepcopy(scene)
-
     _json_no_indent(scene['goal'], [
         'action_list', 'domain_list', 'type_list', 'task_list', 'info_list'
     ])
@@ -72,12 +114,13 @@ def _write_scene_file(filename: str, scene: Dict[str, Any]) -> None:
                 _json_no_indent(scene['goal']['metadata'][target], [
                     'info', 'image'
                 ])
-
     for instance in scene['objects']:
         _json_no_indent(instance, ['materials', 'salientMaterials', 'states'])
         if 'debug' in instance:
             _json_no_indent(instance['debug'], 'info')
 
+
+def _write_scene_file(filename: str, scene: Dict[str, Any]) -> None:
     # If the filename contains a directory, ensure that directory exists.
     path = Path(filename)
     path.parents[0].mkdir(parents=True, exist_ok=True)
@@ -110,7 +153,9 @@ def find_next_filename(
 def save_scene_files(
     scene: Dict[str, Any],
     scene_filename: str,
-    no_scene_id: bool = False
+    no_scene_id: bool = False,
+    no_debug_file: bool = False,
+    only_debug_file: bool = False
 ) -> int:
     """Save the given scene as a normal JSON file and a debug JSON file."""
 
@@ -122,10 +167,13 @@ def save_scene_files(
     )
 
     # Ensure that the scene's 'name' property doesn't have a directory.
-    scene['name'] = Path(scene_filename).name
+    scene_copy = copy.deepcopy(scene)
+    scene_copy['name'] = Path(scene_filename).name
+    _ready_scene_for_writing(scene_copy)
 
     # Save the scene as both normal and debug JSON files.
-    _strip_debug_misleading_data(scene)
-    _write_scene_file(debug_filename + '_debug.json', scene)
-    _strip_debug_data(scene)
-    _write_scene_file(scene_filename + '.json', scene)
+    if not no_debug_file:
+        _write_scene_file(debug_filename + '_debug.json', scene_copy)
+    _strip_debug_data(scene_copy)
+    if not only_debug_file:
+        _write_scene_file(scene_filename + '.json', scene_copy)

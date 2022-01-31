@@ -1,6 +1,7 @@
 import pytest
+from machine_common_sense.config_manager import Vector3d
 
-from generator import exceptions, geometry, materials
+from generator import ObjectBounds, exceptions, geometry, materials
 from hypercube import hypercubes
 from hypercube.agent_scene_pair_json_converter import (
     AGENT_OBJECT_MATERIAL_LIST,
@@ -34,21 +35,21 @@ UNIT_SIZE = [0.025, 0.025]
 
 
 def create_bounds(x1, x2, z1, z2):
-    return [
-        {'x': x, 'z': z} for x, z in [(x1, z1), (x1, z2), (x2, z2), (x2, z1)]
-    ]
+    return ObjectBounds(box_xz=[
+        Vector3d(x, 0, z) for x, z in [(x1, z1), (x1, z2), (x2, z2), (x2, z1)]
+    ], max_y=0, min_y=0)
 
 
 def verify_bounds(mcs_object, step, x1, x2, z1, z2):
-    bounds_at_step = mcs_object['debug']['boundsAtStep']
-    assert bounds_at_step[step][0]['x'] == pytest.approx(x1)
-    assert bounds_at_step[step][0]['z'] == pytest.approx(z1)
-    assert bounds_at_step[step][1]['x'] == pytest.approx(x1)
-    assert bounds_at_step[step][1]['z'] == pytest.approx(z2)
-    assert bounds_at_step[step][2]['x'] == pytest.approx(x2)
-    assert bounds_at_step[step][2]['z'] == pytest.approx(z2)
-    assert bounds_at_step[step][3]['x'] == pytest.approx(x2)
-    assert bounds_at_step[step][3]['z'] == pytest.approx(z1)
+    bounds_at_step = mcs_object['debug']['boundsAtStep'][step].box_xz
+    assert bounds_at_step[0].x == pytest.approx(x1)
+    assert bounds_at_step[0].z == pytest.approx(z1)
+    assert bounds_at_step[1].x == pytest.approx(x1)
+    assert bounds_at_step[1].z == pytest.approx(z2)
+    assert bounds_at_step[2].x == pytest.approx(x2)
+    assert bounds_at_step[2].z == pytest.approx(z2)
+    assert bounds_at_step[3].x == pytest.approx(x2)
+    assert bounds_at_step[3].z == pytest.approx(z1)
 
 
 def verify_key_properties(key_object):
@@ -765,10 +766,10 @@ def test_create_goal_object_list_single_object():
     ]
 
     # We're not testing this right now, so just use a silly value.
-    mock_agent_start_bounds = [
-        {'x': 10, 'z': 10}, {'x': 10, 'z': 12},
-        {'x': 12, 'z': 12}, {'x': 12, 'z': 10}
-    ]
+    mock_agent_start_bounds = ObjectBounds(box_xz=[
+        Vector3d(10, 0, 10), Vector3d(10, 0, 12),
+        Vector3d(12, 0, 12), Vector3d(12, 0, 10)
+    ], max_y=0, min_y=0)
 
     goal_object_list = _create_goal_object_list(
         trial_list,
@@ -834,10 +835,10 @@ def test_create_goal_object_list_multiple_object():
     ]
 
     # We're not testing this right now, so just use a silly value.
-    mock_agent_start_bounds = [
-        {'x': 10, 'z': 10}, {'x': 10, 'z': 12},
-        {'x': 12, 'z': 12}, {'x': 12, 'z': 10}
-    ]
+    mock_agent_start_bounds = ObjectBounds(box_xz=[
+        Vector3d(10, 0, 10), Vector3d(10, 0, 12),
+        Vector3d(12, 0, 12), Vector3d(12, 0, 10)
+    ], max_y=0, min_y=0)
 
     goal_object_list = _create_goal_object_list(
         trial_list,
@@ -922,10 +923,10 @@ def test_create_goal_object_list_multiple_object_swap_icon():
     ]
 
     # We're not testing this right now, so just use a silly value.
-    mock_agent_start_bounds = [
-        {'x': 10, 'z': 10}, {'x': 10, 'z': 12},
-        {'x': 12, 'z': 12}, {'x': 12, 'z': 10}
-    ]
+    mock_agent_start_bounds = ObjectBounds(box_xz=[
+        Vector3d(10, 0, 10), Vector3d(10, 0, 12),
+        Vector3d(12, 0, 12), Vector3d(12, 0, 10)
+    ], max_y=0, min_y=0)
 
     goal_object_list = _create_goal_object_list(
         trial_list,
@@ -1007,10 +1008,10 @@ def test_create_goal_object_list_single_object_on_home():
         )
     ]
 
-    agent_start_bounds = [
-        {'x': -0.25, 'z': -0.25}, {'x': -0.25, 'z': 0.25},
-        {'x': 0.25, 'z': 0.25}, {'x': 0.25, 'z': -0.25}
-    ]
+    agent_start_bounds = ObjectBounds(box_xz=[
+        Vector3d(-0.25, 0, -0.25), Vector3d(-0.25, 0, 0.25),
+        Vector3d(0.25, 0, 0.25), Vector3d(0.25, 0, -0.25)
+    ], max_y=0, min_y=0)
 
     with pytest.raises(exceptions.SceneException):
         _create_goal_object_list(
@@ -1041,10 +1042,10 @@ def test_create_goal_object_list_multiple_object_on_home():
         )
     ]
 
-    agent_start_bounds = [
-        {'x': -0.25, 'z': -0.25}, {'x': -0.25, 'z': 0.25},
-        {'x': 0.25, 'z': 0.25}, {'x': 0.25, 'z': -0.25}
-    ]
+    agent_start_bounds = ObjectBounds(box_xz=[
+        Vector3d(-0.25, 0, -0.25), Vector3d(-0.25, 0, 0.25),
+        Vector3d(0.25, 0, 0.25), Vector3d(0.25, 0, -0.25)
+    ], max_y=0, min_y=0)
 
     with pytest.raises(exceptions.SceneException):
         _create_goal_object_list(
@@ -2490,54 +2491,132 @@ def test_move_agent_past_lock_location():
         'shows': [{
             'stepBegin': 0,
             'position': {'x': 0, 'y': 0, 'z': 0},
-            'boundingBox': geometry.calc_obj_coords(0, 0, 0.1, 0.1, 0, 0, 0)
+            'boundingBox': geometry.create_bounds(
+                dimensions={'x': 0.2, 'y': 0.2, 'z': 0.2},
+                offset=None,
+                position={'x': 0, 'y': 0, 'z': 0},
+                rotation={'x': 0, 'y': 0, 'z': 0},
+                standing_y=0
+            )
         }, {
             'stepBegin': 1,
             'position': {'x': 0, 'y': 0, 'z': 0.1},
-            'boundingBox': geometry.calc_obj_coords(0, 0.1, 0.1, 0.1, 0, 0, 0)
+            'boundingBox': geometry.create_bounds(
+                dimensions={'x': 0.2, 'y': 0.2, 'z': 0.2},
+                offset=None,
+                position={'x': 0, 'y': 0, 'z': 0.1},
+                rotation={'x': 0, 'y': 0, 'z': 0},
+                standing_y=0
+            )
         }, {
             'stepBegin': 2,
             'position': {'x': 0, 'y': 0, 'z': 0.2},
-            'boundingBox': geometry.calc_obj_coords(0, 0.2, 0.1, 0.1, 0, 0, 0)
+            'boundingBox': geometry.create_bounds(
+                dimensions={'x': 0.2, 'y': 0.2, 'z': 0.2},
+                offset=None,
+                position={'x': 0, 'y': 0, 'z': 0.2},
+                rotation={'x': 0, 'y': 0, 'z': 0},
+                standing_y=0
+            )
         }, {
             'stepBegin': 3,
             'position': {'x': 0, 'y': 0, 'z': 0.3},
-            'boundingBox': geometry.calc_obj_coords(0, 0.3, 0.1, 0.1, 0, 0, 0)
+            'boundingBox': geometry.create_bounds(
+                dimensions={'x': 0.2, 'y': 0.2, 'z': 0.2},
+                offset=None,
+                position={'x': 0, 'y': 0, 'z': 0.3},
+                rotation={'x': 0, 'y': 0, 'z': 0},
+                standing_y=0
+            )
         }, {
             'stepBegin': 4,
             'position': {'x': 0, 'y': 0, 'z': 0.4},
-            'boundingBox': geometry.calc_obj_coords(0, 0.4, 0.1, 0.1, 0, 0, 0)
+            'boundingBox': geometry.create_bounds(
+                dimensions={'x': 0.2, 'y': 0.2, 'z': 0.2},
+                offset=None,
+                position={'x': 0, 'y': 0, 'z': 0.4},
+                rotation={'x': 0, 'y': 0, 'z': 0},
+                standing_y=0
+            )
         }, {
             'stepBegin': 10,
             'position': {'x': 0, 'y': 0, 'z': 0.8},
-            'boundingBox': geometry.calc_obj_coords(0, 0.8, 0.1, 0.1, 0, 0, 0)
+            'boundingBox': geometry.create_bounds(
+                dimensions={'x': 0.2, 'y': 0.2, 'z': 0.2},
+                offset=None,
+                position={'x': 0, 'y': 0, 'z': 0.8},
+                rotation={'x': 0, 'y': 0, 'z': 0},
+                standing_y=0
+            )
         }, {
             'stepBegin': 11,
             'position': {'x': 0, 'y': 0, 'z': 0.9},
-            'boundingBox': geometry.calc_obj_coords(0, 0.9, 0.1, 0.1, 0, 0, 0)
+            'boundingBox': geometry.create_bounds(
+                dimensions={'x': 0.2, 'y': 0.2, 'z': 0.2},
+                offset=None,
+                position={'x': 0, 'y': 0, 'z': 0.9},
+                rotation={'x': 0, 'y': 0, 'z': 0},
+                standing_y=0
+            )
         }, {
             'stepBegin': 12,
             'position': {'x': 0, 'y': 0, 'z': 1},
-            'boundingBox': geometry.calc_obj_coords(0, 1, 0.1, 0.1, 0, 0, 0)
+            'boundingBox': geometry.create_bounds(
+                dimensions={'x': 0.2, 'y': 0.2, 'z': 0.2},
+                offset=None,
+                position={'x': 0, 'y': 0, 'z': 1},
+                rotation={'x': 0, 'y': 0, 'z': 0},
+                standing_y=0
+            )
         }, {
             'stepBegin': 13,
             'position': {'x': 0, 'y': 0, 'z': 1.1},
-            'boundingBox': geometry.calc_obj_coords(0, 1.1, 0.1, 0.1, 0, 0, 0)
+            'boundingBox': geometry.create_bounds(
+                dimensions={'x': 0.2, 'y': 0.2, 'z': 0.2},
+                offset=None,
+                position={'x': 0, 'y': 0, 'z': 1.1},
+                rotation={'x': 0, 'y': 0, 'z': 0},
+                standing_y=0
+            )
         }, {
             'stepBegin': 14,
             'position': {'x': 0, 'y': 0, 'z': 1.2},
-            'boundingBox': geometry.calc_obj_coords(0, 1.2, 0.1, 0.1, 0, 0, 0)
+            'boundingBox': geometry.create_bounds(
+                dimensions={'x': 0.2, 'y': 0.2, 'z': 0.2},
+                offset=None,
+                position={'x': 0, 'y': 0, 'z': 1.2},
+                rotation={'x': 0, 'y': 0, 'z': 0},
+                standing_y=0
+            )
         }, {
             'stepBegin': 15,
             'position': {'x': 0, 'y': 0, 'z': 1.3},
-            'boundingBox': geometry.calc_obj_coords(0, 1.3, 0.1, 0.1, 0, 0, 0)
+            'boundingBox': geometry.create_bounds(
+                dimensions={'x': 0.2, 'y': 0.2, 'z': 0.2},
+                offset=None,
+                position={'x': 0, 'y': 0, 'z': 1.3},
+                rotation={'x': 0, 'y': 0, 'z': 0},
+                standing_y=0
+            )
         }, {
             'stepBegin': 16,
             'position': {'x': 0, 'y': 0, 'z': 1.4},
-            'boundingBox': geometry.calc_obj_coords(0, 1.4, 0.1, 0.1, 0, 0, 0)
+            'boundingBox': geometry.create_bounds(
+                dimensions={'x': 0.2, 'y': 0.2, 'z': 0.2},
+                offset=None,
+                position={'x': 0, 'y': 0, 'z': 1.4},
+                rotation={'x': 0, 'y': 0, 'z': 0},
+                standing_y=0
+            )
         }]
     }
-    lock_bounds = geometry.calc_obj_coords(0, 0.8, 0.25, 0.25, 0, 0, 0)
+    lock_bounds = geometry.create_bounds(
+        dimensions={'x': 0.5, 'y': 0.5, 'z': 0.5},
+        offset=None,
+        position={'x': 0, 'y': 0, 'z': 0.8},
+        rotation={'x': 0, 'y': 0, 'z': 0},
+        standing_y=0
+    )
     lock_object = {
         'debug': {
             'boundsAtStep': ([lock_bounds] * 5) + ([None] * 12)
@@ -2567,54 +2646,132 @@ def test_move_agent_past_lock_location_move_back():
         'shows': [{
             'stepBegin': 0,
             'position': {'x': 0, 'y': 0, 'z': 0},
-            'boundingBox': geometry.calc_obj_coords(0, 0, 0.1, 0.1, 0, 0, 0)
+            'boundingBox': geometry.create_bounds(
+                dimensions={'x': 0.2, 'y': 0.2, 'z': 0.2},
+                offset=None,
+                position={'x': 0, 'y': 0, 'z': 0},
+                rotation={'x': 0, 'y': 0, 'z': 0},
+                standing_y=0
+            )
         }, {
             'stepBegin': 1,
             'position': {'x': 0, 'y': 0, 'z': 0.1},
-            'boundingBox': geometry.calc_obj_coords(0, 0.1, 0.1, 0.1, 0, 0, 0)
+            'boundingBox': geometry.create_bounds(
+                dimensions={'x': 0.2, 'y': 0.2, 'z': 0.2},
+                offset=None,
+                position={'x': 0, 'y': 0, 'z': 0.1},
+                rotation={'x': 0, 'y': 0, 'z': 0},
+                standing_y=0
+            )
         }, {
             'stepBegin': 2,
             'position': {'x': 0, 'y': 0, 'z': 0.2},
-            'boundingBox': geometry.calc_obj_coords(0, 0.2, 0.1, 0.1, 0, 0, 0)
+            'boundingBox': geometry.create_bounds(
+                dimensions={'x': 0.2, 'y': 0.2, 'z': 0.2},
+                offset=None,
+                position={'x': 0, 'y': 0, 'z': 0.2},
+                rotation={'x': 0, 'y': 0, 'z': 0},
+                standing_y=0
+            )
         }, {
             'stepBegin': 3,
             'position': {'x': 0, 'y': 0, 'z': 0.3},
-            'boundingBox': geometry.calc_obj_coords(0, 0.3, 0.1, 0.1, 0, 0, 0)
+            'boundingBox': geometry.create_bounds(
+                dimensions={'x': 0.2, 'y': 0.2, 'z': 0.2},
+                offset=None,
+                position={'x': 0, 'y': 0, 'z': 0.3},
+                rotation={'x': 0, 'y': 0, 'z': 0},
+                standing_y=0
+            )
         }, {
             'stepBegin': 4,
             'position': {'x': 0, 'y': 0, 'z': 0.4},
-            'boundingBox': geometry.calc_obj_coords(0, 0.4, 0.1, 0.1, 0, 0, 0)
+            'boundingBox': geometry.create_bounds(
+                dimensions={'x': 0.2, 'y': 0.2, 'z': 0.2},
+                offset=None,
+                position={'x': 0, 'y': 0, 'z': 0.4},
+                rotation={'x': 0, 'y': 0, 'z': 0},
+                standing_y=0
+            )
         }, {
             'stepBegin': 10,
             'position': {'x': 0, 'y': 0, 'z': 0.8},
-            'boundingBox': geometry.calc_obj_coords(0, 0.8, 0.1, 0.1, 0, 0, 0)
+            'boundingBox': geometry.create_bounds(
+                dimensions={'x': 0.2, 'y': 0.2, 'z': 0.2},
+                offset=None,
+                position={'x': 0, 'y': 0, 'z': 0.8},
+                rotation={'x': 0, 'y': 0, 'z': 0},
+                standing_y=0
+            )
         }, {
             'stepBegin': 11,
             'position': {'x': 0, 'y': 0, 'z': 0.7},
-            'boundingBox': geometry.calc_obj_coords(0, 0.9, 0.1, 0.1, 0, 0, 0)
+            'boundingBox': geometry.create_bounds(
+                dimensions={'x': 0.2, 'y': 0.2, 'z': 0.2},
+                offset=None,
+                position={'x': 0, 'y': 0, 'z': 0.7},
+                rotation={'x': 0, 'y': 0, 'z': 0},
+                standing_y=0
+            )
         }, {
             'stepBegin': 12,
             'position': {'x': 0, 'y': 0, 'z': 0.6},
-            'boundingBox': geometry.calc_obj_coords(0, 0.6, 0.1, 0.1, 0, 0, 0)
+            'boundingBox': geometry.create_bounds(
+                dimensions={'x': 0.2, 'y': 0.2, 'z': 0.2},
+                offset=None,
+                position={'x': 0, 'y': 0, 'z': 0.6},
+                rotation={'x': 0, 'y': 0, 'z': 0},
+                standing_y=0
+            )
         }, {
             'stepBegin': 13,
             'position': {'x': 0, 'y': 0, 'z': 0.5},
-            'boundingBox': geometry.calc_obj_coords(0, 0.5, 0.1, 0.1, 0, 0, 0)
+            'boundingBox': geometry.create_bounds(
+                dimensions={'x': 0.2, 'y': 0.2, 'z': 0.2},
+                offset=None,
+                position={'x': 0, 'y': 0, 'z': 0.5},
+                rotation={'x': 0, 'y': 0, 'z': 0},
+                standing_y=0
+            )
         }, {
             'stepBegin': 14,
             'position': {'x': 0, 'y': 0, 'z': 0.4},
-            'boundingBox': geometry.calc_obj_coords(0, 0.4, 0.1, 0.1, 0, 0, 0)
+            'boundingBox': geometry.create_bounds(
+                dimensions={'x': 0.2, 'y': 0.2, 'z': 0.2},
+                offset=None,
+                position={'x': 0, 'y': 0, 'z': 0.4},
+                rotation={'x': 0, 'y': 0, 'z': 0},
+                standing_y=0
+            )
         }, {
             'stepBegin': 15,
             'position': {'x': 0, 'y': 0, 'z': 0.3},
-            'boundingBox': geometry.calc_obj_coords(0, 0.3, 0.1, 0.1, 0, 0, 0)
+            'boundingBox': geometry.create_bounds(
+                dimensions={'x': 0.2, 'y': 0.2, 'z': 0.2},
+                offset=None,
+                position={'x': 0, 'y': 0, 'z': 0.3},
+                rotation={'x': 0, 'y': 0, 'z': 0},
+                standing_y=0
+            )
         }, {
             'stepBegin': 16,
             'position': {'x': 0, 'y': 0, 'z': 0.2},
-            'boundingBox': geometry.calc_obj_coords(0, 0.2, 0.1, 0.1, 0, 0, 0)
+            'boundingBox': geometry.create_bounds(
+                dimensions={'x': 0.2, 'y': 0.2, 'z': 0.2},
+                offset=None,
+                position={'x': 0, 'y': 0, 'z': 0.2},
+                rotation={'x': 0, 'y': 0, 'z': 0},
+                standing_y=0
+            )
         }]
     }
-    lock_bounds = geometry.calc_obj_coords(0, 0.8, 0.25, 0.25, 0, 0, 0)
+    lock_bounds = geometry.create_bounds(
+        dimensions={'x': 0.5, 'y': 0.5, 'z': 0.5},
+        offset=None,
+        position={'x': 0, 'y': 0, 'z': 0.8},
+        rotation={'x': 0, 'y': 0, 'z': 0},
+        standing_y=0
+    )
     lock_object = {
         'debug': {
             'boundsAtStep': ([lock_bounds] * 5) + ([None] * 12)

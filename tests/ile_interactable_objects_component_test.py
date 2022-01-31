@@ -1,21 +1,28 @@
 from typing import List
 
 import pytest
+from machine_common_sense.config_manager import Vector3d
 
-from generator import FULL_TYPE_LIST, geometry, materials, util
+from generator import (
+    FULL_TYPE_LIST,
+    ObjectBounds,
+    definitions,
+    geometry,
+    materials,
+)
 from ideal_learning_env import (
+    ILEConfigurationException,
     ILEException,
+    ILESharedConfiguration,
     InteractableObjectConfig,
+    KeywordObjectsConfig,
     MinMaxInt,
+    ObjectRepository,
     RandomInteractableObjectsComponent,
+    RandomKeywordObjectsComponent,
     SpecificInteractableObjectsComponent,
 )
-from ideal_learning_env.defs import ILEConfigurationException
-from ideal_learning_env.interactable_objects_component import (
-    KeywordObjectsConfig,
-    RandomKeywordObjectsComponent,
-)
-from ideal_learning_env.object_services import ObjectRepository
+from ideal_learning_env.numerics import VectorFloatConfig
 
 
 def prior_scene():
@@ -55,12 +62,12 @@ def prior_scene_with_target():
         'pickupable': True, 'shows': [
                  {'rotation': {'x': 0, 'y': 45, 'z': 0},
                   'position': {'x': -1.03, 'y': 0.11, 'z': 4.08},
-                  'boundingBox': [
-                      {'x': -0.8744365081389596, 'y': 0, 'z': 4.08},
-                     {'x': -1.03, 'y': 0, 'z': 3.92443650813896},
-                     {'x': -1.1855634918610405, 'y': 0, 'z': 4.08},
-                     {'x': -1.0299999999999998, 'y': 0,
-                          'z': 4.23556349186104}],
+                  'boundingBox': ObjectBounds(box_xz=[
+                      Vector3d(**{'x': -0.8744, 'y': 0, 'z': 4.08}),
+                      Vector3d(**{'x': -1.03, 'y': 0, 'z': 3.9244}),
+                      Vector3d(**{'x': -1.1856, 'y': 0, 'z': 4.08}),
+                      Vector3d(**{'x': -1.03, 'y': 0, 'z': 4.2356})
+                  ], max_y=0, min_y=0),
                   'stepBegin': 0, 'scale': {'x': 1, 'y': 1, 'z': 1}}],
         'materials': []}
 
@@ -79,8 +86,17 @@ def prior_scene_with_target():
 
 
 @pytest.fixture(autouse=True)
-def run_before_test():
+def run_around_test():
+    # Prepare test
     ObjectRepository.get_instance().clear()
+    ILESharedConfiguration.get_instance().set_excluded_shapes([])
+
+    # Run test
+    yield
+
+    # Cleanup
+    ObjectRepository.get_instance().clear()
+    ILESharedConfiguration.get_instance().set_excluded_shapes([])
 
 
 def test_specific_objects_defaults():
@@ -90,6 +106,8 @@ def test_specific_objects_defaults():
     scene = component.update_ile_scene(prior_scene())
     objs = scene['objects']
     assert isinstance(objs, list)
+    for obj in objs:
+        assert obj['debug']['random_position']
 
 
 def test_specific_objects_single():
@@ -110,6 +128,8 @@ def test_specific_objects_single():
 
     scene = component.update_ile_scene(prior_scene())
     assert isinstance(scene['objects'], list)
+    assert len(scene['objects']) == 1
+    assert scene['objects'][0]['debug']['random_position']
 
 
 def test_specific_objects_array_single():
@@ -138,12 +158,16 @@ def test_specific_objects_array_single():
     assert 'materials' in obj
     assert isinstance(obj['materials'], list)
     if len(obj['materials']) > 0:
-        assert obj['materials'][0] in materials.ALL_MATERIAL_STRINGS
+        assert (
+            obj['materials'][0] in materials.ALL_CONFIGURABLE_MATERIAL_STRINGS
+        )
     show = obj['shows'][0]
     assert show['scale']['x'] == show['scale']['z'] == 1
     assert 0 <= show['rotation']['y'] < 360
     assert -10 <= show['position']['x'] < 10
     assert -10 <= show['position']['z'] < 10
+    assert len(scene['objects']) == 1
+    assert scene['objects'][0]['debug']['random_position']
 
 
 def test_specific_objects_array_single_num_range():
@@ -178,12 +202,16 @@ def test_specific_objects_array_single_num_range():
         assert 'materials' in obj
         assert isinstance(obj['materials'], list)
         if len(obj['materials']) > 0:
-            assert obj['materials'][0] in materials.ALL_MATERIAL_STRINGS
+            assert (
+                obj['materials'][0] in
+                materials.ALL_CONFIGURABLE_MATERIAL_STRINGS
+            )
         show = obj['shows'][0]
         assert show['scale']['x'] == show['scale']['z'] == 1
         assert 0 <= show['rotation']['y'] < 360
         assert -10 <= show['position']['x'] < 10
         assert -10 <= show['position']['z'] < 10
+        assert obj['debug']['random_position']
 
 
 def test_specific_objects_array_single_mat_list_mixed():
@@ -214,6 +242,7 @@ def test_specific_objects_array_single_mat_list_mixed():
     for obj in scene['objects']:
         assert 'materials' in obj
         assert isinstance(obj['materials'], list)
+        assert obj['debug']['random_position']
         for mat in obj['materials']:
             assert mat in material_options
 
@@ -238,9 +267,82 @@ def test_specific_objects_single_shape():
     assert isinstance(scene['objects'], list)
     assert len(scene['objects']) == 7
     for obj in scene['objects']:
+        assert obj['debug']['random_position']
         assert 'type' in obj
         assert isinstance(obj['type'], str)
         assert obj['type'] == "crayon_blue"
+
+
+def test_specific_objects_excluded_type():
+    ILESharedConfiguration.get_instance().set_excluded_shapes(['ball'])
+    component = SpecificInteractableObjectsComponent({
+        "specific_interactable_objects": {
+            "num": 1
+        }
+    })
+    # Test a bunch of times to make sure.
+    for _ in range(100):
+        scene = component.update_ile_scene(prior_scene())
+        assert scene['objects'][0]['type'] != 'ball'
+
+
+def test_specific_objects_specific_type_is_excluded():
+    ILESharedConfiguration.get_instance().set_excluded_shapes(['ball'])
+    component = SpecificInteractableObjectsComponent({
+        "specific_interactable_objects": {
+            "num": 1,
+            "shape": "ball"
+        }
+    })
+    scene = component.update_ile_scene(prior_scene())
+    assert scene['objects'][0]['type'] == 'ball'
+
+
+def test_specific_objects_not_random_position():
+    component = SpecificInteractableObjectsComponent({
+        "specific_interactable_objects": [{
+            "num": 1,
+            "position": {
+                "x": 2,
+                "y": 0,
+                "z": 2
+            }
+        }, {
+            "num": 1,
+            "position": {
+                "x": -3,
+                "y": 0,
+                "z": -3
+            }
+        }]
+    })
+    assert isinstance(component.specific_interactable_objects, list)
+    assert len(component.specific_interactable_objects) == 2
+    obj = component.specific_interactable_objects[0]
+    assert obj.num == 1
+    assert obj.position == VectorFloatConfig(2, 0, 2)
+    obj = component.specific_interactable_objects[1]
+    assert obj.num == 1
+    assert obj.position == VectorFloatConfig(-3, 0, -3)
+
+    scene = component.update_ile_scene(prior_scene())
+
+    assert isinstance(scene['objects'], list)
+    assert len(scene['objects']) == 2
+    objs = scene['objects']
+    obj = objs[0]
+    pos = obj['shows'][0]['position']
+    assert pos['x'] == 2
+    assert pos['y'] == 0
+    assert pos['z'] == 2
+    assert not obj['debug']['random_position']
+
+    obj = objs[1]
+    pos = obj['shows'][0]['position']
+    assert pos['x'] == -3
+    assert pos['y'] == 0
+    assert pos['z'] == -3
+    assert not obj['debug']['random_position']
 
 
 def test_specific_objects_array_multiple_scale():
@@ -280,16 +382,25 @@ def test_specific_objects_array_multiple_scale():
     objs = scene['objects']
     obj = objs[0]
     s = obj['shows'][0]['scale']
+    is_cylinder = (
+        obj['type'] in ['cylinder', 'hex_cylinder', 'decagon_cylinder']
+    )
+    print(f'type={obj["type"]}')
     assert isinstance(s, dict)
     assert s['x'] == 1.5
-    assert (s['y'] * (1 if obj['type'] != 'cylinder' else 2)) == 1.5
+    assert (s['y'] * (1 if not is_cylinder else 2)) == 1.5
     assert s['z'] == 1.5
     for i in range(3):
         obj = objs[i + 1]
         s = obj['shows'][0]['scale']
+        is_cylinder = (
+            obj['type'] in ['cylinder', 'hex_cylinder', 'decagon_cylinder']
+        )
+        print(f'type={obj["type"]}')
         assert s['x'] == 2
-        assert (s['y'] * (1 if obj['type'] != 'cylinder' else 2)) in [4.5, 5.5]
+        assert (s['y'] * (1 if not is_cylinder else 2)) in [4.5, 5.5]
         assert 0 <= s['z'] <= 0.5
+        assert obj['debug']['random_position']
 
 
 def test_specific_objects_array_multiple_position_rotation():
@@ -342,7 +453,7 @@ def test_specific_objects_array_multiple_position_rotation():
     assert isinstance(p, dict)
     assert p['x'] == 1.5
     assert p['y'] == 0
-    assert p['z'] == 0
+    assert -4.75 <= p['z'] <= 4.75
     for i in range(3):
         obj = objs[i + 1]['shows'][0]
         p = obj['position']
@@ -351,6 +462,8 @@ def test_specific_objects_array_multiple_position_rotation():
         assert -5 <= p['z'] <= 3.2
         r = obj['rotation']
         assert 40 <= r['y'] <= 279
+    for obj in objs:
+        assert obj['debug']['random_position']
 
 
 def test_specific_objects_array_multiple():
@@ -380,12 +493,13 @@ def test_specific_objects_array_multiple():
         print(obj['materials'])
         assert isinstance(obj['materials'], list)
         for mat in obj['materials']:
-            assert mat in materials.ALL_MATERIAL_STRINGS
+            assert mat in materials.ALL_CONFIGURABLE_MATERIAL_STRINGS
         show = obj['shows'][0]
         assert show['scale']['x'] == show['scale']['z'] == 1
         assert 0 <= show['rotation']['y'] < 360
         assert -10 <= show['position']['x'] < 10
         assert -10 <= show['position']['z'] < 10
+        assert obj['debug']['random_position']
 
 
 def test_random_interactable_objects_config_component():
@@ -408,6 +522,28 @@ def test_random_interactable_objects_config_component_configured():
     assert isinstance(scene['objects'], list)
     objs = scene['objects']
     assert len(objs) == 5
+    for obj in objs:
+        assert obj['debug']['random_position']
+
+
+def test_random_interactable_objects_config_component_excluded_type():
+    ILESharedConfiguration.get_instance().set_excluded_shapes(['ball'])
+    component = RandomInteractableObjectsComponent({
+        'num_random_interactable_objects': 1
+    })
+    # Test a bunch of times to make sure.
+    for _ in range(100):
+        scene = component.update_ile_scene(prior_scene())
+        assert scene['objects'][0]['type'] != 'ball'
+
+
+def test_random_interactable_objects_config_component_excluded_type_fail():
+    ILESharedConfiguration.get_instance().set_excluded_shapes(FULL_TYPE_LIST)
+    component = RandomInteractableObjectsComponent({
+        'num_random_interactable_objects': 1
+    })
+    with pytest.raises(ILEException):
+        component.update_ile_scene(prior_scene())
 
 
 def test_random_interactable_objects_config_component_configured_min_max():
@@ -445,7 +581,7 @@ def test_random_interactable_objects_config_component_overlap():
             for obj_2 in objs
             if obj_1['id'] != obj_2['id']
         ]
-
+        assert obj_1['debug']['random_position']
         assert geometry.validate_location_rect(
             obj_1['shows'][0]['boundingBox'],
             scene['performerStart']['position'],
@@ -474,7 +610,7 @@ def test_random_interactable_objects_types_none():
     # occluders create 2 objects
     assert 2 <= len(objs) <= 18
     for obj in objs:
-        ...
+        assert obj['debug']['random_position']
 
 
 def test_random_interactable_objects_types_containers():
@@ -498,11 +634,27 @@ def test_random_interactable_objects_types_containers():
     assert len(objs) == 4
     for obj in objs:
         assert obj['receptacle']
+        assert obj['debug']['random_position']
 
     assert 1 == len(ObjectRepository.get_instance()._labeled_object_store)
     assert 4 == len(ObjectRepository.get_instance()
                     .get_all_from_labeled_objects(
         RandomKeywordObjectsComponent.LABEL_KEYWORDS_CONTAINERS))
+
+
+def test_random_interactable_objects_types_containers_excluded_type():
+    ILESharedConfiguration.get_instance().set_excluded_shapes(['chest_1'])
+    component = RandomKeywordObjectsComponent({
+        'keyword_objects': {
+            'keyword': 'containers',
+            'num': 1
+        }
+    })
+
+    # Test a bunch of times to make sure.
+    for _ in range(100):
+        scene = component.update_ile_scene(prior_scene())
+        assert scene['objects'][0]['type'] != 'chest_1'
 
 
 def test_random_interactable_objects_types_containers_contain_without_target():
@@ -551,6 +703,7 @@ def test_random_interactable_objects_types_containers_contain_target():
     for i, obj in enumerate(objs):
         if i != 0:
             assert obj['receptacle']
+            assert obj['debug']['random_position']
 
     assert 2 == len(ObjectRepository.get_instance()._labeled_object_store)
     assert 2 == len(ObjectRepository.get_instance()
@@ -588,6 +741,7 @@ def test_random_interactable_objects_types_containers_min_max():
     assert 1 <= len(objs) <= 3
     for obj in objs:
         assert obj['receptacle']
+        assert obj['debug']['random_position']
 
     assert 1 == len(ObjectRepository.get_instance()._labeled_object_store)
     assert 1 <= len(ObjectRepository.get_instance()
@@ -628,10 +782,11 @@ def test_random_interactable_objects_types_confusors():
             goal = obj
             continue
         assert obj['moveable']
-        sim_color = util.is_similar_except_in_color(obj, goal)
-        sim_shape = util.is_similar_except_in_shape(obj, goal)
-        sim_size = util.is_similar_except_in_size(obj, goal)
+        sim_color = definitions.is_similar_except_in_color(obj, goal)
+        sim_shape = definitions.is_similar_except_in_shape(obj, goal)
+        sim_size = definitions.is_similar_except_in_size(obj, goal)
         assert sim_color or sim_shape or sim_size
+        assert obj['debug']['random_position']
 
     assert 1 == len(ObjectRepository.get_instance()._labeled_object_store)
     assert 2 <= len(ObjectRepository.get_instance()
@@ -660,11 +815,28 @@ def test_random_interactable_objects_types_obstacles():
     assert isinstance(scene['objects'], list)
     objs = scene['objects']
     assert len(objs) == 2
+    for obj in objs:
+        assert obj['debug']['random_position']
 
     assert 1 == len(ObjectRepository.get_instance()._labeled_object_store)
     assert 1 <= len(ObjectRepository.get_instance()
                     .get_all_from_labeled_objects(
         RandomKeywordObjectsComponent.LABEL_KEYWORDS_OBSTACLES)) <= 2
+
+
+def test_random_interactable_objects_types_obstacles_excluded_type():
+    ILESharedConfiguration.get_instance().set_excluded_shapes(['chair_1'])
+    component = RandomKeywordObjectsComponent({
+        'keyword_objects': {
+            'keyword': 'obstacles',
+            'num': 1
+        }
+    })
+
+    # Test a bunch of times to make sure.
+    for _ in range(100):
+        scene = component.update_ile_scene(prior_scene())
+        assert scene['objects'][0]['type'] != 'chair_1'
 
 
 def test_random_interactable_objects_types_obstacles_with_target():
@@ -688,6 +860,8 @@ def test_random_interactable_objects_types_obstacles_with_target():
     assert isinstance(scene['objects'], list)
     objs = scene['objects']
     assert len(objs) == 3
+    assert objs[1]['debug']['random_position']
+    assert objs[2]['debug']['random_position']
 
     assert 1 == len(ObjectRepository.get_instance()._labeled_object_store)
     assert 2 == len(ObjectRepository.get_instance()
@@ -717,10 +891,28 @@ def test_random_interactable_objects_types_occluders():
     objs = scene['objects']
     assert len(objs) == 3
 
+    for obj in objs:
+        assert obj['debug']['random_position']
+
     assert 1 == len(ObjectRepository.get_instance()._labeled_object_store)
     assert 3 == len(ObjectRepository.get_instance()
                     .get_all_from_labeled_objects(
         RandomKeywordObjectsComponent.LABEL_KEYWORDS_OCCLUDERS))
+
+
+def test_random_interactable_objects_types_occluders_excluded_type():
+    ILESharedConfiguration.get_instance().set_excluded_shapes(['sofa_1'])
+    component = RandomKeywordObjectsComponent({
+        'keyword_objects': {
+            'keyword': 'occluders',
+            'num': 1
+        }
+    })
+
+    # Test a bunch of times to make sure.
+    for _ in range(100):
+        scene = component.update_ile_scene(prior_scene())
+        assert scene['objects'][0]['type'] != 'sofa_1'
 
 
 def test_random_interactable_objects_types_occluders_with_target():
@@ -780,6 +972,21 @@ def test_random_interactable_objects_types_context():
         RandomKeywordObjectsComponent.LABEL_KEYWORDS_CONTEXT))
 
 
+def test_random_interactable_objects_types_context_excluded_type():
+    ILESharedConfiguration.get_instance().set_excluded_shapes(['ball'])
+    component = RandomKeywordObjectsComponent({
+        'keyword_objects': {
+            'keyword': 'context',
+            'num': 1
+        }
+    })
+
+    # Test a bunch of times to make sure.
+    for _ in range(100):
+        scene = component.update_ile_scene(prior_scene())
+        assert scene['objects'][0]['type'] != 'ball'
+
+
 def test_random_interactable_objects_types_occluder_front():
     component = RandomKeywordObjectsComponent({
         'keyword_objects': {
@@ -807,6 +1014,7 @@ def test_random_interactable_objects_types_occluder_front():
         pos = obj['shows'][0]['position']
         assert pos['x'] == 0
         assert pos['z'] > 0
+        assert obj['debug']['random_position']
 
     assert 1 == len(ObjectRepository.get_instance()._labeled_object_store)
     assert 4 == len(ObjectRepository.get_instance()
@@ -849,6 +1057,8 @@ def test_random_interactable_objects_types_context_in_containers():
     objs = scene['objects']
     assert len(objs) == 2
     assert objs[0]['receptacle']
+    assert objs[0]['debug']['random_position']
+    assert objs[1]['debug']['random_position']
 
     assert 2 == len(ObjectRepository.get_instance()._labeled_object_store)
     assert 1 == len(ObjectRepository.get_instance()

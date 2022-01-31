@@ -1,7 +1,7 @@
 import pytest
 
-from ideal_learning_env.defs import ILEException
-from ideal_learning_env.object_services import (
+from ideal_learning_env import (
+    ILEException,
     InstanceDefinitionLocationTuple,
     MaterialRestrictions,
     ObjectRepository,
@@ -9,7 +9,14 @@ from ideal_learning_env.object_services import (
 
 
 @pytest.fixture(autouse=True)
-def run_before_test():
+def run_around_test():
+    # Prepare test
+    ObjectRepository.get_instance().clear()
+
+    # Run test
+    yield
+
+    # Cleanup
     ObjectRepository.get_instance().clear()
 
 
@@ -101,11 +108,11 @@ def test_material_restrictions_valid():
         'bookcase_1_shelf',
         "UnityAssetStore/Kindergarten_Interior/Models/Materials/color 4")
     MaterialRestrictions.valid_shape_material_or_raise(
-        'soccer_ball', "AI2-THOR/Materials/Ceramics/WhiteCountertop")
+        'cube', "AI2-THOR/Materials/Ceramics/WhiteCountertop")
     MaterialRestrictions.valid_shape_material_or_raise(
         'wardrobe', 'AI2-THOR/Materials/Wood/BedroomFloor1')
     MaterialRestrictions.valid_shape_material_or_raise(
-        'crayon_yellow', 'AI2-THOR/Materials/Plastics/BlueRubber')
+        'crayon_yellow', None)
 
 
 def test_material_restrictions_invalid():

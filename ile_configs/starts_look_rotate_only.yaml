@@ -1,0 +1,9 @@
+# Only able to use Look and Rotate actions for the first steps.
+swivels:
+    - begin: 1
+      end:
+          - 5
+          - 10
+          - 25
+          - 50
+          - 100

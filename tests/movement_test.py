@@ -47,16 +47,26 @@ def validate_option_list(
                     -1 * retrieve_off_screen_position_x(starting_z)
                 ))
                 for step, validate_position in step_list:
+                    step_x = (
+                        movement['xDistanceByStep'][step]
+                        if len(movement['xDistanceByStep']) > step else
+                        movement['xDistanceByStep'][-1]
+                    )
+                    step_z = (
+                        movement['zDistanceByStep'][step]
+                        if len(movement['zDistanceByStep']) > step else
+                        movement['zDistanceByStep'][-1]
+                    ) if 'zDistanceByStep' in movement else None
                     position_x = object_x_to_occluder_x(
-                        (starting_x + movement['xDistanceByStep'][step]),
-                        (starting_z + movement['zDistanceByStep'][step])
+                        (starting_x + step_x),
+                        (starting_z + step_z)
                         if 'zDistanceByStep' in movement else starting_z
                     )
                     assert base_position_x is not None
                     assert position_x is not None
                     if validate_position:
-                        assert position_x <= (base_position_x + 0.1)
-                        assert position_x >= (base_position_x - 0.1)
+                        assert position_x <= (base_position_x + 0.25)
+                        assert position_x >= (base_position_x - 0.25)
 
 
 def test_exit_only_movement():
@@ -82,19 +92,12 @@ def test_exit_only_movement():
 
 def is_known_exit_stop_failure(movement, position_z):
     # Based on output from running the generate_movement.py script.
-    if movement['forceX'] == 650:
-        return position_z in [3.5]
     if movement['forceX'] == 670:
-        return position_z in [
-            1.6, 1.65, 1.7, 2, 2.05, 2.1, 2.15, 2.2, 2.25, 2.3, 2.75, 2.8,
-            2.85, 2.9, 2.95, 3, 3.05, 3.5, 3.65
-        ]
-    if movement['forceX'] == 680:
-        return position_z in [1.65]
+        return position_z in [4.4]
     if movement['forceX'] == 690:
-        return position_z in [3.5, 3.55, 3.6, 3.65]
+        return position_z in [4.25, 4.3, 4.35, 4.4]
     if movement['forceX'] == 700:
-        return position_z in [1.6, 1.9, 2.4]
+        return position_z in [4.4]
     return False
 
 
@@ -162,7 +165,7 @@ def validate_double_occluder(
 
 def is_known_double_occluder_failure(position_z):
     # Based on output from running this test case.
-    return position_z <= 1.8 or position_z >= 3.1
+    return position_z in [4.3, 4.35, 4.4]
 
 
 def test_exit_only_movement_double_occluder():

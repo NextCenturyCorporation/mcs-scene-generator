@@ -1,0 +1,39 @@
+# Add a Retrieval goal with a soccer ball as the target object.
+goal:
+    category: retrieval
+    target:
+        shape: soccer_ball
+        scale:
+            min: 1.0
+            max: 3.0
+
+# Only the target can be a soccer ball.
+excluded_shapes: soccer_ball
+
+# Only generate large rooms.
+room_dimensions:
+    x:
+        min: 8
+        max: 12
+    y: 3
+    z:
+        min: 8
+        max: 12
+
+# Generate many holes, walls, and areas of lava, but no other structures.
+random_structural_objects:
+    - type:
+        - holes
+        - lava
+        - walls
+      num:
+        min: 10
+        max: 20
+
+# Override default to avoid randomly generating any more objects besides the
+# target. Remove this if you want to have randomly generated objects.
+keyword_objects:
+    - num: 0
+
+# Ensure holes and lava don't completely obstruct the path to the target.
+check_valid_path: True

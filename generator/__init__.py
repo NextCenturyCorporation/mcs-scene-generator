@@ -15,6 +15,7 @@ from .definitions import (
     TypeChoice,
 )
 from .exceptions import SceneException
+from .geometry import MAX_TRIES, ObjectBounds
 from .interactive_goals import (
     InteractiveGoal,
     RetrievalGoal,

@@ -1,0 +1,27 @@
+# Between 1 and 50 areas of the floor will be colored randomly.
+floor_material_override:
+    - num:
+        min: 1
+        max: 50
+
+# Each outer room wall will be colored randomly and independently.
+wall_back_material:
+    - CERAMIC_MATERIALS
+    - METAL_MATERIALS
+    - WALL_MATERIALS
+    - WOOD_MATERIALS
+wall_front_material:
+    - CERAMIC_MATERIALS
+    - METAL_MATERIALS
+    - WALL_MATERIALS
+    - WOOD_MATERIALS
+wall_left_material:
+    - CERAMIC_MATERIALS
+    - METAL_MATERIALS
+    - WALL_MATERIALS
+    - WOOD_MATERIALS
+wall_right_material:
+    - CERAMIC_MATERIALS
+    - METAL_MATERIALS
+    - WALL_MATERIALS
+    - WOOD_MATERIALS
