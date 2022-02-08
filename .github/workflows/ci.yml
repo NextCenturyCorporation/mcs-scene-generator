@@ -24,7 +24,7 @@ jobs:
         run: brew install geos
       - name: Install Geos for Linux
         if: runner.os == 'Linux'
-        run: apt-get install libgeos-dev
+        run: sudo apt-get install libgeos-dev
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip setuptools wheel
