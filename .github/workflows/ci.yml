@@ -31,4 +31,4 @@ jobs:
           echo pip install --upgrade pip
           echo python -m pip install -r requirements.txt 
       - name: Run unit tests
-        run: echo python -m pytest -vv
+        run: echo python -m pytest -vv 
