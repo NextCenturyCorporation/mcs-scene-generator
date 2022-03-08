@@ -1,0 +1,31 @@
+# Add a Retrieval goal with a soccer ball as the target object.
+goal:
+    category: retrieval
+    target:
+        shape: soccer_ball
+        scale:
+            min: 1.0
+            max: 3.0
+
+# Only the target can be a soccer ball.
+excluded_shapes: soccer_ball
+
+# Generate many placer devices, but no other structures.
+# One will always begin holding the target, then release it.
+# The others will begin holding other objects, then release them.
+placers:
+    - num: 1
+      placed_object_labels: target
+      # 50% of the time the object will be released in mid-air.
+      end_height: [0, 0, 0, 0, 0, 0, 0.25, 0.5, 0.75, 1, 1.25, 1.5]
+    - num:
+        min: 4
+        max: 9
+      # 50% of the time the object will be released in mid-air.
+      end_height: [0, 0, 0, 0, 0, 0, 0.25, 0.5, 0.75, 1, 1.25, 1.5]
+
+# Override default to avoid randomly generating any more objects besides the
+# target and other objects that begin held by devices. Remove this if you want
+# to have randomly generated objects.
+keyword_objects:
+    - num: 0

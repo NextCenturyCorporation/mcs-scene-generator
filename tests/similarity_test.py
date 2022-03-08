@@ -1,5 +1,6 @@
 import copy
 
+import pytest
 from machine_common_sense.config_manager import Vector3d
 
 from generator import (
@@ -279,6 +280,7 @@ def test_is_similar_except_in_size():
     assert not is_similar_except_in_size(definition_1, definition_8)
 
 
+@pytest.mark.slow
 def test_is_similar_except_in_color_all_objects():
     for definition_1 in DEFINITIONS:
         x_size_1 = definition_1.dimensions.x
@@ -318,6 +320,7 @@ def test_is_similar_except_in_color_all_objects():
                 assert bool(actual) == expected
 
 
+@pytest.mark.slow
 def test_is_similar_except_in_shape_all_objects():
     for definition_1 in DEFINITIONS:
         x_size_1 = definition_1.dimensions.x
@@ -357,6 +360,7 @@ def test_is_similar_except_in_shape_all_objects():
                 assert bool(actual) == expected
 
 
+@pytest.mark.slow
 def test_is_similar_except_in_size_all_objects():
     for definition_1 in DEFINITIONS:
         x_size_1 = definition_1.dimensions.x
@@ -453,6 +457,7 @@ def test_similarity_soccer_ball():
     assert get_similar_definition(soccer_ball, white_dataset) == white_copy
 
 
+@pytest.mark.slow
 def test_get_similar_definition():
     failed = False
     for definition in DEFINITIONS:

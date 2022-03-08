@@ -12,8 +12,7 @@ excluded_shapes: soccer_ball
 
 # Generate many obstacles and/or occluders (usually large interactable objects
 # like furniture) and zero or more context (distractor) objects.
-# One obstacle/occluder will always begin either in front of (50%) or behind
-# (50%) the target, randomized for each scene.
+# One obstacle/occluder will always begin in front of the target.
 keyword_objects:
     - keyword:
         - obstacles
@@ -22,7 +21,6 @@ keyword_objects:
       keyword_location:
           keyword:
               - occlude
-              - behind
           relative_object_label: target
     - keyword:
         - obstacles

@@ -20,10 +20,15 @@ performer_start_rotation: null
 placers:
     - num: 0
 random_structural_objects: null
+restrict_open_doors: False
 room_dimensions: null
 room_shape: null
 shortcut_bisecting_platform: False
+shortcut_lava_room: False
+shortcut_lava_target_tool: False
 shortcut_ramp_to_platform: False
+shortcut_start_on_platform: False
+shortcut_triple_door_choice: False
 specific_interactable_objects: null
 structural_droppers:
   num: 0
@@ -41,6 +46,8 @@ structural_walls:
   num: 0
 swivels: null
 teleports: null
+tools:
+    - num: 0
 wall_back_material: null
 wall_front_material: null
 wall_left_material: null

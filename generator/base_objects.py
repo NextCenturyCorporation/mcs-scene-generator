@@ -131,7 +131,7 @@ class ObjectBaseSize():
         ) for area in (self.enclosed_area_list or [])]
         mass = round((
             self.mass * (x_multiplier + y_multiplier + z_multiplier) / 3.0
-        ), 4)
+        ), 4) if self.mass else None
         offset = Vector3d(
             self.offset.x * x_multiplier,
             self.offset.y * y_multiplier,
@@ -263,7 +263,12 @@ _BED_6_SIZE = ObjectBaseSize(
     offset=Vector3d(0, 1.1, 0),
     positionY=0
 )
-# Coincidentally, all of the blocks have the same base size.
+_BLOCK_BLANK_SIZE = ObjectBaseSize(
+    dimensions=Vector3d(0.1, 0.1, 0.1),
+    mass=0.333,
+    offset=Vector3d(0, 0.05, 0),
+    positionY=0.05
+)
 _BLOCK_SIZE = ObjectBaseSize(
     dimensions=Vector3d(0.1, 0.1, 0.1),
     mass=0.333,
@@ -374,19 +379,37 @@ _BOWL_3_SIZE = ObjectBaseSize(
     dimensions=Vector3d(0.175, 0.116, 0.171),
     mass=0.5,
     offset=Vector3d(0, 0.055, 0),
-    positionY=0.005
+    positionY=0.005,
+    enclosed_area_list=[
+        ObjectInteractableArea(
+            dimensions=Vector3d(0.138, 0.2, 0.138),
+            position=Vector3d(0, 0.102, 0)
+        )
+    ]
 )
 _BOWL_4_SIZE = ObjectBaseSize(
     dimensions=Vector3d(0.209, 0.059, 0.206),
     mass=0.5,
     offset=Vector3d(0, 0.027, 0),
-    positionY=0.005
+    positionY=0.005,
+    enclosed_area_list=[
+        ObjectInteractableArea(
+            dimensions=Vector3d(0.18, 0.1, 0.18),
+            position=Vector3d(0, 0.052, 0)
+        )
+    ]
 )
 _BOWL_6_SIZE = ObjectBaseSize(
-    dimensions=Vector3d(0.198, 0.109, 0.201),
+    dimensions=Vector3d(0.19, 0.1, 0.19),
     mass=0.5,
     offset=Vector3d(0, 0.052, 0),
-    positionY=0.005
+    positionY=0.005,
+    enclosed_area_list=[
+        ObjectInteractableArea(
+            dimensions=Vector3d(0.07, .18, 0.07),
+            position=Vector3d(0, 0.092, 0)
+        )
+    ]
 )
 _CAKE_SIZE = ObjectBaseSize(
     dimensions=Vector3d(0.22, 0.22, 0.22),
@@ -710,19 +733,37 @@ _CUP_2_SIZE = ObjectBaseSize(
     dimensions=Vector3d(0.105, 0.135, 0.104),
     mass=0.5,
     offset=Vector3d(0, 0.064, 0),
-    positionY=0.005
+    positionY=0.005,
+    enclosed_area_list=[
+        ObjectInteractableArea(
+            dimensions=Vector3d(0.05, .18, 0.05),
+            position=Vector3d(0, 0.092, 0)
+        )
+    ]
 )
 _CUP_3_SIZE = ObjectBaseSize(
     dimensions=Vector3d(0.123, 0.149, 0.126),
     mass=0.5,
     offset=Vector3d(0, 0.072, 0),
-    positionY=0.005
+    positionY=0.005,
+    enclosed_area_list=[
+        ObjectInteractableArea(
+            dimensions=Vector3d(0.04, 2, 0.04),
+            position=Vector3d(0, 0.12, 0)
+        )
+    ]
 )
 _CUP_6_SIZE = ObjectBaseSize(
     dimensions=Vector3d(0.106, 0.098, 0.106),
     mass=0.5,
     offset=Vector3d(0, 0.046, 0),
-    positionY=0.005
+    positionY=0.005,
+    enclosed_area_list=[
+        ObjectInteractableArea(
+            dimensions=Vector3d(0.05, .14, 0.05),
+            position=Vector3d(0, 0.09, 0)
+        )
+    ]
 )
 _DOG_ON_WHEELS_SIZE = ObjectBaseSize(
     dimensions=Vector3d(0.355, 0.134, 0.071),
@@ -1227,9 +1268,9 @@ _TOY_TROLLEY_SIZE = ObjectBaseSize(
     positionY=0.005
 )
 _TOY_TRUCK_1_SIZE = ObjectBaseSize(
-    dimensions=Vector3d(0.2, 0.18, 0.25),
+    dimensions=Vector3d(0.2, 0.2, 0.25),
     mass=1,
-    offset=Vector3d(0, 0.09, 0),
+    offset=Vector3d(0, 0.1, 0),
     positionY=0.1
 )
 _TOY_TRUCK_2_SIZE = ObjectBaseSize(
@@ -1311,12 +1352,32 @@ _WARDROBE_SIZE = ObjectBaseSize(
 )
 
 
+def turn_sideways(definition: ObjectDefinition) -> ObjectDefinition:
+    """Set the Y rotation to 90 in the given definition and switch its X and Z
+    dimensions."""
+    definition.rotation = Vector3d(0, 90, 0)
+    if definition.dimensions:
+        definition.dimensions = Vector3d(
+            definition.dimensions.z,
+            definition.dimensions.y,
+            definition.dimensions.x
+        )
+    for size in definition.chooseSizeList:
+        size.dimensions = Vector3d(
+            size.dimensions.z,
+            size.dimensions.y,
+            size.dimensions.x
+        )
+    return definition
+
+
 def _create_apple_1(args: _FunctionArgs) -> ObjectDefinition:
     return ObjectDefinition(
         type='apple_1',
         attributes=['moveable', 'pickupable'],
         color=['red'],
         materialCategory=[],
+        poleOffsetY=0.04,
         salientMaterials=['food'],
         shape=['apple'],
         chooseSizeList=[
@@ -1331,6 +1392,7 @@ def _create_apple_2(args: _FunctionArgs) -> ObjectDefinition:
         attributes=['moveable', 'pickupable'],
         color=['green'],
         materialCategory=[],
+        poleOffsetY=0.04,
         salientMaterials=['food'],
         shape=['apple'],
         chooseSizeList=[
@@ -1449,7 +1511,7 @@ def _create_block_blank_cube(args: _FunctionArgs) -> ObjectDefinition:
         stackTarget=True,
         chooseMaterialList=[item.copy() for item in args.chosen_material_list],
         chooseSizeList=[
-            _BLOCK_SIZE.make(size) for size in args.size_multiplier_list
+            _BLOCK_BLANK_SIZE.make(size) for size in args.size_multiplier_list
         ]
     )
 
@@ -1462,7 +1524,7 @@ def _create_block_blank_cylinder(args: _FunctionArgs) -> ObjectDefinition:
         shape=['blank block', 'cube'],
         chooseMaterialList=[item.copy() for item in args.chosen_material_list],
         chooseSizeList=[
-            _BLOCK_SIZE.make(size) for size in args.size_multiplier_list
+            _BLOCK_BLANK_SIZE.make(size) for size in args.size_multiplier_list
         ]
     )
 
@@ -1626,6 +1688,7 @@ def _create_bowl_3(args: _FunctionArgs) -> ObjectDefinition:
     return ObjectDefinition(
         type='bowl_3',
         attributes=['moveable', 'pickupable', 'receptacle'],
+        poleOffsetY=0.07,
         shape=['bowl'],
         stackTarget=True,
         chooseMaterialList=[item.copy() for item in args.chosen_material_list],
@@ -1639,6 +1702,7 @@ def _create_bowl_4(args: _FunctionArgs) -> ObjectDefinition:
     return ObjectDefinition(
         type='bowl_4',
         attributes=['moveable', 'pickupable', 'receptacle'],
+        poleOffsetY=0.02,
         shape=['bowl'],
         stackTarget=True,
         chooseMaterialList=[item.copy() for item in args.chosen_material_list],
@@ -1652,6 +1716,7 @@ def _create_bowl_6(args: _FunctionArgs) -> ObjectDefinition:
     return ObjectDefinition(
         type='bowl_6',
         attributes=['moveable', 'pickupable', 'receptacle'],
+        poleOffsetY=0.06,
         shape=['bowl'],
         stackTarget=True,
         chooseMaterialList=[item.copy() for item in args.chosen_material_list],
@@ -1732,16 +1797,17 @@ def _create_case_3(args: _FunctionArgs) -> ObjectDefinition:
 
 
 def _create_cart_2(args: _FunctionArgs) -> ObjectDefinition:
-    return ObjectDefinition(
+    return turn_sideways(ObjectDefinition(
         type='cart_2',
         untrainedShape=True,
         attributes=['moveable', 'pickupable'],
+        poleOffsetY=0.6,
         shape=['cart'],
         chooseMaterialList=[item.copy() for item in args.chosen_material_list],
         chooseSizeList=[
             _CART_2_SIZE.make(size) for size in args.size_multiplier_list
         ]
-    )
+    ))
 
 
 def _create_chair_1(args: _FunctionArgs) -> ObjectDefinition:
@@ -2046,6 +2112,7 @@ def _create_cup_2(args: _FunctionArgs) -> ObjectDefinition:
     return ObjectDefinition(
         type='cup_2',
         attributes=['moveable', 'pickupable', 'receptacle'],
+        poleOffsetY=0.04,
         shape=['cup'],
         stackTarget=True,
         chooseMaterialList=[item.copy() for item in args.chosen_material_list],
@@ -2059,6 +2126,7 @@ def _create_cup_3(args: _FunctionArgs) -> ObjectDefinition:
     return ObjectDefinition(
         type='cup_3',
         attributes=['moveable', 'pickupable', 'receptacle'],
+        poleOffsetY=0.04,
         shape=['cup'],
         stackTarget=True,
         chooseMaterialList=[item.copy() for item in args.chosen_material_list],
@@ -2072,6 +2140,7 @@ def _create_cup_6(args: _FunctionArgs) -> ObjectDefinition:
     return ObjectDefinition(
         type='cup_6',
         attributes=['moveable', 'pickupable', 'receptacle'],
+        poleOffsetY=0.04,
         shape=['cup'],
         stackTarget=True,
         chooseMaterialList=[item.copy() for item in args.chosen_material_list],
@@ -2082,23 +2151,25 @@ def _create_cup_6(args: _FunctionArgs) -> ObjectDefinition:
 
 
 def _create_dog_on_wheels(args: _FunctionArgs) -> ObjectDefinition:
-    return ObjectDefinition(
+    return turn_sideways(ObjectDefinition(
         type='dog_on_wheels',
         untrainedShape=True,
         attributes=['moveable', 'pickupable'],
+        poleOffsetY=0.03,
         shape=['dog'],
         chooseMaterialList=[item.copy() for item in args.chosen_material_list],
         chooseSizeList=[
             _DOG_ON_WHEELS_SIZE.make(size) for size in
             args.size_multiplier_list
         ]
-    )
+    ))
 
 
 def _create_duck_on_wheels(args: _FunctionArgs) -> ObjectDefinition:
     return ObjectDefinition(
         type='duck_on_wheels',
         attributes=['moveable', 'pickupable'],
+        poleOffsetY=0.01,
         shape=['duck'],
         chooseMaterialList=[item.copy() for item in args.chosen_material_list],
         chooseSizeList=[
@@ -2199,6 +2270,7 @@ def _create_plate_1(args: _FunctionArgs) -> ObjectDefinition:
     return ObjectDefinition(
         type='plate_1',
         attributes=['moveable', 'pickupable', 'receptacle'],
+        poleOffsetY=0.1,
         shape=['plate'],
         stackTarget=True,
         chooseMaterialList=[item.copy() for item in args.chosen_material_list],
@@ -2212,6 +2284,7 @@ def _create_plate_3(args: _FunctionArgs) -> ObjectDefinition:
     return ObjectDefinition(
         type='plate_3',
         attributes=['moveable', 'pickupable', 'receptacle'],
+        poleOffsetY=0.19,
         shape=['plate'],
         stackTarget=True,
         chooseMaterialList=[item.copy() for item in args.chosen_material_list],
@@ -2225,6 +2298,7 @@ def _create_plate_4(args: _FunctionArgs) -> ObjectDefinition:
     return ObjectDefinition(
         type='plate_4',
         attributes=['moveable', 'pickupable', 'receptacle'],
+        poleOffsetY=0.1,
         shape=['plate'],
         stackTarget=True,
         chooseMaterialList=[item.copy() for item in args.chosen_material_list],
@@ -2758,6 +2832,50 @@ def _create_table_16(args: _FunctionArgs) -> ObjectDefinition:
     )
 
 
+# Maps each tool type to its base X/Z dimensions.
+LARGE_BLOCK_TOOLS_TO_DIMENSIONS = {
+    'tool_rect_0_50_x_4_00': (0.5, 4),
+    'tool_rect_0_50_x_5_00': (0.5, 5),
+    'tool_rect_0_50_x_6_00': (0.5, 6),
+    'tool_rect_0_50_x_7_00': (0.5, 7),
+    'tool_rect_0_50_x_8_00': (0.5, 8),
+    'tool_rect_0_50_x_9_00': (0.5, 9),
+    'tool_rect_0_75_x_4_00': (0.75, 4),
+    'tool_rect_0_75_x_5_00': (0.75, 5),
+    'tool_rect_0_75_x_6_00': (0.75, 6),
+    'tool_rect_0_75_x_7_00': (0.75, 7),
+    'tool_rect_0_75_x_8_00': (0.75, 8),
+    'tool_rect_0_75_x_9_00': (0.75, 9),
+    'tool_rect_1_00_x_4_00': (1, 4),
+    'tool_rect_1_00_x_5_00': (1, 5),
+    'tool_rect_1_00_x_6_00': (1, 6),
+    'tool_rect_1_00_x_7_00': (1, 7),
+    'tool_rect_1_00_x_8_00': (1, 8),
+    'tool_rect_1_00_x_9_00': (1, 9),
+}
+
+
+def _create_tool(args: _FunctionArgs) -> ObjectDefinition:
+    dimensions = LARGE_BLOCK_TOOLS_TO_DIMENSIONS[args.type]
+    base_size = ObjectBaseSize(
+        dimensions=Vector3d(dimensions[0], 0.6, dimensions[1]),
+        mass=None,
+        offset=Vector3d(0, 0.3, 0),
+        positionY=0.3
+    )
+    return ObjectDefinition(
+        type=args.type,
+        attributes=[],
+        color=['grey', 'black'],
+        materials=[],
+        salientMaterials=['metal'],
+        shape=['tool'],
+        chooseSizeList=[
+            base_size.make(size) for size in args.size_multiplier_list
+        ]
+    )
+
+
 def _create_toolbox_1(args: _FunctionArgs) -> ObjectDefinition:
     return ObjectDefinition(
         type='toolbox_1',
@@ -2789,7 +2907,7 @@ def _create_toolbox_2(args: _FunctionArgs) -> ObjectDefinition:
 
 
 def _create_toy_bus_1(args: _FunctionArgs) -> ObjectDefinition:
-    return ObjectDefinition(
+    return turn_sideways(ObjectDefinition(
         type='bus_1',
         untrainedShape=True,
         attributes=['moveable', 'pickupable'],
@@ -2798,24 +2916,25 @@ def _create_toy_bus_1(args: _FunctionArgs) -> ObjectDefinition:
         chooseSizeList=[
             _TOY_BUS_1_SIZE.make(size) for size in args.size_multiplier_list
         ]
-    )
+    ))
 
 
 def _create_toy_car_2(args: _FunctionArgs) -> ObjectDefinition:
-    return ObjectDefinition(
+    return turn_sideways(ObjectDefinition(
         type='car_2',
         untrainedShape=True,
         attributes=['moveable', 'pickupable'],
+        poleOffsetY=0.01,
         shape=['car'],
         chooseMaterialList=[item.copy() for item in args.chosen_material_list],
         chooseSizeList=[
             _TOY_CAR_2_SIZE.make(size) for size in args.size_multiplier_list
         ]
-    )
+    ))
 
 
 def _create_toy_racecar(args: _FunctionArgs) -> ObjectDefinition:
-    return ObjectDefinition(
+    return turn_sideways(ObjectDefinition(
         type='racecar_red',
         attributes=['moveable', 'pickupable'],
         shape=['car'],
@@ -2824,11 +2943,11 @@ def _create_toy_racecar(args: _FunctionArgs) -> ObjectDefinition:
             _TOY_RACECAR_SIZE.make(size) for size in
             args.size_multiplier_list
         ]
-    )
+    ))
 
 
 def _create_toy_sedan(args: _FunctionArgs) -> ObjectDefinition:
-    return ObjectDefinition(
+    return turn_sideways(ObjectDefinition(
         type='car_1',
         attributes=['moveable', 'pickupable'],
         shape=['car'],
@@ -2836,11 +2955,11 @@ def _create_toy_sedan(args: _FunctionArgs) -> ObjectDefinition:
         chooseSizeList=[
             _TOY_SEDAN_SIZE.make(size) for size in args.size_multiplier_list
         ]
-    )
+    ))
 
 
 def _create_toy_train(args: _FunctionArgs) -> ObjectDefinition:
-    return ObjectDefinition(
+    return turn_sideways(ObjectDefinition(
         type='train_1',
         attributes=['moveable', 'pickupable'],
         shape=['train'],
@@ -2848,23 +2967,24 @@ def _create_toy_train(args: _FunctionArgs) -> ObjectDefinition:
         chooseSizeList=[
             _TOY_TRAIN_SIZE.make(size) for size in args.size_multiplier_list
         ]
-    )
+    ))
 
 
 def _create_toy_trolley(args: _FunctionArgs) -> ObjectDefinition:
-    return ObjectDefinition(
+    return turn_sideways(ObjectDefinition(
         type='trolley_1',
         attributes=['moveable', 'pickupable'],
+        poleOffsetY=0.12,
         shape=['trolley'],
         chooseMaterialList=[item.copy() for item in args.chosen_material_list],
         chooseSizeList=[
             _TOY_TROLLEY_SIZE.make(size) for size in args.size_multiplier_list
         ]
-    )
+    ))
 
 
 def _create_toy_truck_1(args: _FunctionArgs) -> ObjectDefinition:
-    return ObjectDefinition(
+    return turn_sideways(ObjectDefinition(
         type='truck_1',
         untrainedShape=True,
         attributes=['moveable', 'pickupable'],
@@ -2875,11 +2995,11 @@ def _create_toy_truck_1(args: _FunctionArgs) -> ObjectDefinition:
         chooseSizeList=[
             _TOY_TRUCK_1_SIZE.make(size) for size in args.size_multiplier_list
         ]
-    )
+    ))
 
 
 def _create_toy_truck_2(args: _FunctionArgs) -> ObjectDefinition:
-    return ObjectDefinition(
+    return turn_sideways(ObjectDefinition(
         type='truck_2',
         untrainedShape=True,
         attributes=['moveable', 'pickupable'],
@@ -2888,7 +3008,7 @@ def _create_toy_truck_2(args: _FunctionArgs) -> ObjectDefinition:
         chooseSizeList=[
             _TOY_TRUCK_2_SIZE.make(size) for size in args.size_multiplier_list
         ]
-    )
+    ))
 
 
 def _create_trophy(args: _FunctionArgs) -> ObjectDefinition:
@@ -2897,6 +3017,7 @@ def _create_trophy(args: _FunctionArgs) -> ObjectDefinition:
         attributes=['moveable', 'pickupable'],
         color=['grey'],
         materials=[],
+        poleOffsetY=0.05,
         salientMaterials=['metal'],
         shape=['trophy'],
         chooseSizeList=[
@@ -3335,6 +3456,10 @@ _TYPES_TO_DETAILS: Dict[str, TypeDetailsTuple] = {
 }
 
 
+for tool_type in LARGE_BLOCK_TOOLS_TO_DIMENSIONS.keys():
+    _TYPES_TO_DETAILS[tool_type] = TypeDetailsTuple(_create_tool, [])
+
+
 _PRIMITIVE_TUPLES = [
     ('circle_frustum', _create_primitive_non_cylinder),
     ('cone', _create_primitive_non_cylinder),
@@ -3456,6 +3581,11 @@ def is_valid_shape_material(
 
 # List of all currently supported object types (shapes).
 FULL_TYPE_LIST: List[str] = list(_TYPES_TO_DETAILS.keys())
+
+
+ALL_LARGE_BLOCK_TOOLS: List[str] = [
+    shape for shape in FULL_TYPE_LIST if shape.startswith('tool_')
+]
 
 
 def create_specific_definition_from_base(

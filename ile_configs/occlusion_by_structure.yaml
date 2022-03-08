@@ -10,19 +10,8 @@ goal:
 # Only the target can be a soccer ball.
 excluded_shapes: soccer_ball
 
-# Only generate medium or large rooms.
-room_dimensions:
-    x:
-        min: 6
-        max: 14
-    y: 4
-    z:
-        min: 6
-        max: 14
-
 # Generate many occluding structures, but no other structures.
-# One will always begin either in front of (50%) or behind (50%) the target,
-# randomized for each scene.
+# One will always begin in front of the target, occluding it.
 random_structural_objects:
     - type:
         - occluding_walls
@@ -30,17 +19,18 @@ random_structural_objects:
       keyword_location:
           keyword:
               - occlude
-              - behind
           relative_object_label: target
     - type:
         - l_occluders
-        - moving_occluders
         - occluding_walls
       num:
         min: 4
         max: 9
 
-# Override default to avoid randomly generating any more objects besides the
-# target. Remove this if you want to have randomly generated objects.
+# Override the default to only generate random context objects, in addition to
+# the target and the occluding structures.
 keyword_objects:
-    - num: 0
+    - keyword: context
+      num:
+          min: 0
+          max: 10

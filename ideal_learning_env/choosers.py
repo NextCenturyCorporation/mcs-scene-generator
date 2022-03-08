@@ -32,6 +32,19 @@ def choose_random(data: Any, data_type: Type = None) -> Any:
     return _choose_random(data, data_type)
 
 
+def choose_counts(
+    data: List[Any],
+    count_attribute: str = 'num',
+    default_count: int = 1
+) -> List[Tuple[Any, int]]:
+    """Return the given data list, but each item in the list is now a tuple
+    containing the original item and a count randomly chosen from its 'num'
+    attribute."""
+    return [(item, choose_random((
+        item if isinstance(item, dict) else vars(item)
+    ).get(count_attribute, default_count))) for item in data]
+
+
 def choose_position(
     position: Union[VectorFloatConfig, List[VectorFloatConfig]],
     object_x: float = None,

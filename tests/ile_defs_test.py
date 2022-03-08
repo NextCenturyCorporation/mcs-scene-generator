@@ -3,11 +3,12 @@ import random
 import pytest
 from machine_common_sense.config_manager import Vector3d
 
-from generator import ObjectBounds, ObjectDefinition, materials
+from generator import ObjectBounds, ObjectDefinition
 from ideal_learning_env.defs import (
     ILEException,
     ILESharedConfiguration,
     find_bounds,
+    return_list,
 )
 
 
@@ -144,7 +145,7 @@ def test_find_bounds():
     ]}
     assert find_bounds(scene) == [bounds_3, bounds_4, bounds_1, bounds_2]
 
-    # Case 7: 0 lava areas
+    # Case 7: floor textures
     scene = {'floorTextures': [{
         'material': 'blue',
         'positions': [{'x': 0, 'z': 0}]
@@ -152,24 +153,15 @@ def test_find_bounds():
     assert find_bounds(scene) == []
 
     # Case 8: 1 lava area
-    scene = {'floorTextures': [{
-        'material': materials.LAVA_MATERIALS[0].material,
-        'positions': [{'x': 3, 'z': 3}]
-    }], 'objects': []}
+    scene = {'lava': [{'x': 3, 'z': 3}], 'objects': []}
     assert find_bounds(scene) == [bounds_3]
 
     # Case 9: 2 lava areas
-    scene = {'floorTextures': [{
-        'material': materials.LAVA_MATERIALS[0].material,
-        'positions': [{'x': 3, 'z': 3}, {'x': -3, 'z': -3}]
-    }], 'objects': []}
+    scene = {'lava': [{'x': 3, 'z': 3}, {'x': -3, 'z': -3}], 'objects': []}
     assert find_bounds(scene) == [bounds_3, bounds_4]
 
     # Case 10: lava areas and objects
-    scene = {'floorTextures': [{
-        'material': materials.LAVA_MATERIALS[0].material,
-        'positions': [{'x': 3, 'z': 3}, {'x': -3, 'z': -3}]
-    }], 'objects': [
+    scene = {'lava': [{'x': 3, 'z': 3}, {'x': -3, 'z': -3}], 'objects': [
         {'shows': [{'boundingBox': bounds_1}]},
         {'shows': [{'boundingBox': bounds_2}]}
     ]}
@@ -179,11 +171,15 @@ def test_find_bounds():
     scene = {'floorTextures': [{
         'material': 'blue',
         'positions': [{'x': 0, 'z': 0}]
-    }, {
-        'material': materials.LAVA_MATERIALS[0].material,
-        'positions': [{'x': 3, 'z': 3}],
-    }], 'holes': [{'x': -3, 'z': -3}], 'objects': [
+    }], 'lava': [{'x': 3, 'z': 3}], 'holes': [{'x': -3, 'z': -3}], 'objects': [
         {'shows': [{'boundingBox': bounds_1}]},
         {'shows': [{'boundingBox': bounds_2}]}
     ]}
     assert find_bounds(scene) == [bounds_4, bounds_3, bounds_1, bounds_2]
+
+
+def test_return_list():
+    assert return_list(None) == []
+    assert return_list(None, [1234]) == [1234]
+    assert return_list(1234) == [1234]
+    assert return_list([1234]) == [1234]

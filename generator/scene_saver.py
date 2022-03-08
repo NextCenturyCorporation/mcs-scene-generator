@@ -19,6 +19,8 @@ def _convert_non_serializable_data(scene: Dict[str, Any]) -> None:
         if 'boundsAtStep' in instance['debug']:
             del instance['debug']['boundsAtStep']
         for show in instance['shows']:
+            if not show['boundingBox']:
+                continue
             show['boundingBox'] = [{
                 'x': corner.x,
                 'y': show['boundingBox'].min_y,

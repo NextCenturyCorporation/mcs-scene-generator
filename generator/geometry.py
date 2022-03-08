@@ -69,6 +69,18 @@ class ObjectBounds():
         points = [(point.x, point.z) for point in self.box_xz]
         self.polygon_xz = geometry.Polygon(points)
 
+    def expand_by(self, amount: float) -> None:
+        """Expand this bounds by the given amount on both the X and Z axes."""
+        self.polygon_xz = self.polygon_xz.buffer(
+            amount,
+            # Ensure the output polygon is also a rectangle.
+            join_style=geometry.JOIN_STYLE.mitre
+        )
+        self.box_xz = [
+            Vector3d(point[0], 0, point[1]) for point in
+            self.polygon_xz.exterior.coords
+        ][:-1]
+
     def extend_bottom_to_ground(self) -> None:
         """Extend the bottom of this bounds to the ground."""
         # We're not currently saving any height data in the box or polygon,
@@ -919,6 +931,9 @@ def move_to_location(
     location = copy.deepcopy(object_location)
     location['position']['x'] -= object_instance['debug']['offset']['x']
     location['position']['z'] -= object_instance['debug']['offset']['z']
+    original_rotation = object_instance['debug'].get('originalRotation', {})
+    for axis in ['x', 'y', 'z']:
+        location['rotation'][axis] += original_rotation.get(axis, 0)
     object_instance['shows'][0]['position'] = location['position']
     object_instance['shows'][0]['rotation'] = location['rotation']
     object_instance['shows'][0]['boundingBox'] = create_bounds(

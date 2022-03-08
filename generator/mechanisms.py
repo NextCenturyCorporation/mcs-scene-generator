@@ -11,6 +11,7 @@ from .structures import finalize_structural_object
 DEVICE_MATERIAL = MaterialTuple('Custom/Materials/Grey', ['grey'])
 HELD = 'held'
 RELEASED = 'released'
+THROWING_DEVICE_TUBE_SIZE_MULTIPLIER = 1.5
 TUBE_SIZE_MULTIPLIER = 1.25
 
 PLACER_ACTIVE_STATUS = ['active']
@@ -95,16 +96,12 @@ PLACER_TEMPLATE = {
     }],
     'debug': {
         'color': ['magenta', 'cyan'],
-        'info': ['magenta', 'cyan', 'placer', 'magenta placer', 'cyan placer'],
+        'info': [],
         'role': 'structural',
         'shape': ['placer'],
         'size': 'medium'
     }
 }
-
-
-DROPPING_DEVICE_Y_SCALE_MULTIPLIER = 1.1
-THROWING_DEVICE_Y_SCALE_MULTIPLIER = 1.45
 
 
 class MechanismDirection(Enum):
@@ -114,8 +111,11 @@ class MechanismDirection(Enum):
     Z_NEGATIVE = auto()
 
 
-def _calculate_tube_scale(dimension: float, multiplier: float = 1) -> float:
-    return round(dimension * TUBE_SIZE_MULTIPLIER * multiplier, 2)
+def _calculate_tube_scale(
+    dimension: float,
+    multiplier: float = TUBE_SIZE_MULTIPLIER
+) -> float:
+    return round(dimension * multiplier, 2)
 
 
 def _set_placer_or_placed_object_movement(
@@ -162,7 +162,8 @@ def create_dropping_device(
     object_dimensions: Dict[str, float],
     last_step: int = None,
     dropping_step: int = None,
-    id_modifier: str = None
+    id_modifier: str = None,
+    is_round: bool = False
 ) -> Dict[str, Any]:
     """Create and return an instance of a dropping device (tube) to drop the
     object with the given dimensions. The device will always face down."""
@@ -170,16 +171,15 @@ def create_dropping_device(
     device['id'] = (
         f'dropping_device_{(id_modifier + "_") if id_modifier else ""}'
     )
-    scale_x = _calculate_tube_scale(object_dimensions['x'])
-    scale_y = _calculate_tube_scale(
-        object_dimensions['y'],
-        DROPPING_DEVICE_Y_SCALE_MULTIPLIER
+    tube_scale_length = _calculate_tube_scale(object_dimensions['y'])
+    tube_scale_radius = _calculate_tube_scale(
+        object_dimensions['x'] if is_round else
+        math.hypot(object_dimensions['x'], object_dimensions['z'])
     )
-    scale_z = _calculate_tube_scale(object_dimensions['z'])
     device['shows'][0]['scale'] = {
-        'x': max(scale_x, scale_z),
-        'y': scale_y,
-        'z': max(scale_x, scale_z)
+        'x': tube_scale_radius,
+        'y': tube_scale_length,
+        'z': tube_scale_radius
     }
     half_y = (device['shows'][0]['scale']['y'] / 2.0)
     device['shows'][0]['position'] = {
@@ -207,7 +207,6 @@ def create_dropping_device(
 
 def create_placer(
     placed_object_position: Dict[str, float],
-    placed_object_scale: Dict[str, float],
     placed_object_dimensions: Dict[str, float],
     placed_object_offset_y: float,
     activation_step: int,
@@ -222,7 +221,6 @@ def create_placer(
     object with the given position and dimensions at the given end height.
 
     - placed_object_position: Placed object's position (probably in the air).
-    - placed_object_scale: Placed object's scale.
     - placed_object_dimensions: Placed object's dimensions.
     - placed_object_offset_y: Placed object's positionY, indicating whether its
                               Y position is its bottom or center.
@@ -234,24 +232,17 @@ def create_placer(
     - placed_object_pole_offset_y: Placed object's poleOffsetY.
     """
 
-    scaled_dimensions = {
-        'x': placed_object_scale['x'] * placed_object_dimensions['x'],
-        'y': placed_object_scale['y'] * placed_object_dimensions['y'],
-        'z': placed_object_scale['z'] * placed_object_dimensions['z']
-    }
-
     object_bottom = placed_object_position['y'] - placed_object_offset_y
-    object_top = object_bottom + scaled_dimensions['y'] - (
-        # Intentionally multiply the Y offset by the scale, not dimensions.
-        placed_object_scale['y'] * (placed_object_pole_offset_y or 0)
+    object_top = object_bottom + placed_object_dimensions['y'] - (
+        placed_object_pole_offset_y or 0
     )
 
     placer = copy.deepcopy(PLACER_TEMPLATE)
     placer['id'] = f'placer_{(id_modifier + "_") if id_modifier else ""}'
 
     # Set placer X/Z scale to be fraction of placed object X/Z dimensions.
-    object_scale_x = round(scaled_dimensions['x'] * PLACER_SIZE_MULT, 2)
-    object_scale_z = round(scaled_dimensions['z'] * PLACER_SIZE_MULT, 2)
+    object_scale_x = round(placed_object_dimensions['x'] * PLACER_SIZE_MULT, 2)
+    object_scale_z = round(placed_object_dimensions['z'] * PLACER_SIZE_MULT, 2)
     placer_scale = min(
         max([object_scale_x, object_scale_z, PLACER_SCALE_MIN]),
         PLACER_SCALE_MAX
@@ -291,7 +282,7 @@ def create_placer(
         ))
     )
 
-    placer = finalize_structural_object([placer])[0]
+    placer = finalize_structural_object([placer], None, ['placer'])[0]
     # The placer's bounding box should occupy the entire vertical space.
     placer['shows'][0]['boundingBox'].extend_bottom_to_ground()
     return placer
@@ -306,7 +297,9 @@ def create_throwing_device(
     object_dimensions: Dict[str, float],
     last_step: int = None,
     throwing_step: int = None,
-    id_modifier: str = None
+    id_modifier: str = None,
+    object_rotation_y: float = None,
+    is_round: bool = False
 ) -> Dict[str, Any]:
     """Create and return an instance of a throwing device (tube) to throw the
     object with the given dimensions. The device will always face left by
@@ -315,16 +308,20 @@ def create_throwing_device(
     device['id'] = (
         f'throwing_device_{(id_modifier + "_") if id_modifier else ""}'
     )
-    scale_x = _calculate_tube_scale(object_dimensions['x'])
-    scale_y = _calculate_tube_scale(
-        object_dimensions['y'],
-        THROWING_DEVICE_Y_SCALE_MULTIPLIER
+    width_axis = 'x'
+    length_axis = 'z'
+    if object_rotation_y is not None and object_rotation_y % 180 == 0:
+        width_axis = 'z'
+        length_axis = 'x'
+    tube_scale_length = _calculate_tube_scale(object_dimensions[length_axis])
+    tube_scale_radius = _calculate_tube_scale(
+        object_dimensions[width_axis] if is_round else
+        math.hypot(object_dimensions[width_axis], object_dimensions['y'])
     )
-    scale_z = _calculate_tube_scale(object_dimensions['z'])
     device['shows'][0]['scale'] = {
-        'x': max(scale_x, scale_z),
-        'y': scale_y,
-        'z': max(scale_x, scale_z)
+        'x': tube_scale_radius,
+        'y': tube_scale_length,
+        'z': tube_scale_radius
     }
     device['shows'][0]['rotation'] = {
         'x': 0,
@@ -448,7 +445,9 @@ def throw_object(
             ),
             'y': (
                 throwing_device['shows'][0]['position']['y'] +
-                position_y_modifier
+                position_y_modifier -
+                (instance['debug']['dimensions']['y'] / 2.0) +
+                instance['debug']['positionY']
             ),
             'z': (
                 throwing_device['shows'][0]['position']['z'] +
@@ -462,15 +461,18 @@ def throw_object(
         }
     }
     move_to_location(instance, location)
+    original_rotation = instance['debug'].get('originalRotation', {})
+    swap_axes = (original_rotation.get('y', 0) % 180 == 90)
     # Add the force to the object.
     instance['forces'] = [{
         'relative': True,
         'stepBegin': throwing_step,
         'stepEnd': throwing_step,
         'vector': {
-            'x': throwing_force,
+            'x': 0 if swap_axes else throwing_force,
             'y': 0,
-            'z': 0
+            'z': throwing_force if swap_axes else 0
         }
     }]
+    instance['maxAngularVelocity'] = 25
     return instance

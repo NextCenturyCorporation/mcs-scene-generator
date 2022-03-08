@@ -3,8 +3,8 @@ from machine_common_sense.config_manager import Vector3d
 
 from generator import ObjectBounds, specific_objects
 from ideal_learning_env.defs import ILEConfigurationException, ILEException
+from ideal_learning_env.goal_services import TARGET_LABEL
 from ideal_learning_env.object_services import (
-    TARGET_LABEL,
     InstanceDefinitionLocationTuple,
     ObjectRepository,
 )
@@ -78,7 +78,14 @@ def prior_scene_with_target(start_x=0, start_z=0):
 
 
 @pytest.fixture(autouse=True)
-def run_before_test():
+def run_around_test():
+    # Prepare test
+    ObjectRepository.get_instance().clear()
+
+    # Run test
+    yield
+
+    # Cleanup
     ObjectRepository.get_instance().clear()
 
 
@@ -132,11 +139,7 @@ def test_valid_path_blocked_by_lava():
     scene = prior_scene_with_target()
 
     # create blocked by lava
-    positions = [{'x': i - 5, 'z': 2} for i in range(11)]
-    scene['floorTextures'] = [{
-        'material': 'Stylized Lava Texture/Materials/Stylize_Lava_diffuse',
-        'positions': positions
-    }]
+    scene['lava'] = [{'x': i - 5, 'z': 2} for i in range(11)]
 
     with pytest.raises(ILEException):
         component.update_ile_scene(scene)
@@ -256,11 +259,7 @@ def test_valid_path_with_lava_and_holes():
     for i in range(8):
         holes.append({'x': i - 5, 'z': 3})
 
-    positions = [{'x': i - 3, 'z': 0} for i in range(8)]
-    scene['floorTextures'] = [{
-        'material': 'Stylized Lava Texture/Materials/Stylize_Lava_diffuse',
-        'positions': positions
-    }]
+    scene['lava'] = [{'x': i - 3, 'z': 0} for i in range(8)]
 
     component.update_ile_scene(scene)
     assert component.last_distance == pytest.approx(15, 0.1)

@@ -1,12 +1,12 @@
 import logging
 import math
 import random
-from dataclasses import dataclass
-from typing import Any, Dict, List, Tuple, Union
+from typing import Any, Dict, List, Union
 
 from machine_common_sense.config_manager import Vector3d
 
 from generator import MaterialTuple, geometry, materials
+from ideal_learning_env.numerics import MinMaxInt
 
 from .choosers import (
     choose_material_tuple_from_material,
@@ -16,56 +16,20 @@ from .choosers import (
 )
 from .components import ILEComponent
 from .decorators import ile_config_setter
-from .defs import ILEDelayException, ILESharedConfiguration, find_bounds
-from .interactable_object_config import InteractableObjectConfig
+from .defs import ILEDelayException, ILESharedConfiguration
+from .goal_services import GoalConfig, GoalServices
 from .numerics import VectorFloatConfig, VectorIntConfig
-from .object_services import TARGET_LABEL
 from .validators import ValidateNoNullProp, ValidateNumber, ValidateOptions
 
 logger = logging.getLogger(__name__)
 
-# MCS-553 Increase the max room size from 15 once we are able to properly
-# render the depth data at that distance in Unity.
-ROOM_MAX_XZ = 15
+ROOM_MAX_XZ = 100
 ROOM_MIN_XZ = 2
 ROOM_MAX_Y = 10
 ROOM_MIN_Y = 2
-
-
-@dataclass
-class GoalConfig():
-    """A dict with str `category` and optional `target`, `target_1`, and
-    `target_2` properties that represents the goal and target object(s) in each
-    scene. The `target*` properties are only needed if required for the
-    specific category of goal. Each `target*` property is either an
-    InteractableObjectConfig dict or list of InteractableObjectConfig dicts.
-    For each list, one dict will be randomly chosen within the list in each
-    new scene.  All goal target objects will be assigned the 'target' label.
-
-    Example:
-    ```
-    category: retrieval
-    target:
-        shape: soccer_ball
-        scale:
-          min: 1.0
-          max: 3.0
-    ```
-    """
-
-    category: str = None
-    target: Union[
-        InteractableObjectConfig,
-        List[InteractableObjectConfig]
-    ] = None
-    target_1: Union[
-        InteractableObjectConfig,
-        List[InteractableObjectConfig]
-    ] = None
-    target_2: Union[
-        InteractableObjectConfig,
-        List[InteractableObjectConfig]
-    ] = None
+# Limit the possible random room dimensions to more typical choices.
+ROOM_RANDOM_XZ = MinMaxInt(5, 30)
+ROOM_RANDOM_Y = MinMaxInt(3, 8)
 
 
 class GlobalSettingsComponent(ILEComponent):
@@ -224,13 +188,30 @@ class GlobalSettingsComponent(ILEComponent):
     ```
     """
 
+    restrict_open_doors: bool = None
+    """
+    (bool): If there are multiple doors in a scene, only allow for one door to
+    ever be opened.
+    Default: False
+
+    Simple Example:
+    ```
+    restrict_open_doors: False
+    ```
+
+    Advanced Example:
+    ```
+    restrict_open_doors: True
+    ```
+    """
+
     room_dimensions: Union[VectorIntConfig, List[VectorIntConfig]] = None
     """
     ([VectorIntConfig](#VectorIntConfig) dict, or list of VectorIntConfig
     dicts): The total dimensions for the room, or list of dimensions, from
     which one is chosen at random for each scene. Rooms are always rectangular
-    or square. The X and Z must each be within [2, 15] and the Y must be within
-    [2, 10]. The room's bounds will be [-X/2, X/2] and [-Z/2, Z/2].
+    or square. The X and Z must each be within [2, 100] and the Y must be
+    within [2, 10]. The room's bounds will be [-X/2, X/2] and [-Z/2, Z/2].
     Default: random
 
     Simple Example:
@@ -370,6 +351,7 @@ class GlobalSettingsComponent(ILEComponent):
         scene['roomMaterials'] = dict([
             (key, value.material) for key, value in wall_material_data.items()
         ])
+        scene['restrictOpenDoors'] = self.get_restrict_open_doors()
         scene['debug']['wallColors'] = list(set([
             color for value in wall_material_data.values()
             for color in value.color
@@ -383,23 +365,13 @@ class GlobalSettingsComponent(ILEComponent):
         if last_step:
             scene['goal']['last_step'] = last_step
             logger.trace(f'Setting last step = {last_step}')
-
         self._attempt_goal(scene)
         return scene
 
     def _attempt_goal(self, scene):
         try:
-            goal_data, target_list = self.get_goal_data(scene)
-            if goal_data:
-                scene['goal']['category'] = goal_data['category']
-                scene['goal']['description'] = goal_data['description']
-                scene['goal']['metadata'] = goal_data['metadata']
-                logger.trace(
-                    f'Setting {scene["goal"]["category"]} goal with '
-                    f'{len(target_list)} target(s): {scene["goal"]}'
-                )
-            for target in target_list:
-                scene['objects'].append(target)
+            goal_template = self.goal
+            GoalServices.attempt_to_add_goal(scene, goal_template)
             self._delayed_goal = False
         except ILEDelayException as e:
             logger.trace("Goal failed and needs delay.", exc_info=e)
@@ -440,52 +412,8 @@ class GlobalSettingsComponent(ILEComponent):
     def set_floor_material(self, data: Any) -> None:
         self.floor_material = data
 
-    def get_goal_data(self, scene: Dict[str, Any]) -> Tuple[
-        Dict[str, Any],
-        List[Dict[str, Any]]
-    ]:
-        if not self.goal:
-            return None, []
-
-        # Choose a random goal category (and target if needed) from the config.
-        choice: GoalConfig = choose_random(self.goal)
-        goal_metadata = {}
-        bounds_list = find_bounds(scene)
-        target_list = []
-
-        # Create the target(s) and add ID(s) to the goal's metadata.
-        for prop in ['target', 'target_1', 'target_2']:
-            config: InteractableObjectConfig = getattr(choice, prop)
-            if config:
-                labels = getattr(config, 'labels') or []
-                labels = labels if isinstance(labels, list) else [labels]
-                if TARGET_LABEL not in labels:
-                    labels.append(TARGET_LABEL)
-                setattr(config, 'labels', labels)
-                instance = config.create_instance(
-                    scene['roomDimensions'],
-                    scene['performerStart'],
-                    bounds_list
-                )
-                goal_metadata[prop] = {
-                    'id': instance['id']
-                }
-                target_list.append(instance)
-                logger.trace(
-                    f'Creating goal "{prop}" from config = {vars(config)}'
-                )
-
-        description = None
-        if choice.category.lower() == 'retrieval' and len(target_list):
-            description = (
-                f'Find and pick up the {target_list[0]["debug"]["goalString"]}'
-            )
-
-        return {
-            'category': choice.category.lower(),
-            'description': description,
-            'metadata': goal_metadata
-        }, target_list
+    def get_goal(self):
+        return self.goal
 
     # If not null, category is required.
     @ile_config_setter(validator=ValidateNoNullProp(props=['category']))
@@ -535,33 +463,65 @@ class GlobalSettingsComponent(ILEComponent):
         ) if data is not None else None
 
     def get_room_dimensions(self) -> VectorIntConfig:
-        if self.room_dimensions:
-            return choose_random(self.room_dimensions)
+        has_none = False
+        rd = self.room_dimensions or VectorIntConfig()
+        template = VectorIntConfig(rd.x, rd.y, rd.z)
+        if not template:
+            template = VectorIntConfig()
+        if template.x is None:
+            template.x = ROOM_RANDOM_XZ
+            has_none = True
+        if template.y is None:
+            template.y = ROOM_RANDOM_Y
+            has_none = True
+        if template.z is None:
+            template.z = ROOM_RANDOM_XZ
+            has_none = True
+
+        has_random = (
+            isinstance(template.x, (list, MinMaxInt)) or
+            isinstance(template.y, (list, MinMaxInt)) or
+            isinstance(template.z, (list, MinMaxInt))
+        )
+        if not has_none and not has_random:
+            return template
+
         good = False
         while not good:
-            x = random.randint(ROOM_MIN_XZ, ROOM_MAX_XZ)
-            z = (
-                x if self.room_shape == 'square' else
-                random.randint(ROOM_MIN_XZ, ROOM_MAX_XZ)
-            )
+            dims = choose_random(template)
+            x = dims.x
+            z = dims.x if self.room_shape == 'square' else dims.z
             good = True
             # Enforce the max for the diagonal distance too.
             if math.sqrt(x**2 + z**2) > ROOM_MAX_XZ:
                 good = False
             if self.room_shape == 'rectangle' and x == z:
                 good = False
-        return VectorIntConfig(x, random.randint(ROOM_MIN_Y, ROOM_MAX_Y), z)
+        return VectorIntConfig(x, dims.y, z)
+
+    @ile_config_setter()
+    def set_restrict_open_doors(self, data: Any) -> None:
+        self.restrict_open_doors = data
+
+    def get_restrict_open_doors(
+            self) -> bool:
+        if self.restrict_open_doors is None:
+            return False
+
+        return self.restrict_open_doors
 
     # If not null, all X/Y/Z properties are required.
     @ile_config_setter(validator=ValidateNumber(
         props=['x', 'z'],
         min_value=ROOM_MIN_XZ,
-        max_value=ROOM_MAX_XZ)
+        max_value=ROOM_MAX_XZ,
+        null_ok=True)
     )
     @ile_config_setter(validator=ValidateNumber(
         props=['y'],
         min_value=ROOM_MIN_Y,
-        max_value=ROOM_MAX_Y)
+        max_value=ROOM_MAX_Y,
+        null_ok=True)
     )
     def set_room_dimensions(self, data: Any) -> None:
         self.room_dimensions = data

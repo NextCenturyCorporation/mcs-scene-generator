@@ -2231,7 +2231,6 @@ class GravitySupportHypercube(IntuitivePhysicsHypercube):
             target_definition = target_variations._definitions[name]
             pole_instances[name] = mechanisms.create_placer(
                 placed_object_position=target['shows'][0]['position'],
-                placed_object_scale=target['shows'][0]['scale'],
                 placed_object_dimensions=target['debug']['dimensions'],
                 placed_object_offset_y=target['debug']['positionY'],
                 activation_step=target['shows'][0]['stepBegin'],

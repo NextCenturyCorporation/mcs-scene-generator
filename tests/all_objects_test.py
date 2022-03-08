@@ -1,5 +1,7 @@
 import math
 
+import pytest
+
 from generator import (
     definitions,
     gravity_support_objects,
@@ -9,6 +11,7 @@ from generator import (
 )
 
 
+@pytest.mark.slow
 def test_all_objects_have_expected_properties():
     for dataset in [
         specific_objects.get_interactable_definition_dataset(unshuffled=True),

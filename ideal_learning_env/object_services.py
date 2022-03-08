@@ -1,4 +1,5 @@
 import copy
+import logging
 import random
 from typing import (
     Any,
@@ -24,8 +25,7 @@ from ideal_learning_env.defs import ILEDelayException, ILEException
 
 from .numerics import VectorFloatConfig
 
-# All goal targets will be assigned this label automatically
-TARGET_LABEL = "target"
+logger = logging.getLogger(__name__)
 
 
 class InstanceDefinitionLocationTuple(NamedTuple):
@@ -79,6 +79,10 @@ class ObjectRepository():
         if labels and obj_defn_loc_tuple:
             labels = labels if isinstance(labels, list) else [labels]
             for label in labels:
+                logger.debug(
+                    f'Adding object {obj_defn_loc_tuple.instance["id"]} with '
+                    f'label {label} to the object repository'
+                )
                 self._labeled_object_store[label].append(obj_defn_loc_tuple)
 
     def get_one_from_labeled_objects(
@@ -313,20 +317,6 @@ class MaterialRestrictions():
         shape = defn.type
         for mat in defn.materials or []:
             MaterialRestrictions.valid_shape_material_or_raise(shape, mat)
-
-
-#  TODO MCS-812 Move to some utility area?
-def get_target_object(scene):
-    tgt = None
-    goal = scene.get('goal', {})
-    metadata = goal.get('metadata', {})
-    tar = metadata.get('target', {})
-    targetId = tar.get('id', {})
-    for o in scene.get('objects', []):
-        if o.get('id', '') == targetId:
-            tgt = o
-            break
-    return tgt
 
 
 T = TypeVar('T')

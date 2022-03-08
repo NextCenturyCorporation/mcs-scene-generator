@@ -1,3 +1,4 @@
+import logging
 from dataclasses import dataclass
 from typing import Any, Dict, List, Union
 
@@ -8,8 +9,13 @@ from generator import (
     base_objects,
     geometry,
     instances,
+    specific_objects,
 )
-from ideal_learning_env.defs import ILEException, ILESharedConfiguration
+from ideal_learning_env.defs import (
+    ILEDelayException,
+    ILEException,
+    ILESharedConfiguration,
+)
 from ideal_learning_env.object_services import (
     InstanceDefinitionLocationTuple,
     KeywordLocation,
@@ -28,6 +34,8 @@ from .numerics import (
     VectorFloatConfig,
     VectorIntConfig,
 )
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -117,6 +125,9 @@ class InteractableObjectConfig():
     VectorIntConfig dicts): The rotation of this object in each scene. For a
     list, a new rotation will be randomly chosen for each scene.
     Default: random
+    - `identical_to` (str): used to match to another object with
+    the specified label, so that this definition can share that object's
+    exact shape, scale, and material.
     - `scale` (float, or list of floats, or [MinMaxFloat](#MinMaxFloat) dict,
     or list of MinMaxFloat dicts, or [VectorFloatConfig](#VectorFloatConfig)
     dict, or list of VectorFloatConfig dicts): The scale of this object in each
@@ -126,6 +137,9 @@ class InteractableObjectConfig():
     - `shape` (string, or list of strings): The shape (object type) of this
     object in each scene. For a list, a new shape will be randomly chosen for
     each scene. Default: random
+    - `locked` (bool or list of bools): If true and the resulting object is
+    lockable, like a container or door, the object will be locked.  If the
+    object is not lockable, this field has no affect.
 
     Example:
     ```
@@ -169,6 +183,9 @@ class InteractableObjectConfig():
         keyword_location:
           keyword: adjacent
           relative_object_label: my_container
+      -
+        num: 2
+        identical_to: my_container
     ```
     """
 
@@ -181,7 +198,9 @@ class InteractableObjectConfig():
     rotation: Union[VectorIntConfig, List[VectorIntConfig]] = None
     keyword_location: Union[KeywordLocationConfig,
                             List[KeywordLocationConfig]] = None
+    locked: Union[bool, List[bool]] = False
     labels: Union[str, List[str]] = None
+    identical_to: str = None
 
     def create_instance(
         self,
@@ -214,11 +233,22 @@ class InteractableObjectConfig():
                     self._create_definition
                 )
             if self.keyword_location:
-                idl = KeywordLocation.get_keyword_location_object_tuple(
-                    self.keyword_location,
-                    defn, performer_start, bounds, room_dimensions)
-                if idl:
-                    break
+                try:
+                    idl = KeywordLocation.get_keyword_location_object_tuple(
+                        self.keyword_location,
+                        defn, performer_start, bounds, room_dimensions)
+                    if idl:
+                        break
+                except ILEException as e:
+                    # If location can't be found, try again and therefore log
+                    # but don't let exception continue.  However, if the
+                    # Exception is a Delay Exception, we want ot pass it up.
+                    if isinstance(e, ILEDelayException):
+                        raise e from e
+                    logger.debug(
+                        f"Failed to place object with keyword location="
+                        f"{self.keyword_location}",
+                        exc_info=e)
             else:
                 location = self._attach_location(
                     defn,
@@ -235,12 +265,13 @@ class InteractableObjectConfig():
                         idl = InstanceDefinitionLocationTuple(
                             obj, defn, location)
                         break
-
         if not idl:
             location_str = f"location={self.keyword_location or self.position}"
             raise ILEException(
                 "Failed to create object instance. "
                 f"shape={self.shape} {location_str}")
+        if idl.instance['type'] in specific_objects.get_lockable_shapes():
+            idl.instance['locked'] = self.locked
 
         object_repo = ObjectRepository.get_instance()
         object_repo.add_to_labeled_objects(idl, self.labels)
@@ -266,6 +297,7 @@ class InteractableObjectConfig():
                 )),
                 'rotation': vars(choose_rotation(self.rotation))
             }
+            location['position']['y'] += defn.positionY
         else:
             return geometry.calc_obj_pos(
                 performer_start['position'],
@@ -301,6 +333,7 @@ class InteractableObjectConfig():
         else:
             colors = [mat[0]]
             mat = mat[1]
+
         return base_objects.create_specific_definition_from_base(
             shape,
             mat,

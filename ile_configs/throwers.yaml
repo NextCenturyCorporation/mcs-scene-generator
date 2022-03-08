@@ -1,0 +1,27 @@
+# Add a Retrieval goal with a soccer ball as the target object.
+goal:
+    category: retrieval
+    target:
+        shape: soccer_ball
+        scale:
+            min: 1.0
+            max: 3.0
+
+# Only the target can be a soccer ball.
+excluded_shapes: soccer_ball
+
+# Generate many throwing devices, but no other structures.
+# One will always begin holding the target, then release it.
+# The others will begin holding other objects, then release them.
+structural_throwers:
+    - num: 1
+      projectile_labels: target
+    - num:
+        min: 4
+        max: 9
+
+# Override default to avoid randomly generating any more objects besides the
+# target and other objects that begin held by devices. Remove this if you want
+# to have randomly generated objects.
+keyword_objects:
+    - num: 0

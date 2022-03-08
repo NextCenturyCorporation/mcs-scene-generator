@@ -1,5 +1,6 @@
 from .actions_component import ActionRestrictionsComponent
 from .choosers import (
+    choose_counts,
     choose_position,
     choose_random,
     choose_rotation,
@@ -13,8 +14,10 @@ from .defs import (
     ILEException,
     ILESharedConfiguration,
     find_bounds,
+    return_list,
 )
-from .global_settings_component import GlobalSettingsComponent, GoalConfig
+from .global_settings_component import GlobalSettingsComponent
+from .goal_services import TARGET_LABEL, GoalConfig, get_target_object
 from .interactable_object_config import InteractableObjectConfig
 from .interactable_objects_component import (
     KeywordLocationConfig,

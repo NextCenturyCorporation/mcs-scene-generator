@@ -13,22 +13,26 @@ excluded_shapes: soccer_ball
 # Only generate large rooms.
 room_dimensions:
     x:
-        min: 8
-        max: 12
+        min: 10
+        max: 30
     y: 3
     z:
-        min: 8
-        max: 12
+        min: 10
+        max: 30
 
 # Generate many holes, walls, and areas of lava, but no other structures.
 random_structural_objects:
     - type:
         - holes
         - lava
+      num:
+        min: 50
+        max: 300
+    - type:
         - walls
       num:
-        min: 10
-        max: 20
+        min: 5
+        max: 15
 
 # Override default to avoid randomly generating any more objects besides the
 # target. Remove this if you want to have randomly generated objects.

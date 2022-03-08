@@ -5,6 +5,7 @@ from typing import Any, Dict, List, Union
 from ideal_learning_env.defs import ILEConfigurationException, ILEException
 from ideal_learning_env.numerics import MinMaxFloat
 
+from .action_generator import StepBeginEnd, add_freezes
 from .choosers import choose_random
 from .components import ILEComponent
 from .decorators import ile_config_setter
@@ -12,26 +13,6 @@ from .numerics import MinMaxInt
 from .validators import ValidateNumber
 
 logger = logging.getLogger(__name__)
-
-
-@dataclass
-class StepBeginEnd():
-    """
-    Contains a step range for a specific event.
-
-    - `begin` (int, or list of ints, or [MinMaxInt](#MinMaxInt) dict, or list
-    of MinMaxInt dicts):
-    The step where the performer agent starts being frozen
-    and can only use the `"Pass"` action. For example, if 1, the performer
-    agent must pass immediately at the start of the scene.  This is an
-    inclusive limit.
-    - `end` (int, or list of ints, or [MinMaxInt](#MinMaxInt) dict, or list
-    of MinMaxInt dicts):
-    The step where the performer agent ends being frozen and can resume
-    using actions besides `"Pass"`.  Therefore, this is an exclusive limit.
-    """
-    begin: Union[int, MinMaxInt, List[Union[int, MinMaxInt]]] = None
-    end: Union[int, MinMaxInt, List[Union[int, MinMaxInt]]] = None
 
 
 @dataclass
@@ -226,7 +207,7 @@ class ActionRestrictionsComponent(ILEComponent):
             goal['action_list'] = [['Pass']] * total_steps
             logger.trace('Setting whole scene as passive')
         if freezes:
-            self._add_freezes(goal, freezes)
+            add_freezes(goal, freezes)
             logger.trace(f'Adding {len(freezes)} freezes to scene')
         if swivels:
             self._add_swivels(goal, swivels)
@@ -254,31 +235,6 @@ class ActionRestrictionsComponent(ILEComponent):
                     f"Cannot teleport during freeze or swivel "
                     f"at step={step - 1}")
             al[step - 1] = [cmd]
-
-    def _add_freezes(self, goal, freezes):
-        goal['action_list'] = goal.get('action_list', [])
-        al = goal['action_list']
-        limit = 1
-        for f in freezes:
-            f.begin = 1 if f.begin is None else f.begin
-            if f.end is None:
-                if goal['last_step'] is None:
-                    raise ILEConfigurationException(
-                        "Configuration error.  A freeze without an 'end' "
-                        "requires 'last_step' to be set.")
-                else:
-                    # Add one so we include the last step.  End is exclusive.
-                    f.end = goal['last_step'] + 1
-            if (limit > f.begin):
-                raise ILEException(f"Freezes overlapped at {limit}")
-            if f.begin >= f.end:
-                raise ILEException(
-                    f"Freezes has begin >= end ({f.begin} >= {f.end})")
-            num_free = f.begin - limit
-            num_limited = f.end - f.begin
-            al += ([[]] * (num_free))
-            al += ([['Pass']] * (num_limited))
-            limit = f.end
 
     def _add_swivels(self, goal, swivels):
         swivel_actions = ['LookDown', 'LookUp', 'RotateLeft', 'RotateRight']

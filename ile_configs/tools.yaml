@@ -1,0 +1,28 @@
+# Generate a pool of lava with an island in the center; a randomly-sized soccer
+# ball retrieval target positioned on the island; and a large block tool on
+# wheels positioned near the lava.
+shortcut_lava_target_tool:
+    random_performer_position: true
+    # Equal chance for the tool to begin facing the target, or not.
+    tool_rotation: [0, 0, 0, 0, 0, 0, 15, 30, 45, 60, 75, 90]
+
+# Only generate medium or large rooms.
+room_dimensions:
+    x:
+        min: 15
+        max: 30
+    y: 3
+    z:
+        min: 15
+        max: 30
+room_shape: square
+
+# Override default behavior to avoid randomly generating any other structures
+# beside the platform.
+random_structural_objects:
+    - num: 0
+keyword_objects:
+    - num: 0
+
+# Only the target can be a soccer ball.
+excluded_shapes: soccer_ball

@@ -3,8 +3,15 @@
 [How to Use the ILE](./README.md)
 
 #### Table of Content
+- [Lists](#Lists)
 - [Classes](#Classes)
 - [Options](#Options)
+
+## Lists
+
+- [Interactable shapes](https://nextcenturycorporation.github.io/MCS/schema.html#interactable-objects)
+- [Materials](https://nextcenturycorporation.github.io/MCS/schema.html#material-list)
+- [Tool shapes](https://nextcenturycorporation.github.io/MCS/schema.html#tool-objects)
 
 ## Classes
 
@@ -89,6 +96,9 @@ Default: random
 VectorIntConfig dicts): The rotation of this object in each scene. For a
 list, a new rotation will be randomly chosen for each scene.
 Default: random
+- `identical_to` (str): used to match to another object with
+the specified label, so that this definition can share that object's
+exact shape, scale, and material.
 - `scale` (float, or list of floats, or [MinMaxFloat](#MinMaxFloat) dict,
 or list of MinMaxFloat dicts, or [VectorFloatConfig](#VectorFloatConfig)
 dict, or list of VectorFloatConfig dicts): The scale of this object in each
@@ -98,6 +108,9 @@ for each scene. Default: `1`
 - `shape` (string, or list of strings): The shape (object type) of this
 object in each scene. For a list, a new shape will be randomly chosen for
 each scene. Default: random
+- `locked` (bool or list of bools): If true and the resulting object is
+lockable, like a container or door, the object will be locked.  If the
+object is not lockable, this field has no affect.
 
 Example:
 ```
@@ -141,6 +154,9 @@ specific_interactable_objects:
     keyword_location:
       keyword: adjacent
       relative_object_label: my_container
+  -
+    num: 2
+    identical_to: my_container
 ```
 
 #### KeywordLocationConfig
@@ -227,12 +243,41 @@ If an array is given, one will be chosen for each creation of this group.
     pickupable, and serve to clutter the room to possibly distract the AI.
     They are never the same shape as the target object, if the scene has a
     goal with a target object.
+    - `"open_topped_containers"`: Objects that can contain other objects
+    but have no lid and open tops instead.
 - `num` (int, or list of ints, or [MinMaxInt](#MinMaxInt) dict, or list of
 MinMaxInt dicts): The number of this object the user wants to create.
 - `keyword_location`: ([KeywordLocationConfig](#KeywordLocationConfig)):
 One of the keyword locations for this object or set of objects. Any choices
 in `keyword_location` are made for each object inside the group, not the
 group as a whole.
+
+#### LavaTargetToolConfig
+
+Defines details of the shortcut_lava_target_tool shortcut.  This shortcut
+creates a room with a goal object on an island surrounded by lava. There
+will also be a block tool to facilitate acquiring the goal object.
+- `island_size` (int, or list of ints, or [MinMaxInt](#MinMaxInt) dict,
+or list of MinMaxInt dicts): The width and lenght of the island inside the
+lava.  Must produce value from 1 to 3.
+Default: Random based on room size
+- `front_lava_width` (int, or list of ints, or [MinMaxInt](#MinMaxInt):
+The number of tiles of lava in front of the island.  Must produce value
+between 2 and 6. Default: Random based on room size and island size
+- `rear_lava_width` (int, or list of ints, or [MinMaxInt](#MinMaxInt):
+The number of tiles of lava behind of the island.  Must produce value
+between 2 and 6. Default: Random based on room size, island size, and
+other lava widths.
+- `guide_rails` (bool, or list of bools): If True, guide rails will be
+generated to guide the tool in the direction it is oriented.  If a target
+exists, the guide rails will extend to the target.  This option cannot be
+used with `tool_rotation`. Default: False
+- `tool_rotation` (int, or list of ints, or [MinMaxInt](#MinMaxInt):
+Angle that too should be rotated out of alignment with target.
+This option cannot be used with `guide_rails`.  Default: 0
+- `random_performer_position` (bool, or list of bools): If True, the
+performer will be randomly placed in the room. They will not be placed in
+the lava or the island   Default: False
 
 #### MinMaxFloat
 
@@ -276,7 +321,7 @@ options for this group.  The options include the following:
         up appearing below objects which can cause the objects to fall
         into the hole.
     - `l_occluders`: A random L-shaped occluder.
-    - `lava`: A random floor area's texture is changed to lava.
+    - `lava`: A random area in the floor is changed to a pool of lava.
     - `moving_occluders`: A random occluder on a pole that moves up and
         rotates to reveal anything behind it and then back down.  It may
         repeat the movement indefinitely or stop after the first iteration.
@@ -331,9 +376,19 @@ material type.
 - `position` ([VectorFloatConfig](#VectorFloatConfig) dict, or list of
 VectorFloatConfig dicts): The structure's position in the scene
 - `rotation_y` (float, or list of floats, or [MinMaxFloat](#MinMaxFloat)
-dict, or list of MinMaxFloat dicts): The structure's rotation in the scene
-- `scale` (float, or list of floats, or [MinMaxFloat](#MinMaxFloat) dict,
-or list of MinMaxFloat dicts): Scale of the door
+dict, or list of MinMaxFloat dicts): The structure's rotation in the scene.
+For doors, must be 0, 90, 180, or 270
+- `wall_material` (string, or list of strings): The material for the wall
+around the door.
+- `wall_scale_x` (float, or list of floats, or [MinMaxFloat](#MinMaxFloat)
+dict, or list of MinMaxFloat dicts): Scale of the walls around the door in
+the x direction.  Default: A random value between 2 and the size of the
+room in the direction parallel with the door and wall.
+- `wall_scale_y` (float, or list of floats, or [MinMaxFloat](#MinMaxFloat)
+dict, or list of MinMaxFloat dicts): Scale of the walls around the door in
+the y direction.  The door will be 2 units high, so this scale must be
+greater than 2 for the top wall to appear.  Default: A random value between
+2 and the height of the room.
 
 #### StructuralDropperConfig
 
@@ -374,6 +429,8 @@ Defines details of a structural L-shaped occluder.
 
 - `num` (int, or list of ints, or [MinMaxInt](#MinMaxInt) dict, or list of
 MinMaxInt dicts): Number of structures to be created with these parameters
+- `backwards` (bool, or list of bools): Whether to create a backwards L.
+Default: [true, false]
 - `labels` (string, or list of strings): A label or labels to be assigned
 to this object. Always automatically assigned "l_occluders"
 - `material` (string, or list of strings): The structure's material or
@@ -433,12 +490,12 @@ position of the center of the occluder
 or list of MinMaxInt dicts): if `repeat_movement` is true, the number of
 steps to wait before repeating the full movement.  Default is between 1
 and 20.
-- `repeat_movement` (boolean): If true, repeat the occluder's full
-movement and rotation indefinitely, using `repeat_interval` as the number
-of steps to wait.
-- `reverse_direction` (bool): Reverse the rotation direction of a sideways
-wall by rotating the wall 180 degrees.  Only used if `origin` is set to a
-wall and not `top`
+- `repeat_movement` (bool, or list of bools): If true, repeat the
+occluder's full movement and rotation indefinitely, using `repeat_interval`
+as the number of steps to wait. Default: [true, false]
+- `reverse_direction` (bool, or list of bools): Reverse the rotation
+direction of a sideways wall by rotating the wall 180 degrees. Only used if
+`origin` is set to a wall and not `top`. Default: [true, false]
 - `rotation_y` (int, or list of ints, or [MinMaxInt](#MinMaxInt) dict,
 or list of MinMaxInt dicts): Y rotation of a non-sideways occluder wall;
 only used if any `origin` is set to `top`.  Default is 0 to 359.
@@ -468,12 +525,12 @@ Will be overrided by keyword location.
 or list of MinMaxFloat dicts): Scale of the wall.  Default is scaled to
 target size.  This will override the scale provided by the `type` field.
 - `type` (string, or list of strings): describes the type of occluding
-wall.
-The types include:
+wall. Types include:
   `occludes` - occludes the target or object.
   `short` - wide enough, but not tall enough to occlude the target.
   `thin` - tall enough, but not wide enough to occlude the target.
   `hole` - wall with a hole that reveals the target.
+Default: ['occludes', 'occludes', 'occludes', 'short', 'thin', 'hole']
 
 #### StructuralPlacerConfig
 
@@ -484,7 +541,11 @@ position.
 - `num` (int, or list of ints, or [MinMaxInt](#MinMaxInt) dict, or list of
 MinMaxInt dicts): Number of areas to be used with these parameters
 - `activation_step`: (int, or list of ints, or [MinMaxInt](#MinMaxInt)
-dict): Step on which placer should begin downward movement.
+dict): Step on which placer should begin downward movement. Default:
+between 0 and 10
+- `end_height`: (float, or list of floats, or [MinMaxFloat](#MinMaxFloat)
+dict): Height at which the placer should release its held object. Default:
+0 (so the held object is in contact with the floor)
 - `labels` (string, or list of strings): A label or labels to be assigned
 to this object. Always automatically assigned "placers"
 - `placed_object_labels` (string, or list of strings): A label for an
@@ -527,6 +588,31 @@ VectorFloatConfig dicts): The structure's position in the scene
 dict, or list of MinMaxFloat dicts): The structure's rotation in the scene
 - `scale` (float, or list of floats, or [MinMaxFloat](#MinMaxFloat) dict,
 or list of MinMaxFloat dicts): Scale of the platform
+- `lips` ([StructuralPlatformLipsConfig]
+(#StructuralPlatformLipsConfig), or list of
+StructuralPlatformLipsConfig): The platform's lips. Default: None
+- `attached_ramps` (int, or list of ints, or [MinMaxInt](#MinMaxInt) dict,
+or list of MinMaxInt dicts): Number of ramps that should be attached to
+this platform to allow the performer to climb up to this platform.
+Default: 0
+- `platform_underneath` (bool or list of bools): If true, add a platform
+below this platform that touches the floor on the bottom and this platform
+on the top.  This platform will fully be encased in the x/z directions by
+the platform created underneath.  Default: False
+- `platform_underneath_attached_ramps` (int, or list of ints, or
+[MinMaxInt](#MinMaxInt) dict, or list of MinMaxInt dicts): Number of ramps
+that should be attached to the platform created below this platform to
+allow the performer to climb onto that platform. Default: 0
+
+#### StructuralPlatformLipsConfig
+
+Defines the platform's lips with front, back,
+left, and right configurations.
+
+- `front` (bool) : Positive Z axis
+- `back` (bool) : Negative Z axis
+- `left` (bool) : Negative X axis
+- `right` (bool) : Positive X axis
 
 #### StructuralRampConfig
 
@@ -539,7 +625,8 @@ or list of MinMaxFloat dicts): Angle of the ramp upward from the floor
 - `labels` (string, or list of strings): A label or labels to be assigned
 to this object. Always automatically assigned "ramps"
 - `length` (float, or list of floats, or [MinMaxFloat](#MinMaxFloat) dict,
-or list of MinMaxFloat dicts): Length of the ramp
+or list of MinMaxFloat dicts): Length of the ramp along the floor.  This
+is the 'adjacent' side and not the hypotenuse.
 - `material` (string, or list of strings): The structure's material or
 material type.
 - `position` ([VectorFloatConfig](#VectorFloatConfig) dict, or list of
@@ -548,6 +635,14 @@ VectorFloatConfig dicts): The structure's position in the scene
 dict, or list of MinMaxFloat dicts): The structure's rotation in the scene
 - `width` (float, or list of floats, or [MinMaxFloat](#MinMaxFloat) dict,
 or list of MinMaxFloat dicts): Width of the ramp
+- `platform_underneath` (bool or list of bools): If true, add a platform
+below this ramp that touches the floor on the bottom and the bottom of
+this ramp on the top.  This ramp will fully be encased in the x/z
+directions by the platform created underneath.  Default: False
+- `platform_underneath_attached_ramps` (int, or list of ints, or
+[MinMaxInt](#MinMaxInt) dict, or list of MinMaxInt dicts): Number of ramps
+that should be attached to the platform created below this ramp to
+allow the performer to climb onto that platform.  Default: 0
 
 #### StructuralThrowerConfig
 
@@ -633,6 +728,52 @@ dict, or list of MinMaxFloat dicts):
 Rotation in Y direction where the performer agent
 is teleported.  This field is required for teleport action
 restrictions if `position_x` and `position_z` are not both set.
+
+#### ToolConfig
+
+Defines details of a tool object.
+
+- `num` (int, or list of ints, or [MinMaxInt](#MinMaxInt) dict, or list of
+MinMaxInt dicts): Number of structures to be created with these parameters
+- `labels` (string, or list of strings): A label or labels to be assigned
+to this object. Always automatically assigned "platforms"
+- `position` ([VectorFloatConfig](#VectorFloatConfig) dict, or list of
+VectorFloatConfig dicts): The structure's position in the scene
+- `rotation_y` (float, or list of floats, or [MinMaxFloat](#MinMaxFloat)
+dict, or list of MinMaxFloat dicts): The structure's rotation in the scene
+- `shape` (string, or list of strings): The shape (object type) of this
+object in each scene. For a list, a new shape will be randomly chosen for
+each scene. Must be a valid [tool shape](#Lists). Default: random
+- `guide_rails` (bool, or list of bools): If True, guide rails will be
+generated to guide the tool in the direction it is oriented.  If a target
+exists, the guide rails will extend to the target.  Default: random
+
+#### TripleDoorConfig
+
+Defines details of the triple door shortcut.  This short cut contains a
+platform that bisects the room.  A wall with 3 doors (a.k.a. door occluder,
+or "door-cluder" or "doorcluder") will bisect the room
+in the perpendicular direction.
+
+- `start_drop_step` (int, or list of ints, or [MinMaxInt](#MinMaxInt) dict,
+or list of MinMaxInt dicts): Step number to start dropping the bisecting
+wall with doors.  If None or less than 1, the wall will start in position.
+Default: None
+- `add_lips` (bool, or list of bools): If true, lips will be added on the
+platform beyond the doors and wall such that the performer will be forced
+to go through the corresponding door to enter the area behind it.
+Default: True
+- `add_freeze` (bool, or list of bools): If true and 'start_drop_step is'
+greater than 0, the user will be frozen (forced to Pass) until the wall and
+doors are in position.  If the 'start_drop_step' is None or less than 1,
+this value has no effect.  Default: True
+- `restrict_open_doors` (bool, or list of bools): If true, the performer
+will only be able to open one door.  Using this feature and 'add_lips'
+will result in a forced choice by the performer.  Default: True
+- `door_material` (string, or list of strings): The material or material
+type for the doors.
+- `wall_material` (string, or list of strings): The material or material
+type for the wall.
 
 #### VectorFloatConfig
 
@@ -720,7 +861,7 @@ check_valid_path: true
 
 #### doors
 
-([StructuralDoorConfig](#FloorStructuralDoorConfigMaterialConfig), or list
+([StructuralDoorConfig](#StructuralDoorConfig), or list
 of [StructuralDoorConfig](#StructuralDoorConfig) dict) --
 Groups of door configurations and how many should be generated from the
 given options.  Note: Doors do not contain any frame or wall support.
@@ -946,6 +1087,7 @@ for more information on labels.
   - obstacles: keywords_obstacles
   - occluders: keywords_occluders
   - context: keywords_context
+  - open_topped_containers: keywords_open_topped_containers
 
 Simple Example:
 ```
@@ -1007,9 +1149,7 @@ last_step: 1000
 
 ([FloorAreaConfig](#FloorAreaConfig), or list of
 [FloorAreaConfig](#FloorAreaConfig) dict) --
-Groups of lava configurations. Shortcut for the "floor_material_override"
-option with the lava material.
-Default: 0
+Groups of lava configurations. Default: 0
 
 
 Simple Example:
@@ -1208,13 +1348,29 @@ random_structural_objects:
     num: 2
 ```
 
+#### restrict_open_doors
+
+(bool): If there are multiple doors in a scene, only allow for one door to
+ever be opened.
+Default: False
+
+Simple Example:
+```
+restrict_open_doors: False
+```
+
+Advanced Example:
+```
+restrict_open_doors: True
+```
+
 #### room_dimensions
 
 ([VectorIntConfig](#VectorIntConfig) dict, or list of VectorIntConfig
 dicts): The total dimensions for the room, or list of dimensions, from
 which one is chosen at random for each scene. Rooms are always rectangular
-or square. The X and Z must each be within [2, 15] and the Y must be within
-[2, 10]. The room's bounds will be [-X/2, X/2] and [-Z/2, Z/2].
+or square. The X and Z must each be within [2, 100] and the Y must be
+within [2, 10]. The room's bounds will be [-X/2, X/2] and [-Z/2, Z/2].
 Default: random
 
 Simple Example:
@@ -1269,6 +1425,48 @@ Advanced Example:
 shortcut_bisecting_platform: True
 ```
 
+#### shortcut_lava_room
+
+(bool): Creates a room with lava on either side of the performer. The
+performer will start in the center (non-lava) part.
+
+Simple Example:
+```
+shortcut_lava_room: False
+```
+
+Advanced Example:
+```
+shortcut_lava_room: True
+```
+
+#### shortcut_lava_target_tool
+
+(bool or [LavaTargetToolConfig](#LavaTargetToolConfig)):
+Creates a room with a goal object on an island surrounded by lava.
+There will also be a block tool to facilitate acquiring the goal object.
+One dimension of the room must be 13 or greater.  The other dimension must
+be 7 or greater.  By default, the target is a soccer ball with scale
+between 1 and 3. The tool is a pushable tool object with a length equal
+to the span from the front of the lava over the island to the back of the
+lava.  It will have a width of either 0.5, 0.75, 1.0.
+
+Simple Example:
+```
+shortcut_lava_target_tool: False
+```
+
+Advanced Example:
+```
+shortcut_lava_target_tool:
+  island_size:
+    min: 1
+    max: 3
+  front_lava_width: 2
+  rear_lava_width: [2, 3]
+  guide_rails: [True, False]
+```
+
 #### shortcut_ramp_to_platform
 
 (bool): Creates a ramp with a platform connected to it such that a
@@ -1284,6 +1482,49 @@ shortcut_ramp_to_platform: False
 Advanced Example:
 ```
 shortcut_ramp_to_platform: True
+```
+
+#### shortcut_start_on_platform
+
+(bool): Ensures that the performer will start on top of a platform. In
+order for this to work, `structural_platforms` needs to be specified
+using the label `start_structure`.
+
+Default: False
+
+Simple Example:
+```
+shortcut_start_on_platform: False
+```
+
+Advanced Example:
+```
+shortcut_start_on_platform: True
+```
+
+#### shortcut_triple_door_choice
+
+(bool or [TripleDoorConfig](#TripleDoorConfig)):
+Creates a platform bisecting the room with a wall with 3 doors
+(a.k.a. door occluder, or "door-cluder" or "doorcluder").
+The performer starts on one end such that the performer is forced to make
+a choice on which door they want to open.  By default, the doors will be
+restricted so only one can be opened.  Default: False
+
+Simple Example:
+```
+shortcut_triple_door_choice: False
+```
+
+Advanced Example:
+```
+shortcut_triple_door_choice:
+  start_drop_step:
+    min: 2
+    max: 5
+  add_lips: True
+  add_freeze: [True, False]
+  restrict_open_doors: True
 ```
 
 #### specific_interactable_objects
@@ -1492,6 +1733,11 @@ structural_platforms:
       z: 2
     rotation_y: 30
     material: 'PLASTIC_MATERIALS'
+    lips:
+      front: True
+      back: True
+      left: False
+      right: False
     scale:
       x: 1.1
       y: [0.5, 1]
@@ -1653,6 +1899,49 @@ teleports:
       min: 41
       max: 48
     rotation_y: [30, 120, 270]
+```
+
+#### tools
+
+([ToolConfig](#ToolConfig), or list of [ToolConfig](#ToolConfig) dict) --
+Groups of large block tool configurations and how many should be generated
+from the given options.
+Default: 0
+
+
+Simple Example:
+```
+tools:
+    - num: 0
+```
+
+Advanced Example:
+```
+tools:
+    - num:
+        min: 1
+        max: 3
+    - num: 1
+      shape: tool_rect_1_00_x_9_00
+      position:
+        x: [1,2]
+        y: 0
+        z:
+          min: -3
+          max: 3
+    - num: [1, 3]
+      shape:
+        - tool_rect_0_50_x_4_00
+        - tool_rect_0_75_x_4_00
+        - tool_rect_1_00_x_4_00
+      position:
+        x: [4, 5]
+        y: 0
+        z:
+          min: -5
+          max: -4
+
+
 ```
 
 #### wall_back_material

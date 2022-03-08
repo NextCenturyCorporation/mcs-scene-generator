@@ -42,7 +42,7 @@ def test_interactable_object_config_create_instance_random_material():
         []
     )
     assert instance['type'] == 'ball'
-    assert instance['shows'][0]['position'] == {'x': 1, 'y': 0, 'z': 2}
+    assert instance['shows'][0]['position'] == {'x': 1, 'y': 1.5, 'z': 2}
     assert instance['shows'][0]['rotation'] == {'x': 0, 'y': 90, 'z': 0}
     assert instance['shows'][0]['scale'] == {'x': 3, 'y': 3, 'z': 3}
 
@@ -72,7 +72,7 @@ def test_interactable_object_config_create_instance_random_position():
     assert instance['shows'][0]['scale'] == {'x': 3, 'y': 3, 'z': 3}
 
     assert -3.5 <= instance['shows'][0]['position']['x'] <= 3.5
-    assert instance['shows'][0]['position']['y'] == 0
+    assert instance['shows'][0]['position']['y'] == 1.5
     assert -3.5 <= instance['shows'][0]['position']['z'] <= 3.5
 
 
@@ -92,7 +92,7 @@ def test_interactable_object_config_create_instance_random_rotation():
     assert instance['type'] == 'ball'
     assert instance['materials'] == [
         'AI2-THOR/Materials/Plastics/BlackPlastic']
-    assert instance['shows'][0]['position'] == {'x': 1, 'y': 0, 'z': 2}
+    assert instance['shows'][0]['position'] == {'x': 1, 'y': 1.5, 'z': 2}
     assert instance['shows'][0]['scale'] == {'x': 3, 'y': 3, 'z': 3}
 
     assert instance['shows'][0]['rotation']['x'] == 0
@@ -117,7 +117,7 @@ def test_interactable_object_config_create_instance_random_scale():
     )
     assert instance['type'] == 'ball'
     assert instance['materials'] == ['AI2-THOR/Materials/Wood/DarkWoodSmooth2']
-    assert instance['shows'][0]['position'] == {'x': 1, 'y': 0, 'z': 2}
+    assert instance['shows'][0]['position'] == {'x': 1, 'y': 0.5, 'z': 2}
     assert instance['shows'][0]['rotation'] == {'x': 0, 'y': 90, 'z': 0}
     assert instance['shows'][0]['scale'] == {'x': 1, 'y': 1, 'z': 1}
 
@@ -137,8 +137,13 @@ def test_interactable_object_config_create_instance_random_shape():
     )
     assert instance['materials'] == [
         'AI2-THOR/Materials/Metals/BrushedAluminum_Blue']
-    assert instance['shows'][0]['position'] == {'x': 1, 'y': 0, 'z': 2}
-    assert instance['shows'][0]['rotation'] == {'x': 0, 'y': 90, 'z': 0}
+    assert instance['shows'][0]['position']['x'] == 1
+    assert instance['shows'][0]['position']['z'] == 2
+    assert instance['shows'][0]['rotation'] == {
+        'x': 0,
+        'y': 90 + instance['debug']['originalRotation']['y'],
+        'z': 0
+    }
     if instance['type'].endswith('cylinder'):
         assert instance['shows'][0]['scale'] == {'x': 3, 'y': 1.5, 'z': 3}
     else:
@@ -163,8 +168,13 @@ def test_interactable_object_config_create_instance_random_shape_excluded():
     )
     assert instance['materials'] == [
         'AI2-THOR/Materials/Metals/BrushedAluminum_Blue']
-    assert instance['shows'][0]['position'] == {'x': 1, 'y': 0, 'z': 2}
-    assert instance['shows'][0]['rotation'] == {'x': 0, 'y': 90, 'z': 0}
+    assert instance['shows'][0]['position']['x'] == 1
+    assert instance['shows'][0]['position']['z'] == 2
+    assert instance['shows'][0]['rotation'] == {
+        'x': 0,
+        'y': 90 + instance['debug']['originalRotation']['y'],
+        'z': 0
+    }
     if instance['type'].endswith('cylinder'):
         assert instance['shows'][0]['scale'] == {'x': 3, 'y': 1.5, 'z': 3}
     else:
@@ -192,9 +202,39 @@ def test_interactable_object_config_create_instance_specific():
     assert instance['type'] == 'ball'
     assert instance['materials'] == [
         'UnityAssetStore/Wooden_Toys_Bundle/ToyBlocks/meshes/Materials/red_1x1']  # noqa
-    assert instance['shows'][0]['position'] == {'x': 1, 'y': 0, 'z': 2}
+    assert instance['shows'][0]['position'] == {'x': 1, 'y': 1.5, 'z': 2}
     assert instance['shows'][0]['rotation'] == {'x': 0, 'y': 90, 'z': 0}
     assert instance['shows'][0]['scale'] == {'x': 3, 'y': 3, 'z': 3}
+
+
+def test_interactable_object_config_create_instance_locked():
+    config = InteractableObjectConfig(
+        shape='chest_4',
+        locked=True
+    )
+    instance = config.create_instance(
+        {'x': 10, 'y': 3, 'z': 10},
+        {'position': {'x': 0, 'y': 0, 'z': 0},
+         'rotation': {'x': 0, 'y': 0, 'z': 0}},
+        []
+    )
+    assert instance['type'] == 'chest_4'
+    assert instance['locked']
+
+
+def test_interactable_object_config_create_instance_locked_unlockable():
+    config = InteractableObjectConfig(
+        shape='ball',
+        locked=True
+    )
+    instance = config.create_instance(
+        {'x': 10, 'y': 3, 'z': 10},
+        {'position': {'x': 0, 'y': 0, 'z': 0},
+         'rotation': {'x': 0, 'y': 0, 'z': 0}},
+        []
+    )
+    assert instance['type'] == 'ball'
+    assert instance.get('locked') is None
 
 
 def test_interactable_object_config_create_instance_specific_excluded():
@@ -216,7 +256,7 @@ def test_interactable_object_config_create_instance_specific_excluded():
     assert instance['type'] == 'ball'
     assert instance['materials'] == [
         'UnityAssetStore/Wooden_Toys_Bundle/ToyBlocks/meshes/Materials/red_1x1']  # noqa
-    assert instance['shows'][0]['position'] == {'x': 1, 'y': 0, 'z': 2}
+    assert instance['shows'][0]['position'] == {'x': 1, 'y': 1.5, 'z': 2}
     assert instance['shows'][0]['rotation'] == {'x': 0, 'y': 90, 'z': 0}
     assert instance['shows'][0]['scale'] == {'x': 3, 'y': 3, 'z': 3}
 
@@ -259,10 +299,9 @@ def test_interactable_object_config_create_instance_specific_list():
         ['UnityAssetStore/Wooden_Toys_Bundle/ToyBlocks/meshes/Materials/wood_1x1'],  # noqa
         ['UnityAssetStore/Wooden_Toys_Bundle/ToyBlocks/meshes/Materials/blue_1x1']  # noqa
     ]
-    assert (
-        instance['shows'][0]['position'] == {'x': 1, 'y': 0, 'z': 2} or
-        instance['shows'][0]['position'] == {'x': -1, 'y': 0, 'z': -2}
-    )
+    assert instance['shows'][0]['position']['x'] in [1, -1]
+    assert round(instance['shows'][0]['position']['y'], 2) in [0, 1.5, 1.75]
+    assert instance['shows'][0]['position']['z'] in [2, -2]
     assert (
         instance['shows'][0]['rotation'] == {'x': 0, 'y': 90, 'z': 0} or
         instance['shows'][0]['rotation'] == {'x': 0, 'y': 180, 'z': 0}

@@ -16,6 +16,7 @@ from .definitions import (
     ObjectDefinition,
     get_dataset,
 )
+from .structures import DOOR_TEMPLATE
 
 
 def multiply(one: Vector3d, two: Vector3d) -> Vector3d:
@@ -1476,7 +1477,6 @@ _CONTAINERS = [
     [_TOOLBOX_2],
 ]
 
-
 _CONTAINERS_OPEN_TOPPED = [[
     # Each definition has multiple available sizes: the first is the smallest
     # size that can fit the soccer ball, and the rest are bigger sizes.
@@ -1694,3 +1694,19 @@ def choose_distractor_definition(
 
     dataset = DISTRACTOR_DATASET.filter_on_custom(_filter_data_callback)
     return dataset.choose_random_definition()
+
+
+LOCKABLE_SHAPES = None
+
+
+def get_lockable_shapes():
+    """Generate and return a list of all the lockable shapes"""
+    global LOCKABLE_SHAPES
+    if not LOCKABLE_SHAPES:
+        LOCKABLE_SHAPES = []
+        all_containers = _get("CONTAINERS")
+        for outer in all_containers:
+            for inner in outer:
+                if inner and inner.type:
+                    LOCKABLE_SHAPES.append(inner.type)
+    return LOCKABLE_SHAPES + [DOOR_TEMPLATE['type']]

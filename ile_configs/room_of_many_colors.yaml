@@ -1,8 +1,8 @@
-# Between 1 and 50 areas of the floor will be colored randomly.
+# Between 1 and 100 areas of the floor will be colored randomly.
 floor_material_override:
     - num:
         min: 1
-        max: 50
+        max: 100
 
 # Each outer room wall will be colored randomly and independently.
 wall_back_material:

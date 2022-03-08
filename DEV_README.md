@@ -24,6 +24,12 @@ If you want to ignore a subset of files by filename pattern, use `find`. For exa
 python -m pytest $(find tests/*.py ! -name 'ile*') -vv
 ```
 
+Many of the slower unit tests are marked as `slow`.  To skip these tests, use `-m 'not slow'` option:
+
+```
+python -m pytest -vv -m 'not slow'
+```
+
 ## Linting
 
 We are currently using [flake8](https://flake8.pycqa.org/en/latest/) and [autopep8](https://pypi.org/project/autopep8/) for linting and formatting our Python code. This is enforced within the python_api and scene_generator projects. Both are [PEP 8](https://www.python.org/dev/peps/pep-0008/) compliant (besides some inline exceptions), although we are ignoring the following rules:

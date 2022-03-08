@@ -1,7 +1,12 @@
 import pytest
 from machine_common_sense.config_manager import Vector3d
 
-from generator import MaterialTuple, ObjectBounds, structures
+from generator import (
+    ALL_LARGE_BLOCK_TOOLS,
+    MaterialTuple,
+    ObjectBounds,
+    structures,
+)
 
 
 def test_create_interior_wall():
@@ -179,7 +184,7 @@ def test_create_l_occluder():
 
 def test_create_l_occluder_optional_parameters():
     occluder = structures.create_l_occluder(
-        position_x=1,
+        position_x=-1,
         position_z=2,
         rotation_y=0,
         scale_front_x=2.5,
@@ -374,6 +379,67 @@ def test_create_platform():
     )
     assert platform_bounds.max_y == 5
     assert platform_bounds.min_y == 0
+    assert platform['lips']['front'] is False
+    assert platform['lips']['back'] is False
+    assert platform['lips']['left'] is False
+    assert platform['lips']['right'] is False
+
+
+def test_create_platform_with_lips():
+    platform = structures.create_platform(
+        position_x=1,
+        position_z=2,
+        rotation_y=0,
+        scale_x=4,
+        scale_y=5,
+        scale_z=6,
+        lips={
+            'front': True,
+            'back': True,
+            'left': False,
+            'right': False
+        },
+        material_tuple=MaterialTuple('test_material', ['black', 'white'])
+    )
+
+    assert isinstance(platform['id'], str)
+    assert platform['kinematic'] is True
+    assert platform['structure'] is True
+    assert platform['type'] == 'cube'
+    # Expected mass from _calculate_mass function
+    assert platform['mass'] == 15000
+    assert platform['materials'] == ['test_material']
+    assert platform['debug']['color'] == ['black', 'white']
+    assert platform['debug']['info'] == [
+        'black', 'white', 'platform', 'black platform', 'white platform',
+        'black white platform'
+    ]
+
+    assert len(platform['shows']) == 1
+    assert platform['shows'][0]['stepBegin'] == 0
+    assert platform['shows'][0]['position'] == {'x': 1, 'y': 2.5, 'z': 2}
+    assert platform['shows'][0]['rotation'] == {'x': 0, 'y': 0, 'z': 0}
+    assert platform['shows'][0]['scale'] == {'x': 4, 'y': 5, 'z': 6}
+    platform_bounds = platform['shows'][0]['boundingBox']
+    assert vars(platform_bounds.box_xz[0]) == pytest.approx(
+        {'x': 3, 'y': 0, 'z': 5}
+    )
+    assert vars(platform_bounds.box_xz[1]) == pytest.approx(
+        {'x': 3, 'y': 0, 'z': -1}
+    )
+    assert vars(platform_bounds.box_xz[2]) == pytest.approx(
+        {'x': -1, 'y': 0, 'z': -1}
+    )
+    assert vars(platform_bounds.box_xz[3]) == pytest.approx(
+        {'x': -1, 'y': 0, 'z': 5}
+    )
+    assert platform_bounds.max_y == 5
+    assert platform_bounds.min_y == 0
+
+    assert platform['lips']['front'] is True
+    assert platform['lips']['back'] is True
+    assert platform['lips']['left'] is False
+    assert platform['lips']['right'] is False
 
 
 def test_create_platform_optional_parameters():
@@ -706,19 +772,22 @@ def test_create_ramp_45_degree_optional_parameters():
 
 
 def test_create_door():
-    door = structures.create_door(
+    door_objs = structures.create_door(
         position_x=1,
+        position_y=0,
         position_z=3,
-        rotation_y=78,
-        scale_x=1.2,
-        scale_y=0.9,
-        scale_z=1.3,
-        material_tuple=MaterialTuple("test_material", ["brown", "blue"])
+        rotation_y=180,
+        wall_scale_x=3.2,
+        wall_scale_y=2.5,
+        material_tuple=MaterialTuple("test_material", ["brown", "blue"]),
+        wall_material_tuple=MaterialTuple("wall_material", ["green", "red"])
     )
+
+    door = door_objs[0]
 
     assert isinstance(door['id'], str)
     assert door['kinematic']
-    assert door['structure']
+    assert not door.get('structure')
     assert door['type'] == 'door_4'
     assert door['materials'] == ['test_material']
     assert door['debug']['color'] == ['brown', 'blue']
@@ -730,24 +799,165 @@ def test_create_door():
     assert door['shows'][0]['position']['x'] == 1
     assert door['shows'][0]['position']['y'] == 0
     assert door['shows'][0]['position']['z'] == 3
-    assert door['shows'][0]['rotation'] == {'x': 0, 'y': 78, 'z': 0}
-    assert door['shows'][0]['scale']['x'] == 1.2
-    assert door['shows'][0]['scale']['y'] == 0.9
-    assert door['shows'][0]['scale']['z'] == 1.3
-    bb = door['shows'][0]['boundingBox'].box_xz
-    bb0 = vars(bb[0])
-    bb1 = vars(bb[1])
-    bb2 = vars(bb[2])
-    bb3 = vars(bb[3])
-    assert bb0['x'] == pytest.approx(1.76054, 0.01)
+    assert door['shows'][0]['rotation'] == {'x': 0, 'y': 180, 'z': 0}
+    assert door['shows'][0]['scale']['x'] == 1
+    assert door['shows'][0]['scale']['y'] == 1
+    assert door['shows'][0]['scale']['z'] == 1
+    bb = door['shows'][0]['boundingBox']
+    assert bb.max_y == 2
+    assert bb.min_y == 0
+    bb0 = vars(bb.box_xz[0])
+    bb1 = vars(bb.box_xz[1])
+    bb2 = vars(bb.box_xz[2])
+    bb3 = vars(bb.box_xz[3])
+    assert bb0['x'] == pytest.approx(0.575, 0.01)
     assert bb0['y'] == 0
-    assert bb0['z'] == pytest.approx(2.5482, 0.01)
-    assert bb1['x'] == pytest.approx(0.4889, 0.01)
+    assert bb0['z'] == pytest.approx(2.15, 0.01)
+    assert bb1['x'] == pytest.approx(0.575, 0.01)
     assert bb1['y'] == 0
-    assert bb1['z'] == pytest.approx(2.27796, 0.01)
-    assert bb2['x'] == pytest.approx(0.23945, 0.01)
+    assert bb1['z'] == pytest.approx(3.85, 0.01)
+    assert bb2['x'] == pytest.approx(1.425, 0.01)
     assert bb2['y'] == 0
-    assert bb2['z'] == pytest.approx(3.4517, 0.01)
-    assert bb3['x'] == pytest.approx(1.51104, 0.01)
+    assert bb2['z'] == pytest.approx(3.85, 0.01)
+    assert bb3['x'] == pytest.approx(1.425, 0.01)
     assert bb3['y'] == 0
-    assert bb3['z'] == pytest.approx(3.7220, 0.01)
+    assert bb3['z'] == pytest.approx(2.15, 0.01)
+
+    top_wall = door_objs[1]
+    assert isinstance(top_wall['id'], str)
+    assert top_wall['kinematic']
+    assert top_wall['structure']
+    assert top_wall['type'] == 'cube'
+    assert top_wall['materials'] == ['wall_material']
+    assert top_wall['debug']['color'] == ['green', 'red']
+    assert top_wall['shows'][0]['stepBegin'] == 0
+    assert top_wall['shows'][0]['position']['x'] == 1
+    assert top_wall['shows'][0]['position']['y'] == 2.25
+    assert top_wall['shows'][0]['position']['z'] == 3
+    assert top_wall['shows'][0]['rotation'] == {'x': 0, 'y': 180, 'z': 0}
+    assert top_wall['shows'][0]['scale']['x'] == 3.2
+    assert top_wall['shows'][0]['scale']['y'] == 0.5
+    assert top_wall['shows'][0]['scale']['z'] == 0.1
+
+    left_wall = door_objs[2]
+    assert isinstance(left_wall['id'], str)
+    assert left_wall['kinematic']
+    assert left_wall['structure']
+    assert left_wall['type'] == 'cube'
+    assert left_wall['materials'] == ['wall_material']
+    assert left_wall['debug']['color'] == ['green', 'red']
+    assert left_wall['shows'][0]['stepBegin'] == 0
+    assert left_wall['shows'][0]['position']['x'] == pytest.approx(-0.01)
+    assert left_wall['shows'][0]['position']['y'] == 1
+    assert left_wall['shows'][0]['position']['z'] == 3
+    assert left_wall['shows'][0]['rotation'] == {'x': 0, 'y': 180, 'z': 0}
+    assert left_wall['shows'][0]['scale']['x'] == pytest.approx(1.18)
+    assert left_wall['shows'][0]['scale']['y'] == 2
+    assert left_wall['shows'][0]['scale']['z'] == 0.1
+
+    right_wall = door_objs[3]
+    assert isinstance(right_wall['id'], str)
+    assert right_wall['kinematic']
+    assert right_wall['structure']
+    assert right_wall['type'] == 'cube'
+    assert right_wall['materials'] == ['wall_material']
+    assert right_wall['debug']['color'] == ['green', 'red']
+    assert right_wall['shows'][0]['stepBegin'] == 0
+    assert right_wall['shows'][0]['position']['x'] == pytest.approx(2.01)
+    assert right_wall['shows'][0]['position']['y'] == 1
+    assert right_wall['shows'][0]['position']['z'] == 3
+    assert right_wall['shows'][0]['rotation'] == {'x': 0, 'y': 180, 'z': 0}
+    assert right_wall['shows'][0]['scale']['x'] == pytest.approx(1.18)
+    assert right_wall['shows'][0]['scale']['y'] == 2
+    assert right_wall['shows'][0]['scale']['z'] == 0.1
+
+
+def test_create_guide_rail():
+    mat = MaterialTuple("AI2-THOR/Materials/Wood/BedroomFloor1", ["brown"])
+    rail = structures.create_guide_rail(1, 2, 90, 4, mat)
+    assert rail['id'].startswith('guide_rail')
+    assert rail['type'] == 'cube'
+    assert rail['structure']
+    assert rail['kinematic']
+    show = rail['shows'][0]
+    pos = show['position']
+    scale = show['scale']
+    assert pos == {'x': 1, 'y': 0, 'z': 2}
+    assert show['rotation'] == {'x': 0, 'y': 90, 'z': 0}
+    assert scale == {'x': 0.2, 'y': 0.2, 'z': 4}
+    assert rail['materials'] == [mat[0]]
+
+
+def test_create_guilde_rail_around():
+    mat = MaterialTuple("AI2-THOR/Materials/Walls/BrownDrywall", ["brown"])
+    rails = structures.create_guide_rails_around(3, 1, 180, 3, 2, mat)
+    rail1 = rails[0]
+    rail2 = rails[1]
+
+    assert rail1['id'].startswith('guide_rail')
+    assert rail1['type'] == 'cube'
+    assert rail1['structure']
+    assert rail1['kinematic']
+    show = rail1['shows'][0]
+    pos = show['position']
+    scale = show['scale']
+    assert pos == {'x': 4.2, 'y': 0, 'z': 1}
+    assert show['rotation'] == {'x': 0, 'y': 180, 'z': 0}
+    assert scale == {'x': 0.2, 'y': 0.2, 'z': 3}
+
+    assert rail2['id'].startswith('guide_rail')
+    assert rail2['type'] == 'cube'
+    assert rail2['structure']
+    assert rail2['kinematic']
+    show = rail2['shows'][0]
+    pos = show['position']
+    scale = show['scale']
+    assert pos == {'x': 1.8, 'y': 0, 'z': 1}
+    assert show['rotation'] == {'x': 0, 'y': 180, 'z': 0}
+    assert scale == {'x': 0.2, 'y': 0.2, 'z': 3}
+    assert rail1['materials'] == rail2['materials'] == [mat[0]]
+
+
+def test_create_tool():
+    tool_type = 'tool_rect_1_00_x_4_00'
+    assert tool_type in ALL_LARGE_BLOCK_TOOLS
+    tool = structures.create_tool(
+        object_type=tool_type,
+        position_x=1,
+        position_z=2,
+        rotation_y=180
+    )
+
+    assert tool['id'].startswith('tool_')
+    assert tool['type'] == tool_type
+    assert not tool.get('kinematic')
+    assert not tool.get('structure')
+    assert tool.get('moveable', True)
+    assert 'mass' not in tool
+    assert 'materials' not in tool
+    assert tool['debug']['color'] == ['grey', 'black']
+    assert tool['debug']['info'] == [
+        'grey', 'black', 'tool', 'grey tool', 'black tool',
+        'grey black tool'
+    ]
+
+    assert len(tool['shows']) == 1
+    assert tool['shows'][0]['stepBegin'] == 0
+    assert tool['shows'][0]['position'] == {'x': 1, 'y': 0.15, 'z': 2}
+    assert tool['shows'][0]['rotation'] == {'x': 0, 'y': 180, 'z': 0}
+    assert tool['shows'][0]['scale'] == {'x': 1, 'y': 1, 'z': 1}
+    tool_bounds = tool['shows'][0]['boundingBox']
+    assert vars(tool_bounds.box_xz[0]) == pytest.approx(
+        {'x': 0.5, 'y': 0, 'z': 0}
+    )
+    assert vars(tool_bounds.box_xz[1]) == pytest.approx(
+        {'x': 0.5, 'y': 0, 'z': 4}
+    )
+    assert vars(tool_bounds.box_xz[2]) == pytest.approx(
+        {'x': 1.5, 'y': 0, 'z': 4}
+    )
+    assert vars(tool_bounds.box_xz[3]) == pytest.approx(
+        {'x': 1.5, 'y': 0, 'z': 0}
+    )
+    assert tool_bounds.max_y == 0.3
+    assert tool_bounds.min_y == 0

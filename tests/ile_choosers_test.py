@@ -10,6 +10,7 @@ from ideal_learning_env import (
     MinMaxInt,
     VectorFloatConfig,
     VectorIntConfig,
+    choose_counts,
     choose_position,
     choose_random,
     choose_rotation,
@@ -32,6 +33,83 @@ def run_before_and_after_tests():
     base_objects.FULL_TYPE_LIST = saved_type_list
     base_objects._TYPES_TO_DETAILS = saved_material_restrictions
     base_objects._MATERIAL_TO_VALID_TYPE["_all_types"] = saved_all_types
+
+
+def test_choose_counts():
+    item_a = {'id': 'a', 'num': 1}
+    item_b = {'id': 'b', 'num': [2, 3]}
+    item_c = {'id': 'c', 'num': MinMaxInt(4, 6)}
+    item_d = {'id': 'd', 'num': [MinMaxInt(1, 2), MinMaxInt(7, 8)]}
+
+    assert choose_counts([]) == []
+
+    assert choose_counts([item_a]) == [(item_a, 1)]
+
+    result = choose_counts([item_b])
+    assert result == [(item_b, 2)] or result == [(item_b, 3)]
+
+    result = choose_counts([item_a, item_b])
+    assert (
+        result == [(item_a, 1), (item_b, 2)] or
+        result == [(item_a, 1), (item_b, 3)]
+    )
+
+    result = choose_counts([item_c])
+    assert (
+        result == [(item_c, 4)] or result == [(item_c, 5)] or
+        result == [(item_c, 6)]
+    )
+
+    result = choose_counts([item_c, item_a])
+    assert (
+        result == [(item_c, 4), (item_a, 1)] or
+        result == [(item_c, 5), (item_a, 1)] or
+        result == [(item_c, 6), (item_a, 1)]
+    )
+
+    result = choose_counts([item_d])
+    assert (
+        result == [(item_d, 1)] or result == [(item_d, 2)] or
+        result == [(item_d, 7)] or result == [(item_d, 8)]
+    )
+
+    result = choose_counts([item_d, item_a])
+    assert (
+        result == [(item_d, 1), (item_a, 1)] or
+        result == [(item_d, 2), (item_a, 1)] or
+        result == [(item_d, 7), (item_a, 1)] or
+        result == [(item_d, 8), (item_a, 1)]
+    )
+
+    assert choose_counts([{}]) == [({}, 1)]
+    assert choose_counts([{}, {}]) == [({}, 1), ({}, 1)]
+
+
+def test_choose_counts_override_defaults():
+    item_a = {'id': 'a', 'count': 1}
+    item_b = {'id': 'b', 'count': [2, 3]}
+    item_c = {'id': 'c', 'count': MinMaxInt(4, 6)}
+    item_d = {'id': 'd', 'count': [MinMaxInt(1, 2), MinMaxInt(7, 8)]}
+
+    assert choose_counts([item_a], 'count', 0) == [(item_a, 1)]
+
+    result = choose_counts([item_b], 'count', 0)
+    assert result == [(item_b, 2)] or result == [(item_b, 3)]
+
+    result = choose_counts([item_c], 'count', 0)
+    assert (
+        result == [(item_c, 4)] or result == [(item_c, 5)] or
+        result == [(item_c, 6)]
+    )
+
+    result = choose_counts([item_d], 'count', 0)
+    assert (
+        result == [(item_d, 1)] or result == [(item_d, 2)] or
+        result == [(item_d, 7)] or result == [(item_d, 8)]
+    )
+
+    assert choose_counts([{}], 'count', 0) == [({}, 0)]
+    assert choose_counts([{}, {}], 'count', 0) == [({}, 0), ({}, 0)]
 
 
 def test_choose_position():

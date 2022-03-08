@@ -22,7 +22,7 @@ def run_around_test():
 
 def test_object_repository_clear():
     repo = ObjectRepository.get_instance()
-    fake = InstanceDefinitionLocationTuple({}, {}, {})
+    fake = InstanceDefinitionLocationTuple({'id': 'fake'}, {}, {})
     repo.add_to_labeled_objects(fake, "label")
 
     assert repo.get_one_from_labeled_objects("label") == fake
@@ -42,7 +42,7 @@ def test_object_repository_add_none_tuple():
 
 def test_object_repository_add_none_label():
     repo = ObjectRepository.get_instance()
-    fake = InstanceDefinitionLocationTuple({}, {}, {})
+    fake = InstanceDefinitionLocationTuple({'id': 'fake'}, {}, {})
     assert len(repo._labeled_object_store) == 0
     repo.add_to_labeled_objects(fake, None)
     assert len(repo._labeled_object_store) == 0
@@ -50,7 +50,7 @@ def test_object_repository_add_none_label():
 
 def test_object_repository_add_array():
     repo = ObjectRepository.get_instance()
-    fake = InstanceDefinitionLocationTuple({}, {}, {})
+    fake = InstanceDefinitionLocationTuple({'id': 'fake'}, {}, {})
     repo.add_to_labeled_objects(fake, ["label", "label2"])
 
     assert repo.get_one_from_labeled_objects("label") == fake
@@ -61,7 +61,7 @@ def test_object_repository_add_array():
 
 def test_object_repository_get_single():
     repo = ObjectRepository.get_instance()
-    fake = InstanceDefinitionLocationTuple({}, {}, {})
+    fake = InstanceDefinitionLocationTuple({'id': 'fake'}, {}, {})
     fake2 = InstanceDefinitionLocationTuple({"id": "12345"}, {}, {})
     repo.add_to_labeled_objects(fake, ["label", "label2"])
     repo.add_to_labeled_objects(fake2, ["label3", "label2"])
@@ -74,7 +74,7 @@ def test_object_repository_get_single():
 
 def test_object_repository_get_multiple():
     repo = ObjectRepository.get_instance()
-    fake = InstanceDefinitionLocationTuple({}, {}, {})
+    fake = InstanceDefinitionLocationTuple({'id': 'fake'}, {}, {})
     fake2 = InstanceDefinitionLocationTuple({"id": "12345"}, {}, {})
     repo.add_to_labeled_objects(fake, ["label", "label2"])
     repo.add_to_labeled_objects(fake2, ["label3", "label2"])

@@ -10,6 +10,7 @@ from machine_common_sense.config_manager import Vector3d
 from machine_common_sense.logging_config import TRACE
 
 from generator import (
+    ALL_LARGE_BLOCK_TOOLS,
     MAX_TRIES,
     ObjectBounds,
     geometry,
@@ -20,12 +21,16 @@ from generator import (
     specific_objects,
     structures,
 )
+from ideal_learning_env.global_settings_component import (
+    ROOM_MIN_XZ,
+    ROOM_MIN_Y,
+)
+from ideal_learning_env.goal_services import TARGET_LABEL
 from ideal_learning_env.interactable_object_config import (
     InteractableObjectConfig,
     KeywordLocationConfig,
 )
 from ideal_learning_env.object_services import (
-    TARGET_LABEL,
     InstanceDefinitionLocationTuple,
     KeywordLocation,
     ObjectDefinition,
@@ -63,7 +68,6 @@ RAMP_ANGLE_MIN = 15
 RAMP_ANGLE_MAX = 45
 L_OCCLUDER_SCALE_MIN = 0.5
 L_OCCLUDER_SCALE_MAX = 2
-DROPPER_THROWER_SCALE_MULTIPLIER = 1.5
 DROPPER_THROWER_BUFFER = 0.2
 DEFAULT_PROJECTILE_SCALE = MinMaxFloat(0.2, 2)
 # Ranges for Occluders when values are not specified
@@ -94,6 +98,24 @@ DEFAULT_OCCLUDING_WALL_SHORT_THIN_SCALE_MAX = 0.5
 # Height of 0.9 blocks agent, but doesn't look like it should visually
 OCCLUDING_WALL_HOLE_MAX_HEIGHT = 0.8
 OCCLUDING_WALL_WIDTH_BUFFER = 0.6
+
+ATTACHED_RAMP_MIN_WIDTH = .5
+ATTACHED_RAMP_MAX_WIDTH = 1.5
+ATTACHED_RAMP_MAX_LENGTH = 3
+ATTACHED_RAMP_MIN_LENGTH = .5
+TOP_PLATFORM_POSITION_MIN = 0.3
+
+# These are arbitrary but they need to be high enough that a ramp can get up
+# the top platform without being greater than 45 degress.
+BOTTOM_PLATFORM_SCALE_BUFFER_MIN = geometry.PERFORMER_WIDTH
+BOTTOM_PLATFORM_SCALE_BUFFER_MAX = 5
+
+# used to determine where ramps can fit next to platforms.  When on the floor,
+# we don't have a good way to determine this (particularly when rotated) so we
+# use an arbitrarily large number and let the bounds checking determine if
+# locations are valid later.
+DEFAULT_AVAIABLE_LENGTHS = (10, 10, 10, 10)
+RAMP_ROTATIONS = (90, 180, -90, 0)
 
 ALL_THROWABLE_SHAPES = list(set([
     definition.type for definition in
@@ -158,6 +180,7 @@ class StructuralTypes(Enum):
     RAMPS = auto()
     THROWERS = auto()
     WALLS = auto()
+    TOOLS = auto()
 
 
 @dataclass
@@ -203,6 +226,23 @@ class StructuralWallConfig(PositionableStructuralObjectsConfig):
 
 
 @dataclass
+class StructuralPlatformLipsConfig():
+    """
+    Defines the platform's lips with front, back,
+    left, and right configurations.
+
+    - `front` (bool) : Positive Z axis
+    - `back` (bool) : Negative Z axis
+    - `left` (bool) : Negative X axis
+    - `right` (bool) : Positive X axis
+    """
+    front: bool = None
+    back: bool = None
+    left: bool = None
+    right: bool = None
+
+
+@dataclass
 class StructuralPlatformConfig(PositionableStructuralObjectsConfig):
     """
     Defines details of a structural platform.
@@ -219,9 +259,29 @@ class StructuralPlatformConfig(PositionableStructuralObjectsConfig):
     dict, or list of MinMaxFloat dicts): The structure's rotation in the scene
     - `scale` (float, or list of floats, or [MinMaxFloat](#MinMaxFloat) dict,
     or list of MinMaxFloat dicts): Scale of the platform
+    - `lips` ([StructuralPlatformLipsConfig]
+    (#StructuralPlatformLipsConfig), or list of
+    StructuralPlatformLipsConfig): The platform's lips. Default: None
+    - `attached_ramps` (int, or list of ints, or [MinMaxInt](#MinMaxInt) dict,
+    or list of MinMaxInt dicts): Number of ramps that should be attached to
+    this platform to allow the performer to climb up to this platform.
+    Default: 0
+    - `platform_underneath` (bool or list of bools): If true, add a platform
+    below this platform that touches the floor on the bottom and this platform
+    on the top.  This platform will fully be encased in the x/z directions by
+    the platform created underneath.  Default: False
+    - `platform_underneath_attached_ramps` (int, or list of ints, or
+    [MinMaxInt](#MinMaxInt) dict, or list of MinMaxInt dicts): Number of ramps
+    that should be attached to the platform created below this platform to
+    allow the performer to climb onto that platform. Default: 0
     """
+    lips: Union[StructuralPlatformLipsConfig,
+                List[StructuralPlatformLipsConfig]] = None
     scale: Union[float, MinMaxFloat, List[Union[float, MinMaxFloat]],
                  VectorFloatConfig, List[VectorFloatConfig]] = None
+    attached_ramps: Union[int, MinMaxInt, List[Union[int, MinMaxInt]]] = None
+    platform_underneath: Union[bool, List[bool]] = None
+    platform_underneath_attached_ramps: Union[int, MinMaxInt, List[Union[int, MinMaxInt]]] = None  # noqa
 
 
 @dataclass
@@ -236,7 +296,8 @@ class StructuralRampConfig(PositionableStructuralObjectsConfig):
     - `labels` (string, or list of strings): A label or labels to be assigned
     to this object. Always automatically assigned "ramps"
     - `length` (float, or list of floats, or [MinMaxFloat](#MinMaxFloat) dict,
-    or list of MinMaxFloat dicts): Length of the ramp
+    or list of MinMaxFloat dicts): Length of the ramp along the floor.  This
+    is the 'adjacent' side and not the hypotenuse.
     - `material` (string, or list of strings): The structure's material or
     material type.
     - `position` ([VectorFloatConfig](#VectorFloatConfig) dict, or list of
@@ -245,6 +306,14 @@ class StructuralRampConfig(PositionableStructuralObjectsConfig):
     dict, or list of MinMaxFloat dicts): The structure's rotation in the scene
     - `width` (float, or list of floats, or [MinMaxFloat](#MinMaxFloat) dict,
     or list of MinMaxFloat dicts): Width of the ramp
+    - `platform_underneath` (bool or list of bools): If true, add a platform
+    below this ramp that touches the floor on the bottom and the bottom of
+    this ramp on the top.  This ramp will fully be encased in the x/z
+    directions by the platform created underneath.  Default: False
+    - `platform_underneath_attached_ramps` (int, or list of ints, or
+    [MinMaxInt](#MinMaxInt) dict, or list of MinMaxInt dicts): Number of ramps
+    that should be attached to the platform created below this ramp to
+    allow the performer to climb onto that platform.  Default: 0
     """
     angle: Union[float, MinMaxFloat,
                  List[Union[float, MinMaxFloat]]] = None
@@ -252,6 +321,8 @@ class StructuralRampConfig(PositionableStructuralObjectsConfig):
                  List[Union[float, MinMaxFloat]]] = None
     length: Union[float, MinMaxFloat,
                   List[Union[float, MinMaxFloat]]] = None
+    platform_underneath: Union[bool, List[bool]] = None
+    platform_underneath_attached_ramps: Union[int, MinMaxInt, List[Union[int, MinMaxInt]]] = None  # noqa
 
 
 @dataclass
@@ -261,6 +332,8 @@ class StructuralLOccluderConfig(PositionableStructuralObjectsConfig):
 
     - `num` (int, or list of ints, or [MinMaxInt](#MinMaxInt) dict, or list of
     MinMaxInt dicts): Number of structures to be created with these parameters
+    - `backwards` (bool, or list of bools): Whether to create a backwards L.
+    Default: [true, false]
     - `labels` (string, or list of strings): A label or labels to be assigned
     to this object. Always automatically assigned "l_occluders"
     - `material` (string, or list of strings): The structure's material or
@@ -285,6 +358,7 @@ class StructuralLOccluderConfig(PositionableStructuralObjectsConfig):
     dict, or list of MinMaxFloat dicts): Scale in the y direction for the
     entire occluder
     """
+    backwards: Union[bool, List[bool]] = None
     scale_front_x: Union[float, MinMaxFloat,
                          List[Union[float, MinMaxFloat]]] = None
     scale_front_z: Union[float, MinMaxFloat,
@@ -444,12 +518,12 @@ class StructuralMovingOccluderConfig(BaseStructuralObjectsConfig):
     or list of MinMaxInt dicts): if `repeat_movement` is true, the number of
     steps to wait before repeating the full movement.  Default is between 1
     and 20.
-    - `repeat_movement` (boolean): If true, repeat the occluder's full
-    movement and rotation indefinitely, using `repeat_interval` as the number
-    of steps to wait.
-    - `reverse_direction` (bool): Reverse the rotation direction of a sideways
-    wall by rotating the wall 180 degrees.  Only used if `origin` is set to a
-    wall and not `top`
+    - `repeat_movement` (bool, or list of bools): If true, repeat the
+    occluder's full movement and rotation indefinitely, using `repeat_interval`
+    as the number of steps to wait. Default: [true, false]
+    - `reverse_direction` (bool, or list of bools): Reverse the rotation
+    direction of a sideways wall by rotating the wall 180 degrees. Only used if
+    `origin` is set to a wall and not `top`. Default: [true, false]
     - `rotation_y` (int, or list of ints, or [MinMaxInt](#MinMaxInt) dict,
     or list of MinMaxInt dicts): Y rotation of a non-sideways occluder wall;
     only used if any `origin` is set to `top`.  Default is 0 to 359.
@@ -472,9 +546,9 @@ class StructuralMovingOccluderConfig(BaseStructuralObjectsConfig):
                           List[Union[float, MinMaxFloat]]] = None
     occluder_thickness: Union[float, MinMaxFloat,
                               List[Union[float, MinMaxFloat]]] = None
-    repeat_movement: bool = None
+    repeat_movement: Union[bool, List[bool]] = None
     repeat_interval: Union[int, MinMaxInt, List[Union[int, MinMaxInt]]] = None
-    reverse_direction: bool = None
+    reverse_direction: Union[bool, List[bool]] = None
     rotation_y: Union[int, MinMaxInt, List[Union[int, MinMaxInt]]] = None
 
 
@@ -539,12 +613,12 @@ class StructuralOccludingWallConfig(PositionableStructuralObjectsConfig):
     or list of MinMaxFloat dicts): Scale of the wall.  Default is scaled to
     target size.  This will override the scale provided by the `type` field.
     - `type` (string, or list of strings): describes the type of occluding
-    wall.
-    The types include:
+    wall. Types include:
       `occludes` - occludes the target or object.
       `short` - wide enough, but not tall enough to occlude the target.
       `thin` - tall enough, but not wide enough to occlude the target.
       `hole` - wall with a hole that reveals the target.
+    Default: ['occludes', 'occludes', 'occludes', 'short', 'thin', 'hole']
     """
     type: Union[str, List[str]] = None
     scale: Union[float, MinMaxFloat, List[Union[float, MinMaxFloat]],
@@ -562,7 +636,11 @@ class StructuralPlacerConfig(BaseStructuralObjectsConfig):
     - `num` (int, or list of ints, or [MinMaxInt](#MinMaxInt) dict, or list of
     MinMaxInt dicts): Number of areas to be used with these parameters
     - `activation_step`: (int, or list of ints, or [MinMaxInt](#MinMaxInt)
-    dict): Step on which placer should begin downward movement.
+    dict): Step on which placer should begin downward movement. Default:
+    between 0 and 10
+    - `end_height`: (float, or list of floats, or [MinMaxFloat](#MinMaxFloat)
+    dict): Height at which the placer should release its held object. Default:
+    0 (so the held object is in contact with the floor)
     - `labels` (string, or list of strings): A label or labels to be assigned
     to this object. Always automatically assigned "placers"
     - `placed_object_labels` (string, or list of strings): A label for an
@@ -591,6 +669,9 @@ class StructuralPlacerConfig(BaseStructuralObjectsConfig):
     """
 
     num: Union[int, MinMaxInt, List[Union[int, MinMaxInt]]] = 0
+    activation_step: Union[int, MinMaxInt, List[Union[int, MinMaxInt]]] = None
+    end_height: Union[float, MinMaxFloat,
+                      List[Union[float, MinMaxFloat]]] = None
     placed_object_position: Union[VectorFloatConfig,
                                   List[VectorFloatConfig]] = None
     placed_object_scale: Union[float, MinMaxFloat,
@@ -601,7 +682,6 @@ class StructuralPlacerConfig(BaseStructuralObjectsConfig):
                                   List[Union[int, MinMaxInt]]] = None
     placed_object_shape: Union[str, List[str]] = None
     placed_object_material: Union[str, List[str]] = None
-    activation_step: Union[int, MinMaxInt, List[Union[int, MinMaxInt]]] = None
     placed_object_labels: Union[str, List[str]] = None
 
 
@@ -619,12 +699,53 @@ class StructuralDoorConfig(PositionableStructuralObjectsConfig):
     - `position` ([VectorFloatConfig](#VectorFloatConfig) dict, or list of
     VectorFloatConfig dicts): The structure's position in the scene
     - `rotation_y` (float, or list of floats, or [MinMaxFloat](#MinMaxFloat)
-    dict, or list of MinMaxFloat dicts): The structure's rotation in the scene
-    - `scale` (float, or list of floats, or [MinMaxFloat](#MinMaxFloat) dict,
-    or list of MinMaxFloat dicts): Scale of the door
+    dict, or list of MinMaxFloat dicts): The structure's rotation in the scene.
+    For doors, must be 0, 90, 180, or 270
+    - `wall_material` (string, or list of strings): The material for the wall
+    around the door.
+    - `wall_scale_x` (float, or list of floats, or [MinMaxFloat](#MinMaxFloat)
+    dict, or list of MinMaxFloat dicts): Scale of the walls around the door in
+    the x direction.  Default: A random value between 2 and the size of the
+    room in the direction parallel with the door and wall.
+    - `wall_scale_y` (float, or list of floats, or [MinMaxFloat](#MinMaxFloat)
+    dict, or list of MinMaxFloat dicts): Scale of the walls around the door in
+    the y direction.  The door will be 2 units high, so this scale must be
+    greater than 2 for the top wall to appear.  Default: A random value between
+    2 and the height of the room.
     """
-    scale: Union[float, MinMaxFloat, List[Union[float, MinMaxFloat]],
-                 VectorFloatConfig, List[VectorFloatConfig]] = None
+    wall_material: Union[str, List[str]] = None
+    wall_scale_x: Union[float, MinMaxFloat,
+                        List[Union[float, MinMaxFloat]]] = None
+    wall_scale_y: Union[float, MinMaxFloat,
+                        List[Union[float, MinMaxFloat]]] = None
+
+
+# TODO MCS-1206 Move into the interactable object component
+@dataclass
+class ToolConfig(BaseStructuralObjectsConfig):
+    """
+    Defines details of a tool object.
+
+    - `num` (int, or list of ints, or [MinMaxInt](#MinMaxInt) dict, or list of
+    MinMaxInt dicts): Number of structures to be created with these parameters
+    - `labels` (string, or list of strings): A label or labels to be assigned
+    to this object. Always automatically assigned "platforms"
+    - `position` ([VectorFloatConfig](#VectorFloatConfig) dict, or list of
+    VectorFloatConfig dicts): The structure's position in the scene
+    - `rotation_y` (float, or list of floats, or [MinMaxFloat](#MinMaxFloat)
+    dict, or list of MinMaxFloat dicts): The structure's rotation in the scene
+    - `shape` (string, or list of strings): The shape (object type) of this
+    object in each scene. For a list, a new shape will be randomly chosen for
+    each scene. Must be a valid [tool shape](#Lists). Default: random
+    - `guide_rails` (bool, or list of bools): If True, guide rails will be
+    generated to guide the tool in the direction it is oriented.  If a target
+    exists, the guide rails will extend to the target.  Default: random
+    """
+    position: Union[VectorFloatConfig, List[VectorFloatConfig]] = None
+    rotation_y: Union[float, MinMaxFloat,
+                      List[Union[float, MinMaxFloat]]] = None
+    shape: Union[str, List[str]] = None
+    guide_rails: Union[bool, List[bool]] = False
 
 
 DEFAULT_TEMPLATE_DROPPER = StructuralDropperConfig(
@@ -666,8 +787,12 @@ DEFAULT_TEMPLATE_MOVING_OCCLUDER = StructuralMovingOccluderConfig(
     repeat_interval=MinMaxInt(DEFAULT_MOVING_OCCLUDER_REPEAT_MIN,
                               DEFAULT_MOVING_OCCLUDER_REPEAT_MAX))
 DEFAULT_TEMPLATE_PLATFORM = StructuralPlatformConfig(
-    num=0, position=VectorFloatConfig(None, None, None),
-    scale=MinMaxFloat(PLATFORM_SCALE_MIN, PLATFORM_SCALE_MAX))
+    num=0,
+    lips=StructuralPlatformLipsConfig(False, False, False, False),
+    position=VectorFloatConfig(None, None, None),
+    scale=MinMaxFloat(PLATFORM_SCALE_MIN, PLATFORM_SCALE_MAX),
+    attached_ramps=0, platform_underneath=False,
+    platform_underneath_attached_ramps=0)
 DEFAULT_TEMPLATE_WALL = StructuralWallConfig(
     num=0, position=VectorFloatConfig(None, None, None))
 DEFAULT_TEMPLATE_RAMP = StructuralRampConfig(
@@ -679,14 +804,16 @@ DEFAULT_TEMPLATE_L_OCCLUDER = StructuralLOccluderConfig(
     scale_front_z=MinMaxFloat(L_OCCLUDER_SCALE_MIN, L_OCCLUDER_SCALE_MAX),
     scale_side_x=MinMaxFloat(L_OCCLUDER_SCALE_MIN, L_OCCLUDER_SCALE_MAX),
     scale_side_z=MinMaxFloat(L_OCCLUDER_SCALE_MIN, L_OCCLUDER_SCALE_MAX),
-    scale_y=MinMaxFloat(L_OCCLUDER_SCALE_MIN, L_OCCLUDER_SCALE_MAX))
+    scale_y=MinMaxFloat(L_OCCLUDER_SCALE_MIN, L_OCCLUDER_SCALE_MAX),
+    backwards=[True, False])
 
-DEFAULT_TEMPLATE_HOLES = FloorAreaConfig(0)
+DEFAULT_TEMPLATE_HOLES_LAVA = FloorAreaConfig(0)
 
 DEFAULT_TEMPLATE_FLOOR_MATERIALS = FloorMaterialConfig(0)
 
 DEFAULT_OCCLUDING_WALL = StructuralOccludingWallConfig(
-    num=0, type=[e.value for e in OccludingWallType],
+    num=0,
+    type=['occludes', 'occludes', 'occludes', 'short', 'thin', 'hole'],
     keyword_location=None,
     scale=None, rotation_y=MinMaxFloat(
         DEFAULT_OCCLUDER_ROTATION_MIN, DEFAULT_OCCLUDER_ROTATION_MAX),
@@ -700,7 +827,8 @@ DEFAULT_TEMPLATE_PLACER = StructuralPlacerConfig(
     placed_object_rotation=MinMaxInt(0, 359),
     placed_object_scale=DEFAULT_PROJECTILE_SCALE,
     placed_object_shape=ALL_THROWABLE_SHAPES,
-    activation_step=MinMaxInt(0, 10))
+    activation_step=MinMaxInt(0, 10),
+    end_height=0)
 
 DOOR_MATERIAL_RESTRICTIONS = [mat[0] for mat in (materials.METAL_MATERIALS +
                                                  materials.PLASTIC_MATERIALS +
@@ -708,15 +836,21 @@ DOOR_MATERIAL_RESTRICTIONS = [mat[0] for mat in (materials.METAL_MATERIALS +
 
 DEFAULT_TEMPLATE_DOOR = StructuralDoorConfig(
     num=0, position=VectorFloatConfig(None, None, None),
+    rotation_y=[0, 90, 180, 270],
+    material=DOOR_MATERIAL_RESTRICTIONS,
+    wall_material=materials.WALL_MATERIALS,
+    wall_scale_x=None, wall_scale_y=None)
+
+DEFAULT_TEMPLATE_TOOL = ToolConfig(
+    num=0, position=VectorFloatConfig(None, None, None),
     rotation_y=MinMaxInt(0, 359),
-    scale=1, material=DOOR_MATERIAL_RESTRICTIONS)
+    shape=ALL_LARGE_BLOCK_TOOLS.copy()
+)
 
 
 def add_structural_object_with_retries_or_throw(
         scene: dict, bounds: List[ObjectBounds], retries: int, template,
-        structural_type: StructuralTypes, i: int,
-        existing_holes: Tuple[int, int], mat_to_loc,
-        existing_floor_materials: Tuple[int, int]):
+        structural_type: StructuralTypes):
     """Attempts to take a scene and a bounds and add an structural object of a
     given type.  If a template is provided, then the template will be used for
     the values provided.
@@ -734,7 +868,7 @@ def add_structural_object_with_retries_or_throw(
             StructuralTypes.WALLS, StructuralTypes.L_OCCLUDERS,
             StructuralTypes.PLATFORMS, StructuralTypes.RAMPS]:
         _add_ramp_platform_occluder_wall(
-            scene, bounds, retries, template, structural_type, i)
+            scene, bounds, retries, template, structural_type)
     elif structural_type == StructuralTypes.DROPPERS:
         _add_dropper(scene,
                      bounds,
@@ -747,36 +881,25 @@ def add_structural_object_with_retries_or_throw(
                      template)
     elif structural_type == StructuralTypes.MOVING_OCCLUDERS:
         _add_moving_occluder(scene, bounds, retries, template)
-    elif structural_type == StructuralTypes.HOLES:
-        _add_holes_with_retries_or_throw(
-            scene, template, existing_holes, bounds)
     elif (
-        structural_type == StructuralTypes.FLOOR_MATERIALS or
+        structural_type == StructuralTypes.HOLES or
         structural_type == StructuralTypes.LAVA
     ):
-        # Ensure that the lava template always uses the lava material.
-        # Especially important when lava is made via random_structural_objects.
-        if structural_type == StructuralTypes.LAVA:
-            if not template:
-                template = FloorMaterialConfig()
-            template.material = materials.LAVA_MATERIALS[0].material
-        mat, mat_loc = _get_floor_material_loc_with_retries_or_throw(
-            scene, template, existing_floor_materials)
-        mat = mat[0]
-        loc_list = mat_to_loc.get(mat, [])
-        loc_list.append(mat_loc)
-        mat_to_loc[mat] = loc_list
-        # For a lava material, add its bounds to the list.
-        if mat in [item.material for item in materials.LAVA_MATERIALS]:
-            bounds.append(geometry.generate_floor_area_bounds(
-                mat_loc['x'],
-                mat_loc['z']
-            ))
-        log_structural_template_object(
-            structural_type.name.lower().replace('_', ' '),
-            mat,
-            mat_to_loc[mat],
-            [template]
+        performer_start_position = scene['performerStart']['position']
+        _add_holes_or_lava_with_retries_or_throw(
+            (scene['roomDimensions']['x'], scene['roomDimensions']['z']),
+            (performer_start_position['x'], performer_start_position['z']),
+            template,
+            scene['holes'] if structural_type == StructuralTypes.HOLES else
+            scene['lava'],
+            bounds,
+            'holes' if structural_type == StructuralTypes.HOLES else 'lava'
+        )
+    elif structural_type == StructuralTypes.FLOOR_MATERIALS:
+        _add_floor_material_loc_with_retries_or_throw(
+            (scene['roomDimensions']['x'], scene['roomDimensions']['z']),
+            template,
+            scene['floorTextures']
         )
     elif structural_type == StructuralTypes.OCCLUDING_WALLS:
         _add_occluding_wall(scene, bounds, retries, template)
@@ -784,6 +907,8 @@ def add_structural_object_with_retries_or_throw(
         _add_placer(scene, bounds, retries, template)
     elif structural_type == StructuralTypes.DOORS:
         _add_door_with_retries_or_throw(scene, bounds, retries, template)
+    elif structural_type == StructuralTypes.TOOLS:
+        _add_tool_with_retries_or_throw(scene, bounds, retries, template)
 
 
 def _get_structural_object(
@@ -829,6 +954,25 @@ def _get_structural_object(
         'material_tuple': mat
     }
 
+    if template.position.y == 0 and template.platform_underneath:
+        # this assumes we never want to put these structures in holes
+        raise ILEException("Cannot put platform underneith structural "
+                           "object with y position less than 0")
+
+    plat_under = getattr(template, 'platform_underneath', None)
+
+    if template.position.y is None:
+        if plat_under:
+            # what should the default be?
+            template.position.y = MinMaxFloat(
+                TOP_PLATFORM_POSITION_MIN,
+                room_height - geometry.PERFORMER_HEIGHT).convert_value()
+        else:
+            template.position.y = 0
+
+    if template.position.y:
+        args['position_y_modifier'] = template.position.y
+
     if structural_type == StructuralTypes.WALLS:
         _setup_wall_args(template, room_height, max_room_dim, args)
         logger.trace(f'Creating interior wall:\nINPUT = {args}')
@@ -849,7 +993,400 @@ def _get_structural_object(
         new_obj, reconciled_template = structures.create_l_occluder(
             **args), template
     add_random_placement_tag(new_obj, source_template)
+    new_objs = new_obj if isinstance(new_obj, list) else [new_obj]
+    for obj in new_objs:
+        extra_labels = (
+            source_template.labels
+            if source_template and source_template.labels
+            else [])
+        extra_labels = extra_labels if isinstance(
+            extra_labels, list) else [extra_labels]
+        obj['debug']['labels'] = (
+            [structural_type.name.lower()] + (extra_labels))
+    if plat_under or getattr(
+            template, 'attached_ramps', None):
+        # if we ever try to attach to l_occluders, this won't work
+        new_obj = _add_platform_attached_objects(scene, template, new_obj)
     return new_obj, reconciled_template
+
+
+def _add_platform_attached_objects(
+        scene,
+        orig_template: Union[StructuralPlatformConfig,
+                             StructuralRampConfig],
+        obj: dict):
+    # Ideally, we've position everything and then rotate everything around a
+    # single axis.  Doing this is harder with some of the utlity functions
+    # available and can limit retries since objects may be moved outside the
+    # room late.  Therefore, we create and place each additional object and
+    # then rotate it around the original objects position.  To create some
+    # objects, we need information from objects from a pre-rotation state.
+    # We simply return and store these states when needed.
+
+    # bounds to test ramps to make sure they don't hit each other.  We'll
+    # check all objects against all other objects when finished.
+    local_bounds = []
+    objs = [obj]
+    new_platform = None
+    top_pos = rotation_point = obj['shows'][0]['position']
+    top_scale = obj['shows'][0]['scale']
+    mat = obj['materials'][0]
+    rotation_y = obj['shows'][0]['rotation']['y']
+    below_pre_rot_pos = None
+
+    if getattr(orig_template, 'platform_underneath', None):
+        new_platform, below_pre_rot_pos = _add_platform_below(
+            scene, obj, rotation_point, orig_template)
+        objs += [new_platform]
+        below_scale = new_platform['shows'][0]['scale']
+    if getattr(orig_template, 'attached_ramps', None):
+        # These values are just large to tell the system they have
+        # essentially unlimited space for ramps when we don't know.
+        # We can't determine exactly how much space when the base flooring
+        # isn't rotated the same (I.E. the floor)
+        available_lengths = DEFAULT_AVAIABLE_LENGTHS
+        if below_pre_rot_pos:
+            available_lengths = _get_space_around_platform(
+                top_pos=top_pos,
+                top_scale=top_scale,
+                bottom_pos=below_pre_rot_pos,
+                bottom_scale=below_scale)
+
+        # Attach ramps
+        gaps = []
+        for i in range(orig_template.attached_ramps):
+            logger.trace(
+                f"Attempting to attach ramp {i}/"
+                f"{orig_template.attached_ramps} to platform.")
+            gap = _add_valid_ramp_with_retries(
+                scene, objs, bounds=local_bounds,
+                pre_rot_pos=top_pos,
+                scale=top_scale,
+                rotation_y=rotation_y,
+                rotation_point=rotation_point,
+                material=mat,
+                max_angle=45,
+                available_lengths=available_lengths)
+            gaps.append(gap)
+        _add_gaps_to_object(gaps, obj)
+
+    if getattr(orig_template, 'platform_underneath_attached_ramps',
+               None) and new_platform:
+        gaps = []
+        for i in range(orig_template.platform_underneath_attached_ramps):
+            logger.trace(
+                f"Attempting to attach ramp {i}/"
+                f"{orig_template.platform_underneath_attached_ramps} to "
+                f"underneath platform.")
+            new_mat = new_platform['materials'][0]
+            gap = _add_valid_ramp_with_retries(
+                scene, objs, bounds=local_bounds,
+                pre_rot_pos=below_pre_rot_pos,
+                scale=below_scale,
+                rotation_y=rotation_y,
+                rotation_point=rotation_point,
+                material=new_mat,
+                max_angle=45,
+                available_lengths=DEFAULT_AVAIABLE_LENGTHS)
+            gaps.append(gap)
+        _add_gaps_to_object(gaps, new_platform)
+    return objs
+
+
+def _add_gaps_to_object(gaps_list, obj):
+    all_gaps = {}
+    lips_cfg = obj['lips']
+    for gap in gaps_list:
+        side = gap['side']
+        if not lips_cfg[side]:
+            continue
+        gaps = all_gaps.get(side, [])
+        gap = copy.deepcopy(gap)
+        gap.pop('side')
+        gaps.append(gap)
+        gaps = sorted(gaps, key=lambda item: item['low'])
+        all_gaps[side] = gaps
+    if all_gaps:
+        obj['lips']['gaps'] = all_gaps
+
+
+def _add_platform_below(scene, obj, rotation_point, top_template):
+    show = obj['shows'][0]
+    scale = show['scale']
+    pos = show['position']
+    min_y = show['boundingBox'].min_y
+    for _ in range(MAX_TRIES):
+        # some assumptions:
+        # rotation between platforms is fixed
+
+        max_room_dim = max(
+            scene['roomDimensions']['x'],
+            scene['roomDimensions']['z'])
+        x0, z0, scale_x, scale_z = _get_under_platform_position_scale(
+            scale, pos, max_room_dim)
+
+        # rotation around arbitrary center is:
+        # x1 = (x0 -xc) cos(theta) - (z0 -zc)sin(theta) + xc
+        # z1 = (x0 -xc) sin(theat) + (z0 -zc)cos(theta) + zc
+        # rotate position around obj position
+        r_point_x = rotation_point['x']
+        r_point_z = rotation_point['z']
+        radians = math.radians(obj['shows'][0]['rotation']['y'])
+        x = (x0 - r_point_x) * math.cos(radians) - \
+            (z0 - r_point_z) * math.sin(radians) + r_point_x
+        z = -(x0 - r_point_x) * math.sin(radians) - \
+            (z0 - r_point_z) * math.cos(radians) + r_point_z
+
+        new_template = StructuralPlatformConfig(
+            num=1,
+            position=VectorFloatConfig(x, 0, z),
+            rotation_y=show['rotation']['y'],
+            scale=VectorFloatConfig(
+                scale_x,
+                min_y,
+                scale_z),
+            lips=top_template.lips,
+            labels=top_template.labels)
+        new_platform, _ = _get_structural_object(
+            StructuralTypes.PLATFORMS, scene, new_template)
+        new_platform['debug']['random_position'] = True
+        return new_platform, {'x': x0, 'y': min_y * 0.5, 'z': z0}
+
+    raise ILEException("Failed to add platform under existing platform.")
+
+
+def _get_under_platform_position_scale(top_scale, top_position, max_room_dim):
+    # How do we want to determine the position and scale of the platform below?
+    # This has a range which is determined based on the top objects scale.
+    # We then choose a random position where the top object entirely fits on
+    # the bottom platform.
+
+    # top_scale['y'] is the ramp length at 45 degrees (max angle)
+    scale_min_buffer = max(
+        top_scale['y'] +
+        BOTTOM_PLATFORM_SCALE_BUFFER_MIN,
+        top_scale['y'] * 2)
+    scale_max_buffer = min(
+        max_room_dim - geometry.PERFORMER_WIDTH -
+        min(top_scale['x'], top_scale['z']),
+        top_scale['y'] +
+        BOTTOM_PLATFORM_SCALE_BUFFER_MAX)
+    scale_x = MinMaxFloat(
+        # Note: top_scale
+        top_scale['x'] + scale_min_buffer,
+        top_scale['x'] + scale_max_buffer
+    ).convert_value()
+    scale_z = MinMaxFloat(
+        top_scale['z'] + scale_min_buffer,
+        top_scale['z'] + scale_max_buffer
+    ).convert_value()
+
+    top_pos_x = _get_pre_rotate_under_position(
+        top_scale, top_position, scale_x, 'x')
+    top_pos_z = _get_pre_rotate_under_position(
+        top_scale, top_position, scale_z, 'z')
+
+    return top_pos_x, top_pos_z, scale_x, scale_z
+
+
+def _get_pre_rotate_under_position(
+        top_scale, top_position, bot_scale, key):
+    """determine the range of positions in one dimension for a platform under
+    another platform or ramp to ensure the top (original) object is
+    entirely contained in the bottom in this one dimension.
+    """
+    pos_min = top_position[key] + top_scale[key] * 0.5 - bot_scale * 0.5
+    pos_max = top_position[key] - top_scale[key] * 0.5 + bot_scale * 0.5
+    return random.uniform(pos_min, pos_max)
+
+
+def _add_valid_ramp_with_retries(
+        scene, objs, bounds,
+        pre_rot_pos, scale, rotation_y,
+        rotation_point, material,
+        max_angle, available_lengths):
+    """ Returns gap location"""
+    for i in range(MAX_TRIES):
+        logger.trace(f"attempting to find ramp, try #{i}")
+        ramp, gap = _get_attached_ramp(
+            scene,
+            pre_rot_pos=pre_rot_pos, scale=scale,
+            rotation_y=rotation_y,
+            rotation_point=rotation_point,
+            material=material,
+            available_lengths=available_lengths,
+            max_angle=max_angle)
+        if _validate_all_locations_and_update_bounds(
+                [ramp], scene, bounds):
+            objs.append(ramp)
+            return gap
+    raise ILEException("Unable to find valid location to attach ramp to "
+                       "platform.  This is usually due too many ramps for the"
+                       "amount of space.")
+
+
+def _get_attached_ramp(scene: dict, pre_rot_pos: dict, scale: dict,
+                       rotation_y, rotation_point, material, available_lengths,
+                       max_angle=89,
+                       ):
+    ppx = pre_rot_pos['x']
+    ppy = pre_rot_pos['y']
+    ppz = pre_rot_pos['z']
+    psx = scale['x']
+    psy = scale['y']
+    psz = scale['z']
+
+    r_point_x = rotation_point['x']
+    r_point_z = rotation_point['z']
+
+    performer_buffer = geometry.PERFORMER_HALF_WIDTH * 2
+    # then randomize which edge we choose first
+    edge_choices = [0, 1, 2, 3]
+    random.shuffle(edge_choices)
+
+    # get how much room we have for a ramp in this edge if on top of
+    # another platform
+    # default to a high number.  Ignore the space check if platform is on
+    # floor.
+
+    valid_edge = False
+    # verify there is enough space for a ramp
+    for edge in edge_choices:
+        max_ramp_length = min(
+            available_lengths[edge] -
+            performer_buffer,
+            ATTACHED_RAMP_MAX_LENGTH)
+        min_ramp_length = psy / math.tan(math.radians(max_angle))
+        min_ramp_length = max(min_ramp_length, ATTACHED_RAMP_MIN_LENGTH)
+        # what angle do we need to get to the necessary height given the max
+        # length.
+        angle_needed = math.degrees(math.atan(psy / (max_ramp_length)))
+        # make sure ramp isn't wider than platform
+        ramp_width_max = min(
+            ATTACHED_RAMP_MAX_WIDTH,
+            psz if edge %
+            2 == 0 else psx)
+        if (angle_needed <= max_angle and angle_needed >=
+                0 and max_ramp_length > min_ramp_length and
+                ramp_width_max >= ATTACHED_RAMP_MIN_WIDTH):
+            scale = VectorFloatConfig(
+                MinMaxFloat(ATTACHED_RAMP_MIN_WIDTH, ramp_width_max),
+                psy,
+                MinMaxFloat(min_ramp_length, max_ramp_length))
+            scale = choose_random(scale)
+            valid_edge = True
+            break
+
+    if not valid_edge:
+        raise ILEException(
+            f"Unable to add ramp to given platform with angle less than "
+            f"{max_angle}")
+
+    rsx = scale.x
+    rsz = scale.z
+    rot = rotation_y
+
+    # need to rotate ramps when all is done so they go from the platform down.
+    rot_add = RAMP_ROTATIONS[edge]
+
+    rpy = ppy - 0.5 * psy
+
+    length = rsz
+    r_angle = math.degrees(math.atan(psy / rsz))
+
+    # determing the position of the ramp is somewhat complicated.
+    # The steps are:
+    #  Determine position as if there is no rotation.
+    #  Rotate the position around the center (position) of the platform
+
+    # x limit when x of ramp is outside the platform relative to platform
+    # origin
+    x_limit_out = psx * 0.5 + 0.5 * rsz
+    # x limit when x of ramp is inside the platform relative to platform origin
+    x_limit_in = psx * 0.5 - 0.5 * rsx
+    # same with z
+    z_limit_out = psz * 0.5 + 0.5 * rsz
+    z_limit_in = psz * 0.5 - 0.5 * rsx
+
+    # position ranges as if platform has no rotation.  Each
+    # index corresponds to one edge of the platform.
+    non_rot_x_min = [-x_limit_out, -x_limit_in, x_limit_out, -x_limit_in]
+    non_rot_x_max = [-x_limit_out, x_limit_in, x_limit_out, x_limit_in]
+    non_rot_z_min = [-z_limit_in, -z_limit_out, -z_limit_in, z_limit_out]
+    non_rot_z_max = [z_limit_in, -z_limit_out, z_limit_in, z_limit_out]
+
+    # rotation around arbitrary center is:
+    # x1 = (x0 -xc) cos(theta) - (z0 -zc)sin(theta) + xc
+    # z1 = (x0 -xc) sin(theat) + (z0 -zc)cos(theta) + zc
+    rel_x0 = random.uniform(non_rot_x_min[edge], non_rot_x_max[edge])
+    rel_z0 = random.uniform(non_rot_z_min[edge], non_rot_z_max[edge])
+
+    if edge % 2 == 0:
+        # on left or right, we need to determine range in z
+        # ramp width is always x so always use rsx
+        gap = _get_lip_gap(rel_z0, rsx, ppz, psz, edge)
+    else:
+        # on front or back, we need to determine range in x
+        gap = _get_lip_gap(rel_x0, rsx, ppx, psx, edge)
+
+    x0 = rel_x0 + ppx
+    z0 = rel_z0 + ppz
+
+    radians = math.radians(rot)
+    rpx = (x0 - r_point_x) * math.cos(radians) - \
+        (z0 - r_point_z) * math.sin(radians) + r_point_x
+    rpz = -(x0 - r_point_x) * math.sin(radians) - \
+        (z0 - r_point_z) * math.cos(radians) + r_point_z
+
+    pos = VectorFloatConfig(rpx, rpy, rpz)
+
+    rot = (rot + rot_add) % 360
+    new_template = StructuralRampConfig(
+        num=1, position=pos, rotation_y=rot, angle=r_angle,
+        length=length, width=rsx, material=material)
+    new_ramp, _ = _get_structural_object(
+        StructuralTypes.RAMPS, scene, new_template)
+    new_ramp['debug']['random_position'] = True
+    return new_ramp, gap
+
+
+def _get_lip_gap(ramp_pos, ramp_scale, plat_pos, plat_scale, edge):
+    # ramp_pos is relative to the platform.  To get the actual position, we
+    # would add plat_pos as we do in the function where this is called.
+    # However that should get factored out so we don't need it.
+    # edge 0 = -x left, 1=-z back, 2=+x right, 3=+z front
+    gap = {'side': ['left', 'back', 'right', 'front'][edge]}
+    gap['high'] = (ramp_pos + ramp_scale * 0.5 +
+                   plat_scale * 0.5) / plat_scale
+    gap['low'] = (ramp_pos - ramp_scale * 0.5 + plat_scale * 0.5) / plat_scale
+    # I'm not sure why I need to reverse the direction here.
+    if edge % 2 == 0:
+        temp = 1 - gap['high']
+        gap['high'] = 1 - gap['low']
+        gap['low'] = temp
+    return gap
+
+
+def _get_space_around_platform(
+        top_pos: dict, top_scale: dict, bottom_pos: dict, bottom_scale: dict):
+    """All values must be pre-rotation and both objects must have the same
+    rotation applied.
+    """
+    # delta pos
+    dposx = bottom_pos['x'] - top_pos['x']
+    dposz = bottom_pos['z'] - top_pos['z']
+    # delta scale
+    dscalex = bottom_scale['x'] - top_scale['x']
+    dscalez = bottom_scale['z'] - top_scale['z']
+
+    x_positive = dposx + dscalex / 2
+    x_negative = -dposx + dscalex / 2
+
+    z_positive = dposz + dscalez / 2
+    z_negative = -dposz + dscalez / 2
+    logger.debug(f" Area around platform for ramps: "
+                 f"{[x_negative, z_negative, x_positive, z_positive]}")
+    return [x_negative, z_negative, x_positive, z_positive]
 
 
 def _setup_wall_args(template: StructuralWallConfig, room_height: int,
@@ -876,6 +1413,7 @@ def _setup_l_occluder_args(
 ) -> None:
     """Applies extra arguments needed for an l occluder from the template if
     available."""
+    args['flip'] = template.backwards
     args['scale_front_x'] = template.scale_front_x
     args['scale_front_z'] = template.scale_front_z
     args['scale_side_x'] = template.scale_side_x
@@ -920,6 +1458,7 @@ def _setup_platform_args(
 ) -> None:
     """Applies extra arguments needed for a platform from the template if
     available."""
+    args['lips'] = template.lips
     if isinstance(template.scale, Vector3d):
         args['scale_x'] = template.scale.x
         # Restrict max height to room height.
@@ -957,20 +1496,20 @@ def _validate_all_locations_and_update_bounds(
     return True
 
 
-def _add_holes_with_retries_or_throw(
-    scene: Dict[str, Any],
+def _add_holes_or_lava_with_retries_or_throw(
+    room_dimensions: Tuple[float, float],
+    performer_start: Tuple[float, float],
     src_template: FloorAreaConfig,
-    existing: List[Tuple[int, int]],
-    bounds: List[ObjectBounds]
+    existing: List[Dict[str, float]],
+    bounds: List[ObjectBounds],
+    label: str
 ) -> None:
-    room_dim = scene['roomDimensions']
-    xmax = math.floor(room_dim['x'] / 2)
-    zmax = math.floor(room_dim['z'] / 2)
-    default_template = DEFAULT_TEMPLATE_HOLES
+    xmax = math.floor(room_dimensions[0] / 2)
+    zmax = math.floor(room_dimensions[1] / 2)
+    default_template = DEFAULT_TEMPLATE_HOLES_LAVA
     errors = set({})
-    performer_pos = scene['performerStart']['position']
-    perf_x = performer_pos['x']
-    perf_z = performer_pos['z']
+    perf_x = performer_start[0]
+    perf_z = performer_start[1]
     perf_x = round(perf_x)
     perf_z = round(perf_z)
     restrict_under_user = (
@@ -978,33 +1517,31 @@ def _add_holes_with_retries_or_throw(
         src_template.position_z is None)
 
     for _ in range(MAX_TRIES):
-        error, hole_loc, _ = _get_floor_location(
+        error, floor_loc, template = _get_floor_location(
             src_template, xmax, zmax, default_template)
         if (restrict_under_user and
-                hole_loc[0] == perf_x and hole_loc[1] == perf_z):
-            error = ("Random location of hole put under performer start at"
+                floor_loc['x'] == perf_x and floor_loc['z'] == perf_z):
+            error = ("Random location of {label} put under performer start at"
                      f" ({perf_x}, {perf_z}). ")
         if error is None:
-            if hole_loc not in existing:
-                existing.append(hole_loc)
-                scene['holes'].append({'x': hole_loc[0], 'z': hole_loc[1]})
+            if floor_loc not in existing:
+                existing.append(floor_loc)
                 bounds.append(geometry.generate_floor_area_bounds(
-                    hole_loc[0],
-                    hole_loc[1]
+                    floor_loc['x'],
+                    floor_loc['z']
                 ))
                 log_structural_template_object(
-                    'holes',
-                    'holes',
-                    scene['holes'][-1],
-                    [src_template]
+                    label,
+                    label,
+                    existing[-1],
+                    [src_template, template]
                 )
                 return
             else:
                 errors.add("Unable to find valid location. ")
         else:
             errors.add(error)
-    raise ILEException(
-        f"Failed to create holes.  Errors={''.join(errors)}")
+    raise ILEException(f"Failed to create {label}. Errors={''.join(errors)}")
 
 
 def _get_floor_location(src_template, xmax: int,
@@ -1013,27 +1550,27 @@ def _get_floor_location(src_template, xmax: int,
     template = reconcile_template(default_template, src_template)
     x = template.position_x
     x = x if x is not None else random.randint(-xmax, xmax)
-
     z = template.position_z
     z = z if z is not None else random.randint(-zmax, zmax)
     if x < -xmax or x > xmax:
         error = f"x location of hole is out of bounds x={x}. "
     if z < -zmax or z > zmax:
         error = f"z location of hole is out of bounds z={z}. "
-    floor_loc = (x, z)
+    floor_loc = {'x': x, 'z': z}
     return error, floor_loc, template
 
 
-def _get_floor_material_loc_with_retries_or_throw(
-    scene, src_template: FloorMaterialConfig,
-        existing: List[Tuple[int, int]]):
+def _add_floor_material_loc_with_retries_or_throw(
+    room_dimensions: Tuple[float, float],
+    src_template: FloorMaterialConfig,
+    existing: List[Dict[str, Any]]
+) -> None:
     default_template = DEFAULT_TEMPLATE_FLOOR_MATERIALS
     errors = set({})
-    room_dim = scene['roomDimensions']
-    xmax = math.floor(room_dim['x'] / 2)
-    zmax = math.floor(room_dim['z'] / 2)
+    xmax = math.floor(room_dimensions[0] / 2)
+    zmax = math.floor(room_dimensions[1] / 2)
     for _ in range(MAX_TRIES):
-        error, mat_loc, template = _get_floor_location(
+        error, floor_loc, template = _get_floor_location(
             src_template, xmax, zmax, default_template)
         if error is None:
             mat = template.material
@@ -1042,9 +1579,29 @@ def _get_floor_material_loc_with_retries_or_throw(
                 choose_material_tuple_from_material(mat) if mat else
                 random.choice(materials.FLOOR_MATERIALS)
             )
-            if mat_loc not in existing:
-                existing.append(mat_loc)
-                return (mat, {'x': mat_loc[0], 'z': mat_loc[1]})
+            valid = True
+            for floor_texture in existing:
+                if floor_loc in floor_texture['positions']:
+                    valid = False
+                    break
+            if valid:
+                found = False
+                for floor_texture in existing:
+                    if mat.material == floor_texture['material']:
+                        floor_texture['positions'].append(floor_loc)
+                        found = True
+                        break
+                if not found:
+                    existing.append(
+                        {'material': mat.material, 'positions': [floor_loc]}
+                    )
+                log_structural_template_object(
+                    'floor textures',
+                    mat.material,
+                    floor_loc,
+                    [src_template, template]
+                )
+                return
             else:
                 errors.add("Unable to find valid location. ")
         else:
@@ -1075,16 +1632,14 @@ def _add_dropper(
                                 2.0 + buffer, room_dim['z'] / 2.0 - buffer)
                  if template.position_z is None else template.position_z)
         projectile_dimensions = vars(target.definition.dimensions)
-        projectile_dimensions['x'] *= DROPPER_THROWER_SCALE_MULTIPLIER
-        projectile_dimensions['y'] *= DROPPER_THROWER_SCALE_MULTIPLIER
-        projectile_dimensions['z'] *= DROPPER_THROWER_SCALE_MULTIPLIER
         args = {
             'position_x': pos_x,
             'position_z': pos_z,
             'room_dimensions_y': room_dim['y'],
             'object_dimensions': projectile_dimensions,
             'last_step': scene.get('last_step'),
-            'dropping_step': template.drop_step
+            'dropping_step': template.drop_step,
+            'is_round': ('ball' in target.definition.shape)
         }
         logger.trace(f'Creating dropper:\nINPUT = {args}')
         obj = mechanisms.create_dropping_device(**args)
@@ -1153,9 +1708,6 @@ def _add_thrower(
             bounds
         )
         projectile_dimensions = vars(target.definition.dimensions)
-        projectile_dimensions['x'] *= DROPPER_THROWER_SCALE_MULTIPLIER
-        projectile_dimensions['y'] *= DROPPER_THROWER_SCALE_MULTIPLIER
-        projectile_dimensions['z'] *= DROPPER_THROWER_SCALE_MULTIPLIER
         max_scale = max(projectile_dimensions['x'], projectile_dimensions['z'])
         wall = template.wall
         pos_x, pos_y, pos_z, rot_y = _compute_thrower_position_rotation(
@@ -1168,8 +1720,10 @@ def _add_thrower(
             'rotation_y': rot_y,
             'rotation_z': template.rotation,
             'object_dimensions': projectile_dimensions,
+            'object_rotation_y': target.definition.rotation.y,
             'last_step': scene.get('last_step'),
-            'throwing_step': template.throw_step
+            'throwing_step': template.throw_step,
+            'is_round': ('ball' in target.definition.shape)
         }
         logger.trace(f'Creating thrower:\nINPUT = {args}')
         obj = mechanisms.create_throwing_device(**args)
@@ -1344,7 +1898,7 @@ def _get_occluding_wall_scale(
             scale.x = (min(dim.x,
                            dim.z) *
                        random.uniform(
-                           DEFAULT_OCCLUDING_WALL_SHORT_THIN_SCALE_MIN,
+                DEFAULT_OCCLUDING_WALL_SHORT_THIN_SCALE_MIN,
                 DEFAULT_OCCLUDING_WALL_SHORT_THIN_SCALE_MAX))
         elif template.type == OccludingWallType.SHORT:
             scale.y = dim.y * random.uniform(
@@ -1661,7 +2215,6 @@ def _add_placer(scene: dict, bounds: List[ObjectBounds], retries: int,
             )
 
         start_height = room_dim['y']
-        end_height = 0
         max_height = room_dim['y']
         last_step = scene.get("last_step")
         instance = idl.instance
@@ -1671,18 +2224,17 @@ def _add_placer(scene: dict, bounds: List[ObjectBounds], retries: int,
             'instance': instance,
             'activation_step': template.activation_step,
             'start_height': start_height,
-            'end_height': end_height
+            'end_height': template.end_height
         }
         logger.trace(f'Positioning placer object:\nINPUT = {args}')
         mechanisms.place_object(**args)
 
         args = {
             'placed_object_position': instance['shows'][0]['position'],
-            'placed_object_scale': instance['shows'][0]['scale'],
             'placed_object_dimensions': instance['debug']['dimensions'],
             'placed_object_offset_y': instance['debug']['positionY'],
             'activation_step': template.activation_step,
-            'end_height': end_height,
+            'end_height': template.end_height,
             'max_height': max_height,
             'id_modifier': None,
             'last_step': last_step,
@@ -1715,11 +2267,14 @@ def _add_door_with_retries_or_throw(
     room_width = room_dim.get('x', def_dim['x'])
     room_length = room_dim.get('z', def_dim['y'])
 
-    for try_num in range(retries):
+    # When getting values here, we don't want to corrupt the template so we
+    # store in local values now.  This allows retries or delayed actions to
+    # use the original template as intended.
+    for _ in range(retries):
         template = reconcile_template(
             DEFAULT_TEMPLATE_DOOR,
             source_template)
-        template.material = (
+        mat = (
             choose_material_tuple_from_material(template.material)
             if template.material else random.choice(random.choice([
                 materials.METAL_MATERIALS,
@@ -1727,6 +2282,86 @@ def _add_door_with_retries_or_throw(
                 materials.WOOD_MATERIALS,
             ]))
         )
+        # Convert tuple back to string
+        wall_mat = template.wall_material
+        wall_mat = wall_mat[0] if isinstance(
+            wall_mat, materials.MaterialTuple) else wall_mat
+        wall_mat = (
+            choose_material_tuple_from_material(wall_mat)
+            if template.wall_material else random.choice(random.choice([
+                materials.METAL_MATERIALS,
+                materials.PLASTIC_MATERIALS,
+                materials.WOOD_MATERIALS,
+            ]))
+        )
+        x = choose_random(
+            MinMaxFloat(-room_width / 2.0, room_width / 2.0)
+            if template.position.x is None else template.position.x
+        )
+        y = 0 if template.position.y is None else template.position.y
+        z = choose_random(
+            MinMaxFloat(-room_length / 2.0, room_length / 2.0)
+            if template.position.z is None else template.position.z
+        )
+        # need to determine random now
+        rot = choose_random(template.rotation_y)
+        default_wall_scale_x = MinMaxInt(
+            ROOM_MIN_XZ,
+            room_dim['x'] if rot in [0, 180] else room_dim['z']
+        )
+        wall_scale_x = choose_random(
+            default_wall_scale_x
+            if template.wall_scale_x is None else
+            template.wall_scale_x)
+
+        wall_scale_y = choose_random(
+            MinMaxInt(ROOM_MIN_Y, room_dim['y'])
+            if template.wall_scale_y is None else
+            template.wall_scale_y)
+
+        args = {
+            'position_x': x,
+            'position_y': y,
+            'position_z': z,
+            'rotation_y': rot,
+            'material_tuple': mat,
+            'wall_scale_x': wall_scale_x,
+            'wall_scale_y': wall_scale_y,
+            'wall_material_tuple': wall_mat
+
+        }
+        logger.trace(f'Creating door:\nINPUT = {args}')
+        door_objs = structures.create_door(**args)
+
+        if _validate_all_locations_and_update_bounds(door_objs, scene, bounds):
+            for door in door_objs:
+                add_random_placement_tag(door, source_template)
+                scene['objects'].append(door)
+            _save_to_object_repository(
+                door_objs[0],
+                StructuralTypes.DOORS,
+                template.labels
+            )
+            log_structural_template_object(
+                'door',
+                'id',
+                door_objs[0]['id'],
+                [source_template, template]
+            )
+            return
+    raise ILEException("Failed to create door")
+
+
+def _add_tool_with_retries_or_throw(
+        scene: dict, bounds: List[ObjectBounds], retries: int,
+        source_template: ToolConfig):
+    room_dim = scene.get('roomDimensions', {})
+    def_dim = geometry.DEFAULT_ROOM_DIMENSIONS
+    room_width = room_dim.get('x', def_dim['x'])
+    room_length = room_dim.get('z', def_dim['y'])
+
+    for _ in range(retries):
+        template = reconcile_template(DEFAULT_TEMPLATE_TOOL, source_template)
         template.position.x = (
             MinMaxFloat(-room_width / 2.0, room_width / 2.0).convert_value()
             if template.position.x is None else template.position.x
@@ -1735,42 +2370,29 @@ def _add_door_with_retries_or_throw(
             MinMaxFloat(-room_length / 2.0, room_length / 2.0).convert_value()
             if template.position.z is None else template.position.z
         )
-        scale = template.scale
-        scale = scale if isinstance(
-            scale, Vector3d) else Vector3d(
-            scale, scale, scale)
-        # Restrict max height to room height.
-        # Door objects are twice as tall as their Y scale.
-        scale.y = min(scale.y, room_dim['y'] / 2.0)
-        mat = template.material
         args = {
+            'object_type': template.shape,
             'position_x': template.position.x,
             'position_z': template.position.z,
-            'rotation_y': template.rotation_y,
-            'scale_x': scale.x,
-            'scale_y': scale.y,
-            'scale_z': scale.z,
-            'material_tuple': mat
+            'rotation_y': template.rotation_y
         }
-        logger.trace(f'Creating door:\nINPUT = {args}')
-        door = structures.create_door(**args)
-
-        if _validate_all_locations_and_update_bounds([door], scene, bounds):
-            add_random_placement_tag(door, source_template)
-            scene['objects'].append(door)
+        logger.trace(f'Creating tool:\nINPUT = {args}')
+        obj = structures.create_tool(**args)
+        if _validate_all_locations_and_update_bounds([obj], scene, bounds):
+            scene['objects'].append(obj)
             _save_to_object_repository(
-                door,
-                StructuralTypes.DOORS,
+                obj,
+                StructuralTypes.TOOLS,
                 template.labels
             )
             log_structural_template_object(
-                'door',
+                'tool',
                 'id',
-                door['id'],
+                obj['id'],
                 [source_template, template]
             )
             return
-    raise ILEException("Failed to create door")
+    raise ILEException(f'Failed to create tool shape={source_template.shape}')
 
 
 def _get_existing_held_object_idl(
@@ -1905,7 +2527,7 @@ def _compute_thrower_position_rotation(
 
 def _add_ramp_platform_occluder_wall(
         scene: dict, bounds: List[ObjectBounds], retries: int, template: dict,
-        structural_type: StructuralTypes, i: int):
+        structural_type: StructuralTypes):
     for try_num in range(retries):
         new_obj, reconciled_template = _get_structural_object(
             structural_type,
@@ -1914,7 +2536,12 @@ def _add_ramp_platform_occluder_wall(
         )
         if not isinstance(new_obj, list):
             new_obj = [new_obj]
+        valid = False
         if _validate_all_locations_and_update_bounds(new_obj, scene, bounds):
+            valid = True
+            if structural_type == StructuralTypes.WALLS:
+                valid = (not is_wall_too_close(new_obj[0]))
+        if valid:
             break
         else:
             # Checks if enabled for TRACE logging.
@@ -1962,11 +2589,18 @@ def _save_to_object_repository(
     structural_type: StructuralTypes,
     labels: List[str]
 ) -> None:
-    labels_list = (
-        labels.copy() if isinstance(labels, list) else ([labels] or [])
-    )
-    if structural_type.name.lower() not in labels_list:
-        labels_list.append(structural_type.name.lower())
+    # debug labels are labels going into the debug key.
+    # We use the debug key because we need to generate the labels before we
+    # are sure they object will be added to the scene.
+    debug_labels = obj.get('debug', {}).get('labels')
+    if debug_labels is not None:
+        labels_list = debug_labels.copy()
+    else:
+        labels_list = (
+            labels.copy() if isinstance(labels, list) else ([labels] or [])
+        )
+        if structural_type.name.lower() not in labels_list:
+            labels_list.append(structural_type.name.lower())
     show = obj['shows'][0]
     location = {
         'position': copy.deepcopy(show['position']),
@@ -1976,3 +2610,45 @@ def _save_to_object_repository(
     obj_repo = ObjectRepository.get_instance()
     obj_tuple = InstanceDefinitionLocationTuple(obj, None, location)
     obj_repo.add_to_labeled_objects(obj_tuple, labels=labels_list)
+
+
+def is_wall_too_close(new_wall: Dict[str, Any]) -> bool:
+    """Return if the given wall object is too close to any existing parallel
+    walls in the object repository."""
+    new_wall_rotation = new_wall['shows'][0]['rotation']
+    # Only run this check if the wall is perfectly horizontal or vertical.
+    # TODO Should we check all existing walls that are parallel to this wall,
+    #      regardless of starting rotation? We'd need to update the math.
+    if new_wall_rotation['y'] % 90 != 0:
+        return False
+    new_wall_is_horizontal = (new_wall_rotation['y'] % 180 == 0)
+    new_wall_position = new_wall['shows'][0]['position']
+    new_wall_scale = new_wall['shows'][0]['scale']
+    new_wall_thickness_halved = (new_wall_scale['z'] / 2.0)
+    new_wall_width_halved = (new_wall_scale['x'] / 2.0)
+    object_repository = ObjectRepository.get_instance()
+    walls = object_repository.get_all_from_labeled_objects('walls') or []
+    for old_wall in walls:
+        old_wall_position = old_wall.instance['shows'][0]['position']
+        old_wall_rotation = old_wall.instance['shows'][0]['rotation']
+        # Only check this wall if it's perfectly horizontal or vertical.
+        if old_wall_rotation['y'] % 90 != 0:
+            continue
+        old_wall_is_horizontal = (old_wall_rotation['y'] % 180 == 0)
+        if old_wall_is_horizontal == new_wall_is_horizontal:
+            major_axis = 'z' if old_wall_is_horizontal else 'x'
+            minor_axis = 'x' if old_wall_is_horizontal else 'z'
+            old_wall_scale = old_wall.instance['shows'][0]['scale']
+            old_wall_thickness_halved = (old_wall_scale['z'] / 2.0)
+            old_wall_width_halved = (old_wall_scale['x'] / 2.0)
+            distance_adjacent = (abs(
+                new_wall_position[minor_axis] - old_wall_position[minor_axis]
+            ) - old_wall_width_halved - new_wall_width_halved)
+            if distance_adjacent > 0:
+                continue
+            distance_across = (abs(
+                new_wall_position[major_axis] - old_wall_position[major_axis]
+            ) - old_wall_thickness_halved - new_wall_thickness_halved)
+            if distance_across < geometry.PERFORMER_WIDTH:
+                return True
+    return False

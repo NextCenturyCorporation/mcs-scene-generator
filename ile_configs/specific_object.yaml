@@ -1,0 +1,7 @@
+# Generate at least one object with a consistent shape (car_1), scale (2), and
+# color/texture (blue wood), but a random position/rotation in each scene.
+specific_interactable_objects:
+    - num: 1
+      shape: car_1
+      scale: 2
+      material: "UnityAssetStore/Wooden_Toys_Bundle/ToyBlocks/meshes/Materials/blue_1x1"

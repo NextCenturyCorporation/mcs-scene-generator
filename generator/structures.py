@@ -5,6 +5,10 @@ from typing import Any, Dict, List
 
 from shapely import affinity
 
+from .base_objects import (
+    ALL_LARGE_BLOCK_TOOLS,
+    LARGE_BLOCK_TOOLS_TO_DIMENSIONS,
+)
 from .geometry import ObjectBounds, create_bounds
 from .materials import MaterialTuple
 
@@ -144,6 +148,12 @@ PLATFORM_TEMPLATE = {
     'materials': [],
     'kinematic': True,
     'structure': True,
+    'lips': {
+        'front': False,
+        'back': False,
+        'left': False,
+        'right': False,
+    },
     'shows': [{
         'stepBegin': 0,
         'position': {
@@ -206,7 +216,6 @@ DOOR_TEMPLATE = {
     'mass': 100,
     'materials': [],
     'kinematic': True,
-    'structure': True,
     'openable': True,
     'shows': [{
         'stepBegin': 0,
@@ -227,6 +236,74 @@ DOOR_TEMPLATE = {
         }
     }]
 }
+
+TOOL_HEIGHT = 0.3
+TOOL_TEMPLATE = {
+    'id': 'tool_',
+    'type': None,
+    'debug': {
+        'color': ['grey', 'black'],
+        'info': []
+    },
+    'shows': [{
+        'stepBegin': 0,
+        'position': {
+            'x': 0,
+            'y': TOOL_HEIGHT / 2.0,
+            'z': 0
+        },
+        'rotation': {
+            'x': 0,
+            'y': 0,
+            'z': 0
+        },
+        'scale': {
+            'x': 1,
+            'y': 1,
+            'z': 1
+        }
+    }]
+}
+
+GUIDE_RAIL_TEMPLATE = {
+    'id': 'guide_rail_',
+    'type': 'cube',
+    'debug': {
+        'color': [],
+        'info': []
+    },
+    'mass': None,  # Set in finalize_structural_object
+    'materials': [],  # Set to randomly chosen material
+    'kinematic': True,
+    'structure': True,
+    'shows': [{
+        'stepBegin': 0,
+        'position': {
+            'x': 0,  # Set to necessary position
+            'y': 0.1,
+            'z': 0  # Set to necessary position
+        },
+        'rotation': {
+            'x': 0,
+            'y': 0,  # Set to necessary rotation
+            'z': 0
+        },
+        'scale': {
+            'x': 0.2,
+            'y': 0.2,
+            'z': 1  # Set to necessary length
+        }
+    }]
+}
+
+# door constants
+BASE_DOOR_HEIGHT = 2.0
+BASE_WALL_WITH_DOOR_WIDTH = 1.0
+BASE_SIDE_WALL_POSITION = 0.21
+BASE_SIDE_WALL_SCALE = 0.08
+
+# guide rail constants
+RAIL_CENTER_TO_EDGE = 0.2
 
 
 def _calculate_info(colors: List[str], labels: List[str]) -> List[str]:
@@ -339,7 +416,8 @@ def create_l_occluder(
     position_y_modifier: float = 0,
     flip: bool = False
 ) -> List[Dict[str, Any]]:
-    """Create and return an instance of an L-shaped occluder."""
+    """Create and return an instance of an L-shaped occluder. If flip is True,
+    the side part of the L will be on the left side (like a backwards L)."""
     occluder = copy.deepcopy(L_OCCLUDER_TEMPLATE)
     front = occluder[0]
     side = occluder[1]
@@ -350,7 +428,7 @@ def create_l_occluder(
         'z': scale_front_z
     }
     front['shows'][0]['position'] = {
-        'x': position_x * (-1 if flip else 1),
+        'x': position_x,
         'y': position_y_modifier + (scale_y / 2.0),
         'z': position_z
     }
@@ -366,8 +444,8 @@ def create_l_occluder(
         'z': scale_side_z
     }
     side['shows'][0]['position'] = {
-        'x': (
-            (position_x + (scale_side_x / 2.0) - (scale_front_x / 2.0))
+        'x': position_x + (
+            (scale_side_x / 2.0) - (scale_front_x / 2.0)
         ) * (-1 if flip else 1),
         'y': position_y_modifier + (scale_y / 2.0),
         'z': (position_z + (scale_side_z / 2.0) + (scale_front_z / 2.0))
@@ -415,11 +493,21 @@ def create_platform(
     scale_y: float,
     scale_z: float,
     material_tuple: MaterialTuple,
+    lips: dict = None,
     position_y_modifier: float = 0,
     bounds: ObjectBounds = None
 ) -> Dict[str, Any]:
     """Create and return an instance of a platform."""
     platform = copy.deepcopy(PLATFORM_TEMPLATE)
+
+    lips = platform['lips'] if lips is None else lips if isinstance(
+        lips, dict) else lips.__dict__
+    platform['lips'] = {
+        'front': lips['front'],
+        'back': lips['back'],
+        'left': lips['left'],
+        'right': lips['right']
+    }
     platform['shows'][0]['position'] = {
         'x': position_x,
         'y': position_y_modifier + (scale_y / 2.0),
@@ -489,21 +577,66 @@ def create_ramp(
 
 def create_door(
     position_x: float,
+    position_y: float,
     position_z: float,
     rotation_y: float,
-    scale_x: float,
-    scale_y: float,
-    scale_z: float,
     material_tuple: MaterialTuple,
-    bounds: ObjectBounds = None
-) -> Dict[str, Any]:
+    wall_material_tuple: MaterialTuple,
+    wall_scale_x: float,
+    wall_scale_y: float,
+    bounds: ObjectBounds = None,
+    add_walls: bool = True,
+) -> List[Dict[str, Any]]:
     """Create and return an instance of an interior door."""
+    if rotation_y not in [0, 90, 180, 270]:
+        raise Exception("Doors rotation must be either 0, 90, 180, or 270")
+
+    # if we ever want to alter the scale of the door, we need to update wall
+    # calculations.
+    scale_x = 1
+    scale_y = 1
+    scale_z = 1
+    # The wall_x_scale must be at least 1 (the door itself is a little under 1
+    # wide and we want to have walls on both sides of it).
+    wall_scale_x = max(BASE_WALL_WITH_DOOR_WIDTH, wall_scale_x)
+    # The wall_y_scale must be at least 2 (since doors are 2 units tall)
+    wall_scale_y = max(BASE_DOOR_HEIGHT, wall_scale_y)
+
+    # Calculate the properties for the top and side wall sections
+    top_wall_scale_x = wall_scale_x
+    top_wall_scale_y = (wall_scale_y - BASE_DOOR_HEIGHT)
+    top_wall_position_y = position_y + \
+        BASE_DOOR_HEIGHT + (top_wall_scale_y / 2.0)
+    side_wall_scale_x = ((wall_scale_x - 1) * 0.5) + BASE_SIDE_WALL_SCALE
+    side_wall_position_offset = (wall_scale_x * 0.25) + BASE_SIDE_WALL_POSITION
+
+    # The X and Z positions of the side wall sections will depend on the Y
+    # rotation
+    side_wall_position_x = (
+        side_wall_position_offset if rotation_y in {0, 180} else 0
+    )
+
+    side_wall_position_z = (
+        side_wall_position_offset if rotation_y in {90, 270} else 0
+    )
+
+    if add_walls:
+        door_wall_objects = _get_door_wall_objects(
+            position_x=position_x,
+            position_y=position_y,
+            position_z=position_z,
+            rotation_y=rotation_y,
+            top_wall_position_y=top_wall_position_y,
+            side_wall_position_x=side_wall_position_x,
+            side_wall_position_z=side_wall_position_z,
+            top_wall_scale_x=top_wall_scale_x,
+            top_wall_scale_y=top_wall_scale_y,
+            side_wall_scale_x=side_wall_scale_x)
 
     door = copy.deepcopy(DOOR_TEMPLATE)
-    door['id'] += str(uuid.uuid4())
     door['shows'][0]['position'] = {
         'x': position_x,
-        'y': 0,
+        'y': position_y,
         'z': position_z
     }
     door['shows'][0]['rotation'] = {
@@ -516,12 +649,250 @@ def create_door(
         'y': scale_y,
         'z': scale_z
     }
-    return finalize_structural_object(
+    objs = finalize_structural_object(
         [door],
         material_tuple,
         ['door'],
+        bounds,
+        override_scale={
+            'x': 0.85 * scale_x,
+            'y': 2 * scale_y,
+            # Ensure that both sides of the door's opening are big enough to
+            # walk through, and that they're spaced away from other walls.
+            'z': 0.85 * scale_z * 2
+        },
+        override_offset={'x': 0, 'y': 1, 'z': 0},
+        override_standing_y=0
+    )
+    walls = []
+    if add_walls:
+        walls = finalize_structural_object(
+            door_wall_objects,
+            wall_material_tuple,
+            ['door_wall'],
+            bounds
+        )
+    return objs + walls
+
+
+def _get_door_wall_objects(
+    position_x: float,
+    position_y: float,
+    position_z: float,
+    rotation_y: float,
+    top_wall_position_y: float,
+    side_wall_position_x: float,
+    side_wall_position_z: float,
+    top_wall_scale_x: float,
+    top_wall_scale_y: float,
+    side_wall_scale_x: float,
+    wall_material_str: str = "Custom/Materials/GreyDrywallMCS",
+):
+    # Create the wall sections and the door object
+    objs = []
+    # only add top wall if the scale is greater than 0
+    if top_wall_scale_x > 0 and top_wall_scale_y > 0:
+        objs.append({
+            "id": "wall_top",
+            "type": "cube",
+            "mass": 10,
+            "materials": [wall_material_str],
+            'debug': {
+                'color': [],
+                'info': []
+            },
+            "kinematic": True,
+            "structure": True,
+            "shows": [
+                {
+                    "stepBegin": 0,
+                    "position": {
+                        "x": position_x,
+                        "y": top_wall_position_y,
+                        "z": position_z
+                    },
+                    "rotation": {
+                        "x": 0,
+                        "y": rotation_y,
+                        "z": 0
+                    },
+                    "scale": {
+                        "x": top_wall_scale_x,
+                        "y": top_wall_scale_y,
+                        "z": 0.1
+                    }
+                }
+            ]
+        })
+    if side_wall_scale_x > 0:
+        objs += [{
+            "id": "wall_left",
+            "type": "cube",
+            "mass": 10,
+            "materials": [wall_material_str],
+            'debug': {
+                    'color': [],
+                    'info': []
+            },
+            "kinematic": True,
+            "structure": True,
+            "shows": [
+                {
+                    "stepBegin": 0,
+                    "position": {
+                        "x": position_x - side_wall_position_x,
+                        "y": 1 + position_y,
+                        "z": position_z - side_wall_position_z
+                    },
+                    "rotation": {
+                        "x": 0,
+                        "y": rotation_y,
+                        "z": 0
+                    },
+                    "scale": {
+                        "x": side_wall_scale_x,
+                        "y": 2,
+                        "z": 0.1
+                    }
+                }
+            ]
+        },
+            {
+            "id": "wall_right",
+            "type": "cube",
+            "mass": 10,
+            "materials": [wall_material_str],
+            'debug': {
+                'color': [],
+                'info': []
+            },
+            "kinematic": True,
+            "structure": True,
+            "shows": [
+                {
+                    "stepBegin": 0,
+                    "position": {
+                        "x": position_x + side_wall_position_x,
+                        "y": 1 + position_y,
+                        "z": position_z + side_wall_position_z
+                    },
+                    "rotation": {
+                        "x": 0,
+                        "y": rotation_y,
+                        "z": 0
+                    },
+                    "scale": {
+                        "x": side_wall_scale_x,
+                        "y": 2,
+                        "z": 0.1
+                    }
+                }
+            ]
+        }
+        ]
+    return objs
+
+
+def create_guide_rails_around(
+        position_x: float,
+        position_z: float,
+        rotation_y: float,
+        length: float,
+        width: float,
+        material_tuple: MaterialTuple,
+        position_y: float = 0,
+        bounds: ObjectBounds = None):
+    """Provide a rectangle to put rails on the sides.  The rectangle will be
+    centered on the position, rotated by the rotation_y and have size of
+    length and width."""
+    if rotation_y not in [0, 90, 180, 270]:
+        raise Exception("Guide rails only implemented at rotations of 0, 90, "
+                        "180, and 270.")
+    if rotation_y % 180 == 0:
+        x1 = position_x + width / 2.0 + RAIL_CENTER_TO_EDGE
+        x2 = position_x - width / 2.0 - RAIL_CENTER_TO_EDGE
+        z1 = position_z
+        z2 = position_z
+    else:
+        x1 = position_x
+        x2 = position_x
+        z1 = position_z + width / 2.0 + RAIL_CENTER_TO_EDGE
+        z2 = position_z - width / 2.0 - RAIL_CENTER_TO_EDGE
+    rail1 = create_guide_rail(
+        x1,
+        z1,
+        rotation_y=rotation_y,
+        length=length,
+        position_y=position_y,
+        material_tuple=material_tuple,
+        bounds=bounds)
+    rail2 = create_guide_rail(
+        x2,
+        z2,
+        rotation_y=rotation_y,
+        length=length,
+        position_y=position_y,
+        material_tuple=material_tuple,
+        bounds=bounds)
+    return [rail1, rail2]
+
+
+def create_guide_rail(
+        position_x: float,
+        position_z: float,
+        rotation_y: float,
+        length: float,
+        material_tuple: MaterialTuple,
+        position_y: float = 0,
+        bounds: ObjectBounds = None):
+    rail = copy.deepcopy(GUIDE_RAIL_TEMPLATE)
+    rail['shows'][0]['position']['x'] = position_x
+    rail['shows'][0]['position']['y'] = position_y
+    rail['shows'][0]['position']['z'] = position_z
+    rail['shows'][0]['rotation']['y'] = rotation_y
+    rail['shows'][0]['scale']['z'] = length
+    rail = finalize_structural_object(
+        [rail],
+        material_tuple,
+        ['guide_rail'],
         bounds
     )[0]
+    return rail
+
+
+def create_tool(
+    # TODO MCS-1206 Move into a separate file for interactable objects
+    object_type: str,
+    position_x: float,
+    position_z: float,
+    rotation_y: float,
+    bounds: ObjectBounds = None
+) -> Dict[str, Any]:
+    """Create and return an instance of a tool."""
+    tool = copy.deepcopy(TOOL_TEMPLATE)
+    tool['type'] = object_type
+    tool['shows'][0]['position']['x'] = position_x
+    tool['shows'][0]['position']['z'] = position_z
+    tool['shows'][0]['rotation']['y'] = rotation_y
+    dimensions = LARGE_BLOCK_TOOLS_TO_DIMENSIONS.get(object_type)
+    if not dimensions:
+        raise Exception(f'Tool object type must be in {ALL_LARGE_BLOCK_TOOLS}')
+    tool = finalize_structural_object(
+        [tool],
+        # Use the tool's default materials set by the Unity prefab.
+        None,
+        ['tool'],
+        bounds,
+        override_scale={
+            'x': dimensions[0],
+            'y': TOOL_HEIGHT,
+            'z': dimensions[1]
+        },
+        override_standing_y=(TOOL_HEIGHT / 2.0)
+    )[0]
+    # Use the tool's default mass set in the Unity object registry file.
+    del tool['mass']
+    return tool
 
 
 def finalize_structural_object(
@@ -529,7 +900,9 @@ def finalize_structural_object(
     material_tuple: MaterialTuple = None,
     name_list: List[str] = None,
     bounds: ObjectBounds = None,
-    override_scale: Dict[str, float] = None
+    override_scale: Dict[str, float] = None,
+    override_offset: Dict[str, float] = None,
+    override_standing_y: float = None
 ) -> List[Dict[str, Any]]:
     """Finalize and return each of the instances of structural objects."""
     common_id = str(uuid.uuid4())
@@ -538,18 +911,21 @@ def finalize_structural_object(
         instance['id'] += common_id
         instance['shows'][0]['boundingBox'] = bounds or create_bounds(
             dimensions=scale,
-            offset={'x': 0, 'y': 0, 'z': 0},
+            offset=override_offset or {'x': 0, 'y': 0, 'z': 0},
             position=instance['shows'][0]['position'],
             rotation=instance['shows'][0]['rotation'],
-            standing_y=(scale['y'] / 2.0)
+            standing_y=(
+                scale['y'] / 2.0 if override_standing_y is None
+                else override_standing_y
+            )
         )
         instance['debug']['dimensions'] = instance['shows'][0]['scale'].copy()
         instance['mass'] = _calculate_mass(instance['debug']['dimensions'])
         if material_tuple:
             instance['materials'] = [material_tuple.material]
             instance['debug']['color'] = material_tuple.color
-            instance['debug']['info'] = _calculate_info(
-                material_tuple.color,
-                name_list or []
-            )
+        instance['debug']['info'] = _calculate_info(
+            instance['debug']['color'],
+            name_list or []
+        )
     return instance_list

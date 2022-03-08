@@ -19,7 +19,7 @@ from generator import (
     ObjectDefinition,
     geometry,
 )
-from generator.materials import LAVA_MATERIAL_STRINGS, find_colors
+from generator.materials import find_colors
 
 
 class ILEException(Exception):
@@ -153,15 +153,9 @@ def choose_random(data: Any, data_type: Type = None) -> Any:
 def find_bounds(scene: Dict[str, Any]) -> List[ObjectBounds]:
     """Calculate and return the bounds for all the given objects."""
     # Create a bounding box for each hole and lava area and add it to the list.
-    areas = scene.get('holes', []) + [
-        area for item in scene.get('floorTextures', [])
-        for area in item['positions']
-        if item['material'] in LAVA_MATERIAL_STRINGS
-    ]
-
     bounds = [
         geometry.generate_floor_area_bounds(area['x'], area['z'])
-        for area in areas
+        for area in (scene.get('holes', []) + scene.get('lava', []))
     ]
 
     # Add each object's bounding box to the list.
@@ -171,3 +165,13 @@ def find_bounds(scene: Dict[str, Any]) -> List[ObjectBounds]:
         except(KeyError):
             ...
     return bounds
+
+
+def return_list(data: Any, default_value: Any = None) -> List[Any]:
+    """Return the given data as a list if it's not already one; return an empty
+    list, or the given default value, if the data is None."""
+    if data is None:
+        return [] if default_value is None else default_value
+    if not isinstance(data, list):
+        return [data]
+    return data

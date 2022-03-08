@@ -1,0 +1,75 @@
+# Can only use the Pass action through the whole scene.
+passive_scene: true
+
+# Max of 240 action steps in each "move across" scene.
+last_step: 240
+
+# Large room with a high ceiling.
+room_dimensions:
+    x: 16
+    y: 8
+    z: 16
+
+# Specific starting position and rotation used in passive physics tasks.
+performer_start_position:
+    x: 0
+    y: 1.5
+    z: -4.5
+performer_start_rotation:
+    x: 0
+    y: 0
+
+# Platform underneath starting position to raise camera height.
+structural_platforms:
+    num: 1
+    position:
+        x: 0
+        y: 0
+        z: -4.5
+    rotation_y: 0
+    scale:
+        x: 0.5
+        y: 0.738
+        z: 0.5
+
+# Two moving-and-rotating occluding walls at semi-random locations.
+structural_moving_occluders:
+    - num: 2
+      occluder_height: 3
+      occluder_thickness: 0.1
+      occluder_width:
+          min: 0.5
+          max: 2.5
+      origin: 'top'
+      position_x:
+          min: -2.0
+          max: 2.0
+      position_z: 1
+      repeat_movement: false
+      reverse_direction: [true, false]
+      rotation_y: 0
+
+# Up to two throwers with random small objects at semi-random locations.
+structural_throwers:
+    - num: 2
+      wall: ['left', 'right']
+      position_wall:
+          min: 1.6
+          max: 7.4
+      height:
+          min: 0
+          max: 2
+      rotation: [0, 0, 0, 5, 10, 15]
+      throw_force:
+          min: 1000
+          max: 1500
+      throw_step:
+          min: 31
+          max: 40
+
+# Override the defaults to avoid randomly generating any unwanted objects.
+keyword_objects:
+    - num: 0
+random_structural_objects:
+    - num: 0
+excluded_shapes: soccer_ball

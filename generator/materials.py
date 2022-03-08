@@ -61,12 +61,10 @@ OPPOSITE_SETS = {
     "Custom/Materials/Azure": ORANGE,
     "Custom/Materials/Black": WHITE,
     "Custom/Materials/Blue": YELLOW,
-    "Custom/Materials/Brown": GREY,  # Not an official opposite
     "Custom/Materials/Chartreuse": VIOLET,
     "Custom/Materials/Cyan": RED,
     "Custom/Materials/Goldenrod": INDIGO,  # Not an official opposite
     "Custom/Materials/Green": PURPLE,
-    "Custom/Materials/Grey": BROWN,  # Not an official opposite
     "Custom/Materials/Indigo": GOLDENROD,  # Not an official opposite
     "Custom/Materials/Lime": MAGENTA,
     "Custom/Materials/Magenta": LIME,
@@ -85,43 +83,78 @@ OPPOSITE_SETS = {
 }
 
 ADJACENT_SETS = {
-    "Custom/Materials/Azure": [BLUE.material, CYAN.material, NAVY.material, TEAL.material],
+    "Custom/Materials/Azure": [
+        BLUE.material, CYAN.material, NAVY.material, TEAL.material
+    ],
     "Custom/Materials/Black": [GREY.material],
-    "Custom/Materials/Blue": [AZURE.material, INDIGO.material, NAVY.material, VIOLET.material],
+    "Custom/Materials/Blue": [
+        AZURE.material, INDIGO.material, NAVY.material, VIOLET.material
+    ],
     "Custom/Materials/Brown": [
-        GOLDENROD.material, MAROON.material, OLIVE.material, RED.material, YELLOW.material
+        GOLDENROD.material, MAROON.material, OLIVE.material, ORANGE.material,
+        RED.material, YELLOW.material
     ],
     "Custom/Materials/Chartreuse": [
-        GOLDENROD.material, GREEN.material, LIME.material, OLIVE.material, YELLOW.material
+        GOLDENROD.material, GREEN.material, LIME.material, OLIVE.material,
+        YELLOW.material
     ],
-    "Custom/Materials/Cyan": [AZURE.material, SPRINGGREEN.material, TEAL.material],
+    "Custom/Materials/Cyan": [
+        AZURE.material, SPRINGGREEN.material, TEAL.material
+    ],
     "Custom/Materials/Goldenrod": [
-        BROWN.material, CHARTREUSE.material, OLIVE.material, ORANGE.material, YELLOW.material
+        BROWN.material, CHARTREUSE.material, OLIVE.material, ORANGE.material,
+        YELLOW.material
     ],
-    "Custom/Materials/Green": [CHARTREUSE.material, LIME.material, SPRINGGREEN.material],
+    "Custom/Materials/Green": [
+        CHARTREUSE.material, LIME.material, SPRINGGREEN.material
+    ],
     "Custom/Materials/Grey": [BLACK.material, WHITE.material],
-    "Custom/Materials/Indigo": [BLUE.material, NAVY.material, PURPLE.material, VIOLET.material],
-    "Custom/Materials/Lime": [CHARTREUSE.material, GREEN.material, SPRINGGREEN.material],
-    "Custom/Materials/Magenta": [PURPLE.material, ROSE.material, VIOLET.material],
-    "Custom/Materials/Maroon": [BROWN.material, ORANGE.material, RED.material, ROSE.material],
-    "Custom/Materials/Navy": [AZURE.material, BLUE.material, INDIGO.material, VIOLET.material],
+    "Custom/Materials/Indigo": [
+        BLUE.material, NAVY.material, PURPLE.material, VIOLET.material
+    ],
+    "Custom/Materials/Lime": [
+        CHARTREUSE.material, GREEN.material, SPRINGGREEN.material
+    ],
+    "Custom/Materials/Magenta": [
+        PURPLE.material, ROSE.material, VIOLET.material
+    ],
+    "Custom/Materials/Maroon": [
+        BROWN.material, ORANGE.material, RED.material, ROSE.material
+    ],
+    "Custom/Materials/Navy": [
+        AZURE.material, BLUE.material, INDIGO.material, VIOLET.material
+    ],
     "Custom/Materials/Olive": [
-        BROWN.material, CHARTREUSE.material, GOLDENROD.material, ORANGE.material, YELLOW.material
+        BROWN.material, CHARTREUSE.material, GOLDENROD.material,
+        ORANGE.material, YELLOW.material
     ],
     "Custom/Materials/Orange": [
-        GOLDENROD.material, MAROON.material, OLIVE.material, RED.material, YELLOW.material
+        BROWN.material, GOLDENROD.material, MAROON.material, OLIVE.material,
+        RED.material, YELLOW.material
     ],
-    "Custom/Materials/Purple": [INDIGO.material, MAGENTA.material, ROSE.material, VIOLET.material],
-    "Custom/Materials/Red": [BROWN.material, MAROON.material, ORANGE.material, ROSE.material],
-    "Custom/Materials/Rose": [MAGENTA.material, MAROON.material, PURPLE.material, RED.material],
-    "Custom/Materials/SpringGreen": [CYAN.material, GREEN.material, LIME.material, TEAL.material],
-    "Custom/Materials/Teal": [AZURE.material, CYAN.material, SPRINGGREEN.material],
+    "Custom/Materials/Purple": [
+        INDIGO.material, MAGENTA.material, ROSE.material, VIOLET.material
+    ],
+    "Custom/Materials/Red": [
+        BROWN.material, MAROON.material, ORANGE.material, ROSE.material
+    ],
+    "Custom/Materials/Rose": [
+        MAGENTA.material, MAROON.material, PURPLE.material, RED.material
+    ],
+    "Custom/Materials/SpringGreen": [
+        CYAN.material, GREEN.material, LIME.material, TEAL.material
+    ],
+    "Custom/Materials/Teal": [
+        AZURE.material, CYAN.material, SPRINGGREEN.material
+    ],
     "Custom/Materials/Violet": [
-        BLUE.material, INDIGO.material, MAGENTA.material, NAVY.material, PURPLE.material
+        BLUE.material, INDIGO.material, MAGENTA.material, NAVY.material,
+        PURPLE.material
     ],
     "Custom/Materials/White": [GREY.material],
     "Custom/Materials/Yellow": [
-        BROWN.material, CHARTREUSE.material, GOLDENROD.material, OLIVE.material, ORANGE.material
+        BROWN.material, CHARTREUSE.material, GOLDENROD.material,
+        OLIVE.material, ORANGE.material
     ]
 }
 
@@ -498,17 +531,6 @@ FLAT_MATERIALS = [
     VIOLET,
     WHITE,
     YELLOW
-]
-
-
-LAVA_MATERIALS = [
-    MaterialTuple(
-        'Stylized Lava Texture/Materials/Stylize_Lava_diffuse',
-        ['red', 'orange', 'yellow']
-    )
-]
-LAVA_MATERIAL_STRINGS = [
-    material_tuple.material for material_tuple in LAVA_MATERIALS
 ]
 
 

@@ -86,6 +86,8 @@ def instantiate_object(
     object_location['rotation']['y'] += definition.rotation.y
     object_location['rotation']['z'] += definition.rotation.z
 
+    instance['debug']['originalRotation'] = vars(definition.rotation)
+
     shows = [object_location]
     instance['shows'] = shows
     object_location['stepBegin'] = 0

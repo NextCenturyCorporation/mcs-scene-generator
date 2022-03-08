@@ -55,6 +55,75 @@ def test_object_bounds():
     assert bounds.min_y == 3
 
 
+def test_expand_by():
+    box_xz = [
+        Vector3d(1, 0, 1), Vector3d(1, 0, 2),
+        Vector3d(2, 0, 2), Vector3d(2, 0, 1)
+    ]
+    bounds = ObjectBounds(box_xz=box_xz, max_y=4, min_y=3)
+    bounds.expand_by(3)
+    assert bounds.box_xz == [
+        Vector3d(-2, 0, -2), Vector3d(-2, 0, 5),
+        Vector3d(5, 0, 5), Vector3d(5, 0, -2)
+    ]
+    assert bounds.polygon_xz
+    assert bounds.max_y == 4
+    assert bounds.min_y == 3
+
+
+def test_expand_by_diagonal_fraction():
+    box_xz = [
+        Vector3d(0.2, 0, 0.6), Vector3d(0.4, 0, 0.8),
+        Vector3d(0.8, 0, 0.4), Vector3d(0.6, 0, 0.2)
+    ]
+    bounds = ObjectBounds(box_xz=box_xz, max_y=4, min_y=3)
+    bounds.expand_by(0.1)
+    expected = [
+        Vector3d(0.059, 0, 0.6), Vector3d(0.4, 0, 0.941),
+        Vector3d(0.941, 0, 0.4), Vector3d(0.6, 0, 0.059)
+    ]
+    for index, point in enumerate(expected):
+        assert point.x == round(bounds.box_xz[index].x, 3)
+        assert point.y == 0
+        assert point.z == round(bounds.box_xz[index].z, 3)
+    assert bounds.polygon_xz
+    assert bounds.max_y == 4
+    assert bounds.min_y == 3
+
+
+def test_expand_by_diagonal_negative():
+    box_xz = [
+        Vector3d(-1.5, 0, -1), Vector3d(-1, 0, -1.5),
+        Vector3d(-0.5, 0, -1), Vector3d(-1, 0, -0.5)
+    ]
+    bounds = ObjectBounds(box_xz=box_xz, max_y=4, min_y=3)
+    bounds.expand_by(1)
+    expected = [
+        Vector3d(-2.914, 0, -1.0), Vector3d(-1.0, 0, 0.914),
+        Vector3d(0.914, 0, -1.0), Vector3d(-1.0, 0, -2.914)
+    ]
+    for index, point in enumerate(expected):
+        assert point.x == round(bounds.box_xz[index].x, 3)
+        assert point.y == 0
+        assert point.z == round(bounds.box_xz[index].z, 3)
+    assert bounds.polygon_xz
+    assert bounds.max_y == 4
+    assert bounds.min_y == 3
+
+
+def test_extend_bottom_to_ground():
+    box_xz = [
+        Vector3d(1, 0, 1), Vector3d(1, 0, 2),
+        Vector3d(2, 0, 2), Vector3d(2, 0, 1)
+    ]
+    bounds = ObjectBounds(box_xz=box_xz, max_y=4, min_y=3)
+    bounds.extend_bottom_to_ground()
+    assert bounds.box_xz == box_xz
+    assert bounds.polygon_xz
+    assert bounds.max_y == 4
+    assert bounds.min_y == 0
+
+
 def test_rect_intersection():
     A = [{'x': 0, 'y': 0, 'z': 0}, {'x': 1, 'y': 0, 'z': 0},
          {'x': 1, 'y': 0, 'z': 1}, {'x': 0, 'y': 0, 'z': 1}]
@@ -678,6 +747,7 @@ def test_get_position_in_front_of_performer_next_to_room_wall():
         assert location is None
 
 
+@pytest.mark.slow
 def test_get_position_in_back_of_performer():
     performer_start = {
         'position': {'x': 0, 'y': 0, 'z': 0},

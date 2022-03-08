@@ -1,0 +1,20 @@
+# Add a Retrieval goal with a soccer ball as the target object.
+goal:
+    category: retrieval
+    target:
+        shape: soccer_ball
+        scale:
+            min: 1.0
+            max: 3.0
+
+# Only the target can be a soccer ball.
+excluded_shapes: soccer_ball
+
+# Generate an occluding wall containing three doors and a tall platform
+# bisecting the room.
+shortcut_triple_door_choice: True
+
+# Override default behavior to avoid randomly generating any other structures
+# beside the platform.
+random_structural_objects:
+    - num: 0

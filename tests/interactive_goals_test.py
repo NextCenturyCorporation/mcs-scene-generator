@@ -5,12 +5,14 @@ import pytest
 from generator import RetrievalGoal, TransferralGoal, TraversalGoal, geometry
 
 
+@pytest.mark.slow
 def test_choose_definition():
     goal = TraversalGoal('')
     definition = goal.choose_definition()
     assert definition
 
 
+@pytest.mark.slow
 def test_choose_location():
     goal = TraversalGoal('')
     definition = goal.choose_definition()
@@ -61,6 +63,7 @@ def test_RetrievalGoal_validate_target_location():
     assert goal.validate_target_location(0, {}, [], geometry.ORIGIN_LOCATION)
 
 
+@pytest.mark.slow
 def test_TransferralGoal_choose_target_definition_0():
     goal = TransferralGoal('')
     definition = goal.choose_target_definition(0)
@@ -68,6 +71,7 @@ def test_TransferralGoal_choose_target_definition_0():
     assert 'pickupable' in definition.attributes
 
 
+@pytest.mark.slow
 def test_TransferralGoal_choose_target_definition_1():
     goal = TransferralGoal('')
     definition = goal.choose_target_definition(1)
@@ -203,6 +207,7 @@ def test_TransferralGoal_validate_target_location_1_false():
     )
 
 
+@pytest.mark.slow
 def test_TraversalGoal_choose_target_definition():
     goal = TraversalGoal('')
     definition = goal.choose_target_definition(0)

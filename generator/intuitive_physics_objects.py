@@ -70,19 +70,6 @@ _NOVEL_COMPLEX_TYPES_TO_SIZES = dict([
 ])
 
 
-def turn_sideways(definition: ObjectDefinition) -> ObjectDefinition:
-    """Set the Y rotation to 90 in the given definition and switch its X and Z
-    dimensions."""
-    definition.rotation = Vector3d(0, 90, 0)
-    for size in definition.chooseSizeList:
-        size.dimensions = Vector3d(
-            size.dimensions.z,
-            size.dimensions.y,
-            size.dimensions.x
-        )
-    return definition
-
-
 _CIRCLE_FRUSTUM = create_variable_definition_from_base(
     type='circle_frustum',
     size_multiplier_list=TRAINED_SIZE_MULTIPLIER_LIST.copy(),
@@ -258,55 +245,55 @@ _TURTLE_NOVEL_SIZE = create_variable_definition_from_base(
 _TURTLE_NOVEL_SIZE.untrainedSize = True
 
 
-_SEDAN = turn_sideways(create_variable_definition_from_base(
+_SEDAN = create_variable_definition_from_base(
     type='car_1',
     size_multiplier_list=_COMPLEX_TYPES_TO_SIZES['car_1'],
     chosen_material_list=INTUITIVE_PHYSICS_OBJECT_CHOSEN_MATERIAL_LIST
-))
-_SEDAN_NOVEL_SIZE = turn_sideways(create_variable_definition_from_base(
+)
+_SEDAN_NOVEL_SIZE = create_variable_definition_from_base(
     type='car_1',
     size_multiplier_list=_NOVEL_COMPLEX_TYPES_TO_SIZES['car_1'],
     chosen_material_list=INTUITIVE_PHYSICS_OBJECT_CHOSEN_MATERIAL_LIST
-))
+)
 _SEDAN_NOVEL_SIZE.untrainedSize = True
 
 
-_RACECAR = turn_sideways(create_variable_definition_from_base(
+_RACECAR = create_variable_definition_from_base(
     type='racecar_red',
     size_multiplier_list=_COMPLEX_TYPES_TO_SIZES['racecar_red'],
     chosen_material_list=INTUITIVE_PHYSICS_OBJECT_CHOSEN_MATERIAL_LIST
-))
-_RACECAR_NOVEL_SIZE = turn_sideways(create_variable_definition_from_base(
+)
+_RACECAR_NOVEL_SIZE = create_variable_definition_from_base(
     type='racecar_red',
     size_multiplier_list=_NOVEL_COMPLEX_TYPES_TO_SIZES['racecar_red'],
     chosen_material_list=INTUITIVE_PHYSICS_OBJECT_CHOSEN_MATERIAL_LIST
-))
+)
 _RACECAR_NOVEL_SIZE.untrainedSize = True
 
 
-_TRAIN = turn_sideways(create_variable_definition_from_base(
+_TRAIN = create_variable_definition_from_base(
     type='train_1',
     size_multiplier_list=_COMPLEX_TYPES_TO_SIZES['train_1'],
     chosen_material_list=INTUITIVE_PHYSICS_OBJECT_CHOSEN_MATERIAL_LIST
-))
-_TRAIN_NOVEL_SIZE = turn_sideways(create_variable_definition_from_base(
+)
+_TRAIN_NOVEL_SIZE = create_variable_definition_from_base(
     type='train_1',
     size_multiplier_list=_NOVEL_COMPLEX_TYPES_TO_SIZES['train_1'],
     chosen_material_list=INTUITIVE_PHYSICS_OBJECT_CHOSEN_MATERIAL_LIST
-))
+)
 _TRAIN_NOVEL_SIZE.untrainedSize = True
 
 
-_TROLLEY = turn_sideways(create_variable_definition_from_base(
+_TROLLEY = create_variable_definition_from_base(
     type='trolley_1',
     size_multiplier_list=_COMPLEX_TYPES_TO_SIZES['trolley_1'],
     chosen_material_list=INTUITIVE_PHYSICS_OBJECT_CHOSEN_MATERIAL_LIST
-))
-_TROLLEY_NOVEL_SIZE = turn_sideways(create_variable_definition_from_base(
+)
+_TROLLEY_NOVEL_SIZE = create_variable_definition_from_base(
     type='trolley_1',
     size_multiplier_list=_NOVEL_COMPLEX_TYPES_TO_SIZES['trolley_1'],
     chosen_material_list=INTUITIVE_PHYSICS_OBJECT_CHOSEN_MATERIAL_LIST
-))
+)
 _TROLLEY_NOVEL_SIZE.untrainedSize = True
 
 
@@ -381,87 +368,87 @@ _TIE_FIGHTER.rotation = Vector3d(90, 0, 0)
 _TIE_FIGHTER_NOVEL_SIZE.rotation = Vector3d(90, 0, 0)
 
 
-_BUS_1 = turn_sideways(create_variable_definition_from_base(
+_BUS_1 = create_variable_definition_from_base(
     type='bus_1',
     size_multiplier_list=_COMPLEX_TYPES_TO_SIZES['bus_1'],
     chosen_material_list=INTUITIVE_PHYSICS_OBJECT_CHOSEN_MATERIAL_LIST
-))
+)
 _BUS_1.untrainedShape = True
-_BUS_1_NOVEL_SIZE = turn_sideways(create_variable_definition_from_base(
+_BUS_1_NOVEL_SIZE = create_variable_definition_from_base(
     type='bus_1',
     size_multiplier_list=_NOVEL_COMPLEX_TYPES_TO_SIZES['bus_1'],
     chosen_material_list=INTUITIVE_PHYSICS_OBJECT_CHOSEN_MATERIAL_LIST
-))
+)
 _BUS_1_NOVEL_SIZE.untrainedSize = True
 
 
-_CAR_2 = turn_sideways(create_variable_definition_from_base(
+_CAR_2 = create_variable_definition_from_base(
     type='car_2',
     size_multiplier_list=_COMPLEX_TYPES_TO_SIZES['car_2'],
     chosen_material_list=INTUITIVE_PHYSICS_OBJECT_CHOSEN_MATERIAL_LIST
-))
+)
 _CAR_2.untrainedShape = True
-_CAR_2_NOVEL_SIZE = turn_sideways(create_variable_definition_from_base(
+_CAR_2_NOVEL_SIZE = create_variable_definition_from_base(
     type='car_2',
     size_multiplier_list=_NOVEL_COMPLEX_TYPES_TO_SIZES['car_2'],
     chosen_material_list=INTUITIVE_PHYSICS_OBJECT_CHOSEN_MATERIAL_LIST
-))
+)
 _CAR_2_NOVEL_SIZE.untrainedSize = True
 
 
-_CART_2 = turn_sideways(create_variable_definition_from_base(
+_CART_2 = create_variable_definition_from_base(
     type='cart_2',
     size_multiplier_list=_COMPLEX_TYPES_TO_SIZES['cart_2'],
     chosen_material_list=INTUITIVE_PHYSICS_OBJECT_CHOSEN_MATERIAL_LIST
-))
+)
 _CART_2.untrainedShape = True
-_CART_2_NOVEL_SIZE = turn_sideways(create_variable_definition_from_base(
+_CART_2_NOVEL_SIZE = create_variable_definition_from_base(
     type='cart_2',
     size_multiplier_list=_NOVEL_COMPLEX_TYPES_TO_SIZES['cart_2'],
     chosen_material_list=INTUITIVE_PHYSICS_OBJECT_CHOSEN_MATERIAL_LIST
-))
+)
 _CART_2_NOVEL_SIZE.untrainedSize = True
 
 
-_DOG_ON_WHEELS = turn_sideways(create_variable_definition_from_base(
+_DOG_ON_WHEELS = create_variable_definition_from_base(
     type='dog_on_wheels',
     size_multiplier_list=_COMPLEX_TYPES_TO_SIZES['dog_on_wheels'],
     chosen_material_list=INTUITIVE_PHYSICS_OBJECT_CHOSEN_MATERIAL_LIST
-))
+)
 _DOG_ON_WHEELS.untrainedShape = True
-_DOG_ON_WHEELS_NOVEL_SIZE = turn_sideways(create_variable_definition_from_base(
+_DOG_ON_WHEELS_NOVEL_SIZE = create_variable_definition_from_base(
     type='dog_on_wheels',
     size_multiplier_list=_NOVEL_COMPLEX_TYPES_TO_SIZES['dog_on_wheels'],
     chosen_material_list=INTUITIVE_PHYSICS_OBJECT_CHOSEN_MATERIAL_LIST
-))
+)
 _DOG_ON_WHEELS_NOVEL_SIZE.untrainedSize = True
 
 
-_TRUCK_1 = turn_sideways(create_variable_definition_from_base(
+_TRUCK_1 = create_variable_definition_from_base(
     type='truck_1',
     size_multiplier_list=_COMPLEX_TYPES_TO_SIZES['truck_1'],
     chosen_material_list=INTUITIVE_PHYSICS_OBJECT_CHOSEN_MATERIAL_LIST
-))
+)
 _TRUCK_1.untrainedShape = True
-_TRUCK_1_NOVEL_SIZE = turn_sideways(create_variable_definition_from_base(
+_TRUCK_1_NOVEL_SIZE = create_variable_definition_from_base(
     type='truck_1',
     size_multiplier_list=_NOVEL_COMPLEX_TYPES_TO_SIZES['truck_1'],
     chosen_material_list=INTUITIVE_PHYSICS_OBJECT_CHOSEN_MATERIAL_LIST
-))
+)
 _TRUCK_1_NOVEL_SIZE.untrainedSize = True
 
 
-_TRUCK_2 = turn_sideways(create_variable_definition_from_base(
+_TRUCK_2 = create_variable_definition_from_base(
     type='truck_2',
     size_multiplier_list=_COMPLEX_TYPES_TO_SIZES['truck_2'],
     chosen_material_list=INTUITIVE_PHYSICS_OBJECT_CHOSEN_MATERIAL_LIST
-))
+)
 _TRUCK_2.untrainedShape = True
-_TRUCK_2_NOVEL_SIZE = turn_sideways(create_variable_definition_from_base(
+_TRUCK_2_NOVEL_SIZE = create_variable_definition_from_base(
     type='truck_2',
     size_multiplier_list=_NOVEL_COMPLEX_TYPES_TO_SIZES['truck_2'],
     chosen_material_list=INTUITIVE_PHYSICS_OBJECT_CHOSEN_MATERIAL_LIST
-))
+)
 _TRUCK_2_NOVEL_SIZE.untrainedSize = True
 
 

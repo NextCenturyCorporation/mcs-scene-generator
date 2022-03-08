@@ -3,8 +3,14 @@ from typing import List
 import pytest
 from machine_common_sense.config_manager import Vector3d
 
-from generator import ObjectBounds, materials, specific_objects
+from generator import (
+    ALL_LARGE_BLOCK_TOOLS,
+    ObjectBounds,
+    materials,
+    specific_objects,
+)
 from ideal_learning_env import ILEException, RandomStructuralObjectsComponent
+from ideal_learning_env.goal_services import TARGET_LABEL
 from ideal_learning_env.interactable_objects_component import (
     SpecificInteractableObjectsComponent,
 )
@@ -14,10 +20,10 @@ from ideal_learning_env.numerics import (
     VectorFloatConfig,
 )
 from ideal_learning_env.object_services import (
-    TARGET_LABEL,
     InstanceDefinitionLocationTuple,
     ObjectRepository,
 )
+from ideal_learning_env.structural_object_generator import ToolConfig
 from ideal_learning_env.structural_objects_component import (
     FloorAreaConfig,
     FloorMaterialConfig,
@@ -104,7 +110,14 @@ def prior_scene_with_target():
 
 
 @pytest.fixture(autouse=True)
-def run_before_test():
+def run_around_test():
+    # Prepare test
+    ObjectRepository.get_instance().clear()
+
+    # Run test
+    yield
+
+    # Cleanup
     ObjectRepository.get_instance().clear()
 
 
@@ -127,22 +140,28 @@ def test_random_structural_objects_defaults():
     placers = sum(bool(o['id'].startswith('placer'))
                   for o in objs)
 
+    door_walls = sum(bool(o['id'].startswith('wall_left') or
+                          o['id'].startswith('wall_right') or
+                          o['id'].startswith('wall_top'))
+                     for o in objs)
+
     holes = len(scene['holes'])
+    lava = len(scene['lava'])
     floor_textures = 0
     ft = scene['floorTextures']
     for text in ft:
         loc_list = text['positions']
         floor_textures += len(loc_list)
-    num_objs = len(objs) - occluders / 2 - throwers - droppers + \
-        holes + floor_textures - placers - 2 * three_part_occluding_walls
-
+    num_objs = len(objs) - occluders / 2 - throwers - droppers - placers - \
+        2 * three_part_occluding_walls - door_walls + holes + lava + \
+        floor_textures
     assert 2 <= num_objs <= 4
 
 
 def test_random_structural_objects_num():
     component = RandomStructuralObjectsComponent({
         'random_structural_objects': {
-            'num': 3
+            'num': 3,
         }
     })
     assert component.random_structural_objects.num == 3
@@ -162,22 +181,33 @@ def test_random_structural_objects_num():
                                      for o in objs)
     placers = sum(bool(o['id'].startswith('placer'))
                   for o in objs)
+
+    door_walls = sum(bool(o['id'].startswith('wall_left') or
+                          o['id'].startswith('wall_right') or
+                          o['id'].startswith('wall_top'))
+                     for o in objs)
+
     structural = 0
     thrown_dropped = 0
     for obj in objs:
-        if obj.get('structure'):
+        if (
+            obj.get('structure') or 'door' in obj['debug'].get('info', []) or
+            obj.get('id').startswith('tool')
+        ):
             structural += 1
         else:
             thrown_dropped += 1
     holes = len(scene['holes'])
+    lava = len(scene['lava'])
     floor_textures = 0
     ft = scene['floorTextures']
     for text in ft:
         loc_list = text['positions']
         floor_textures += len(loc_list)
-    assert len(objs) == 3 + occluders / 2 + \
-        thrown_dropped - holes - floor_textures + \
-        2 * three_part_occluding_walls
+    valid = len(objs) == 3 + occluders / 2 + \
+        thrown_dropped - holes - lava - floor_textures + \
+        2 * three_part_occluding_walls + door_walls
+    assert valid
     assert thrown_dropped == throwers + droppers + placers
     assert structural + thrown_dropped + 2 * \
         three_part_occluding_walls == len(objs)
@@ -191,8 +221,6 @@ def test_random_structural_objects_min_max():
     })
     assert component.random_structural_objects.num.min == 1
     assert component.random_structural_objects.num.max == 4
-    computed = component.get_random_structural_objects()
-    assert 1 <= computed[0].num <= 4
 
     scene = component.update_ile_scene(prior_scene())
     assert isinstance(scene['objects'], list)
@@ -207,7 +235,14 @@ def test_random_structural_objects_min_max():
                                      for o in objs)
     placers = sum(bool(o['id'].startswith('placer'))
                   for o in objs)
+
+    door_walls = sum(bool(o['id'].startswith('wall_left') or
+                          o['id'].startswith('wall_right') or
+                          o['id'].startswith('wall_top'))
+                     for o in objs)
+
     holes = len(scene['holes'])
+    lava = len(scene['lava'])
     floor_textures = 0
     ft = scene['floorTextures']
     for text in ft:
@@ -219,21 +254,26 @@ def test_random_structural_objects_min_max():
         throwers +
         droppers -
         holes -
+        lava -
         floor_textures +
-        placers + 2 * three_part_occluding_walls)
+        placers + 2 * three_part_occluding_walls + door_walls)
     max = (
         4 +
         occluders +
         throwers +
         droppers -
         holes -
+        lava -
         floor_textures +
-        placers + 2 * three_part_occluding_walls)
+        placers + 2 * three_part_occluding_walls + door_walls)
     assert min <= len(objs) <= max
     structural = 0
     thrown_dropped = 0
     for obj in objs:
-        if obj.get('structure'):
+        if (
+            obj.get('structure') or 'door' in obj['debug'].get('info', []) or
+            obj.get('id').startswith('tool')
+        ):
             structural += 1
         else:
             thrown_dropped += 1
@@ -285,11 +325,6 @@ def test_random_structural_objects_platforms():
     assert component.random_structural_objects.num.max == 3
     assert component.random_structural_objects.type == 'platforms'
 
-    computed = component.get_random_structural_objects()
-    assert isinstance(computed, List)
-    assert computed[0].type == 'platforms'
-    assert 1 <= computed[0].num <= 3
-
     scene = component.update_ile_scene(prior_scene())
     assert isinstance(scene['objects'], list)
     objs = scene['objects']
@@ -301,6 +336,10 @@ def test_random_structural_objects_platforms():
         assert 3 >= obj['shows'][0]['scale']['y'] >= 0.5
         assert obj['shows'][0]['scale']['z'] >= 0.5
         assert obj['debug']['random_position']
+        assert obj['lips']['front'] is False
+        assert obj['lips']['back'] is False
+        assert obj['lips']['left'] is False
+        assert obj['lips']['front'] is False
     assert ObjectRepository.get_instance().has_label('platforms')
     assert ObjectRepository.get_instance().has_label('test_label')
 
@@ -318,11 +357,6 @@ def test_random_structural_objects_ramps():
         RandomStructuralObjectConfig)
     assert component.random_structural_objects.type == 'ramps'
     assert component.random_structural_objects.num == [1, 2, 3]
-
-    computed = component.get_random_structural_objects()
-    assert isinstance(computed, List)
-    assert computed[0].type == 'ramps'
-    assert computed[0].num in [1, 2, 3]
 
     scene = component.update_ile_scene(prior_scene())
     assert isinstance(scene['objects'], list)
@@ -349,11 +383,6 @@ def test_random_structural_objects_l_occluders():
         RandomStructuralObjectConfig)
     assert component.random_structural_objects.type == 'l_occluders'
     assert component.random_structural_objects.num == 2
-
-    computed = component.get_random_structural_objects()
-    assert isinstance(computed, List)
-    assert computed[0].type == 'l_occluders'
-    assert computed[0].num == 2
 
     scene = component.update_ile_scene(prior_scene())
     assert isinstance(scene['objects'], list)
@@ -398,17 +427,6 @@ def test_random_structural_objects_all():
     assert component.random_structural_objects[3].num == 1
     assert component.random_structural_objects[3].type == "l_occluders"
 
-    computed = component.get_random_structural_objects()
-    assert isinstance(computed, List)
-    assert computed[0].type == "walls"
-    assert computed[0].num == 1
-    assert computed[1].type == "platforms"
-    assert computed[1].num == 1
-    assert computed[2].type == "ramps"
-    assert computed[2].num == 1
-    assert computed[3].type == "l_occluders"
-    assert computed[3].num == 1
-
     scene = component.update_ile_scene(prior_scene())
     assert isinstance(scene['objects'], list)
     objs = scene['objects']
@@ -450,11 +468,6 @@ def test_random_structural_objects_droppers():
     assert component.random_structural_objects.type == 'droppers'
     assert component.random_structural_objects.num == 2
 
-    computed = component.get_random_structural_objects()
-    assert isinstance(computed, List)
-    assert computed[0].type == 'droppers'
-    assert computed[0].num == 2
-
     scene = component.update_ile_scene(prior_scene())
     assert isinstance(scene['objects'], list)
     objs = scene['objects']
@@ -488,11 +501,6 @@ def test_random_structural_objects_throwers():
     assert component.random_structural_objects.type == 'throwers'
     assert component.random_structural_objects.num == 4
 
-    computed = component.get_random_structural_objects()
-    assert isinstance(computed, List)
-    assert computed[0].type == 'throwers'
-    assert computed[0].num == 4
-
     scene = component.update_ile_scene(prior_scene())
     assert isinstance(scene['objects'], list)
     objs = scene['objects']
@@ -525,11 +533,6 @@ def test_random_structural_objects_moving_occluders():
         RandomStructuralObjectConfig)
     assert component.random_structural_objects.type == 'moving_occluders'
     assert component.random_structural_objects.num == 3
-
-    computed = component.get_random_structural_objects()
-    assert isinstance(computed, List)
-    assert computed[0].type == 'moving_occluders'
-    assert computed[0].num == 3
 
     scene = component.update_ile_scene(prior_scene())
     assert isinstance(scene['objects'], list)
@@ -572,11 +575,6 @@ def test_random_structural_objects_holes():
     assert component.random_structural_objects.type == 'holes'
     assert component.random_structural_objects.num == 50
 
-    computed = component.get_random_structural_objects()
-    assert isinstance(computed, List)
-    assert computed[0].type == 'holes'
-    assert computed[0].num == 50
-
     scene = component.update_ile_scene(prior_scene_custom_size(12, 13))
     assert isinstance(scene['objects'], list)
     objs = scene['objects']
@@ -602,11 +600,6 @@ def test_random_structural_objects_hole_fail_under_performer():
     assert component.random_structural_objects.type == 'holes'
     assert component.random_structural_objects.num == 1
 
-    computed = component.get_random_structural_objects()
-    assert isinstance(computed, List)
-    assert computed[0].type == 'holes'
-    assert computed[0].num == 1
-
     scene = prior_scene_custom_size(1, 1)
     with pytest.raises(ILEException):
         component.update_ile_scene(scene)
@@ -624,11 +617,6 @@ def test_random_structural_objects_floor_textures():
         RandomStructuralObjectConfig)
     assert component.random_structural_objects.type == 'floor_materials'
     assert component.random_structural_objects.num == 50
-
-    computed = component.get_random_structural_objects()
-    assert isinstance(computed, List)
-    assert computed[0].type == 'floor_materials'
-    assert computed[0].num == 50
 
     scene = component.update_ile_scene(prior_scene_custom_size(12, 13))
     assert isinstance(scene['objects'], list)
@@ -661,11 +649,6 @@ def test_random_structural_objects_floor_materials_under_performer():
     assert component.random_structural_objects.type == 'floor_materials'
     assert component.random_structural_objects.num == 1
 
-    computed = component.get_random_structural_objects()
-    assert isinstance(computed, List)
-    assert computed[0].type == 'floor_materials'
-    assert computed[0].num == 1
-
     scene = prior_scene_custom_size(1, 1)
     scene = component.update_ile_scene(scene)
     ft = scene['floorTextures']
@@ -685,17 +668,10 @@ def test_random_structural_objects_lava():
     })
     scene = component.update_ile_scene(prior_scene())
     assert len(scene['objects']) == 0
-    total_count = 0
-    for item in scene['floorTextures']:
-        assert (
-            item['material'] ==
-            'Stylized Lava Texture/Materials/Stylize_Lava_diffuse'
-        )
-        for area in item['positions']:
-            assert -5 <= area['x'] <= 5
-            assert -5 <= area['z'] <= 5
-        total_count += len(item['positions'])
-    assert total_count == 10
+    for area in scene['lava']:
+        assert -5 <= area['x'] <= 5
+        assert -5 <= area['z'] <= 5
+    assert len(scene['lava']) == 10
 
 
 def test_random_structural_objects_occluding_wall():
@@ -713,10 +689,6 @@ def test_random_structural_objects_occluding_wall():
     assert (component.random_structural_objects.type ==
             'occluding_walls')
     assert component.random_structural_objects.num == 1
-    computed = component.get_random_structural_objects()
-    assert isinstance(computed, List)
-    assert computed[0].type == 'occluding_walls'
-    assert computed[0].num == 1
 
     scene = prior_scene_with_target()
 
@@ -745,11 +717,6 @@ def test_random_structural_objects_placers():
         RandomStructuralObjectConfig)
     assert component.random_structural_objects.type == 'placers'
     assert component.random_structural_objects.num == 5
-
-    computed = component.get_random_structural_objects()
-    assert isinstance(computed, List)
-    assert computed[0].type == 'placers'
-    assert computed[0].num == 5
 
     scene = component.update_ile_scene(prior_scene())
     assert isinstance(scene['objects'], list)
@@ -785,23 +752,60 @@ def test_random_structural_objects_doors():
     assert component.random_structural_objects.type == 'doors'
     assert component.random_structural_objects.num == 3
 
-    computed = component.get_random_structural_objects()
-    assert isinstance(computed, List)
-    assert computed[0].type == 'doors'
-    assert computed[0].num == 3
+    scene = prior_scene()
+    scene = component.update_ile_scene(scene)
+    objects = scene['objects']
+    num_doors = 0
+    num_walls = 0
+    for obj in objects:
+        if obj['id'].startswith('door'):
+            num_doors += 1
+            assert obj['type'] == 'door_4'
+            assert obj['openable']
+            assert not obj.get('structure')
+        else:
+            num_walls += 1
+            assert obj['id'].startswith("wall_")
+            assert obj['type'] == 'cube'
+            assert obj['structure']
+        assert obj['kinematic']
+        assert obj['debug']['random_position']
+    # its possible that doors won't have a top wall depending on the random
+    # scale
+    assert num_doors == 3
+    assert 6 <= num_walls <= 9
+    assert len(objects) == num_doors + num_walls
+    assert ObjectRepository.get_instance().has_label('doors')
+    assert ObjectRepository.get_instance().has_label('test_label')
+
+
+def test_random_structural_objects_tools():
+    component = RandomStructuralObjectsComponent({
+        'random_structural_objects': {
+            'type': 'tools',
+            'num': 2,
+            'labels': 'test_label'
+        }
+    })
+    assert isinstance(
+        component.random_structural_objects,
+        RandomStructuralObjectConfig)
+    assert component.random_structural_objects.type == 'tools'
+    assert component.random_structural_objects.num == 2
 
     scene = prior_scene()
     scene = component.update_ile_scene(scene)
     objects = scene['objects']
-    assert len(objects) == 3
+    assert len(objects) == 2
     for obj in objects:
-        assert obj['id'].startswith('door')
-        assert obj['type'] == 'door_4'
-        assert obj['kinematic']
-        assert obj['openable']
-        assert obj['structure']
-        assert obj['debug']['random_position']
-    assert ObjectRepository.get_instance().has_label('doors')
+        assert obj['id'].startswith('tool_')
+        assert obj['type'] in ALL_LARGE_BLOCK_TOOLS
+        assert not obj.get('kinematic')
+        assert not obj.get('openable')
+        assert not obj.get('structure')
+        assert not obj.get('mass')
+
+    assert ObjectRepository.get_instance().has_label('tools')
     assert ObjectRepository.get_instance().has_label('test_label')
 
 
@@ -848,19 +852,6 @@ def test_structural_objects_walls_full():
     assert pre_walls.material == my_mats
     assert pre_walls.width == 1
     assert pre_walls.height == 1
-
-    # computed walls
-    cwalls = component.get_structural_walls()
-    assert isinstance(cwalls, StructuralWallConfig)
-    assert cwalls.num == 1
-    assert isinstance(cwalls.position, Vector3d)
-    assert cwalls.position.x == 1
-    assert cwalls.position.z == 3
-    assert cwalls.rotation_y == 30
-    assert isinstance(cwalls.material, str)
-    assert cwalls.material in my_mats
-    assert cwalls.width == 1
-    assert cwalls.height == 1
 
     scene = component.update_ile_scene(prior_scene())
     assert isinstance(scene['objects'], list)
@@ -909,18 +900,6 @@ def test_structural_objects_walls_no_num():
     assert pre_walls.width == 2
     assert pre_walls.height == 3
 
-    # computed walls
-    cwalls = component.get_structural_walls()
-    assert isinstance(cwalls, StructuralWallConfig)
-    assert isinstance(cwalls.position, Vector3d)
-    assert cwalls.position.x == 5
-    assert cwalls.position.z == 1
-    assert cwalls.rotation_y == 78
-    assert isinstance(cwalls.material, str)
-    assert cwalls.material in my_mats
-    assert cwalls.width == 2
-    assert cwalls.height == 3
-
     scene = component.update_ile_scene(prior_scene())
     assert isinstance(scene['objects'], list)
     objs = scene['objects']
@@ -944,15 +923,6 @@ def test_structural_objects_walls_empty():
     assert pre_walls.material is None
     assert pre_walls.width is None
     assert pre_walls.height is None
-
-    # computed walls
-    cwalls = component.get_structural_walls()
-    assert isinstance(cwalls, StructuralWallConfig)
-    assert cwalls.num == 1
-    assert cwalls.position is None
-    assert cwalls.material is None
-    assert cwalls.width is None
-    assert cwalls.height is None
 
     scene = component.update_ile_scene(prior_scene())
     assert isinstance(scene['objects'], list)
@@ -1008,22 +978,6 @@ def test_structural_objects_platforms_full():
     assert pre_plat.material == my_mats
     scale = pre_plat.scale
     assert isinstance(scale, VectorFloatConfig)
-    assert scale.x == 1.4
-    assert scale.y == 1.5
-    assert scale.z == 1.6
-
-    # computed walls
-    cplat = component.get_structural_platforms()
-    assert isinstance(cplat, StructuralPlatformConfig)
-    assert cplat.num == 1
-    assert isinstance(cplat.position, Vector3d)
-    assert cplat.position.x == 1
-    assert cplat.position.z == 3
-    assert cplat.rotation_y == 30
-    assert isinstance(cplat.material, str)
-    assert cplat.material in my_mats
-    scale = cplat.scale
-    assert isinstance(scale, Vector3d)
     assert scale.x == 1.4
     assert scale.y == 1.5
     assert scale.z == 1.6
@@ -1094,16 +1048,6 @@ def test_structural_objects_platforms_scale():
     assert scale.y == [.6, .7, .8]
     assert scale.z == .9
 
-    # computed walls
-    cplat = component.get_structural_platforms()
-    assert isinstance(cplat, StructuralPlatformConfig)
-    assert cplat.num == 1
-    scale = cplat.scale
-    assert isinstance(scale, Vector3d)
-    assert 1.3 <= scale.x <= 1.5
-    assert scale.y in [0.6, 0.7, 0.8]
-    assert scale.z == .9
-
     scene = component.update_ile_scene(prior_scene())
     assert isinstance(scene['objects'], list)
     objs = scene['objects']
@@ -1157,19 +1101,6 @@ def test_structural_objects_platforms_variables():
     scale = pre_plat.scale
     assert scale == MinMaxFloat(min=0.8, max=1.2)
 
-    # computed walls
-    cplat = component.get_structural_platforms()
-    assert isinstance(cplat, StructuralPlatformConfig)
-    assert cplat.num == 1
-    assert isinstance(cplat.position, Vector3d)
-    assert -4 <= cplat.position.x <= 4
-    assert cplat.position.z in [-3, 0, 3]
-    assert cplat.rotation_y == 30
-    assert isinstance(cplat.material, str)
-    assert cplat.material in my_mats
-    scale = cplat.scale
-    assert 0.2 <= scale <= 1.2
-
     scene = component.update_ile_scene(prior_scene())
     assert isinstance(scene['objects'], list)
     objs = scene['objects']
@@ -1187,6 +1118,462 @@ def test_structural_objects_platforms_variables():
     assert obj['debug']['random_position']
     assert ObjectRepository.get_instance().has_label('platforms')
     assert ObjectRepository.get_instance().has_label('test_label')
+
+
+def test_structural_objects_platforms_with_ramps():
+    component = SpecificStructuralObjectsComponent({
+        'structural_platforms': {
+            'num': 1,
+            'position': {
+                'x': 1,
+                'y': 1,
+                'z': 3
+            },
+            'rotation_y': 0,
+
+            'scale': {
+                'x': 1,
+                'y': 1,
+                'z': 2
+            },
+            'attached_ramps': 1
+        }
+    })
+    pre_plat = component.structural_platforms
+    assert isinstance(pre_plat, StructuralPlatformConfig)
+    assert pre_plat.num == 1
+    assert isinstance(pre_plat.position, VectorFloatConfig)
+    assert pre_plat.position.x == 1
+    assert pre_plat.position.z == 3
+    assert pre_plat.rotation_y == 0
+    scale = pre_plat.scale
+    assert isinstance(scale, VectorFloatConfig)
+    assert scale.x == 1
+    assert scale.y == 1
+    assert scale.z == 2
+    assert pre_plat.attached_ramps
+    assert not getattr(pre_plat, 'platform_underneath')
+    assert not getattr(pre_plat, 'platform_underneath_attached_ramps')
+
+    scene = component.update_ile_scene(prior_scene())
+    assert isinstance(scene['objects'], list)
+    objs = scene['objects']
+    assert len(objs) == 2
+    obj = objs[0]
+    assert not obj['debug']['random_position']
+    assert obj['type'] == 'cube'
+    assert obj['structure']
+    show = obj['shows'][0]
+    ppos = show['position']
+    prot = show['rotation']
+    pscale = show['scale']
+    plat_poly = show['boundingBox'].polygon_xz
+    assert ppos['x'] == 1
+    assert ppos['z'] == 3
+    assert prot['y'] == 0
+    assert pscale['x'] == 1
+    assert pscale['y'] == 1
+    assert pscale['z'] == 2
+    assert ObjectRepository.get_instance().has_label('platforms')
+
+    obj = objs[1]
+    assert obj['debug']['random_position']
+    assert obj['type'] == 'triangle'
+    assert obj['structure']
+    show = obj['shows'][0]
+    ramp_poly = show['boundingBox'].polygon_xz
+    rpos = show['position']
+    rrot = show['rotation']
+    rscale = show['scale']
+    assert rrot['y'] in [0, 90, 180, 270]
+    top = (rpos['z'] - rscale['z'] * 0.5 ==
+           pytest.approx(ppos['z'] + pscale['z'] * 0.5), 0.1)
+    bottom = (rpos['z'] + rscale['z'] * 0.5 ==
+              pytest.approx(ppos['z'] - pscale['z'] * 0.5), 0.1)
+    left = (rpos['x'] - rscale['x'] * 0.5 ==
+            pytest.approx(ppos['x'] + pscale['x'] * 0.5), 0.1)
+    right = (rpos['x'] + rscale['x'] * 0.5 ==
+             pytest.approx(ppos['x'] - pscale['x'] * 0.5), 0.1)
+    assert top or bottom or left or right
+    # the indexs are a needed due to the above use of pytest.approx
+    if top[0] or bottom[0]:
+        rscale['x'] <= pscale['x']
+    else:
+        rscale['z'] <= pscale['z']
+    assert ObjectRepository.get_instance().has_label('ramps')
+
+    touches = plat_poly.touches(ramp_poly)
+    intersect = plat_poly.intersection(ramp_poly)
+    assert touches or intersect.area < 0.01
+
+
+def test_structural_objects_platforms_with_ramps_and_gaps():
+    component = SpecificStructuralObjectsComponent({
+        'structural_platforms': {
+            'num': 1,
+            'position': {
+                'x': 1,
+                'y': 1,
+                'z': 3
+            },
+            'rotation_y': 0,
+            'lips': {
+                'front': True,
+                'back': True,
+                'left': True,
+                'right': True
+            },
+            'scale': {
+                'x': 1,
+                'y': 1,
+                'z': 2
+            },
+            'attached_ramps': 1
+        }
+    })
+    pre_plat = component.structural_platforms
+    assert isinstance(pre_plat, StructuralPlatformConfig)
+    assert pre_plat.num == 1
+    assert isinstance(pre_plat.position, VectorFloatConfig)
+    assert pre_plat.lips.front
+    assert pre_plat.lips.back
+    assert pre_plat.lips.left
+    assert pre_plat.lips.right
+
+    scene = component.update_ile_scene(prior_scene())
+    assert isinstance(scene['objects'], list)
+    objs = scene['objects']
+    assert len(objs) == 2
+    obj = objs[0]
+    assert not obj['debug']['random_position']
+    assert obj['type'] == 'cube'
+    assert obj['structure']
+    assert obj['lips']
+    assert obj['lips']['front']
+    assert obj['lips']['back']
+    assert obj['lips']['right']
+    assert obj['lips']['left']
+    gaps = obj['lips']['gaps']
+    side = gaps.get('front') or gaps.get(
+        'back') or gaps.get('right') or gaps.get('left')
+    assert len(side) == 1
+    gap = side[0]
+    assert 0 <= gap['high'] <= 1
+    assert 0 <= gap['low'] <= 1
+    assert gap['low'] < gap['high']
+    assert ObjectRepository.get_instance().has_label('platforms')
+
+
+def test_structural_objects_platforms_with_under_platform():
+    component = SpecificStructuralObjectsComponent({
+        'structural_platforms': {
+            'num': 1,
+            'position': {
+                'x': 2,
+                'y': 1,
+                'z': -2
+            },
+            'rotation_y': 0,
+
+            'scale': {
+                'x': .5,
+                'y': 1,
+                'z': 1
+            },
+            'platform_underneath': True
+        }
+    })
+    pre_plat = component.structural_platforms
+    assert isinstance(pre_plat, StructuralPlatformConfig)
+    assert pre_plat.num == 1
+    assert isinstance(pre_plat.position, VectorFloatConfig)
+    assert pre_plat.position.x == 2
+    assert pre_plat.position.z == -2
+    assert pre_plat.rotation_y == 0
+    scale = pre_plat.scale
+    assert isinstance(scale, VectorFloatConfig)
+    assert scale.x == 0.5
+    assert scale.y == 1
+    assert scale.z == 1
+    assert pre_plat.platform_underneath
+    assert not getattr(pre_plat, 'attached_ramps')
+    assert not getattr(pre_plat, 'platform_underneath_attached_ramps')
+
+    scene = component.update_ile_scene(prior_scene())
+    assert isinstance(scene['objects'], list)
+    objs = scene['objects']
+    assert len(objs) == 2
+    obj = objs[0]
+    assert not obj['debug']['random_position']
+    assert obj['type'] == 'cube'
+    assert obj['structure']
+    show = obj['shows'][0]
+    tpos = show['position']
+    trot = show['rotation']
+    tscale = show['scale']
+    top_poly = show['boundingBox'].polygon_xz
+    assert tpos['x'] == 2
+    assert tpos['z'] == -2
+    assert trot['y'] == 0
+    assert tscale['x'] == 0.5
+    assert tscale['y'] == 1
+    assert tscale['z'] == 1
+    assert ObjectRepository.get_instance().has_label('platforms')
+    assert len(ObjectRepository.get_instance(
+    ).get_all_from_labeled_objects('platforms')) == 2
+
+    obj = objs[1]
+    assert obj['debug']['random_position']
+    assert obj['type'] == 'cube'
+    assert obj['structure']
+    show = obj['shows'][0]
+    bottom_poly = show['boundingBox'].polygon_xz
+    bpos = show['position']
+    brot = show['rotation']
+    bscale = show['scale']
+    assert brot['y'] == 0
+    assert bpos['y'] == 0.5
+    assert bscale['x'] > tscale['x']
+    assert bscale['z'] > tscale['z']
+    assert bottom_poly.contains(top_poly)
+
+
+def test_structural_objects_platforms_with_under_platform_with_ramps():
+    component = SpecificStructuralObjectsComponent({
+        'structural_platforms': {
+            'num': 1,
+            'position': {
+                'x': 2,
+                'y': 1,
+                'z': -2
+            },
+            'rotation_y': 37,
+
+            'scale': {
+                'x': 1,
+                'y': 0.5,
+                'z': 1
+            },
+            'platform_underneath': True,
+            'attached_ramps': 1,
+            'platform_underneath_attached_ramps': 2,
+            'labels': 'my_label'
+        }
+    })
+    pre_plat = component.structural_platforms
+    assert isinstance(pre_plat, StructuralPlatformConfig)
+    assert pre_plat.num == 1
+    assert isinstance(pre_plat.position, VectorFloatConfig)
+    assert pre_plat.position.x == 2
+    assert pre_plat.position.z == -2
+    assert pre_plat.rotation_y == 37
+    scale = pre_plat.scale
+    assert isinstance(scale, VectorFloatConfig)
+    assert scale.x == 1
+    assert scale.y == 0.5
+    assert scale.z == 1
+    assert pre_plat.platform_underneath
+    assert pre_plat.attached_ramps == 1
+    assert pre_plat.platform_underneath_attached_ramps == 2
+
+    scene = component.update_ile_scene(prior_scene())
+    assert isinstance(scene['objects'], list)
+    objs = scene['objects']
+    assert len(objs) == 5
+    obj = objs[0]
+    assert not obj['debug']['random_position']
+    assert obj['type'] == 'cube'
+    assert obj['structure']
+    show = obj['shows'][0]
+    tpos = show['position']
+    trot = show['rotation']
+    tscale = show['scale']
+    top_poly = show['boundingBox'].polygon_xz
+    assert tpos['x'] == 2
+    assert tpos['z'] == -2
+    assert trot['y'] == 37
+    assert tscale['x'] == 1
+    assert tscale['y'] == 0.5
+    assert tscale['z'] == 1
+    assert ObjectRepository.get_instance().has_label('platforms')
+    assert len(ObjectRepository.get_instance(
+    ).get_all_from_labeled_objects('platforms')) == 2
+    assert len(ObjectRepository.get_instance(
+    ).get_all_from_labeled_objects('ramps')) == 3
+    # both platforms get the labels
+    assert len(ObjectRepository.get_instance(
+    ).get_all_from_labeled_objects('my_label')) == 2
+
+    obj = objs[1]
+    assert obj['debug']['random_position']
+    assert obj['type'] == 'cube'
+    assert obj['structure']
+    show = obj['shows'][0]
+    bpos = show['position']
+    brot = show['rotation']
+    bscale = show['scale']
+    bottom_poly = show['boundingBox'].polygon_xz
+    assert brot['y'] == 37
+    assert bpos['y'] == 0.5
+    assert bscale['x'] > tscale['x']
+    assert bscale['y'] == 1
+    assert bscale['z'] > tscale['z']
+    assert bottom_poly.contains(top_poly)
+
+    ramp_rots = [37, 90 + 37, 180 + 37, 270 + 37]
+
+    obj = objs[2]
+    assert obj['debug']['random_position']
+    assert obj['type'] == 'triangle'
+    assert obj['structure']
+    show = obj['shows'][0]
+    rpos = show['position']
+    rrot = show['rotation']
+    rscale = show['scale']
+    ramp_poly = show['boundingBox'].polygon_xz
+    assert rrot['y'] in ramp_rots
+    assert rpos['y'] == pytest.approx(1.25)
+    # assert angle is really < 45
+    assert rscale['z'] > rscale['y']
+    assert bottom_poly.contains(ramp_poly)
+    touches = top_poly.touches(ramp_poly)
+    intersect = top_poly.intersection(ramp_poly)
+    assert touches or intersect.area < 0.01
+
+    for i in [3, 4]:
+        obj = objs[i]
+        assert obj['debug']['random_position']
+        assert obj['type'] == 'triangle'
+        assert obj['structure']
+        show = obj['shows'][0]
+        rpos = show['position']
+        rrot = show['rotation']
+        rscale = show['scale']
+        assert rrot['y'] in ramp_rots
+        assert rpos['y'] == pytest.approx(0.5)
+        assert rscale['y'] == pytest.approx(1)
+        # assert angle is really < 45
+        assert rscale['z'] > rscale['y']
+        ramp_poly = show['boundingBox'].polygon_xz
+        touches = bottom_poly.touches(ramp_poly)
+        intersect = bottom_poly.intersection(ramp_poly)
+        assert touches or intersect.area < 0.01
+
+
+def test_structural_objects_platforms_with_platform_ramps_gaps():
+    component = SpecificStructuralObjectsComponent({
+        'structural_platforms': {
+            'num': 1,
+            'position': {
+                'x': 2,
+                'y': 1,
+                'z': -2
+            },
+            'rotation_y': 37,
+            'lips': {
+                'front': True,
+                'back': True,
+                'left': True,
+                'right': True
+            },
+            'scale': {
+                'x': 1,
+                'y': 0.5,
+                'z': 1
+            },
+            'platform_underneath': True,
+            'attached_ramps': 1,
+            'platform_underneath_attached_ramps': 2,
+            'labels': 'my_label'
+        }
+    })
+    pre_plat = component.structural_platforms
+    assert isinstance(pre_plat, StructuralPlatformConfig)
+    assert pre_plat.num == 1
+    assert pre_plat.platform_underneath
+    assert pre_plat.attached_ramps == 1
+    assert pre_plat.platform_underneath_attached_ramps == 2
+    assert pre_plat.lips.front
+    assert pre_plat.lips.back
+    assert pre_plat.lips.left
+    assert pre_plat.lips.right
+
+    scene = component.update_ile_scene(prior_scene_custom_size(12, 13))
+    assert isinstance(scene['objects'], list)
+    objs = scene['objects']
+    assert len(objs) == 5
+    obj = objs[0]
+    assert not obj['debug']['random_position']
+    assert obj['type'] == 'cube'
+    assert obj['structure']
+    assert obj['lips']
+    assert obj['lips']['front']
+    assert obj['lips']['back']
+    assert obj['lips']['right']
+    assert obj['lips']['left']
+    gaps = obj['lips']['gaps']
+    side = gaps.get('front') or gaps.get(
+        'back') or gaps.get('right') or gaps.get('left')
+    assert len(side) == 1
+    gap = side[0]
+    assert 0 <= gap['high'] <= 1
+    assert 0 <= gap['low'] <= 1
+    assert gap['low'] < gap['high']
+
+    obj = objs[1]
+    assert obj['debug']['random_position']
+    assert obj['type'] == 'cube'
+    assert obj['structure']
+    assert obj['lips']
+    assert obj['lips']['front']
+    assert obj['lips']['back']
+    assert obj['lips']['right']
+    assert obj['lips']['left']
+    gaps = obj['lips']['gaps']
+    all_gaps = []
+    for my_gaps in gaps.values():
+        all_gaps += my_gaps
+    # The only way we have 1 gap is if we have a sliver that is removed
+    # for being too small.
+    assert len(all_gaps) in [1, 2]
+    for gap in all_gaps:
+        assert 0 <= gap['high'] <= 1
+        assert 0 <= gap['low'] <= 1
+        assert gap['low'] < gap['high']
+
+    obj = objs[2]
+    assert obj['debug']['random_position']
+    assert obj['type'] == 'triangle'
+    assert obj['structure']
+
+    for i in [3, 4]:
+        obj = objs[i]
+        assert obj['debug']['random_position']
+        assert obj['type'] == 'triangle'
+        assert obj['structure']
+
+
+def test_structural_objects_platforms_with_too_many_ramps():
+    component = SpecificStructuralObjectsComponent({
+        'structural_platforms': {
+            'num': 1,
+            'position': {
+                'x': 2,
+                'y': 1,
+                'z': -2
+            },
+            'rotation_y': 37,
+
+            'scale': {
+                'x': 1,
+                'y': 1,
+                'z': 1
+            },
+            'attached_ramps': 30,
+        }
+    })
+    with pytest.raises(ILEException):
+        component.update_ile_scene(prior_scene())
 
 
 def test_structural_objects_l_occluders_full():
@@ -1225,22 +1612,6 @@ def test_structural_objects_l_occluders_full():
     assert pre_occ.scale_side_x == .5
     assert pre_occ.scale_side_z == .6
     assert pre_occ.scale_y == .7
-
-    # computed occluder
-    comp_occ = component.get_structural_l_occluders()
-    assert isinstance(comp_occ, StructuralLOccluderConfig)
-    assert comp_occ.num == 1
-    assert isinstance(comp_occ.position, Vector3d)
-    assert comp_occ.position.x == 1
-    assert comp_occ.position.z == 3
-    assert comp_occ.rotation_y == 30
-    assert isinstance(comp_occ.material, str)
-    assert comp_occ.material in my_mats
-    assert comp_occ.scale_front_x == .3
-    assert comp_occ.scale_front_z == .4
-    assert comp_occ.scale_side_x == .5
-    assert comp_occ.scale_side_z == .6
-    assert comp_occ.scale_y == .7
 
     scene = component.update_ile_scene(prior_scene())
     assert isinstance(scene['objects'], list)
@@ -1291,20 +1662,6 @@ def test_structural_objects_ramps_full():
     assert pre_ramp.width == .4
     assert pre_ramp.length == .5
 
-    # computed ramps
-    cramp = component.get_structural_ramps()
-    assert isinstance(cramp, StructuralRampConfig)
-    assert cramp.num == 1
-    assert isinstance(cramp.position, Vector3d)
-    assert cramp.position.x == 1
-    assert cramp.position.z == 3
-    assert cramp.rotation_y == 30
-    assert isinstance(cramp.material, str)
-    assert cramp.material in my_mats
-    assert cramp.angle == 30
-    assert cramp.width == .4
-    assert cramp.length == .5
-
     scene = component.update_ile_scene(prior_scene())
     assert isinstance(scene['objects'], list)
     objs = scene['objects']
@@ -1334,12 +1691,6 @@ def test_structural_objects_ramps_labels_convert_array():
     assert isinstance(pre_ramp, StructuralRampConfig)
     assert pre_ramp.num == 1
     assert pre_ramp.labels == "test_label"
-
-    # computed ramps
-    cramp = component.get_structural_ramps()
-    assert isinstance(cramp, StructuralRampConfig)
-    assert cramp.num == 1
-    assert cramp.labels == "test_label"
 
     scene = component.update_ile_scene(prior_scene())
     assert isinstance(scene['objects'], list)
@@ -1444,10 +1795,10 @@ def test_structural_objects_dropper_with_existing_labels():
     assert device['structure']
     assert len(device['shows']) == 1
     assert device['shows'][0]['position']['x'] == 2
-    assert device['shows'][0]['position']['y'] == 2.775
+    assert device['shows'][0]['position']['y'] == 2.86
     assert device['shows'][0]['position']['z'] == 3
     assert device['shows'][0]['rotation'] == {'x': 0, 'y': 0, 'z': 0}
-    assert device['shows'][0]['scale'] == {'x': 0.41, 'y': 0.45, 'z': 0.41}
+    assert device['shows'][0]['scale'] == {'x': 0.28, 'y': 0.28, 'z': 0.28}
     assert ObjectRepository.get_instance().has_label('droppers')
     assert not ObjectRepository.get_instance().has_label('test_label')
 
@@ -1533,10 +1884,10 @@ def test_structural_objects_dropper_with_new_labels():
     assert device['structure']
     assert len(device['shows']) == 1
     assert device['shows'][0]['position']['x'] == 2
-    assert device['shows'][0]['position']['y'] == 2.545
+    assert device['shows'][0]['position']['y'] == 2.725
     assert device['shows'][0]['position']['z'] == 3
     assert device['shows'][0]['rotation'] == {'x': 0, 'y': 0, 'z': 0}
-    assert device['shows'][0]['scale'] == {'x': 0.83, 'y': 0.91, 'z': 0.83}
+    assert device['shows'][0]['scale'] == {'x': 0.55, 'y': 0.55, 'z': 0.55}
     assert ObjectRepository.get_instance().has_label('droppers')
     assert not ObjectRepository.get_instance().has_label('test_label')
 
@@ -1712,9 +2063,9 @@ def test_structural_objects_thrower_with_existing_labels():
     assert len(device['shows']) == 1
     assert device['shows'][0]['position']['x'] == 0
     assert device['shows'][0]['position']['y'] == 1
-    assert device['shows'][0]['position']['z'] == 4.835
+    assert device['shows'][0]['position']['z'] == 4.89
     assert device['shows'][0]['rotation'] == {'x': 0, 'y': 90, 'z': 97}
-    assert device['shows'][0]['scale'] == {'x': 0.41, 'y': 0.6, 'z': 0.41}
+    assert device['shows'][0]['scale'] == {'x': 0.28, 'y': 0.28, 'z': 0.28}
     assert ObjectRepository.get_instance().has_label('throwers')
     assert not ObjectRepository.get_instance().has_label('test_label')
 
@@ -1814,9 +2165,9 @@ def test_structural_objects_thrower_with_new_labels():
     assert len(device['shows']) == 1
     assert device['shows'][0]['position']['x'] == 0
     assert device['shows'][0]['position']['y'] == 1
-    assert device['shows'][0]['position']['z'] == 4.67
+    assert device['shows'][0]['position']['z'] == 4.78
     assert device['shows'][0]['rotation'] == {'x': 0, 'y': 90, 'z': 97}
-    assert device['shows'][0]['scale'] == {'x': 0.83, 'y': 1.2, 'z': 0.83}
+    assert device['shows'][0]['scale'] == {'x': 0.55, 'y': 0.55, 'z': 0.55}
     assert ObjectRepository.get_instance().has_label('throwers')
     assert not ObjectRepository.get_instance().has_label('test_label')
 
@@ -1855,7 +2206,10 @@ def test_structural_objects_thrower_no_spec():
 
     show = proj['shows'][0]
     assert show['position']['x'] == throw_pos['x']
-    assert show['position']['y'] == throw_pos['y']
+    assert show['position']['y'] == (
+        throw_pos['y'] - (proj['debug']['dimensions']['y'] / 2.0) +
+        proj['debug']['positionY']
+    )
     assert show['position']['z'] == throw_pos['z']
     assert ObjectRepository.get_instance().has_label('throwers')
     assert not ObjectRepository.get_instance().has_label('test_label')
@@ -2019,15 +2373,18 @@ def test_structural_objects_moving_occluder_fail():
 
 def test_floor_features_defaults():
     component = SpecificStructuralObjectsComponent({})
-    assert component.holes is None
     assert component.floor_material_override is None
+    assert component.holes is None
     assert component.lava is None
 
     scene = component.update_ile_scene(prior_scene_custom_size(12, 13))
     holes = scene['holes']
+    lava = scene['lava']
     textures = scene['floorTextures']
     assert isinstance(holes, list)
     assert len(holes) == 0
+    assert isinstance(lava, list)
+    assert len(lava) == 0
     assert isinstance(textures, list)
     assert len(textures) == 0
 
@@ -2318,10 +2675,7 @@ def test_floor_features_lava_specific():
     assert component.lava[1].position_z == -3
 
     scene = component.update_ile_scene(prior_scene())
-    assert scene['floorTextures'] == [{
-        'material': 'Stylized Lava Texture/Materials/Stylize_Lava_diffuse',
-        'positions': [{'x': 2, 'z': 3}, {'x': -2, 'z': -3}]
-    }]
+    assert scene['lava'] == [{'x': 2, 'z': 3}, {'x': -2, 'z': -3}]
 
 
 def test_floor_features_lava_variable():
@@ -2344,13 +2698,8 @@ def test_floor_features_lava_variable():
     assert component.lava[0].position_z == MinMaxInt(-4, -1)
 
     scene = component.update_ile_scene(prior_scene())
-    assert len(scene['floorTextures']) == 1
-    assert (
-        scene['floorTextures'][0]['material'] ==
-        'Stylized Lava Texture/Materials/Stylize_Lava_diffuse'
-    )
-    assert len(scene['floorTextures'][0]['positions']) in [5, 6]
-    for area in scene['floorTextures'][0]['positions']:
+    assert len(scene['lava']) in [5, 6]
+    for area in scene['lava']:
         assert area['x'] in [1, 2]
         assert -4 <= area['z'] <= -1
 
@@ -2369,17 +2718,10 @@ def test_floor_features_lava_variable_restricted():
     assert component.lava[0].position_z == 3
 
     scene = component.update_ile_scene(prior_scene())
-    assert len(scene['floorTextures']) == 1
     assert (
-        scene['floorTextures'][0]['material'] ==
-        'Stylized Lava Texture/Materials/Stylize_Lava_diffuse'
-    )
-    assert (
-        scene['floorTextures'][0]['positions'] ==
-        [{'x': 1, 'z': 3}, {'x': 2, 'z': 3}]
+        scene['lava'] == [{'x': 1, 'z': 3}, {'x': 2, 'z': 3}]
     ) or (
-        scene['floorTextures'][0]['positions'] ==
-        [{'x': 2, 'z': 3}, {'x': 1, 'z': 3}]
+        scene['lava'] == [{'x': 2, 'z': 3}, {'x': 1, 'z': 3}]
     )
 
 
@@ -2433,10 +2775,8 @@ def test_floor_features_lava_with_floor_materials():
     }, {
         'material': 'Custom/Materials/Yellow',
         'positions': [{'x': 0, 'z': 1}]
-    }, {
-        'material': 'Stylized Lava Texture/Materials/Stylize_Lava_diffuse',
-        'positions': [{'x': 0, 'z': -1}, {'x': -1, 'z': -1}]
     }]
+    assert scene['lava'] == [{'x': 0, 'z': -1}, {'x': -1, 'z': -1}]
 
 
 def test_floor_features_lava_fail_duplicate():
@@ -2458,24 +2798,6 @@ def test_floor_features_lava_fail_outside_bounds():
             'position_x': 3,
             'position_z': 6,
         }
-    })
-    with pytest.raises(ILEException):
-        component.update_ile_scene(prior_scene())
-
-
-def test_floor_features_lava_fail_overlaps_floor_materials():
-    component = SpecificStructuralObjectsComponent({
-        'floor_material_override': [{
-            'num': 1,
-            'position_x': 1,
-            'position_z': 1,
-            'material': 'Custom/Materials/Red'
-        }],
-        'lava': [{
-            'num': 1,
-            'position_x': 1,
-            'position_z': 1
-        }]
     })
     with pytest.raises(ILEException):
         component.update_ile_scene(prior_scene())
@@ -2934,7 +3256,8 @@ def test_placer_specific():
             'placed_object_material':
             'AI2-THOR/Materials/Metals/BrushedAluminum_Blue',
             'placed_object_shape': 'ball',
-            'activation_step': 5
+            'activation_step': 5,
+            'end_height': 0.25
         }]
     })
 
@@ -2949,6 +3272,7 @@ def test_placer_specific():
             'AI2-THOR/Materials/Metals/BrushedAluminum_Blue')
     assert pre_placer.placed_object_shape == 'ball'
     assert pre_placer.activation_step == 5
+    assert pre_placer.end_height == 0.25
 
     scene = component.update_ile_scene(prior_scene())
     assert isinstance(scene['objects'], list)
@@ -2971,6 +3295,7 @@ def test_placer_specific():
     assert scale['z'] == 1.3
     move = obj['moves'][0]
     assert move['stepBegin'] == 5
+    assert move['stepEnd'] == 10
 
     placer = objs[1]
     assert placer['id'].startswith('placer_')
@@ -2978,6 +3303,8 @@ def test_placer_specific():
     assert placer['kinematic']
     assert placer['structure']
     move = placer['moves'][0]
+    assert move['stepBegin'] == 5
+    assert move['stepEnd'] == 10
     assert ObjectRepository.get_instance().has_label('placers')
     assert ObjectRepository.get_instance().has_label('test_label')
 
@@ -2993,7 +3320,7 @@ def test_placer_with_existing_labels():
                 'z': 2
             },
             'placed_object_rotation': 27,
-            'activation_step': 5
+            'activation_step': 1
         }]
     })
 
@@ -3004,7 +3331,7 @@ def test_placer_with_existing_labels():
     assert pre_placer.placed_object_labels == TARGET_LABEL
     assert pre_placer.placed_object_position == VectorFloatConfig(3, 0, 2)
     assert pre_placer.placed_object_rotation == 27
-    assert pre_placer.activation_step == 5
+    assert pre_placer.activation_step == 1
 
     # Prior scene must have target object.
     scene = component.update_ile_scene(prior_scene_with_target())
@@ -3016,7 +3343,7 @@ def test_placer_with_existing_labels():
     assert target['type'] == 'soccer_ball'
     assert target['debug']['positionedBy'] == 'mechanism'
     assert target['kinematic']
-    assert target['togglePhysics'][0]['stepBegin'] == 21
+    assert target['togglePhysics'][0]['stepBegin'] == 17
     assert len(target['shows']) == 1
     assert target['shows'][0]['position'] == pytest.approx(
         {'x': 3, 'y': 2.885, 'z': 2}
@@ -3024,15 +3351,15 @@ def test_placer_with_existing_labels():
     assert target['shows'][0]['rotation'] == {'x': 0, 'y': 27, 'z': 0}
     assert target['shows'][0]['scale'] == {'x': 1, 'y': 1, 'z': 1}
     assert len(target['moves']) == 1
-    assert target['moves'][0]['stepBegin'] == 5
-    assert target['moves'][0]['stepEnd'] == 15
+    assert target['moves'][0]['stepBegin'] == 1
+    assert target['moves'][0]['stepEnd'] == 11
     assert target['moves'][0]['vector'] == {'x': 0, 'y': -0.25, 'z': 0}
 
     assert placer['id'].startswith('placer_')
     assert placer['type'] == 'cylinder'
     assert placer['kinematic']
     assert placer['structure']
-    assert placer['changeMaterials'][0]['stepBegin'] == 21
+    assert placer['changeMaterials'][0]['stepBegin'] == 17
     assert len(placer['shows']) == 1
     assert placer['shows'][0]['position'] == pytest.approx(
         {'x': 3, 'y': 4.495, 'z': 2}
@@ -3040,11 +3367,11 @@ def test_placer_with_existing_labels():
     assert placer['shows'][0]['rotation'] == {'x': 0, 'y': 0, 'z': 0}
     assert placer['shows'][0]['scale'] == {'x': 0.05, 'y': 1.5, 'z': 0.05}
     assert len(placer['moves']) == 2
-    assert placer['moves'][0]['stepBegin'] == 5
-    assert placer['moves'][0]['stepEnd'] == 15
+    assert placer['moves'][0]['stepBegin'] == 1
+    assert placer['moves'][0]['stepEnd'] == 11
     assert placer['moves'][0]['vector'] == {'x': 0, 'y': -0.25, 'z': 0}
-    assert placer['moves'][1]['stepBegin'] == 26
-    assert placer['moves'][1]['stepEnd'] == 36
+    assert placer['moves'][1]['stepBegin'] == 22
+    assert placer['moves'][1]['stepEnd'] == 32
     assert placer['moves'][1]['vector'] == {'x': 0, 'y': 0.25, 'z': 0}
     assert ObjectRepository.get_instance().has_label('placers')
     assert not ObjectRepository.get_instance().has_label('test_label')
@@ -3060,8 +3387,7 @@ def test_placer_with_missing_targets():
                 'y': 0,
                 'z': 2
             },
-            'placed_object_rotation': 27,
-            'activation_step': 5
+            'placed_object_rotation': 27
         }]
     })
 
@@ -3084,7 +3410,7 @@ def test_placer_with_new_labels():
             'placed_object_rotation': 27,
             'placed_object_scale': 2,
             'placed_object_shape': 'soccer_ball',
-            'activation_step': 5
+            'activation_step': 1
         }]
     })
 
@@ -3097,7 +3423,7 @@ def test_placer_with_new_labels():
     assert pre_placer.placed_object_rotation == 27
     assert pre_placer.placed_object_scale == 2
     assert pre_placer.placed_object_shape == 'soccer_ball'
-    assert pre_placer.activation_step == 5
+    assert pre_placer.activation_step == 1
 
     scene = prior_scene_with_target()
     original_position = {
@@ -3129,7 +3455,7 @@ def test_placer_with_new_labels():
     assert placed_object['type'] == 'soccer_ball'
     assert placed_object['debug']['positionedBy'] == 'mechanism'
     assert placed_object['kinematic']
-    assert placed_object['togglePhysics'][0]['stepBegin'] == 20
+    assert placed_object['togglePhysics'][0]['stepBegin'] == 16
     assert len(placed_object['shows']) == 1
     assert placed_object['shows'][0]['position'] == pytest.approx(
         {'x': 3, 'y': 2.775, 'z': 2}
@@ -3137,27 +3463,27 @@ def test_placer_with_new_labels():
     assert placed_object['shows'][0]['rotation'] == {'x': 0, 'y': 27, 'z': 0}
     assert placed_object['shows'][0]['scale'] == {'x': 2, 'y': 2, 'z': 2}
     assert len(placed_object['moves']) == 1
-    assert placed_object['moves'][0]['stepBegin'] == 5
-    assert placed_object['moves'][0]['stepEnd'] == 14
+    assert placed_object['moves'][0]['stepBegin'] == 1
+    assert placed_object['moves'][0]['stepEnd'] == 10
     assert placed_object['moves'][0]['vector'] == {'x': 0, 'y': -0.25, 'z': 0}
 
     assert placer['id'].startswith('placer_')
     assert placer['type'] == 'cylinder'
     assert placer['kinematic']
     assert placer['structure']
-    assert placer['changeMaterials'][0]['stepBegin'] == 20
+    assert placer['changeMaterials'][0]['stepBegin'] == 16
     assert len(placer['shows']) == 1
     assert placer['shows'][0]['position'] == pytest.approx(
-        {'x': 3, 'y': 4.935, 'z': 2}
+        {'x': 3, 'y': 4.495, 'z': 2}
     )
     assert placer['shows'][0]['rotation'] == {'x': 0, 'y': 0, 'z': 0}
-    assert placer['shows'][0]['scale'] == {'x': 0.18, 'y': 1.5, 'z': 0.18}
+    assert placer['shows'][0]['scale'] == {'x': 0.09, 'y': 1.5, 'z': 0.09}
     assert len(placer['moves']) == 2
-    assert placer['moves'][0]['stepBegin'] == 5
-    assert placer['moves'][0]['stepEnd'] == 14
+    assert placer['moves'][0]['stepBegin'] == 1
+    assert placer['moves'][0]['stepEnd'] == 10
     assert placer['moves'][0]['vector'] == {'x': 0, 'y': -0.25, 'z': 0}
-    assert placer['moves'][1]['stepBegin'] == 25
-    assert placer['moves'][1]['stepEnd'] == 34
+    assert placer['moves'][1]['stepBegin'] == 21
+    assert placer['moves'][1]['stepEnd'] == 30
     assert placer['moves'][1]['vector'] == {'x': 0, 'y': 0.25, 'z': 0}
     assert ObjectRepository.get_instance().has_label('placers')
     assert not ObjectRepository.get_instance().has_label('test_label')
@@ -3174,8 +3500,7 @@ def test_placer_with_used_target():
                 'y': 0,
                 'z': 2
             },
-            'placed_object_rotation': 27,
-            'activation_step': 5
+            'placed_object_rotation': 27
         }]
     })
 
@@ -3203,8 +3528,7 @@ def test_placer_test_overlap_fail():
             },
             'placed_object_material':
             'AI2-THOR/Materials/Metals/BrushedAluminum_Blue',
-            'placed_object_shape': 'ball',
-            'activation_step': 5
+            'placed_object_shape': 'ball'
         }]
     })
     with pytest.raises(ILEException):
@@ -3214,17 +3538,18 @@ def test_placer_test_overlap_fail():
 def test_door_random_values():
     component = SpecificStructuralObjectsComponent({
         'doors': [{
-            'num': 1
+            'num': 2
         }]
     })
 
     assert isinstance(component.doors, List)
     pre_door = component.doors[0]
     assert isinstance(pre_door, StructuralDoorConfig)
-    assert pre_door.num == 1
+    assert pre_door.num == 2
     assert pre_door.position is None
     assert pre_door.rotation_y is None
-    assert pre_door.scale is None
+    assert pre_door.wall_scale_x is None
+    assert pre_door.wall_scale_y is None
     assert pre_door.material is None
 
     scene = component.update_ile_scene(prior_scene())
@@ -3232,11 +3557,15 @@ def test_door_random_values():
 
     objs = scene['objects']
     for obj in objs:
-        assert obj['id'].startswith('door')
-        assert obj['type'] == 'door_4'
+        if obj['id'].startswith('door'):
+            assert obj['type'] == 'door_4'
+            assert obj['openable']
+            assert not obj.get('structure')
+        else:
+            assert obj['id'].startswith("wall_")
+            assert obj['type'] == 'cube'
+            assert obj['structure']
         assert obj['kinematic']
-        assert obj['openable']
-        assert obj['structure']
         assert obj['debug']['random_position']
     assert ObjectRepository.get_instance().has_label('doors')
     assert not ObjectRepository.get_instance().has_label('test_label')
@@ -3253,12 +3582,9 @@ def test_door_fully_defined():
                 'y': 0,
                 'z': 3
             },
-            'rotation_y': 46,
-            'scale': {
-                'x': 1.2,
-                'y': 0.8,
-                'z': .94
-            },
+            'rotation_y': 90,
+            'wall_scale_x': 2.2,
+            'wall_scale_y': 2.5
 
         }]
     })
@@ -3268,8 +3594,9 @@ def test_door_fully_defined():
     assert isinstance(pre_door, StructuralDoorConfig)
     assert pre_door.num == 1
     assert pre_door.position == VectorFloatConfig(2, 0, 3)
-    assert pre_door.rotation_y == 46
-    assert pre_door.scale == VectorFloatConfig(1.2, .8, .94)
+    assert pre_door.rotation_y == 90
+    assert pre_door.wall_scale_x == 2.2
+    assert pre_door.wall_scale_y == 2.5
     assert (pre_door.material ==
             'AI2-THOR/Materials/Metals/BrushedAluminum_Blue')
 
@@ -3283,20 +3610,201 @@ def test_door_fully_defined():
     assert obj['type'] == 'door_4'
     assert obj['kinematic']
     assert obj['openable']
-    assert obj['structure']
+    assert not obj.get('structure')
     show = obj['shows'][0]
     pos = show['position']
     scale = show['scale']
     assert pos['x'] == 2
     assert pos['y'] == 0
     assert pos['z'] == 3
-    assert scale['x'] == 1.2
-    assert scale['y'] == .8
-    assert scale['z'] == .94
-    assert show['rotation']['y'] == 46
+    assert scale['x'] == 1
+    assert scale['y'] == 1
+    assert scale['z'] == 1
+    assert show['rotation']['y'] == 90
     assert not obj['debug']['random_position']
     assert ObjectRepository.get_instance().has_label('doors')
     assert ObjectRepository.get_instance().has_label('test_label')
+
+    obj = objs[1]
+    assert obj['id'].startswith('wall_top')
+    assert obj['type'] == 'cube'
+    assert obj['kinematic']
+    assert obj['structure']
+    show = obj['shows'][0]
+    pos = show['position']
+    scale = show['scale']
+    assert pos['x'] == 2
+    assert pos['y'] == 2.25
+    assert pos['z'] == 3
+    assert scale['x'] == 2.2
+    assert scale['y'] == 0.5
+    assert scale['z'] == 0.1
+    assert show['rotation']['y'] == 90
+    assert not obj['debug']['random_position']
+
+    obj = objs[2]
+    assert obj['id'].startswith('wall_left')
+    assert obj['type'] == 'cube'
+    assert obj['kinematic']
+    assert obj['structure']
+    show = obj['shows'][0]
+    pos = show['position']
+    scale = show['scale']
+    assert pos['x'] == 2
+    assert pos['y'] == 1
+    assert pos['z'] == 2.24
+    assert scale['x'] == 0.68
+    assert scale['y'] == 2
+    assert scale['z'] == 0.1
+    assert show['rotation']['y'] == 90
+    assert not obj['debug']['random_position']
+
+    obj = objs[3]
+    assert obj['id'].startswith('wall_right')
+    assert obj['type'] == 'cube'
+    assert obj['kinematic']
+    assert obj['structure']
+    show = obj['shows'][0]
+    pos = show['position']
+    scale = show['scale']
+    assert pos['x'] == 2
+    assert pos['y'] == 1
+    assert pos['z'] == 3.76
+    assert scale['x'] == 0.68
+    assert scale['y'] == 2
+    assert scale['z'] == 0.1
+    assert show['rotation']['y'] == 90
+    assert not obj['debug']['random_position']
+
+
+def test_door_template_test():
+    # Testing 2 to verify we don't corrupt the template and force the same
+    # values.
+    component = SpecificStructuralObjectsComponent({
+        'doors': [{
+            'num': 2,
+            'labels': 'test_label',
+            'material': 'AI2-THOR/Materials/Metals/BrushedAluminum_Blue',
+            'position': {
+                'x': [2, -2],
+                'y': 0,
+                'z': 2
+            },
+            'rotation_y': 90,
+            'wall_scale_x': [1.5, 2],
+            'wall_scale_y': 2.5
+
+        }]
+    })
+
+    assert isinstance(component.doors, List)
+    pre_door = component.doors[0]
+    assert isinstance(pre_door, StructuralDoorConfig)
+    assert pre_door.num == 2
+
+    scene = component.update_ile_scene(prior_scene())
+    assert isinstance(scene['objects'], list)
+
+    objs = scene['objects']
+    assert isinstance(objs, List)
+    obj = objs[0]
+    assert obj['id'].startswith('door')
+    assert obj['type'] == 'door_4'
+    assert obj['kinematic']
+    assert obj['openable']
+    assert not obj.get('structure')
+    show = obj['shows'][0]
+    pos = show['position']
+    scale = show['scale']
+    assert pos['x'] in [2, -2]
+    assert pos['y'] == 0
+    assert scale['x'] == 1
+    assert scale['y'] == 1
+    assert scale['z'] == 1
+    assert show['rotation']['y'] == 90
+    assert obj['debug']['random_position']
+    assert ObjectRepository.get_instance().has_label('doors')
+    assert ObjectRepository.get_instance().has_label('test_label')
+
+    obj = objs[1]
+    assert obj['id'].startswith('wall_top')
+    assert obj['type'] == 'cube'
+    assert obj['kinematic']
+    assert obj['structure']
+    show = obj['shows'][0]
+    pos = show['position']
+    scale = show['scale']
+    assert show['rotation']['y'] == 90
+    assert obj['debug']['random_position']
+
+    obj = objs[2]
+    assert obj['id'].startswith('wall_left')
+    assert obj['type'] == 'cube'
+    assert obj['kinematic']
+    assert obj['structure']
+    show = obj['shows'][0]
+    pos = show['position']
+    scale = show['scale']
+    assert show['rotation']['y'] == 90
+    assert obj['debug']['random_position']
+
+    obj = objs[3]
+    assert obj['id'].startswith('wall_right')
+    assert obj['type'] == 'cube'
+    assert obj['kinematic']
+    assert obj['structure']
+    show = obj['shows'][0]
+    pos = show['position']
+    scale = show['scale']
+    assert show['rotation']['y'] == 90
+    assert obj['debug']['random_position']
+
+    obj = objs[4]
+    assert obj['id'].startswith('door')
+    assert obj['type'] == 'door_4'
+    assert obj['kinematic']
+    assert obj['openable']
+    assert not obj.get('structure')
+    show = obj['shows'][0]
+    pos = show['position']
+    scale = show['scale']
+    assert show['rotation']['y'] == 90
+    assert obj['debug']['random_position']
+    assert ObjectRepository.get_instance().has_label('doors')
+    assert ObjectRepository.get_instance().has_label('test_label')
+
+    obj = objs[5]
+    assert obj['id'].startswith('wall_top')
+    assert obj['type'] == 'cube'
+    assert obj['kinematic']
+    assert obj['structure']
+    show = obj['shows'][0]
+    pos = show['position']
+    scale = show['scale']
+    assert show['rotation']['y'] == 90
+    assert obj['debug']['random_position']
+
+    obj = objs[6]
+    assert obj['id'].startswith('wall_left')
+    assert obj['type'] == 'cube'
+    assert obj['kinematic']
+    assert obj['structure']
+    show = obj['shows'][0]
+    pos = show['position']
+    scale = show['scale']
+    assert show['rotation']['y'] == 90
+    assert obj['debug']['random_position']
+
+    obj = objs[7]
+    assert obj['id'].startswith('wall_right')
+    assert obj['type'] == 'cube'
+    assert obj['kinematic']
+    assert obj['structure']
+    show = obj['shows'][0]
+    pos = show['position']
+    scale = show['scale']
+    assert show['rotation']['y'] == 90
+    assert obj['debug']['random_position']
 
 
 def test_door_fail_config():
@@ -3353,20 +3861,98 @@ def test_door_fail_common_location():
                 'y': 0,
                 'z': 3
             },
-            'rotation_y': {
-                'min': 40,
-                'max': 279
-            },
-            'scale': {
-                'x': 1.2,
-                'y': 0.8,
-                'z': .94
-            },
+            'rotation_y': 90,
 
         }]
     })
     with pytest.raises(ILEException):
         component.update_ile_scene(prior_scene())
+
+
+def test_tool_random():
+    component = SpecificStructuralObjectsComponent({
+        'tools': [{
+            'num': 1
+        }]
+    })
+
+    assert isinstance(component.tools, List)
+    pre = component.tools[0]
+    assert isinstance(pre, ToolConfig)
+    assert pre.num == 1
+    assert pre.labels is None
+    assert pre.position is None
+    assert pre.rotation_y is None
+    assert pre.shape is None
+
+    scene = component.update_ile_scene(prior_scene())
+    assert isinstance(scene['objects'], list)
+
+    objs = scene['objects']
+    assert isinstance(objs, List)
+    obj = objs[0]
+    assert obj['id'].startswith('tool_')
+    assert obj['type'] in ALL_LARGE_BLOCK_TOOLS
+    assert not obj.get('kinematic')
+    assert not obj.get('structure')
+    assert not obj.get('mass')
+    show = obj['shows'][0]
+    scale = show['scale']
+    assert scale['x'] == 1
+    assert scale['y'] == 1
+    assert scale['z'] == 1
+
+    assert ObjectRepository.get_instance().has_label('tools')
+    assert not ObjectRepository.get_instance().has_label('test_label')
+
+
+def test_tool_full():
+    component = SpecificStructuralObjectsComponent({
+        'tools': [{
+            'num': 1,
+            'labels': 'test_label',
+            'position': {
+                'x': -1.5,
+                'y': 0,
+                'z': 1
+            },
+            'rotation_y': 67,
+            'shape': 'tool_rect_1_00_x_4_00'
+        }]
+    })
+
+    assert isinstance(component.tools, List)
+    pre = component.tools[0]
+    assert isinstance(pre, ToolConfig)
+    assert pre.num == 1
+    assert pre.position == VectorFloatConfig(-1.5, 0, 1)
+    assert pre.rotation_y == 67
+    assert pre.shape == 'tool_rect_1_00_x_4_00'
+
+    scene = component.update_ile_scene(prior_scene())
+    assert isinstance(scene['objects'], list)
+
+    objs = scene['objects']
+    assert isinstance(objs, List)
+    obj = objs[0]
+    assert obj['id'].startswith('tool_')
+    assert obj['type'] in ALL_LARGE_BLOCK_TOOLS
+    assert not obj.get('kinematic')
+    assert not obj.get('structure')
+    assert not obj.get('mass')
+    show = obj['shows'][0]
+    pos = show['position']
+    scale = show['scale']
+    assert pos['x'] == -1.5
+    assert pos['y'] == 0.15
+    assert pos['z'] == 1
+    assert scale['x'] == 1
+    assert scale['y'] == 1
+    assert scale['z'] == 1
+    assert show['rotation']['y'] == 67
+
+    assert ObjectRepository.get_instance().has_label('tools')
+    assert ObjectRepository.get_instance().has_label('test_label')
 
 
 def test_placer_test_config_fail():
@@ -3429,10 +4015,7 @@ def test_door_fail_material_group():
                     'y': 0,
                     'z': 3
                 },
-                'rotation_y': {
-                    'min': 40,
-                    'max': 279
-                },
+                'rotation_y': [90, 180],
                 'scale': {
                     'x': 1.2,
                     'y': 0.8,
@@ -3461,21 +4044,26 @@ def test_door_material_group():
 
     objs = scene['objects']
     assert isinstance(objs, List)
-    obj = objs[0]
-    assert obj['id'].startswith('door')
-    assert obj['type'] == 'door_4'
-    assert obj['kinematic']
-    assert obj['openable']
-    assert obj['structure']
-    assert obj['materials'][0] in wood_mats
 
-    obj = objs[1]
-    assert obj['id'].startswith('door')
-    assert obj['type'] == 'door_4'
-    assert obj['kinematic']
-    assert obj['openable']
-    assert obj['structure']
-    assert obj['materials'][0] in wood_mats
+    doors = 0
+    walls = 0
+    for obj in objs:
+        if obj['id'].startswith('door'):
+            assert obj['type'] == 'door_4'
+            assert obj['openable']
+            assert obj['materials'][0] in wood_mats
+            assert not obj.get('structure')
+            doors += 1
+        else:
+            assert obj['id'].startswith('wall_')
+            assert obj['type'] == 'cube'
+            assert obj['structure']
+            walls += 1
+        assert obj['kinematic']
+
+    assert doors == 2
+    assert 4 <= walls <= 6
+
     assert ObjectRepository.get_instance().has_label('doors')
     assert not ObjectRepository.get_instance().has_label('test_label')
 
@@ -3496,7 +4084,8 @@ def test_delayed():
         }],
         "specific_interactable_objects": {
             "num": 1,
-            "labels": label
+            "labels": label,
+            "shape": "ball"
         }
     }
 
@@ -3533,35 +4122,12 @@ def test_structural_floor_materials_fail_restricted_material():
         })
 
 
-def test_structural_floor_materials_successful_lava_material():
-    component = SpecificStructuralObjectsComponent({
-        'floor_material_override': [{
-            'num': 1,
-            'material': materials.LAVA_MATERIALS[0].material
-        }]
-    })
-    assert (
-        component.floor_material_override[0].material ==
-        materials.LAVA_MATERIALS[0].material
-    )
-
-
 def test_structural_interior_wall_fail_restricted_material():
     with pytest.raises(ILEException):
         SpecificStructuralObjectsComponent({
             'structural_walls': [{
                 'num': 1,
                 'material': materials.SOFA_1_MATERIALS[0].material
-            }]
-        })
-
-
-def test_structural_interior_wall_fail_lava_material():
-    with pytest.raises(ILEException):
-        SpecificStructuralObjectsComponent({
-            'structural_walls': [{
-                'num': 1,
-                'material': materials.LAVA_MATERIALS[0].material
             }]
         })
 
@@ -3576,32 +4142,12 @@ def test_structural_l_occluder_fail_restricted_material():
         })
 
 
-def test_structural_l_occluder_fail_lava_material():
-    with pytest.raises(ILEException):
-        SpecificStructuralObjectsComponent({
-            'structural_l_occluders': [{
-                'num': 1,
-                'material': materials.LAVA_MATERIALS[0].material
-            }]
-        })
-
-
 def test_structural_moving_occluder_pole_fail_restricted_material():
     with pytest.raises(ILEException):
         SpecificStructuralObjectsComponent({
             'structural_moving_occluders': [{
                 'num': 1,
                 'pole_material': materials.SOFA_1_MATERIALS[0].material
-            }]
-        })
-
-
-def test_structural_moving_occluder_pole_fail_lava_material():
-    with pytest.raises(ILEException):
-        SpecificStructuralObjectsComponent({
-            'structural_moving_occluders': [{
-                'num': 1,
-                'pole_material': materials.LAVA_MATERIALS[0].material
             }]
         })
 
@@ -3616,32 +4162,12 @@ def test_structural_moving_occluder_wall_fail_restricted_material():
         })
 
 
-def test_structural_moving_occluder_wall_fail_lava_material():
-    with pytest.raises(ILEException):
-        SpecificStructuralObjectsComponent({
-            'structural_moving_occluders': [{
-                'num': 1,
-                'wall_material': materials.LAVA_MATERIALS[0].material
-            }]
-        })
-
-
 def test_structural_occluding_wall_fail_restricted_material():
     with pytest.raises(ILEException):
         SpecificStructuralObjectsComponent({
             'structural_occluding_walls': [{
                 'num': 1,
                 'material': materials.SOFA_1_MATERIALS[0].material
-            }]
-        })
-
-
-def test_structural_occluding_wall_fail_lava_material():
-    with pytest.raises(ILEException):
-        SpecificStructuralObjectsComponent({
-            'structural_occluding_walls': [{
-                'num': 1,
-                'material': materials.LAVA_MATERIALS[0].material
             }]
         })
 
@@ -3656,31 +4182,11 @@ def test_structural_platform_fail_restricted_material():
         })
 
 
-def test_structural_platform_fail_lava_material():
-    with pytest.raises(ILEException):
-        SpecificStructuralObjectsComponent({
-            'structural_platforms': [{
-                'num': 1,
-                'material': materials.LAVA_MATERIALS[0].material
-            }]
-        })
-
-
 def test_structural_ramp_fail_restricted_material():
     with pytest.raises(ILEException):
         SpecificStructuralObjectsComponent({
             'structural_ramps': [{
                 'num': 1,
                 'material': materials.SOFA_1_MATERIALS[0].material
-            }]
-        })
-
-
-def test_structural_ramp_fail_lava_material():
-    with pytest.raises(ILEException):
-        SpecificStructuralObjectsComponent({
-            'structural_ramps': [{
-                'num': 1,
-                'material': materials.LAVA_MATERIALS[0].material
             }]
         })

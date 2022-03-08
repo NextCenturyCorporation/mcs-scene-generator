@@ -5,12 +5,12 @@ from extremitypathfinder import PolygonEnvironment
 from extremitypathfinder.plotting import PlottingEnvironment
 from shapely.geometry import JOIN_STYLE, mapping
 
-from generator import geometry, materials
+from generator import geometry
 from ideal_learning_env.decorators import ile_config_setter
 
 from .components import ILEComponent
 from .defs import ILEConfigurationException, ILEException
-from .object_services import get_target_object
+from .goal_services import get_target_object
 
 logger = logging.getLogger(__name__)
 
@@ -71,8 +71,10 @@ class ValidPathComponent(ILEComponent):
             # Add each different type
             # coordinates must be clockwise ordering
             self._add_objects_to_blocked(scene, tgt, blocked_area)
-            self._add_lava_to_blocked(scene, blocked_area)
-            self._add_holes_to_blocked(scene, blocked_area)
+            self._add_blocked_areas(scene.get('lava', []), blocked_area)
+            # Buffer should be 0.5 to be exactly hole, but then path library
+            # thinks it can go between holes.
+            self._add_blocked_areas(scene.get('holes', []), blocked_area, 0.6)
             # validate
 
             logger.trace("Setting pathfinding environment")
@@ -142,35 +144,18 @@ class ValidPathComponent(ILEComponent):
                 blocked.pop(-1)
                 blocked_area.append(blocked)
 
-    def _add_lava_to_blocked(self, scene, blocked_area):
-        # To place the buffer exactly, we'd use 0.5 for the lava buffer.
-        # Need to also account for performer width.
-        lava_buffer = 0.5 + geometry.PERFORMER_HALF_WIDTH
-        floor_text = scene.get('floorTextures', [])
-        lava_mats = [mat.material for mat in materials.LAVA_MATERIALS]
-        for floor in floor_text:
-            if floor['material'] in lava_mats:
-                for pos in floor['positions']:
-                    blocked_area.append([
-                        (pos["x"] - lava_buffer, pos["z"] - lava_buffer),
-                        (pos["x"] - lava_buffer, pos["z"] + lava_buffer),
-                        (pos["x"] + lava_buffer, pos["z"] + lava_buffer),
-                        (pos["x"] + lava_buffer, pos["z"] - lava_buffer),
-                    ])
-
-    def _add_holes_to_blocked(self, scene, blocked_area):
-        # Add holes, with a minor buffer.  The agent can walk
-        # on the edge.
-        holes = scene.get('holes', [])
-        # should be 0.5 to be exactly hole, but then path library
-        # thinks it can go between holes.
-        hole_buffer = 0.6
-        for hole in holes:
+    def _add_blocked_areas(
+        self,
+        areas: list,
+        blocked_area: list,
+        area_buffer: float = 0.5 + geometry.PERFORMER_HALF_WIDTH
+    ) -> None:
+        for area in areas:
             blocked_area.append([
-                (hole["x"] - hole_buffer, hole["z"] - hole_buffer),
-                (hole["x"] - hole_buffer, hole["z"] + hole_buffer),
-                (hole["x"] + hole_buffer, hole["z"] + hole_buffer),
-                (hole["x"] + hole_buffer, hole["z"] - hole_buffer),
+                (area["x"] - area_buffer, area["z"] - area_buffer),
+                (area["x"] - area_buffer, area["z"] + area_buffer),
+                (area["x"] + area_buffer, area["z"] + area_buffer),
+                (area["x"] + area_buffer, area["z"] - area_buffer)
             ])
 
     def is_object_path_blocking(self, obj, tgt):

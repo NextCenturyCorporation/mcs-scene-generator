@@ -2,7 +2,7 @@ import logging
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Union
 
-from generator import MAX_TRIES, materials
+from generator import ALL_LARGE_BLOCK_TOOLS, MAX_TRIES, materials
 from ideal_learning_env.structural_object_generator import (
     ALL_THROWABLE_SHAPES,
     DOOR_MATERIAL_RESTRICTIONS,
@@ -22,17 +22,19 @@ from ideal_learning_env.structural_object_generator import (
     StructuralThrowerConfig,
     StructuralTypes,
     StructuralWallConfig,
+    ToolConfig,
     WallSide,
     add_structural_object_with_retries_or_throw,
 )
 
-from .choosers import choose_random
+from .choosers import choose_counts, choose_random
 from .components import ILEComponent
 from .decorators import ile_config_setter
-from .defs import ILEDelayException, find_bounds
+from .defs import ILEDelayException, find_bounds, return_list
+from .goal_services import TARGET_LABEL
 from .interactable_object_config import KeywordLocationConfig
 from .numerics import MinMaxInt
-from .object_services import TARGET_LABEL, ObjectRepository
+from .object_services import ObjectRepository
 from .validators import ValidateNumber, ValidateOptions
 
 logger = logging.getLogger(__name__)
@@ -56,7 +58,7 @@ class RandomStructuralObjectConfig():
             up appearing below objects which can cause the objects to fall
             into the hole.
         - `l_occluders`: A random L-shaped occluder.
-        - `lava`: A random floor area's texture is changed to lava.
+        - `lava`: A random area in the floor is changed to a pool of lava.
         - `moving_occluders`: A random occluder on a pole that moves up and
             rotates to reveal anything behind it and then back down.  It may
             repeat the movement indefinitely or stop after the first iteration.
@@ -156,6 +158,11 @@ class SpecificStructuralObjectsComponent(ILEComponent):
           z: 2
         rotation_y: 30
         material: 'PLASTIC_MATERIALS'
+        lips:
+          front: True
+          back: True
+          left: False
+          right: False
         scale:
           x: 1.1
           y: [0.5, 1]
@@ -417,9 +424,7 @@ class SpecificStructuralObjectsComponent(ILEComponent):
     """
     ([FloorAreaConfig](#FloorAreaConfig), or list of
     [FloorAreaConfig](#FloorAreaConfig) dict) --
-    Groups of lava configurations. Shortcut for the "floor_material_override"
-    option with the lava material.
-    Default: 0
+    Groups of lava configurations. Default: 0
 
 
     Simple Example:
@@ -448,7 +453,7 @@ class SpecificStructuralObjectsComponent(ILEComponent):
     doors: Union[StructuralDoorConfig,
                  List[StructuralDoorConfig]] = 0
     """
-    ([StructuralDoorConfig](#FloorStructuralDoorConfigMaterialConfig), or list
+    ([StructuralDoorConfig](#StructuralDoorConfig), or list
     of [StructuralDoorConfig](#StructuralDoorConfig) dict) --
     Groups of door configurations and how many should be generated from the
     given options.  Note: Doors do not contain any frame or wall support.
@@ -578,8 +583,49 @@ class SpecificStructuralObjectsComponent(ILEComponent):
     ```
     """
 
-    def get_structural_walls(self) -> int:
-        return self._get_val(self.structural_walls, StructuralWallConfig)
+    tools: Union[ToolConfig, List[ToolConfig]] = 0
+    """
+    ([ToolConfig](#ToolConfig), or list of [ToolConfig](#ToolConfig) dict) --
+    Groups of large block tool configurations and how many should be generated
+    from the given options.
+    Default: 0
+
+
+    Simple Example:
+    ```
+    tools:
+        - num: 0
+    ```
+
+    Advanced Example:
+    ```
+    tools:
+        - num:
+            min: 1
+            max: 3
+        - num: 1
+          shape: tool_rect_1_00_x_9_00
+          position:
+            x: [1,2]
+            y: 0
+            z:
+              min: -3
+              max: 3
+        - num: [1, 3]
+          shape:
+            - tool_rect_0_50_x_4_00
+            - tool_rect_0_75_x_4_00
+            - tool_rect_1_00_x_4_00
+          position:
+            x: [4, 5]
+            y: 0
+            z:
+              min: -5
+              max: -4
+
+
+    ```
+    """
 
     @ile_config_setter(validator=ValidateNumber(props=['num'], min_value=0))
     @ile_config_setter(validator=ValidateOptions(
@@ -588,10 +634,6 @@ class SpecificStructuralObjectsComponent(ILEComponent):
     ))
     def set_structural_walls(self, data: Any) -> None:
         self.structural_walls = data
-
-    def get_structural_platforms(self) -> int:
-        return self._get_val(self.structural_platforms,
-                             StructuralPlatformConfig)
 
     @ile_config_setter(validator=ValidateNumber(props=['num'], min_value=0))
     @ile_config_setter(validator=ValidateOptions(
@@ -606,10 +648,6 @@ class SpecificStructuralObjectsComponent(ILEComponent):
     def set_structural_platforms(self, data: Any) -> None:
         self.structural_platforms = data
 
-    def get_structural_l_occluders(self) -> int:
-        return self._get_val(self.structural_l_occluders,
-                             StructuralLOccluderConfig)
-
     @ile_config_setter(validator=ValidateNumber(props=['num'], min_value=0))
     @ile_config_setter(validator=ValidateOptions(
         props=['material'],
@@ -618,9 +656,6 @@ class SpecificStructuralObjectsComponent(ILEComponent):
     def set_structural_l_occluders(self, data: Any) -> None:
         self.structural_l_occluders = data
 
-    def get_structural_ramps(self) -> int:
-        return self._get_val(self.structural_ramps, StructuralRampConfig)
-
     @ile_config_setter(validator=ValidateNumber(props=['num'], min_value=0))
     @ile_config_setter(validator=ValidateOptions(
         props=['material'],
@@ -628,9 +663,6 @@ class SpecificStructuralObjectsComponent(ILEComponent):
     ))
     def set_structural_ramps(self, data: Any) -> None:
         self.structural_ramps = data
-
-    def get_structural_droppers(self) -> int:
-        return self._get_val(self.structural_droppers, StructuralDropperConfig)
 
     @ile_config_setter(validator=ValidateNumber(
         props=['drop_step', 'projectile_scale'],
@@ -646,10 +678,6 @@ class SpecificStructuralObjectsComponent(ILEComponent):
     ))
     def set_structural_droppers(self, data: Any) -> None:
         self.structural_droppers = data
-
-    def get_structural_throwers(self) -> int:
-        return self._get_val(self.structural_throwers,
-                             StructuralThrowerConfig)
 
     @ile_config_setter(validator=ValidateNumber(
         props=['throw_step', 'throw_force', 'height', 'projectile_scale'],
@@ -673,10 +701,6 @@ class SpecificStructuralObjectsComponent(ILEComponent):
     ))
     def set_structural_throwers(self, data: Any) -> None:
         self.structural_throwers = data
-
-    def get_structural_moving_occluders(self) -> int:
-        return self._get_val(self.structural_moving_occluders,
-                             StructuralMovingOccluderConfig)
 
     @ile_config_setter(validator=ValidateNumber(
         props=['occluder_width', 'occluder_height', 'occluder_thickness'],
@@ -706,9 +730,6 @@ class SpecificStructuralObjectsComponent(ILEComponent):
     def set_holes(self, data: Any) -> None:
         self.holes = data
 
-    def get_holes(self) -> int:
-        return self._get_val(self.holes, FloorAreaConfig)
-
     @ile_config_setter(validator=ValidateNumber(props=['num'], min_value=0))
     @ile_config_setter(validator=ValidateNumber(
         props=['position_x', 'position_z'],
@@ -716,17 +737,10 @@ class SpecificStructuralObjectsComponent(ILEComponent):
     ))
     @ile_config_setter(validator=ValidateOptions(
         props=['material'],
-        options=(
-            materials.ALL_UNRESTRICTED_MATERIAL_LISTS_AND_STRINGS +
-            [item.material for item in materials.LAVA_MATERIALS] +
-            ['LAVA_MATERIALS']
-        )
+        options=(materials.ALL_UNRESTRICTED_MATERIAL_LISTS_AND_STRINGS)
     ))
     def set_floor_material_override(self, data: Any) -> None:
         self.floor_material_override = data
-
-    def get_floor_material_override(self) -> int:
-        return self._get_val(self.floor_material_override, FloorMaterialConfig)
 
     @ile_config_setter(validator=ValidateNumber(props=['num'], min_value=0))
     @ile_config_setter(validator=ValidateNumber(
@@ -735,24 +749,6 @@ class SpecificStructuralObjectsComponent(ILEComponent):
     ))
     def set_lava(self, data: Any) -> None:
         self.lava = data
-
-    def get_lava(self) -> FloorAreaConfig:
-        return self._get_val(self.lava, FloorAreaConfig)
-
-    def _get_lava_as_floor_materials(self) -> List[FloorMaterialConfig]:
-        if not self.lava:
-            return None
-        areas = (self.lava if isinstance(self.lava, list) else [self.lava])
-        return [FloorMaterialConfig(
-            num=area.num,
-            position_x=area.position_x,
-            position_z=area.position_z,
-            material=materials.LAVA_MATERIALS[0].material
-        ) for area in areas]
-
-    def get_structural_occluding_walls(self) -> int:
-        return self._get_val(
-            self.structural_occluding_walls, StructuralOccludingWallConfig)
 
     @ile_config_setter(validator=ValidateNumber(props=['num'], min_value=0))
     @ile_config_setter(validator=ValidateOptions(
@@ -785,9 +781,6 @@ class SpecificStructuralObjectsComponent(ILEComponent):
     def set_placers(self, data: Any) -> None:
         self.placers = data
 
-    def get_placers(self) -> int:
-        return self._get_val(self.placers, StructuralPlacerConfig)
-
     @ile_config_setter(validator=ValidateNumber(
         props=['num'], min_value=0))
     @ile_config_setter(validator=ValidateOptions(
@@ -796,18 +789,19 @@ class SpecificStructuralObjectsComponent(ILEComponent):
                  ["METAL_MATERIALS", "PLASTIC_MATERIALS", "WOOD_MATERIALS"]
                  )
     ))
+    @ile_config_setter(validator=ValidateOptions(props='rotation_y',
+                                                 options=[0, 90, 180, 270]))
+    @ile_config_setter(validator=ValidateNumber(
+        props=['wall_scale_x', 'wall_scale_y'], min_value=2, null_ok=True))
     def set_doors(self, data: Any) -> None:
         self.doors = data
 
-    def get_doors(self) -> int:
-        return self._get_val(self.doors, StructuralDoorConfig)
-
-    def _get_val(self, data, type):
-        if data is None:
-            return None
-        return choose_random(
-            [] if data is None else data, type
-        )
+    @ile_config_setter(validator=ValidateNumber(
+        props=['num'], min_value=0))
+    @ile_config_setter(validator=ValidateOptions(
+        props=['shape'], options=ALL_LARGE_BLOCK_TOOLS))
+    def set_tools(self, data: Any) -> None:
+        self.tools = data
 
     # Override
     def update_ile_scene(self, scene: Dict[str, Any]) -> Dict[str, Any]:
@@ -815,11 +809,10 @@ class SpecificStructuralObjectsComponent(ILEComponent):
         self._delayed_templates = []
 
         scene['objects'] = scene.get('objects', [])
-        scene['holes'] = scene.get('holes', [])
         scene['floorTextures'] = scene.get('floorTextures', [])
+        scene['holes'] = scene.get('holes', [])
+        scene['lava'] = scene.get('lava', [])
         bounds = find_bounds(scene)
-
-        mat_to_loc = {}
 
         structural_type_templates = [
             (StructuralTypes.WALLS, self.structural_walls),
@@ -832,38 +825,25 @@ class SpecificStructuralObjectsComponent(ILEComponent):
              self.structural_moving_occluders),
             (StructuralTypes.HOLES, self.holes),
             (StructuralTypes.FLOOR_MATERIALS, self.floor_material_override),
-            # Ensure that the lava is returned as a FloorMaterialConfig here.
-            (StructuralTypes.LAVA, self._get_lava_as_floor_materials()),
+            (StructuralTypes.LAVA, self.lava),
             (StructuralTypes.OCCLUDING_WALLS, self.structural_occluding_walls),
             (StructuralTypes.PLACERS, self.placers),
-            (StructuralTypes.DOORS, self.doors)
+            (StructuralTypes.DOORS, self.doors),
+            (StructuralTypes.TOOLS, self.tools)
         ]
 
-        existing_holes = []
-        existing_floor_materials = []
-
         for s_type, templates in structural_type_templates:
-            if not isinstance(templates, List):
-                templates = [templates]
-            for template in templates:
-                num_template = choose_random(template)
-                if num_template:
-                    for i in range(num_template.num):
-                        try:
-                            add_structural_object_with_retries_or_throw(
-                                scene, bounds, MAX_TRIES, template,
-                                s_type, i, existing_holes, mat_to_loc,
-                                existing_floor_materials)
-                        except ILEDelayException as e:
-                            logger.trace(
-                                f"Failed to generate {s_type}"
-                                f" due to needing delay.",
-                                exc_info=e)
-                            self._delayed_templates.append((s_type, template))
-
-        for mat, value in mat_to_loc.items():
-            scene['floorTextures'].append(
-                {"material": mat, "positions": value})
+            for template, num in choose_counts(return_list(templates)):
+                for i in range(num):
+                    try:
+                        add_structural_object_with_retries_or_throw(
+                            scene, bounds, MAX_TRIES, template, s_type)
+                    except ILEDelayException as e:
+                        logger.trace(
+                            f"Failed to generate {s_type}"
+                            f" due to needing delay.",
+                            exc_info=e)
+                        self._delayed_templates.append((s_type, template))
 
         return scene
 
@@ -875,15 +855,10 @@ class SpecificStructuralObjectsComponent(ILEComponent):
         self._delayed_templates = []
         if delayed:
             bounds = find_bounds(scene)
-            mat_to_loc = {}
-            existing_holes = []
-            existing_floor_materials = []
             for s_type, template in delayed:
                 try:
                     add_structural_object_with_retries_or_throw(
-                        scene, bounds, MAX_TRIES, template,
-                        s_type, 0, existing_holes, mat_to_loc,
-                        existing_floor_materials)
+                        scene, bounds, MAX_TRIES, template, s_type)
                 except ILEDelayException:
                     self._delayed_templates.append((s_type, template))
         return scene
@@ -976,20 +951,16 @@ class RandomStructuralObjectsComponent(ILEComponent):
     def update_ile_scene(self, scene: Dict[str, Any]) -> Dict[str, Any]:
         logger.info('Configuring random structural objects...')
 
-        existing_holes = []
-        existing_floor_materials = []
-        mat_to_loc = {}
-
-        scene['holes'] = scene.get('holes', [])
         scene['floorTextures'] = scene.get('floorTextures', [])
+        scene['holes'] = scene.get('holes', [])
+        scene['lava'] = scene.get('lava', [])
         scene['objects'] = scene.get('objects', [])
         bounds = find_bounds(scene)
-        templates = self.random_structural_objects
-        using_default = False
-        if templates is None:
-            templates = self.DEFAULT_VALUE
-            using_default = True
-        templates = templates if isinstance(templates, List) else [templates]
+        templates = return_list(
+            self.random_structural_objects,
+            self.DEFAULT_VALUE
+        )
+        using_default = (templates == self.DEFAULT_VALUE)
 
         logger.trace(f'Choosing random structural objects: {templates}')
 
@@ -999,8 +970,7 @@ class RandomStructuralObjectsComponent(ILEComponent):
             self.ALL_TYPES if target_exists else self.ALL_TYPES_NO_TARGET
         )
 
-        for template in templates:
-            num = choose_random(template.num)
+        for template, num in choose_counts(templates):
             for i in range(num):
                 type = choose_random(template.type or all_types)
                 structural_type = StructuralTypes[type.upper()]
@@ -1018,12 +988,7 @@ class RandomStructuralObjectsComponent(ILEComponent):
                     )
                 random_template = self._create_random_template(type, template)
                 add_structural_object_with_retries_or_throw(
-                    scene, bounds, MAX_TRIES, random_template, structural_type,
-                    i, existing_holes, mat_to_loc, existing_floor_materials)
-
-        for mat, value in mat_to_loc.items():
-            scene['floorTextures'].append(
-                {"material": mat, "positions": value})
+                    scene, bounds, MAX_TRIES, random_template, structural_type)
 
         return scene
 
@@ -1066,19 +1031,12 @@ class RandomStructuralObjectsComponent(ILEComponent):
                 labels=template.labels,
                 projectile_labels=relative_object_label
             )
+        if structural_type == StructuralTypes.TOOLS:
+            return ToolConfig(labels=template.labels)
         if structural_type == StructuralTypes.WALLS:
             return StructuralWallConfig(labels=template.labels)
         # Otherwise return None; defaults will be used automatically.
         return None
-
-    def get_random_structural_objects(
-            self) -> List[RandomStructuralObjectConfig]:
-        rso = self.random_structural_objects
-        if rso is None:
-            return self.DEFAULT_VALUE
-        if not isinstance(rso, List):
-            rso = [rso]
-        return [choose_random(obj) for obj in rso]
 
     # If not null, each number must be an integer zero or greater.
     @ile_config_setter(validator=ValidateNumber(

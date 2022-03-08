@@ -1,0 +1,95 @@
+# Can only use the Pass action through the whole scene.
+passive_scene: true
+
+# Max of 160 action steps in each "fall down" scene.
+last_step: 160
+
+# Large room with a high ceiling.
+room_dimensions:
+    x: 16
+    y: 8
+    z: 16
+
+# Specific starting position and rotation used in passive physics tasks.
+performer_start_position:
+    x: 0
+    y: 1.5
+    z: -4.5
+performer_start_rotation:
+    x: 0
+    y: 0
+
+structural_platforms:
+    # Platform underneath starting position to raise camera height.
+    - num: 1
+      position:
+          x: 0
+          y: 0
+          z: -4.5
+      rotation_y: 0
+      scale:
+          x: 0.5
+          y: 0.738
+          z: 0.5
+    # One or two platforms with semi-random heights at semi-random locations,
+    # each possibly underneath one of the placed objects.
+    - num: 1
+      position:
+          x:
+              min: -2.5
+              max: -0.5
+          y: 0
+          z: 1
+      rotation_y: 0
+      scale:
+          x:
+              min: 0.5
+              max: 1.0
+          y:
+              min: 0.5
+              max: 2.0
+          z: 1
+    - num: 1
+      position:
+          x:
+              min: 0.5
+              max: 2.5
+          y: 0
+          z: 1
+      rotation_y: 0
+      scale:
+          x:
+              min: 0.5
+              max: 1.0
+          y:
+              min: 0.5
+              max: 2.0
+          z: 1
+
+# Generate two placer devices at semi-random locations. They each begin holding
+# a random small object, then lower it down into the scene and release it,
+# either on one of the platforms (configured above) or in mid-air.
+placers:
+    - num: 1
+      end_height: 2.0
+      placed_object_position:
+          x:
+              min: -2.5
+              max: -0.5
+          y: 0
+          z: 1
+    - num: 1
+      end_height: 2.0
+      placed_object_position:
+          x:
+              min: 0.5
+              max: 2.5
+          y: 0
+          z: 1
+
+# Override the defaults to avoid randomly generating any unwanted objects.
+keyword_objects:
+    - num: 0
+random_structural_objects:
+    - num: 0
+excluded_shapes: soccer_ball

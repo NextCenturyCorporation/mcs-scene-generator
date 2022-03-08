@@ -23,7 +23,8 @@ def test_create_dropping_device():
         2,
         3,
         vars(BALL_DEFINITION.dimensions),
-        100
+        100,
+        is_round=True
     )
 
     assert device['id'].startswith('dropping_device_')
@@ -40,9 +41,9 @@ def test_create_dropping_device():
 
     assert len(device['shows']) == 1
     assert device['shows'][0]['stepBegin'] == 0
-    assert device['shows'][0]['position'] == {'x': 1, 'y': 2.85, 'z': 2}
+    assert device['shows'][0]['position'] == {'x': 1, 'y': 2.86, 'z': 2}
     assert device['shows'][0]['rotation'] == {'x': 0, 'y': 0, 'z': 0}
-    assert device['shows'][0]['scale'] == {'x': 0.28, 'y': 0.3, 'z': 0.28}
+    assert device['shows'][0]['scale'] == {'x': 0.28, 'y': 0.28, 'z': 0.28}
     device_bounds = device['shows'][0]['boundingBox']
     assert vars(device_bounds.box_xz[0]) == pytest.approx(
         {'x': 1.14, 'y': 0, 'z': 2.14}
@@ -73,7 +74,7 @@ def test_create_dropping_device_weird_shape():
     assert device['kinematic'] is True
     assert device['structure'] is True
     assert device['type'] == 'tube_wide'
-    assert device['mass'] == 17
+    assert device['mass'] == 16
     assert device['materials'] == ['Custom/Materials/Grey']
     assert device['debug']['color'] == ['grey']
     assert device['debug']['info'] == [
@@ -83,23 +84,23 @@ def test_create_dropping_device_weird_shape():
 
     assert len(device['shows']) == 1
     assert device['shows'][0]['stepBegin'] == 0
-    assert device['shows'][0]['position'] == {'x': 1, 'y': 2.765, 'z': 2}
+    assert device['shows'][0]['position'] == {'x': 1, 'y': 2.785, 'z': 2}
     assert device['shows'][0]['rotation'] == {'x': 0, 'y': 0, 'z': 0}
-    assert device['shows'][0]['scale'] == {'x': 0.53, 'y': 0.47, 'z': 0.53}
+    assert device['shows'][0]['scale'] == {'x': 0.55, 'y': 0.43, 'z': 0.55}
     device_bounds = device['shows'][0]['boundingBox']
     assert vars(device_bounds.box_xz[0]) == pytest.approx(
-        {'x': 1.265, 'y': 0, 'z': 2.265}
+        {'x': 1.275, 'y': 0, 'z': 2.275}
     )
     assert vars(device_bounds.box_xz[1]) == pytest.approx(
-        {'x': 1.265, 'y': 0, 'z': 1.735}
+        {'x': 1.275, 'y': 0, 'z': 1.725}
     )
     assert vars(device_bounds.box_xz[2]) == pytest.approx(
-        {'x': 0.735, 'y': 0, 'z': 1.735}
+        {'x': 0.725, 'y': 0, 'z': 1.725}
     )
     assert vars(device_bounds.box_xz[3]) == pytest.approx(
-        {'x': 0.735, 'y': 0, 'z': 2.265}
+        {'x': 0.725, 'y': 0, 'z': 2.275}
     )
-    assert device_bounds.max_y == 3
+    assert device_bounds.max_y == pytest.approx(3)
     assert device_bounds.min_y == 0
 
 
@@ -111,7 +112,8 @@ def test_create_dropping_device_with_step():
         vars(BALL_DEFINITION.dimensions),
         100,
         25,
-        'custom_id'
+        'custom_id',
+        is_round=True
     )
 
     assert device['id'].startswith('dropping_device_custom_id_')
@@ -128,9 +130,9 @@ def test_create_dropping_device_with_step():
 
     assert len(device['shows']) == 1
     assert device['shows'][0]['stepBegin'] == 0
-    assert device['shows'][0]['position'] == {'x': 1, 'y': 2.85, 'z': 2}
+    assert device['shows'][0]['position'] == {'x': 1, 'y': 2.86, 'z': 2}
     assert device['shows'][0]['rotation'] == {'x': 0, 'y': 0, 'z': 0}
-    assert device['shows'][0]['scale'] == {'x': 0.28, 'y': 0.3, 'z': 0.28}
+    assert device['shows'][0]['scale'] == {'x': 0.28, 'y': 0.28, 'z': 0.28}
     device_bounds = device['shows'][0]['boundingBox']
     assert vars(device_bounds.box_xz[0]) == pytest.approx(
         {'x': 1.14, 'y': 0, 'z': 2.14}
@@ -151,8 +153,7 @@ def test_create_dropping_device_with_step():
 def test_create_placer():
     placer = mechanisms.create_placer(
         {'x': 1, 'y': 3, 'z': -1},
-        {'x': 0.5, 'y': 0.5, 'z': 0.5},
-        {'x': 2, 'y': 2, 'z': 2},
+        {'x': 1, 'y': 1, 'z': 1},
         0,
         10,
         0,
@@ -167,7 +168,8 @@ def test_create_placer():
     assert placer['materials'] == ['Custom/Materials/Magenta']
     assert placer['debug']['color'] == ['magenta', 'cyan']
     assert placer['debug']['info'] == [
-        'magenta', 'cyan', 'placer', 'magenta placer', 'cyan placer'
+        'magenta', 'cyan', 'placer', 'magenta placer', 'cyan placer',
+        'magenta cyan placer'
     ]
     assert placer['debug']['shape'] == ['placer']
 
@@ -198,8 +200,7 @@ def test_create_placer():
 def test_create_placer_with_position_y_offset():
     placer = mechanisms.create_placer(
         {'x': 1, 'y': 3.5, 'z': -1},
-        {'x': 0.5, 'y': 0.5, 'z': 0.5},
-        {'x': 2, 'y': 2, 'z': 2},
+        {'x': 1, 'y': 1, 'z': 1},
         0.5,
         10,
         0,
@@ -214,7 +215,8 @@ def test_create_placer_with_position_y_offset():
     assert placer['materials'] == ['Custom/Materials/Magenta']
     assert placer['debug']['color'] == ['magenta', 'cyan']
     assert placer['debug']['info'] == [
-        'magenta', 'cyan', 'placer', 'magenta placer', 'cyan placer'
+        'magenta', 'cyan', 'placer', 'magenta placer', 'cyan placer',
+        'magenta cyan placer'
     ]
     assert placer['debug']['shape'] == ['placer']
 
@@ -245,13 +247,12 @@ def test_create_placer_with_position_y_offset():
 def test_create_placer_with_pole_offset():
     placer = mechanisms.create_placer(
         {'x': 1, 'y': 3, 'z': -1},
-        {'x': 0.5, 'y': 0.5, 'z': 0.5},
-        {'x': 2, 'y': 2, 'z': 2},
+        {'x': 1, 'y': 1, 'z': 1},
         0,
         10,
         0,
         4,
-        placed_object_pole_offset_y=0.1
+        placed_object_pole_offset_y=0.05
     )
 
     assert placer['id'].startswith('placer_')
@@ -262,7 +263,8 @@ def test_create_placer_with_pole_offset():
     assert placer['materials'] == ['Custom/Materials/Magenta']
     assert placer['debug']['color'] == ['magenta', 'cyan']
     assert placer['debug']['info'] == [
-        'magenta', 'cyan', 'placer', 'magenta placer', 'cyan placer'
+        'magenta', 'cyan', 'placer', 'magenta placer', 'cyan placer',
+        'magenta cyan placer'
     ]
     assert placer['debug']['shape'] == ['placer']
 
@@ -293,8 +295,7 @@ def test_create_placer_with_pole_offset():
 def test_create_placer_with_last_step():
     placer = mechanisms.create_placer(
         {'x': 1, 'y': 3, 'z': -1},
-        {'x': 0.5, 'y': 0.5, 'z': 0.5},
-        {'x': 2, 'y': 2, 'z': 2},
+        {'x': 1, 'y': 1, 'z': 1},
         0,
         10,
         0,
@@ -310,7 +311,8 @@ def test_create_placer_with_last_step():
     assert placer['materials'] == ['Custom/Materials/Magenta']
     assert placer['debug']['color'] == ['magenta', 'cyan']
     assert placer['debug']['info'] == [
-        'magenta', 'cyan', 'placer', 'magenta placer', 'cyan placer'
+        'magenta', 'cyan', 'placer', 'magenta placer', 'cyan placer',
+        'magenta cyan placer'
     ]
     assert placer['debug']['shape'] == ['placer']
 
@@ -346,14 +348,15 @@ def test_create_throwing_device():
         0,
         0,
         vars(BALL_DEFINITION.dimensions),
-        100
+        100,
+        is_round=True
     )
 
     assert device['id'].startswith('throwing_device_')
     assert device['kinematic'] is True
     assert device['structure'] is True
     assert device['type'] == 'tube_wide'
-    assert device['mass'] == 4
+    assert device['mass'] == 3
     assert device['materials'] == ['Custom/Materials/Grey']
     assert device['debug']['color'] == ['grey']
     assert device['debug']['info'] == [
@@ -365,12 +368,20 @@ def test_create_throwing_device():
     assert device['shows'][0]['stepBegin'] == 0
     assert device['shows'][0]['position'] == {'x': 1, 'y': 2, 'z': 3}
     assert device['shows'][0]['rotation'] == {'x': 0, 'y': 0, 'z': 90}
-    assert device['shows'][0]['scale'] == {'x': 0.28, 'y': 0.4, 'z': 0.28}
+    assert device['shows'][0]['scale'] == {'x': 0.28, 'y': 0.28, 'z': 0.28}
     device_bounds = device['shows'][0]['boundingBox']
-    assert vars(device_bounds.box_xz[0]) == {'x': 1.2, 'y': 0, 'z': 3.14}
-    assert vars(device_bounds.box_xz[1]) == {'x': 1.2, 'y': 0, 'z': 2.86}
-    assert vars(device_bounds.box_xz[2]) == {'x': 0.8, 'y': 0, 'z': 2.86}
-    assert vars(device_bounds.box_xz[3]) == {'x': 0.8, 'y': 0, 'z': 3.14}
+    assert vars(device_bounds.box_xz[0]) == pytest.approx(
+        {'x': 1.14, 'y': 0, 'z': 3.14}
+    )
+    assert vars(device_bounds.box_xz[1]) == pytest.approx(
+        {'x': 1.14, 'y': 0, 'z': 2.86}
+    )
+    assert vars(device_bounds.box_xz[2]) == pytest.approx(
+        {'x': 0.86, 'y': 0, 'z': 2.86}
+    )
+    assert vars(device_bounds.box_xz[3]) == pytest.approx(
+        {'x': 0.86, 'y': 0, 'z': 3.14}
+    )
     assert device_bounds.max_y == pytest.approx(2.14)
     assert device_bounds.min_y == pytest.approx(1.86)
 
@@ -383,14 +394,15 @@ def test_create_throwing_device_weird_shape():
         0,
         0,
         vars(DUCK_DEFINITION.dimensions),
-        100
+        100,
+        object_rotation_y=DUCK_DEFINITION.rotation.y
     )
 
     assert device['id'].startswith('throwing_device_')
     assert device['kinematic'] is True
     assert device['structure'] is True
     assert device['type'] == 'tube_wide'
-    assert device['mass'] == 22
+    assert device['mass'] == 14
     assert device['materials'] == ['Custom/Materials/Grey']
     assert device['debug']['color'] == ['grey']
     assert device['debug']['info'] == [
@@ -402,22 +414,22 @@ def test_create_throwing_device_weird_shape():
     assert device['shows'][0]['stepBegin'] == 0
     assert device['shows'][0]['position'] == {'x': 1, 'y': 2, 'z': 3}
     assert device['shows'][0]['rotation'] == {'x': 0, 'y': 0, 'z': 90}
-    assert device['shows'][0]['scale'] == {'x': 0.53, 'y': 0.62, 'z': 0.53}
+    assert device['shows'][0]['scale'] == {'x': 0.46, 'y': 0.53, 'z': 0.46}
     device_bounds = device['shows'][0]['boundingBox']
     assert vars(device_bounds.box_xz[0]) == pytest.approx(
-        {'x': 1.31, 'y': 0, 'z': 3.265}
+        {'x': 1.265, 'y': 0, 'z': 3.23}
     )
     assert vars(device_bounds.box_xz[1]) == pytest.approx(
-        {'x': 1.31, 'y': 0, 'z': 2.735}
+        {'x': 1.265, 'y': 0, 'z': 2.77}
     )
     assert vars(device_bounds.box_xz[2]) == pytest.approx(
-        {'x': 0.69, 'y': 0, 'z': 2.735}
+        {'x': 0.735, 'y': 0, 'z': 2.77}
     )
     assert vars(device_bounds.box_xz[3]) == pytest.approx(
-        {'x': 0.69, 'y': 0, 'z': 3.265}
+        {'x': 0.735, 'y': 0, 'z': 3.23}
     )
-    assert device_bounds.max_y == pytest.approx(2.265)
-    assert device_bounds.min_y == pytest.approx(1.735)
+    assert device_bounds.max_y == pytest.approx(2.23)
+    assert device_bounds.min_y == pytest.approx(1.77)
 
 
 def test_create_throwing_device_with_step():
@@ -430,14 +442,15 @@ def test_create_throwing_device_with_step():
         vars(BALL_DEFINITION.dimensions),
         100,
         25,
-        'custom_id'
+        'custom_id',
+        is_round=True
     )
 
     assert device['id'].startswith('throwing_device_custom_id_')
     assert device['kinematic'] is True
     assert device['structure'] is True
     assert device['type'] == 'tube_wide'
-    assert device['mass'] == 4
+    assert device['mass'] == 3
     assert device['materials'] == ['Custom/Materials/Grey']
     assert device['debug']['color'] == ['grey']
     assert device['debug']['info'] == [
@@ -449,12 +462,20 @@ def test_create_throwing_device_with_step():
     assert device['shows'][0]['stepBegin'] == 0
     assert device['shows'][0]['position'] == {'x': 1, 'y': 2, 'z': 3}
     assert device['shows'][0]['rotation'] == {'x': 0, 'y': 0, 'z': 90}
-    assert device['shows'][0]['scale'] == {'x': 0.28, 'y': 0.4, 'z': 0.28}
+    assert device['shows'][0]['scale'] == {'x': 0.28, 'y': 0.28, 'z': 0.28}
     device_bounds = device['shows'][0]['boundingBox']
-    assert vars(device_bounds.box_xz[0]) == {'x': 1.2, 'y': 0, 'z': 3.14}
-    assert vars(device_bounds.box_xz[1]) == {'x': 1.2, 'y': 0, 'z': 2.86}
-    assert vars(device_bounds.box_xz[2]) == {'x': 0.8, 'y': 0, 'z': 2.86}
-    assert vars(device_bounds.box_xz[3]) == {'x': 0.8, 'y': 0, 'z': 3.14}
+    assert vars(device_bounds.box_xz[0]) == pytest.approx(
+        {'x': 1.14, 'y': 0, 'z': 3.14}
+    )
+    assert vars(device_bounds.box_xz[1]) == pytest.approx(
+        {'x': 1.14, 'y': 0, 'z': 2.86}
+    )
+    assert vars(device_bounds.box_xz[2]) == pytest.approx(
+        {'x': 0.86, 'y': 0, 'z': 2.86}
+    )
+    assert vars(device_bounds.box_xz[3]) == pytest.approx(
+        {'x': 0.86, 'y': 0, 'z': 3.14}
+    )
     assert device_bounds.max_y == pytest.approx(2.14)
     assert device_bounds.min_y == pytest.approx(1.86)
 
@@ -467,14 +488,15 @@ def test_create_throwing_device_with_y_rotation():
         30,
         0,
         vars(BALL_DEFINITION.dimensions),
-        100
+        100,
+        is_round=True
     )
 
     assert device['id'].startswith('throwing_device_')
     assert device['kinematic'] is True
     assert device['structure'] is True
     assert device['type'] == 'tube_wide'
-    assert device['mass'] == 4
+    assert device['mass'] == 3
     assert device['materials'] == ['Custom/Materials/Grey']
     assert device['debug']['color'] == ['grey']
     assert device['debug']['info'] == [
@@ -486,19 +508,19 @@ def test_create_throwing_device_with_y_rotation():
     assert device['shows'][0]['stepBegin'] == 0
     assert device['shows'][0]['position'] == {'x': 1, 'y': 2, 'z': 3}
     assert device['shows'][0]['rotation'] == {'x': 0, 'y': 30, 'z': 90}
-    assert device['shows'][0]['scale'] == {'x': 0.28, 'y': 0.4, 'z': 0.28}
+    assert device['shows'][0]['scale'] == {'x': 0.28, 'y': 0.28, 'z': 0.28}
     device_bounds = device['shows'][0]['boundingBox']
     assert vars(device_bounds.box_xz[0]) == pytest.approx(
-        {'x': 1.243205, 'y': 0, 'z': 3.021244}
+        {'x': 1.191244, 'y': 0, 'z': 3.051244}
     )
     assert vars(device_bounds.box_xz[1]) == pytest.approx(
-        {'x': 1.103205, 'y': 0, 'z': 2.778756}
+        {'x': 1.051244, 'y': 0, 'z': 2.808756}
     )
     assert vars(device_bounds.box_xz[2]) == pytest.approx(
-        {'x': 0.756795, 'y': 0, 'z': 2.978756}
+        {'x': 0.808756, 'y': 0, 'z': 2.948756}
     )
     assert vars(device_bounds.box_xz[3]) == pytest.approx(
-        {'x': 0.896795, 'y': 0, 'z': 3.221244}
+        {'x': 0.948756, 'y': 0, 'z': 3.191244}
     )
     assert device_bounds.max_y == pytest.approx(2.14)
     assert device_bounds.min_y == pytest.approx(1.86)
@@ -512,14 +534,15 @@ def test_create_throwing_device_with_z_rotation():
         0,
         30,
         vars(BALL_DEFINITION.dimensions),
-        100
+        100,
+        is_round=True
     )
 
     assert device['id'].startswith('throwing_device_')
     assert device['kinematic'] is True
     assert device['structure'] is True
     assert device['type'] == 'tube_wide'
-    assert device['mass'] == 4
+    assert device['mass'] == 3
     assert device['materials'] == ['Custom/Materials/Grey']
     assert device['debug']['color'] == ['grey']
     assert device['debug']['info'] == [
@@ -531,12 +554,20 @@ def test_create_throwing_device_with_z_rotation():
     assert device['shows'][0]['stepBegin'] == 0
     assert device['shows'][0]['position'] == {'x': 1, 'y': 2, 'z': 3}
     assert device['shows'][0]['rotation'] == {'x': 0, 'y': 0, 'z': 120}
-    assert device['shows'][0]['scale'] == {'x': 0.28, 'y': 0.4, 'z': 0.28}
+    assert device['shows'][0]['scale'] == {'x': 0.28, 'y': 0.28, 'z': 0.28}
     device_bounds = device['shows'][0]['boundingBox']
-    assert vars(device_bounds.box_xz[0]) == {'x': 1.2, 'y': 0, 'z': 3.14}
-    assert vars(device_bounds.box_xz[1]) == {'x': 1.2, 'y': 0, 'z': 2.86}
-    assert vars(device_bounds.box_xz[2]) == {'x': 0.8, 'y': 0, 'z': 2.86}
-    assert vars(device_bounds.box_xz[3]) == {'x': 0.8, 'y': 0, 'z': 3.14}
+    assert vars(device_bounds.box_xz[0]) == pytest.approx(
+        {'x': 1.14, 'y': 0, 'z': 3.14}
+    )
+    assert vars(device_bounds.box_xz[1]) == pytest.approx(
+        {'x': 1.14, 'y': 0, 'z': 2.86}
+    )
+    assert vars(device_bounds.box_xz[2]) == pytest.approx(
+        {'x': 0.86, 'y': 0, 'z': 2.86}
+    )
+    assert vars(device_bounds.box_xz[3]) == pytest.approx(
+        {'x': 0.86, 'y': 0, 'z': 3.14}
+    )
     assert device_bounds.max_y == pytest.approx(2.14)
     assert device_bounds.min_y == pytest.approx(1.86)
 
@@ -594,12 +625,12 @@ def test_drop_object_weird_shape():
 
     assert len(target['shows']) == 1
     assert target['shows'][0]['position'] == {'x': 1, 'y': 2, 'z': 3}
-    assert target['shows'][0]['rotation'] == {'x': 0, 'y': 180, 'z': 0}
+    assert target['shows'][0]['rotation'] == {'x': 0, 'y': 360, 'z': 0}
     target_bounds = target['shows'][0]['boundingBox']
-    assert vars(target_bounds.box_xz[0]) == {'x': 0.79, 'y': 0, 'z': 2.935}
-    assert vars(target_bounds.box_xz[1]) == {'x': 0.79, 'y': 0, 'z': 3.065}
-    assert vars(target_bounds.box_xz[2]) == {'x': 1.21, 'y': 0, 'z': 3.065}
-    assert vars(target_bounds.box_xz[3]) == {'x': 1.21, 'y': 0, 'z': 2.935}
+    assert vars(target_bounds.box_xz[0]) == {'x': 1.21, 'y': 0, 'z': 3.065}
+    assert vars(target_bounds.box_xz[1]) == {'x': 1.21, 'y': 0, 'z': 2.935}
+    assert vars(target_bounds.box_xz[2]) == {'x': 0.79, 'y': 0, 'z': 2.935}
+    assert vars(target_bounds.box_xz[3]) == {'x': 0.79, 'y': 0, 'z': 3.065}
     assert target_bounds.max_y == 2.33
     assert target_bounds.min_y == 1.99
 
@@ -799,6 +830,7 @@ def test_throw_object():
         'stepEnd': 25,
         'vector': {'x': 345, 'y': 0, 'z': 0}
     }]
+    assert target['maxAngularVelocity'] == 25
 
     assert len(target['shows']) == 1
     assert target['shows'][0]['position'] == {'x': 1, 'y': 2, 'z': 3}
@@ -838,6 +870,7 @@ def test_throw_object_downward():
         'stepEnd': 25,
         'vector': {'x': 345, 'y': 0, 'z': 0}
     }]
+    assert target['maxAngularVelocity'] == 25
 
     assert len(target['shows']) == 1
     assert target['shows'][0]['position'] == {'x': 1, 'y': 2, 'z': 3}
@@ -877,6 +910,7 @@ def test_throw_object_downward_from_device_with_upward_z_rotation():
         'stepEnd': 25,
         'vector': {'x': 345, 'y': 0, 'z': 0}
     }]
+    assert target['maxAngularVelocity'] == 25
 
     assert len(target['shows']) == 1
     assert target['shows'][0]['position'] == {'x': 1, 'y': 2, 'z': 3}
@@ -916,17 +950,18 @@ def test_throw_object_weird_shape():
         'stepEnd': 25,
         'vector': {'x': 345, 'y': 0, 'z': 0}
     }]
+    assert target['maxAngularVelocity'] == 25
 
     assert len(target['shows']) == 1
-    assert target['shows'][0]['position'] == {'x': 1, 'y': 2, 'z': 3}
-    assert target['shows'][0]['rotation'] == {'x': 0, 'y': 180, 'z': 0}
+    assert target['shows'][0]['position'] == {'x': 1, 'y': 1.84, 'z': 3}
+    assert target['shows'][0]['rotation'] == {'x': 0, 'y': 360, 'z': 0}
     target_bounds = target['shows'][0]['boundingBox']
-    assert vars(target_bounds.box_xz[0]) == {'x': 0.79, 'y': 0, 'z': 2.935}
-    assert vars(target_bounds.box_xz[1]) == {'x': 0.79, 'y': 0, 'z': 3.065}
-    assert vars(target_bounds.box_xz[2]) == {'x': 1.21, 'y': 0, 'z': 3.065}
-    assert vars(target_bounds.box_xz[3]) == {'x': 1.21, 'y': 0, 'z': 2.935}
-    assert target_bounds.max_y == 2.33
-    assert target_bounds.min_y == 1.99
+    assert vars(target_bounds.box_xz[0]) == {'x': 1.21, 'y': 0, 'z': 3.065}
+    assert vars(target_bounds.box_xz[1]) == {'x': 1.21, 'y': 0, 'z': 2.935}
+    assert vars(target_bounds.box_xz[2]) == {'x': 0.79, 'y': 0, 'z': 2.935}
+    assert vars(target_bounds.box_xz[3]) == {'x': 0.79, 'y': 0, 'z': 3.065}
+    assert target_bounds.max_y == 2.17
+    assert target_bounds.min_y == 1.83
 
 
 def test_throw_object_with_y_rotation():
@@ -954,6 +989,7 @@ def test_throw_object_with_y_rotation():
         'stepEnd': 25,
         'vector': {'x': 345, 'y': 0, 'z': 0}
     }]
+    assert target['maxAngularVelocity'] == 25
 
     assert len(target['shows']) == 1
     assert target['shows'][0]['position'] == {'x': 1, 'y': 2, 'z': 3}
@@ -992,6 +1028,7 @@ def test_throw_object_from_device_with_upward_z_rotation():
         'stepEnd': 25,
         'vector': {'x': 345, 'y': 0, 'z': 0}
     }]
+    assert target['maxAngularVelocity'] == 25
 
     assert len(target['shows']) == 1
     assert target['shows'][0]['position'] == {'x': 1, 'y': 2, 'z': 3}

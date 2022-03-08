@@ -21,7 +21,14 @@ def create_new_scene():
 
 
 @pytest.fixture(autouse=True)
-def run_before_test():
+def run_around_test():
+    # Prepare test
+    ObjectRepository.get_instance().clear()
+
+    # Run test
+    yield
+
+    # Cleanup
     ObjectRepository.get_instance().clear()
 
 
@@ -34,6 +41,7 @@ def test_global_settings():
     assert component.last_step is None
     assert component.performer_start_position is None
     assert component.performer_start_rotation is None
+    assert component.restrict_open_doors is None
     assert component.room_dimensions is None
     assert component.room_shape is None
     assert component.wall_back_material is None
@@ -49,10 +57,10 @@ def test_global_settings():
     assert scene['goal'].get('category') is None
     assert scene['goal'].get('metadata') is None
     dimensions = scene['roomDimensions']
-    assert dimensions['x'] >= 2 and dimensions['x'] <= 15
+    assert dimensions['x'] >= 2 and dimensions['x'] <= 100
     assert dimensions['y'] >= 2 and dimensions['y'] <= 10
-    assert dimensions['z'] >= 2 and dimensions['z'] <= 15
-    assert math.sqrt(dimensions['x']**2 + dimensions['z']**2) <= 15
+    assert dimensions['z'] >= 2 and dimensions['z'] <= 100
+    assert math.sqrt(dimensions['x']**2 + dimensions['z']**2) <= 150
     position = scene['performerStart']['position']
     assert (
         position['x'] > -(dimensions['x'] / 2.0) and
@@ -75,6 +83,7 @@ def test_global_settings():
     assert scene['debug']['ceilingColors']
     assert scene['debug']['floorColors']
     assert scene['debug']['wallColors']
+    assert scene['restrictOpenDoors'] is False
 
 
 def test_global_settings_partial_start_position():
@@ -107,6 +116,7 @@ def test_global_settings_configured():
         'last_step': 1000,
         'performer_start_position': {'x': -1, 'y': 0, 'z': 1},
         'performer_start_rotation': {'x': -10, 'y': 90, 'z': 0},
+        'restrict_open_doors': True,
         'room_dimensions': {'x': 5, 'y': 3, 'z': 10},
         'room_shape': 'square',
         'wall_back_material': 'Custom/Materials/WhiteDrywallMCS',
@@ -124,6 +134,7 @@ def test_global_settings_configured():
     assert component.last_step == 1000
     assert component.performer_start_position == VectorFloatConfig(-1, 0, 1)
     assert component.performer_start_rotation == VectorIntConfig(-10, 90, 0)
+    assert component.restrict_open_doors
     assert component.room_dimensions == VectorIntConfig(5, 3, 10)
     assert component.room_shape == 'square'
     assert component.wall_back_material == 'Custom/Materials/WhiteDrywallMCS'
@@ -147,6 +158,7 @@ def test_global_settings_configured():
         'position': {'x': -1, 'y': 0, 'z': 1},
         'rotation': {'x': -10, 'y': 90, 'z': 0}
     }
+    assert scene['restrictOpenDoors'] is True
     assert scene['roomDimensions'] == {'x': 5, 'y': 3, 'z': 10}
     assert scene['roomMaterials'] == {
         'back': 'Custom/Materials/WhiteDrywallMCS',
@@ -220,7 +232,7 @@ def test_global_settings_fail_room_dimensions_x_above_max():
     with pytest.raises(ILEException):
         GlobalSettingsComponent({
             'room_dimensions': {
-                'x': 16,
+                'x': 101,
                 'y': 2,
                 'z': 2
             }
@@ -238,15 +250,18 @@ def test_global_settings_fail_room_dimensions_x_below_min():
         })
 
 
-def test_global_settings_fail_room_dimensions_x_is_none():
-    with pytest.raises(ILEException):
-        GlobalSettingsComponent({
-            'room_dimensions': {
-                'x': None,
-                'y': 2,
-                'z': 2
-            }
-        })
+def test_global_settings_room_dimensions_x_is_none():
+    component = GlobalSettingsComponent({
+        'room_dimensions': {
+            'x': None,
+            'y': 2,
+            'z': 2
+        }
+    })
+    scene = component.update_ile_scene(create_new_scene())
+    assert 2 <= scene['roomDimensions']['x'] <= 100
+    assert scene['roomDimensions']['y'] == 2
+    assert scene['roomDimensions']['z'] == 2
 
 
 def test_global_settings_fail_room_dimensions_y_above_max():
@@ -271,15 +286,18 @@ def test_global_settings_fail_room_dimensions_y_below_min():
         })
 
 
-def test_global_settings_fail_room_dimensions_y_is_none():
-    with pytest.raises(ILEException):
-        GlobalSettingsComponent({
-            'room_dimensions': {
-                'x': 2,
-                'y': None,
-                'z': 2
-            }
-        })
+def test_global_settings_room_dimensions_y_is_none():
+    component = GlobalSettingsComponent({
+        'room_dimensions': {
+            'x': 2,
+            'y': None,
+            'z': 2
+        }
+    })
+    scene = component.update_ile_scene(create_new_scene())
+    assert scene['roomDimensions']['x'] == 2
+    assert 2 <= scene['roomDimensions']['y'] <= 10
+    assert scene['roomDimensions']['z'] == 2
 
 
 def test_global_settings_fail_room_dimensions_z_above_max():
@@ -288,7 +306,7 @@ def test_global_settings_fail_room_dimensions_z_above_max():
             'room_dimensions': {
                 'x': 2,
                 'y': 2,
-                'z': 16
+                'z': 101
             }
         })
 
@@ -304,15 +322,46 @@ def test_global_settings_fail_room_dimensions_z_below_min():
         })
 
 
-def test_global_settings_fail_room_dimensions_z_is_none():
-    with pytest.raises(ILEException):
-        GlobalSettingsComponent({
-            'room_dimensions': {
-                'x': 2,
-                'y': 2,
-                'z': None
-            }
-        })
+def test_global_settings_room_dimensions_z_is_none():
+    component = GlobalSettingsComponent({
+        'room_dimensions': {
+            'x': 2,
+            'y': 2,
+            'z': None
+        }
+    })
+    scene = component.update_ile_scene(create_new_scene())
+    assert scene['roomDimensions']['x'] == 2
+    assert scene['roomDimensions']['y'] == 2
+    assert 2 <= scene['roomDimensions']['z'] <= 100
+
+
+def test_global_settings_room_dimensions_min_max():
+    component = GlobalSettingsComponent({
+        'room_dimensions': {
+            'x': 2,
+            'y': 2,
+            'z': {'min': 3, 'max': 8}
+        }
+    })
+    scene = component.update_ile_scene(create_new_scene())
+    assert scene['roomDimensions']['x'] == 2
+    assert scene['roomDimensions']['y'] == 2
+    assert 3 <= scene['roomDimensions']['z'] <= 8
+
+
+def test_global_settings_room_dimensions_array():
+    component = GlobalSettingsComponent({
+        'room_dimensions': {
+            'x': [4, 8],
+            'y': 2,
+            'z': 4
+        }
+    })
+    scene = component.update_ile_scene(create_new_scene())
+    assert scene['roomDimensions']['x'] in [4, 8]
+    assert scene['roomDimensions']['y'] == 2
+    assert scene['roomDimensions']['z'] == 4
 
 
 def test_global_settings_fail_room_shape():
@@ -452,24 +501,10 @@ def test_global_settings_ceiling_material_fail_restricted_material():
         })
 
 
-def test_global_settings_ceiling_material_fail_lava_material():
-    with pytest.raises(ILEException):
-        GlobalSettingsComponent({
-            'ceiling_material': materials.LAVA_MATERIALS[0].material
-        })
-
-
 def test_global_settings_floor_material_fail_restricted_material():
     with pytest.raises(ILEException):
         GlobalSettingsComponent({
             'floor_material': materials.SOFA_1_MATERIALS[0].material
-        })
-
-
-def test_global_settings_floor_material_fail_lava_material():
-    with pytest.raises(ILEException):
-        GlobalSettingsComponent({
-            'floor_material': materials.LAVA_MATERIALS[0].material
         })
 
 
@@ -480,24 +515,10 @@ def test_global_settings_wall_back_material_fail_restricted_material():
         })
 
 
-def test_global_settings_wall_back_material_fail_lava_material():
-    with pytest.raises(ILEException):
-        GlobalSettingsComponent({
-            'wall_back_material': materials.LAVA_MATERIALS[0].material
-        })
-
-
 def test_global_settings_wall_front_material_fail_restricted_material():
     with pytest.raises(ILEException):
         GlobalSettingsComponent({
             'wall_front_material': materials.SOFA_1_MATERIALS[0].material
-        })
-
-
-def test_global_settings_wall_front_material_fail_lava_material():
-    with pytest.raises(ILEException):
-        GlobalSettingsComponent({
-            'wall_front_material': materials.LAVA_MATERIALS[0].material
         })
 
 
@@ -508,22 +529,8 @@ def test_global_settings_wall_left_material_fail_restricted_material():
         })
 
 
-def test_global_settings_wall_left_material_fail_lava_material():
-    with pytest.raises(ILEException):
-        GlobalSettingsComponent({
-            'wall_left_material': materials.LAVA_MATERIALS[0].material
-        })
-
-
 def test_global_settings_wall_right_material_fail_restricted_material():
     with pytest.raises(ILEException):
         GlobalSettingsComponent({
             'wall_right_material': materials.SOFA_1_MATERIALS[0].material
-        })
-
-
-def test_global_settings_wall_right_material_fail_lava_material():
-    with pytest.raises(ILEException):
-        GlobalSettingsComponent({
-            'wall_right_material': materials.LAVA_MATERIALS[0].material
         })

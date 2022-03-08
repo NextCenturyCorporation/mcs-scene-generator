@@ -1,5 +1,6 @@
 import os
 
+import pytest
 import shapely
 from machine_common_sense.config_manager import Vector3d
 from shapely import affinity
@@ -1379,6 +1380,7 @@ def test_eval_4_container_hypercube():
     delete_scene_debug_files(scene_dict, 'container')
 
 
+@pytest.mark.slow
 def test_obstacle_hypercube():
     hypercube_factory = InteractiveObstacleEvaluationHypercubeFactory(
         RetrievalGoal('obstacle')
@@ -1525,6 +1527,7 @@ def test_obstacle_hypercube():
     delete_scene_debug_files(scene_dict, 'obstacle')
 
 
+@pytest.mark.slow
 def test_occluder_hypercube():
     hypercube_factory = InteractiveOccluderEvaluationHypercubeFactory(
         RetrievalGoal('occluder')

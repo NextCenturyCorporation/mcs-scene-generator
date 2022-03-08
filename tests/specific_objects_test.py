@@ -1,3 +1,5 @@
+import pytest
+
 from generator import DefinitionDataset, ObjectDefinition, specific_objects
 
 
@@ -12,6 +14,7 @@ def test_getters_reuse_immutable_dataset():
     assert isinstance(dataset_1, DefinitionDataset)
 
 
+@pytest.mark.slow
 def test_does_have_definitions():
     dataset = specific_objects.get_interactable_definition_dataset()
     definitions = dataset.definitions()

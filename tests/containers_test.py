@@ -69,6 +69,7 @@ def get_valid_containments(object_a, object_b=None):
     return valid_containments
 
 
+@pytest.mark.slow
 def test_put_object_in_container():
     for obj_def in PICKUPABLE_DEFINITIONS:
         print(f'\nOBJECT={obj_def}')
