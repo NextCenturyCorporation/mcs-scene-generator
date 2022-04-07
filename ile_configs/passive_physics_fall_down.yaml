@@ -8,7 +8,7 @@ last_step: 160
 room_dimensions:
     x: 16
     y: 8
-    z: 16
+    z: 10
 
 # Specific starting position and rotation used in passive physics tasks.
 performer_start_position:
@@ -32,7 +32,7 @@ structural_platforms:
         y: 0.738
         z: 0.5
 
-# Two moving-and-rotating occluding walls at semi-random locations.
+# Two moving-and-rotating occluding walls with semi-random width and position.
 structural_moving_occluders:
     - num: 1
       occluder_height: 1.8
@@ -45,9 +45,10 @@ structural_moving_occluders:
           min: -2.0
           max: -1.0
       position_z: 1
-      repeat_movement: false
-      reverse_direction: true
+      move_up_before_last_step: true
+      reverse_direction: false
       rotation_y: 0
+      labels: left_occluder
     - num: 1
       occluder_height: 1.8
       occluder_thickness: 0.1
@@ -59,34 +60,97 @@ structural_moving_occluders:
           min: 1.0
           max: 2.0
       position_z: 1
-      repeat_movement: false
-      reverse_direction: true
+      move_up_before_last_step: true
+      reverse_direction: false
       rotation_y: 0
+      labels: right_occluder
 
-# Two droppers with random small objects at semi-random locations.
+# Two droppers with random small objects with semi-random positions.
 structural_droppers:
     - num: 1
-      position_x:
-          min: -2.0
-          max: -1.0
       position_z:
           min: 1.6
-          max: 7.4
+          max: 4.4
       drop_step:
-          min: 31
-          max: 40
+          min: 41
+          max: 60
+      # Set this dropper's X position relative to the left occluder.
+      position_relative:
+          label: left_occluder
+          use_x: true
+          view_angle_x: true
+      # Choose randomly from shapes normally used in "fall down" tasks.
+      # Remove shapes from this list you don't want to generate.
+      # Copy lines for shapes you want to generate more often than others.
+      projectile_shape:
+          - ball
+          - bus_1
+          - car_1
+          - car_2
+          - circle_frustum
+          - cone
+          - cube
+          - cylinder
+          - dog_on_wheels
+          - double_cone
+          - duck_on_wheels
+          - dumbbell_1
+          - dumbbell_2
+          - pyramid
+          - racecar_red
+          - sphere
+          - square_frustum
+          - tie_fighter
+          - train_1
+          - trolley_1
+          - truck_1
+          - truck_2
+          - tube_narrow
+          - tube_wide
+          - turtle_on_wheels
     - num: 1
-      position_x:
-          min: 1.0
-          max: 2.0
       position_z:
           min: 1.6
-          max: 7.4
+          max: 4.4
       drop_step:
-          min: 31
-          max: 40
+          min: 41
+          max: 60
+      # Set this dropper's X position relative to the right occluder.
+      position_relative:
+          label: right_occluder
+          use_x: true
+          view_angle_x: true
+      # Choose randomly from shapes normally used in "fall down" tasks.
+      # Remove shapes from this list you don't want to generate.
+      # Copy lines for shapes you want to generate more often than others.
+      projectile_shape:
+          - ball
+          - bus_1
+          - car_1
+          - car_2
+          - circle_frustum
+          - cone
+          - cube
+          - cylinder
+          - dog_on_wheels
+          - double_cone
+          - duck_on_wheels
+          - dumbbell_1
+          - dumbbell_2
+          - pyramid
+          - racecar_red
+          - sphere
+          - square_frustum
+          - tie_fighter
+          - train_1
+          - trolley_1
+          - truck_1
+          - truck_2
+          - tube_narrow
+          - tube_wide
+          - turtle_on_wheels
 
-# Override the defaults to avoid randomly generating any unwanted objects.
+# Override the defaults to avoid randomly generating any other objects.
 keyword_objects:
     - num: 0
 random_structural_objects:

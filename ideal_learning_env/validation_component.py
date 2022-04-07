@@ -1,16 +1,21 @@
 import logging
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 from extremitypathfinder import PolygonEnvironment
 from extremitypathfinder.plotting import PlottingEnvironment
 from shapely.geometry import JOIN_STYLE, mapping
 
-from generator import geometry
+from generator import ObjectBounds, geometry
 from ideal_learning_env.decorators import ile_config_setter
 
 from .components import ILEComponent
-from .defs import ILEConfigurationException, ILEException
-from .goal_services import get_target_object
+from .defs import ILEException
+from .structural_object_service import (
+    LABEL_BIDIRECTIONAL_RAMP,
+    LABEL_CONNECTED_TO_RAMP,
+    LABEL_PLATFORM,
+    LABEL_RAMP,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -19,16 +24,18 @@ class ValidPathComponent(ILEComponent):
     """Validates that a 2D path exists on the ground to avoid lava, holes and
     unmovable objects.  This path does not take Ramps, performers starting
     elevation or any other methods of elevation change into account."""
+
     check_valid_path: bool = False
     """
     (bool): If true, checks for a valid path between the performer agent's
     starting position and the target's position and retries generating the
     current scene if one cannot be found. Considers all objects and structures
-    that the performer would hit when their position is y = 0 or are light
-    enough to be pushed.  The check also considers all holes and areas of lava
-    in the scene. Pathfinding is only done in two dimensions. Check is skipped
-    if false.
-    Default: False
+    that would block the performer when their position is y = 0 or are light
+    enough to be pushed. The check considers all holes and areas of lava in the
+    scene. It also considers moving up and/or down ramps that are attached to
+    platforms (via the `attached_ramps` option in `structural_platforms`), as
+    well as across those platforms. Pathfinding is otherwise only done in two
+    dimensions. This check is skipped if false. Default: False
 
     Simple Example:
     ```
@@ -43,6 +50,9 @@ class ValidPathComponent(ILEComponent):
 
     _step_height = 0.2
     _debug_plot = False
+    _delayed_target = False
+    _delayed_performer_start = False
+    _delayed_error_reason = None
 
     def __init__(self, data: Dict[str, Any]):
         super().__init__(data)
@@ -52,29 +62,80 @@ class ValidPathComponent(ILEComponent):
         # Might be useful later but also helps with testing
         self.last_path = None
         self.last_distance = None
+
+        if self.check_valid_path:
+            self._delayed_target = self._no_target_found(scene)
+            self._delayed_performer_start = self._performer_not_within_room(
+                scene)
+
+            if not self._delayed_target and not self._delayed_performer_start:
+                self._find_valid_path(scene)
+        return scene
+
+    def _no_target_found(self, scene) -> bool:
+        # Target placement may be delayed
+        return scene.get_target_object() is None
+
+    def _performer_not_within_room(self, scene) -> bool:
+        # shortcut_start_on_platform triggers a delayed action, placing
+        # the performer outside of the room until an appropriate
+        # platform is created/found to place them on
+        bb_dim = {
+            "x": geometry.PERFORMER_WIDTH,
+            "y": geometry.PERFORMER_HEIGHT,
+            "z": geometry.PERFORMER_WIDTH
+        }
+
+        perf_bb = geometry.create_bounds(
+            dimensions=bb_dim,
+            offset=None,
+            position={
+                "x": scene.performer_start.position.x,
+                "y": scene.performer_start.position.y,
+                "z": scene.performer_start.position.z
+            },
+            rotation={
+                "x": scene.performer_start.rotation.x,
+                "y": scene.performer_start.rotation.y,
+                "z": scene.performer_start.rotation.z
+            },
+            standing_y=geometry.PERFORMER_HEIGHT
+        )
+
+        return not perf_bb.is_within_room({
+            "x": scene.room_dimensions.x,
+            "y": scene.room_dimensions.y,
+            "z": scene.room_dimensions.z
+        })
+
+    def _find_valid_path(self, scene):
         if self.check_valid_path:
             logger.info('  Running path validation check...')
 
             environ = PlottingEnvironment(
                 "./plots/") if self._debug_plot else PolygonEnvironment()
 
-            tgt = get_target_object(scene)
             blocked_area = []
-            if not tgt:
-                raise ILEConfigurationException(
+            if self._delayed_target:
+                raise ILEException(
                     "Path check requires a goal target. "
                     "No goal target found.")
 
+            if self._delayed_performer_start:
+                raise ILEException(
+                    "Performer start position is not within bounds.")
+
+            tgt = scene.get_target_object()
             start, end = self._compute_start_end(scene, tgt)
             boundary = self._compute_boundary(scene)
 
             # Add each different type
             # coordinates must be clockwise ordering
             self._add_objects_to_blocked(scene, tgt, blocked_area)
-            self._add_blocked_areas(scene.get('lava', []), blocked_area)
+            self._add_blocked_areas(scene.lava, blocked_area)
             # Buffer should be 0.5 to be exactly hole, but then path library
             # thinks it can go between holes.
-            self._add_blocked_areas(scene.get('holes', []), blocked_area, 0.6)
+            self._add_blocked_areas(scene.holes, blocked_area, 0.6)
             # validate
 
             logger.trace("Setting pathfinding environment")
@@ -99,12 +160,10 @@ class ValidPathComponent(ILEComponent):
             except Exception as e:
                 raise ILEException("Failed to generate valid path") from e
 
-        return scene
-
     def _compute_start_end(self, scene, tgt):
         start = (
-            scene["performerStart"]["position"]["x"],
-            scene["performerStart"]["position"]["z"]
+            scene.performer_start.position.x,
+            scene.performer_start.position.z
         )
 
         tgt_pos = tgt['shows'][0]['position']
@@ -112,37 +171,201 @@ class ValidPathComponent(ILEComponent):
         return start, end
 
     def _compute_boundary(self, scene):
-        dim = scene['roomDimensions']
-        x = dim['x'] / 2.0 - geometry.PERFORMER_HALF_WIDTH
-        y = dim['z'] / 2.0 - geometry.PERFORMER_HALF_WIDTH
+        dim = scene.room_dimensions
+        x = dim.x / 2.0 - geometry.PERFORMER_HALF_WIDTH
+        y = dim.z / 2.0 - geometry.PERFORMER_HALF_WIDTH
         return [(-x, -y), (x, -y), (x, y), (-x, y)]
 
-    def _add_objects_to_blocked(self, scene, tgt, blocked_area):
-        objs = scene['objects'] or []
-        buffer = geometry.PERFORMER_HALF_WIDTH
-        for obj in objs:
-            bb = obj['shows'][0]['boundingBox']
-            valid_blocking_object = self.is_object_path_blocking(obj, tgt)
-            # TODO MCS-895 We do not support multiple targets yet.
-            if valid_blocking_object:
-                # This creates a new polygon that is bigger by 'buffer' around
-                # and the corners are beveled. (basically one cut diagnally on
-                # the corner).  This expands the object by half the performer
-                # so that we account for the performers width.
-                #
-                # Bevel is somewhat of an approximation, but using a more
-                # accurate rounded corner results in more significant
-                # performance penalties.
-                buffered = bb.polygon_xz.buffer(
-                    buffer, join_style=JOIN_STYLE.bevel,
-                    resolution=1)
+    def _is_ramp_with_path(self, obj):
+        if(obj and obj["debug"] and "labels" in obj["debug"]):
+            labels = obj["debug"]["labels"]
+            if(LABEL_RAMP in labels and
+               LABEL_BIDIRECTIONAL_RAMP in labels):
+                return True
 
-                coords = mapping(buffered)['coordinates'][0]
-                blocked = list(coords)
-                # removing because shapely repeats first coordinate, but
-                # pathfinding doesn't want that.
-                blocked.pop(-1)
-                blocked_area.append(blocked)
+        return False
+
+    def _is_platform_with_path(self, obj):
+        if(obj and obj["debug"] and "labels" in obj["debug"]):
+            labels = obj["debug"]["labels"]
+            if(LABEL_PLATFORM in labels and
+               LABEL_CONNECTED_TO_RAMP in labels):
+                return True
+        return False
+
+    def _calc_ramp_blocked_areas(self, obj):
+        ramp_pos = obj["shows"][0]["position"]
+        ramp_rot = obj["shows"][0]["rotation"]
+        ramp_scale = obj["shows"][0]["scale"]
+        bb_width = 0.1
+
+        bb_dim = {
+            "x": bb_width,
+            "y": 1.0,
+            "z": ramp_scale["z"] + bb_width +
+            geometry.PERFORMER_HALF_WIDTH}
+        offset_left = {
+            "x": -((ramp_scale["x"] / 2.0) + (bb_width / 2)),
+            "y": 0.0,
+            "z": -geometry.PERFORMER_HALF_WIDTH
+        }
+        offset_right = {
+            "x": ((ramp_scale["x"] / 2.0) + (bb_width / 2)),
+            "y": 0.0,
+            "z": -geometry.PERFORMER_HALF_WIDTH
+        }
+
+        left_bb = geometry.create_bounds(
+            bb_dim, offset_left, ramp_pos, ramp_rot, 0.0)
+        right_bb = geometry.create_bounds(
+            bb_dim, offset_right, ramp_pos, ramp_rot, 0.0)
+
+        return left_bb, right_bb
+
+    def _get_platform_side(self, platform, bounds_list, side,
+                           scale_multiplier, offset_value):
+        plat_pos = platform["shows"][0]["position"]
+        plat_rot = platform["shows"][0]["rotation"]
+        gaps = platform["debug"]["gaps"]
+        isFrontBack = side in ["front", "back"]
+        bb_width = 0.1
+        if(gaps.get(side) is not None):
+            count = 0
+            max = len(gaps[side])
+
+            # Adapted from ai2thor code (PositionLips() in StructureObject.cs)
+            while count < (max + 1):
+                start = 0 if count == 0 else gaps[side][count - 1]["high"]
+                end = gaps[side][count]["low"] if count != max else 1
+
+                start -= 0.5
+                end -= 0.5
+
+                scale = (end - start) * scale_multiplier
+                pos = (start + end) / 2.0 * scale_multiplier
+
+                bb_dim_x = scale if isFrontBack else bb_width
+                bb_dim_z = bb_width if isFrontBack else scale
+
+                offset_x = pos if isFrontBack else offset_value
+                offset_z = offset_value if isFrontBack else pos
+
+                bb_dim = {
+                    "x": bb_dim_x,
+                    "y": 0.0,
+                    "z": bb_dim_z
+                }
+                offset = {
+                    "x": offset_x,
+                    "y": 0.0,
+                    "z": offset_z
+                }
+
+                bb = geometry.create_bounds(
+                    bb_dim, offset, plat_pos, plat_rot, 0.0)
+
+                bounds_list.append(bb)
+
+                count += 1
+        else:
+
+            bb_dim = {
+                "x": scale_multiplier if isFrontBack else bb_width,
+                "y": 0.0,
+                "z": bb_width if isFrontBack else scale_multiplier
+            }
+
+            offset_x = 0.0 if isFrontBack else offset_value
+            offset_z = offset_value if isFrontBack else 0.0
+            offset = {
+                "x": offset_x,
+                "y": 0.0,
+                "z": offset_z
+            }
+
+            bounds_list.append(geometry.create_bounds(
+                bb_dim, offset, plat_pos, plat_rot, 0.0))
+
+    def _get_platform_edges(self, obj) -> List[ObjectBounds]:
+        plat_scale = obj["shows"][0]["scale"]
+        bounds_list = []
+
+        half_scale_x = (plat_scale["x"] / 2.0)
+        half_scale_z = (plat_scale["z"] / 2.0)
+
+        self._get_platform_side(
+            obj, bounds_list, "left", plat_scale["z"], -half_scale_x
+        )
+
+        self._get_platform_side(
+            obj, bounds_list, "right", plat_scale["z"], half_scale_x
+        )
+
+        # Note that front/back are reversed (may be left as is
+        # due to invalidating already released scenes)
+        self._get_platform_side(
+            obj, bounds_list, "front", plat_scale["x"], -half_scale_z
+        )
+
+        self._get_platform_side(
+            obj, bounds_list, "back", plat_scale["x"], half_scale_z
+        )
+
+        return bounds_list
+
+    def _add_objects_to_blocked(self, scene, tgt, blocked_area):
+        objs = scene.objects or []
+        default_buffer = geometry.PERFORMER_HALF_WIDTH
+        plat_ramp_buffer = 0.1
+        for obj in objs:
+            valid_ramp = self._is_ramp_with_path(obj)
+            valid_platform = self._is_platform_with_path(obj)
+
+            if valid_ramp:
+                left_bb, right_bb = self._calc_ramp_blocked_areas(obj)
+
+                self._add_polygon_to_blocked(
+                    left_bb, plat_ramp_buffer, blocked_area)
+                self._add_polygon_to_blocked(
+                    right_bb, plat_ramp_buffer, blocked_area)
+
+            elif valid_platform:
+                # Note that this does not handle bisecting platforms
+                sides = self._get_platform_edges(obj)
+
+                for side in sides:
+                    self._add_polygon_to_blocked(
+                        side, plat_ramp_buffer, blocked_area)
+
+            else:
+                bb = obj['shows'][0]['boundingBox']
+
+                valid_blocking_object = self.is_object_path_blocking(obj, tgt)
+                # TODO MCS-895 We do not support multiple targets yet.
+                if valid_blocking_object:
+                    self._add_polygon_to_blocked(bb, default_buffer,
+                                                 blocked_area)
+
+    def _add_polygon_to_blocked(self, bounding_box, buffer, blocked_area):
+        # This creates a new polygon that is bigger by 'buffer'
+        # around and the corners are beveled. (basically one cut
+        # diagnally on the corner).  This expands the object by
+        # half the performer so that we account for the performers
+        # width.
+        #
+        # Bevel is somewhat of an approximation, but using a more
+        # accurate rounded corner results in more significant
+        # performance penalties.
+        buffered = bounding_box.polygon_xz.buffer(
+            buffer, join_style=JOIN_STYLE.bevel,
+            resolution=1)
+
+        coords = mapping(buffered)['coordinates'][0]
+        blocked = list(coords)
+        # removing because shapely repeats first coordinate, but
+        # pathfinding doesn't want that.
+        blocked.pop(-1)
+        blocked_area.append(blocked)
 
     def _add_blocked_areas(
         self,
@@ -164,17 +387,44 @@ class ValidPathComponent(ILEComponent):
         # Don't add the target
         valid_blocking_object = obj['id'] != tgt['id']
         # Don't add objects that are above
+
         valid_blocking_object &= (bb.min_y < geometry.PERFORMER_HEIGHT or
                                   bb.max_y > self._step_height)
         # Don't add objects that are pushable
-
-        valid_blocking_object &= obj['mass'] > geometry.PERFORMER_MASS
+        # If no mass found, then assume object is blocking
+        mass = geometry.PERFORMER_MASS + \
+            1 if 'mass' not in obj else obj['mass']
+        valid_blocking_object &= mass > geometry.PERFORMER_MASS
         return valid_blocking_object
+
+    def get_num_delayed_actions(self) -> int:
+        delay = self._delayed_target or self._delayed_performer_start
+        no_valid_path = self.last_path == [] and self.last_distance is None
+
+        return 1 if (delay or no_valid_path) else 0
+
+    def run_delayed_actions(self, scene: Dict[str, Any]) -> Dict[str, Any]:
+        delay = self._delayed_target or self._delayed_performer_start
+        no_valid_path = (self.last_path == [] and
+                         self.last_distance is None)
+        if delay or no_valid_path:
+            try:
+                self._delayed_target = self._no_target_found(scene)
+                self._delayed_performer_start = self._performer_not_within_room(scene)  # noqa: E501
+                self._find_valid_path(scene)
+            except Exception as e:
+                self._delayed_error_reason = e
+                self.last_path = []
+                self.last_distance = None
+        return scene
+
+    def get_delayed_action_error_strings(self) -> List[str]:
+        return [str(self._delayed_error_reason)]
 
     def get_check_valid_path(
             self) -> bool:
         return self.check_valid_path or False
 
-    @ile_config_setter()
+    @ ile_config_setter()
     def set_check_valid_path(self, data: Any) -> None:
         self.check_valid_path = data

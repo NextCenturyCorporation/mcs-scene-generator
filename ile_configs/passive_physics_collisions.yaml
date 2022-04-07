@@ -1,0 +1,123 @@
+# Can only use the Pass action through the whole scene.
+passive_scene: true
+
+# Max of 160 action steps in each passive collisions scene.
+last_step: 160
+
+# Large room with a high ceiling.
+room_dimensions:
+    x: 16
+    y: 8
+    z: 10
+
+# Specific starting position and rotation used in passive physics tasks.
+performer_start_position:
+    x: 0
+    y: 1.5
+    z: -4.5
+performer_start_rotation:
+    x: 0
+    y: 0
+
+# Platform underneath starting position to raise camera height.
+structural_platforms:
+    num: 1
+    position:
+        x: 0
+        y: 0
+        z: -4.5
+    rotation_y: 0
+    scale:
+        x: 0.5
+        y: 0.738
+        z: 0.5
+
+# One moving-and-rotating occluding wall with semi-random width and position.
+# Remove these lines if you don't want an occluder in your scenes.
+structural_moving_occluders:
+    - num: 1
+      occluder_height: 1.8
+      occluder_thickness: 0.1
+      occluder_width:
+          min: 1
+          max: 3
+      origin: 'top'
+      position_x:
+          min: -1.5
+          max: 1.5
+      position_z: 1
+      move_up_before_last_step: true
+      reverse_direction: false
+      rotation_y: 0
+      labels: occluder
+
+# One thrower with random small object at semi-random location.
+structural_throwers:
+    - num: 1
+      wall: ['left', 'right']
+      position_wall:
+          min: 2.6
+          max: 3.4
+      height: 0
+      rotation_y: 0
+      rotation_z: 0
+      projectile_labels: rolled_object
+      # Choose randomly from shapes normally used in passive collisions tasks.
+      # Remove shapes from this list you don't want to generate.
+      # Copy lines for shapes you want to generate more often than others.
+      projectile_shape:
+          - ball
+          - bus_1
+          - car_1
+          - car_2
+          - cylinder
+          - dog_on_wheels
+          - double_cone
+          - duck_on_wheels
+          - dumbbell_1
+          - dumbbell_2
+          - racecar_red
+          - sphere
+          - tie_fighter
+          - train_1
+          - trolley_1
+          - truck_1
+          - truck_2
+          - tube_narrow
+          - tube_wide
+          - turtle_on_wheels
+      throw_force:
+          min: 2000
+          max: 2500
+      throw_step:
+          min: 41
+          max: 60
+
+# One object with the same shape and size as the rolled object, but a different
+# color, positioned so it will sometimes (50%) cause a collision.
+specific_interactable_objects:
+    - num: 1
+      identical_except_color: rolled_object
+      position_relative:
+          # Give this object a Z position either in line with the thrower and
+          # rolled object, and will therefore cause a collision (50%), or off
+          # by 1, and will therefore NOT cause a collision (50%).
+          # Change "add_z" to 0 if you want to always generate collisions.
+          - label: rolled_object
+            use_z: true
+            add_z: [-1, 0, 0, 1]
+          # Give this object a X position hidden behind the occluder.
+          # Remove these lines if you don't have an occluder in your scenes.
+          - label: occluder
+            use_x: true
+            view_angle_x: true
+      # The object will either face directly to the left or the right.
+      rotation:
+          y: [0, 180]
+
+# Override the defaults to avoid randomly generating any other objects.
+keyword_objects:
+    - num: 0
+random_structural_objects:
+    - num: 0
+excluded_shapes: soccer_ball

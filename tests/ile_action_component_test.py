@@ -3,21 +3,7 @@ import pytest
 from ideal_learning_env.actions_component import ActionRestrictionsComponent
 from ideal_learning_env.defs import ILEConfigurationException, ILEException
 
-
-def prior_scene(last_step: int = None):
-    scene = {
-        'debug': {},
-        'goal': {},
-        'performerStart':
-        {
-            'position':
-            {'x': 0, 'y': 0, 'z': 0}
-        },
-        'roomDimensions': {'x': 10, 'y': 3, 'z': 10}
-    }
-    if last_step:
-        scene['goal']['last_step'] = last_step
-    return scene
+from .ile_helper import prior_scene
 
 
 def test_action_restrictions_defaults():
@@ -28,7 +14,7 @@ def test_action_restrictions_defaults():
     assert component.teleports is None
 
     scene = component.update_ile_scene(prior_scene())
-    goal = scene['goal']
+    goal = scene.goal
     assert isinstance(goal, dict)
     assert not hasattr(goal, 'action_list')
 
@@ -41,8 +27,11 @@ def test_action_restrictions_passive():
     assert component.passive_scene
     last_step = 100
     scene = component.update_ile_scene(prior_scene(last_step))
-    goal = scene['goal']
+    goal = scene.goal
     assert isinstance(goal, dict)
+    category = goal['category']
+    assert isinstance(category, str)
+    assert category == 'intuitive physics'
     al = goal['action_list']
     assert isinstance(al, list)
     assert len(al) == last_step
@@ -66,7 +55,7 @@ def test_action_restrictions_freeze_start():
     assert fzs[0].end is None
 
     scene = component.update_ile_scene(prior_scene(100))
-    goal = scene['goal']
+    goal = scene.goal
     assert isinstance(goal, dict)
     al = goal['action_list']
     assert isinstance(al, list)
@@ -97,7 +86,7 @@ def test_action_restrictions_freeze_start_end():
     assert fzs[0].end == end_step
 
     scene = component.update_ile_scene(prior_scene())
-    goal = scene['goal']
+    goal = scene.goal
     assert isinstance(goal, dict)
     al = goal['action_list']
     assert isinstance(al, list)
@@ -138,7 +127,7 @@ def test_action_restrictions_freeze_choice():
     assert fzs[0].end == end
 
     scene = component.update_ile_scene(prior_scene())
-    goal = scene['goal']
+    goal = scene.goal
     assert isinstance(goal, dict)
     al = goal['action_list']
     assert isinstance(al, list)
@@ -178,7 +167,7 @@ def test_action_restrictions_freeze_ok_overlap():
     assert fzs[1].end == end_step
 
     scene = component.update_ile_scene(prior_scene())
-    goal = scene['goal']
+    goal = scene.goal
     assert isinstance(goal, dict)
     al = goal['action_list']
     assert isinstance(al, list)
@@ -215,7 +204,7 @@ def test_action_restrictions_freeze_gap():
     assert fzs[1].end == end_step
 
     scene = component.update_ile_scene(prior_scene())
-    goal = scene['goal']
+    goal = scene.goal
     assert isinstance(goal, dict)
     al = goal['action_list']
     assert isinstance(al, list)
@@ -268,7 +257,7 @@ def test_action_restrictions_freeze_just_end():
     assert fzs[0].end == end_step
 
     scene = component.update_ile_scene(prior_scene())
-    goal = scene['goal']
+    goal = scene.goal
     assert isinstance(goal, dict)
     al = goal['action_list']
     assert isinstance(al, list)
@@ -305,7 +294,7 @@ def test_action_restrictions_freeze_empty_list():
     fzs = component.get_freezes()
     assert isinstance(fzs, list)
     scene = component.update_ile_scene(prior_scene())
-    goal = scene['goal']
+    goal = scene.goal
     assert isinstance(goal, dict)
     assert not hasattr(goal, 'action_list')
 
@@ -324,7 +313,7 @@ def test_action_restrictions_swivel_start():
     assert svls[0].end is None
 
     scene = component.update_ile_scene(prior_scene(100))
-    goal = scene['goal']
+    goal = scene.goal
     assert isinstance(goal, dict)
     al = goal['action_list']
     assert isinstance(al, list)
@@ -358,7 +347,7 @@ def test_action_restrictions_swivel_start_end():
     assert svls[0].end == end_step
 
     scene = component.update_ile_scene(prior_scene())
-    goal = scene['goal']
+    goal = scene.goal
     assert isinstance(goal, dict)
     al = goal['action_list']
     assert isinstance(al, list)
@@ -403,7 +392,7 @@ def test_action_restrictions_swivel_choice():
     assert svls[0].end == end
 
     scene = component.update_ile_scene(prior_scene())
-    goal = scene['goal']
+    goal = scene.goal
     assert isinstance(goal, dict)
     al = goal['action_list']
     assert isinstance(al, list)
@@ -446,7 +435,7 @@ def test_action_restrictions_swivel_ok_overlap():
     assert svls[1].end == end_step
 
     scene = component.update_ile_scene(prior_scene())
-    goal = scene['goal']
+    goal = scene.goal
     assert isinstance(goal, dict)
     al = goal['action_list']
     assert isinstance(al, list)
@@ -486,7 +475,7 @@ def test_action_restrictions_swivel_gap():
     assert svls[1].end == end_step
 
     scene = component.update_ile_scene(prior_scene())
-    goal = scene['goal']
+    goal = scene.goal
     assert isinstance(goal, dict)
     al = goal['action_list']
     assert isinstance(al, list)
@@ -542,7 +531,7 @@ def test_action_restrictions_swivel_just_end():
     assert svls[0].end == end_step
 
     scene = component.update_ile_scene(prior_scene())
-    goal = scene['goal']
+    goal = scene.goal
     assert isinstance(goal, dict)
     al = goal['action_list']
     assert isinstance(al, list)
@@ -582,7 +571,7 @@ def test_action_restrictions_swivel_empty_list():
     svls = component.get_swivels()
     assert isinstance(svls, list)
     scene = component.update_ile_scene(prior_scene())
-    goal = scene['goal']
+    goal = scene.goal
     assert isinstance(goal, dict)
     assert not hasattr(goal, 'action_list')
 
@@ -619,7 +608,7 @@ def test_action_restrictions_swivel_then_freeze_ok():
     assert svls[0].end == end
 
     scene = component.update_ile_scene(prior_scene())
-    goal = scene['goal']
+    goal = scene.goal
     assert isinstance(goal, dict)
     al = goal['action_list']
     assert isinstance(al, list)
@@ -671,7 +660,7 @@ def test_action_restrictions_freeze_then_swivel_ok():
     assert svls[0].end == end
 
     scene = component.update_ile_scene(prior_scene())
-    goal = scene['goal']
+    goal = scene.goal
     assert isinstance(goal, dict)
     al = goal['action_list']
     assert isinstance(al, list)
@@ -722,7 +711,7 @@ def test_action_restrictions_freeze_then_swivel_ok_overlap():
     assert svls[0].end == end_step
 
     scene = component.update_ile_scene(prior_scene())
-    goal = scene['goal']
+    goal = scene.goal
     assert isinstance(goal, dict)
     al = goal['action_list']
     assert isinstance(al, list)
@@ -774,7 +763,7 @@ def test_action_restrictions_swivel_then_freeze_ok_overlap():
     assert svls[0].end == mid
 
     scene = component.update_ile_scene(prior_scene())
-    goal = scene['goal']
+    goal = scene.goal
     assert isinstance(goal, dict)
     al = goal['action_list']
     assert isinstance(al, list)
@@ -934,7 +923,7 @@ def test_action_restriction_teleport_missing_rot_y():
     assert tps[0].rotation_y is None
 
     scene = component.update_ile_scene(prior_scene())
-    goal = scene['goal']
+    goal = scene.goal
     assert isinstance(goal, dict)
     al = goal['action_list']
     assert isinstance(al, list)
@@ -969,7 +958,7 @@ def test_action_restriction_teleport():
     assert tps[0].rotation_y == 45
 
     scene = component.update_ile_scene(prior_scene())
-    goal = scene['goal']
+    goal = scene.goal
     assert isinstance(goal, dict)
     al = goal['action_list']
     assert isinstance(al, list)
@@ -1007,7 +996,7 @@ def test_action_restriction_teleport_choice():
     assert tps[0].rotation_y in [45, 90]
 
     scene = component.update_ile_scene(prior_scene())
-    goal = scene['goal']
+    goal = scene.goal
     assert isinstance(goal, dict)
     al = goal['action_list']
     assert isinstance(al, list)
@@ -1066,7 +1055,7 @@ def test_action_restriction_teleport_multi():
     assert tps[2].rotation_y is None
 
     scene = component.update_ile_scene(prior_scene())
-    goal = scene['goal']
+    goal = scene.goal
     assert isinstance(goal, dict)
     al = goal['action_list']
     assert isinstance(al, list)
@@ -1151,7 +1140,7 @@ def test_action_restriction_freeze_teleport_combined():
     assert fzs[0].end == end
 
     scene = component.update_ile_scene(prior_scene())
-    goal = scene['goal']
+    goal = scene.goal
     assert isinstance(goal, dict)
     al = goal['action_list']
     assert isinstance(al, list)
@@ -1200,7 +1189,7 @@ def test_action_restriction_swivel_teleport_combined():
     assert svls[0].end == end
 
     scene = component.update_ile_scene(prior_scene())
-    goal = scene['goal']
+    goal = scene.goal
     assert isinstance(goal, dict)
     al = goal['action_list']
     assert isinstance(al, list)
@@ -1264,7 +1253,7 @@ def test_action_restriction_freeze_swivel_teleport_combined():
     assert svls[0].end == end
 
     scene = component.update_ile_scene(prior_scene())
-    goal = scene['goal']
+    goal = scene.goal
     assert isinstance(goal, dict)
     al = goal['action_list']
     assert isinstance(al, list)
@@ -1378,7 +1367,7 @@ def test_action_restriction_passive_teleport():
     assert component.get_passive_scene()
 
     scene = component.update_ile_scene(prior_scene(100))
-    goal = scene['goal']
+    goal = scene.goal
     assert isinstance(goal, dict)
     al = goal['action_list']
     assert isinstance(al, list)

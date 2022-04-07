@@ -20,6 +20,15 @@ from generator import (
     geometry,
 )
 from generator.materials import find_colors
+from generator.scene import Scene
+
+ROOM_MAX_XZ = 100
+ROOM_MIN_XZ = 2
+ROOM_MAX_Y = 10
+ROOM_MIN_Y = 2
+
+# All goal targets will be assigned this label automatically
+TARGET_LABEL = "target"
 
 
 class ILEException(Exception):
@@ -68,14 +77,15 @@ class ILESharedConfiguration():
 
     def choose_definition_from_included_shapes(
         self,
-        callback: Callable[[], ObjectDefinition]
+        callback: Callable[[], ObjectDefinition],
+        args={}
     ) -> ObjectDefinition:
         """Runs the given callback function repeatedly to randomly choose an
         ObjectDefinition with a valid type/shape that has not been specifically
         excluded via the configuration, and returns that ObjectDefinition, or
         raises an exception if it fails."""
         for _ in range(MAX_TRIES):
-            definition = callback()
+            definition = callback(**args)
             if definition.type not in self._excluded_shapes:
                 return definition
         raise ILEException(
@@ -150,16 +160,16 @@ def choose_random(data: Any, data_type: Type = None) -> Any:
     return choice
 
 
-def find_bounds(scene: Dict[str, Any]) -> List[ObjectBounds]:
+def find_bounds(scene: Scene) -> List[ObjectBounds]:
     """Calculate and return the bounds for all the given objects."""
     # Create a bounding box for each hole and lava area and add it to the list.
     bounds = [
         geometry.generate_floor_area_bounds(area['x'], area['z'])
-        for area in (scene.get('holes', []) + scene.get('lava', []))
+        for area in (scene.holes + scene.lava)
     ]
 
     # Add each object's bounding box to the list.
-    for instance in scene['objects']:
+    for instance in scene.objects:
         try:
             bounds.append(instance['shows'][0]['boundingBox'])
         except(KeyError):
@@ -175,3 +185,7 @@ def return_list(data: Any, default_value: Any = None) -> List[Any]:
     if not isinstance(data, list):
         return [data]
     return data
+
+
+RandomizableBool = Union[bool, List[bool]]
+RandomizableString = Union[str, List[str]]

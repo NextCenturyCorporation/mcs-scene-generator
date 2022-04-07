@@ -19,17 +19,22 @@ def _convert_non_serializable_data(scene: Dict[str, Any]) -> None:
         if 'boundsAtStep' in instance['debug']:
             del instance['debug']['boundsAtStep']
         for show in instance['shows']:
+            bb = show['boundingBox']
+            bb = bb if isinstance(bb, dict) else vars(bb)
+            box_xz = bb['box_xz']
+            box_xz = [el if isinstance(el, dict) else vars(el)
+                      for el in box_xz]
             if not show['boundingBox']:
                 continue
             show['boundingBox'] = [{
-                'x': corner.x,
-                'y': show['boundingBox'].min_y,
-                'z': corner.z
-            } for corner in show['boundingBox'].box_xz] + [{
-                'x': corner.x,
-                'y': show['boundingBox'].max_y,
-                'z': corner.z
-            } for corner in show['boundingBox'].box_xz]
+                'x': corner['x'],
+                'y': bb['min_y'],
+                'z': corner['z']
+            } for corner in box_xz] + [{
+                'x': corner['x'],
+                'y': bb['max_y'],
+                'z': corner['z']
+            } for corner in box_xz]
 
 
 def _json_no_indent(data: Dict[str, Any], prop_list: List[str]) -> None:
@@ -133,6 +138,7 @@ def _write_scene_file(filename: str, scene: Dict[str, Any]) -> None:
             out.write(json.dumps(scene, cls=PrettyJsonEncoder, indent=2))
         except Exception as e:
             logging.error(scene, e)
+            raise e from e
 
 
 def find_next_filename(
@@ -153,7 +159,7 @@ def find_next_filename(
 
 
 def save_scene_files(
-    scene: Dict[str, Any],
+    scene: dict,
     scene_filename: str,
     no_scene_id: bool = False,
     no_debug_file: bool = False,

@@ -11,7 +11,7 @@ from generator import (
     materials,
 )
 
-from .defs import ILEException
+from .defs import ILEException, ILESharedConfiguration
 from .defs import choose_random as _choose_random
 from .numerics import MinMaxFloat, VectorFloatConfig, VectorIntConfig
 
@@ -126,6 +126,11 @@ def _filter_scale_soccer_ball(
             scale.x != scale.y or scale.x != scale.z or scale.y != scale.z or
             SOCCER_BALL_SCALE_MIN > scale.x > SOCCER_BALL_SCALE_MAX
         )
+    if isinstance(scale, Vector3d):
+        return not (
+            scale.x != scale.y or scale.x != scale.z or scale.y != scale.z or
+            SOCCER_BALL_SCALE_MIN > scale.x > SOCCER_BALL_SCALE_MAX
+        )
     return False
 
 
@@ -159,6 +164,8 @@ def choose_shape_material(
     combination or throws and exception.  Throwing an exception will mean
     there is a possible shape without a possible material and thus will not be
     retryable."""
+    shared_config = ILESharedConfiguration.get_instance()
+    excluded_shapes = shared_config.get_excluded_shapes()
     # Cases:
     #   Both are none - choose shape randomly and then pick a valid material
     #   Only shape is none - choose material, then find valid shape
@@ -167,7 +174,19 @@ def choose_shape_material(
     #   Neither are none - Choose shape, find material that fits?
     if material_or_color is None:
         # Case 1 and 3 above
-        shape = choose_random(shape_list or base_objects.FULL_TYPE_LIST)
+        if shape_list:
+            shape = choose_random(shape_list)
+        else:
+            for _ in range(MAX_TRIES):
+                shape = choose_random(base_objects.FULL_TYPE_LIST)
+                if shape not in excluded_shapes:
+                    break
+                shape = None
+            if not shape:
+                raise ILEException(
+                    f'Failed to find a valid shape with excluded shapes: '
+                    f'{excluded_shapes}'
+                )
         material_restriction = base_objects.get_material_restriction_tuples(
             shape)
         material_or_color = (
@@ -178,17 +197,23 @@ def choose_shape_material(
     elif shape_list is None:
         # Case 2 above
         mat = choose_material_tuple_from_material(material_or_color)
-        shape = base_objects.get_type_from_material(mat[0])
+        for _ in range(MAX_TRIES):
+            shape = base_objects.get_type_from_material(mat[0])
+            if shape not in excluded_shapes:
+                break
+            shape = None
         if shape is None:
-            raise ILEException(f"Failed to find shape for material={mat}")
+            raise ILEException(
+                f'Failed to find a valid shape for material {mat} with '
+                f'excluded shapes: {excluded_shapes}'
+            )
         return (shape, mat)
     else:
         # Case 4
         shape = choose_random(shape_list)
         if base_objects.has_material_restriction(shape):
             material_restriction = \
-                base_objects.get_material_restriction_strings(
-                    shape)
+                base_objects.get_material_restriction_strings(shape)
             if not material_restriction:
                 return (shape, None)
             # Can we find a way to figure this out without guess and check?
@@ -198,8 +223,8 @@ def choose_shape_material(
                 if mat[0] in material_restriction:
                     return (shape, mat)
             raise ILEException(
-                f"failed to create valid shape/material combination for"
-                f" shape={shape}")
-        else:
-            mat = choose_material_tuple_from_material(material_or_color)
+                f'Failed to find a valid shape and material combination for '
+                f'shape {shape} and {len(material_restriction)} materials'
+            )
+        mat = choose_material_tuple_from_material(material_or_color)
         return (shape, mat)

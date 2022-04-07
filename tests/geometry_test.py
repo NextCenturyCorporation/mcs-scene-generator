@@ -45,8 +45,8 @@ SMALLEST_OBJECT = [
 
 def test_object_bounds():
     box_xz = [
-        Vector3d(1, 0, 1), Vector3d(1, 0, 2),
-        Vector3d(2, 0, 2), Vector3d(2, 0, 1)
+        Vector3d(x=1, y=0, z=1), Vector3d(x=1, y=0, z=2),
+        Vector3d(x=2, y=0, z=2), Vector3d(x=2, y=0, z=1)
     ]
     bounds = ObjectBounds(box_xz=box_xz, max_y=4, min_y=3)
     assert bounds.box_xz == box_xz
@@ -57,14 +57,14 @@ def test_object_bounds():
 
 def test_expand_by():
     box_xz = [
-        Vector3d(1, 0, 1), Vector3d(1, 0, 2),
-        Vector3d(2, 0, 2), Vector3d(2, 0, 1)
+        Vector3d(x=1, y=0, z=1), Vector3d(x=1, y=0, z=2),
+        Vector3d(x=2, y=0, z=2), Vector3d(x=2, y=0, z=1)
     ]
     bounds = ObjectBounds(box_xz=box_xz, max_y=4, min_y=3)
     bounds.expand_by(3)
     assert bounds.box_xz == [
-        Vector3d(-2, 0, -2), Vector3d(-2, 0, 5),
-        Vector3d(5, 0, 5), Vector3d(5, 0, -2)
+        Vector3d(x=-2, y=0, z=-2), Vector3d(x=-2, y=0, z=5),
+        Vector3d(x=5, y=0, z=5), Vector3d(x=5, y=0, z=-2)
     ]
     assert bounds.polygon_xz
     assert bounds.max_y == 4
@@ -73,14 +73,14 @@ def test_expand_by():
 
 def test_expand_by_diagonal_fraction():
     box_xz = [
-        Vector3d(0.2, 0, 0.6), Vector3d(0.4, 0, 0.8),
-        Vector3d(0.8, 0, 0.4), Vector3d(0.6, 0, 0.2)
+        Vector3d(x=0.2, y=0, z=0.6), Vector3d(x=0.4, y=0, z=0.8),
+        Vector3d(x=0.8, y=0, z=0.4), Vector3d(x=0.6, y=0, z=0.2)
     ]
     bounds = ObjectBounds(box_xz=box_xz, max_y=4, min_y=3)
     bounds.expand_by(0.1)
     expected = [
-        Vector3d(0.059, 0, 0.6), Vector3d(0.4, 0, 0.941),
-        Vector3d(0.941, 0, 0.4), Vector3d(0.6, 0, 0.059)
+        Vector3d(x=0.059, y=0, z=0.6), Vector3d(x=0.4, y=0, z=0.941),
+        Vector3d(x=0.941, y=0, z=0.4), Vector3d(x=0.6, y=0, z=0.059)
     ]
     for index, point in enumerate(expected):
         assert point.x == round(bounds.box_xz[index].x, 3)
@@ -93,14 +93,14 @@ def test_expand_by_diagonal_fraction():
 
 def test_expand_by_diagonal_negative():
     box_xz = [
-        Vector3d(-1.5, 0, -1), Vector3d(-1, 0, -1.5),
-        Vector3d(-0.5, 0, -1), Vector3d(-1, 0, -0.5)
+        Vector3d(x=-1.5, y=0, z=-1), Vector3d(x=-1, y=0, z=-1.5),
+        Vector3d(x=-0.5, y=0, z=-1), Vector3d(x=-1, y=0, z=-0.5)
     ]
     bounds = ObjectBounds(box_xz=box_xz, max_y=4, min_y=3)
     bounds.expand_by(1)
     expected = [
-        Vector3d(-2.914, 0, -1.0), Vector3d(-1.0, 0, 0.914),
-        Vector3d(0.914, 0, -1.0), Vector3d(-1.0, 0, -2.914)
+        Vector3d(x=-2.914, y=0, z=-1.0), Vector3d(x=-1.0, y=0, z=0.914),
+        Vector3d(x=0.914, y=0, z=-1.0), Vector3d(x=-1.0, y=0, z=-2.914)
     ]
     for index, point in enumerate(expected):
         assert point.x == round(bounds.box_xz[index].x, 3)
@@ -113,8 +113,8 @@ def test_expand_by_diagonal_negative():
 
 def test_extend_bottom_to_ground():
     box_xz = [
-        Vector3d(1, 0, 1), Vector3d(1, 0, 2),
-        Vector3d(2, 0, 2), Vector3d(2, 0, 1)
+        Vector3d(x=1, y=0, z=1), Vector3d(x=1, y=0, z=2),
+        Vector3d(x=2, y=0, z=2), Vector3d(x=2, y=0, z=1)
     ]
     bounds = ObjectBounds(box_xz=box_xz, max_y=4, min_y=3)
     bounds.extend_bottom_to_ground()
@@ -1731,7 +1731,7 @@ def test_generate_location_in_line_with_object_obstruct():
             assert location
             object_2_poly = geometry.get_bounding_polygon(location)
             # Location is close to 1st object. (Bigger because of sofas.)
-            assert object_2_poly.distance(object_1_poly) < 0.5
+            assert object_2_poly.distance(object_1_poly) <= 0.5
             # Location is in the room and does not overlap with 1st object.
             assert geometry.validate_location_rect(
                 location['boundingBox'],
@@ -1792,7 +1792,7 @@ def test_generate_location_in_line_with_object_obstruct_diagonal():
             assert location
             object_2_poly = geometry.get_bounding_polygon(location)
             # Location is close to 1st object. (Bigger because of sofas.)
-            assert object_2_poly.distance(object_1_poly) < 0.5
+            assert object_2_poly.distance(object_1_poly) <= 0.5
             # Location is in the room and does not overlap with 1st object.
             assert geometry.validate_location_rect(
                 location['boundingBox'],
@@ -2098,12 +2098,12 @@ def test_retrieve_obstacle_occluder_definition_list_is_occluder():
 
 def test_get_bounding_polygon():
     bounds_a = ObjectBounds(box_xz=[
-        Vector3d(1, 0, 1), Vector3d(1, 0, 2),
-        Vector3d(2, 0, 2), Vector3d(2, 0, 1)
+        Vector3d(x=1, y=0, z=1), Vector3d(x=1, y=0, z=2),
+        Vector3d(x=2, y=0, z=2), Vector3d(x=2, y=0, z=1)
     ], max_y=1, min_y=0)
     bounds_b = ObjectBounds(box_xz=[
-        Vector3d(3, 0, 3), Vector3d(3, 0, 4),
-        Vector3d(4, 0, 4), Vector3d(4, 0, 3)
+        Vector3d(x=3, y=0, z=3), Vector3d(x=3, y=0, z=4),
+        Vector3d(x=4, y=0, z=4), Vector3d(x=4, y=0, z=3)
     ], max_y=1, min_y=0)
     location = {'boundingBox': bounds_a}
     instance = {'shows': [{'boundingBox': bounds_b}]}
@@ -2657,8 +2657,8 @@ def test_does_fully_obstruct_target_returns_false_visible_corners():
 
 def test_validate_location_rect():
     object_bounds = ObjectBounds(box_xz=[
-        Vector3d(1, 0, 1), Vector3d(1, 0, 2),
-        Vector3d(2, 0, 2), Vector3d(2, 0, 1)
+        Vector3d(x=1, y=0, z=1), Vector3d(x=1, y=0, z=2),
+        Vector3d(x=2, y=0, z=2), Vector3d(x=2, y=0, z=1)
     ], max_y=1, min_y=0)
     assert geometry.validate_location_rect(
         object_bounds,
@@ -2668,8 +2668,8 @@ def test_validate_location_rect():
     )
 
     object_bounds = ObjectBounds(box_xz=[
-        Vector3d(-3, 0, -3), Vector3d(-3, 0, -4),
-        Vector3d(-4, 0, -4), Vector3d(-4, 0, -3)
+        Vector3d(x=-3, y=0, z=-3), Vector3d(x=-3, y=0, z=-4),
+        Vector3d(x=-4, y=0, z=-4), Vector3d(x=-4, y=0, z=-3)
     ], max_y=1, min_y=0)
     assert geometry.validate_location_rect(
         object_bounds,
@@ -2682,8 +2682,8 @@ def test_validate_location_rect():
 def test_validate_location_rect_not_inside_room():
     assert not geometry.validate_location_rect(
         ObjectBounds(box_xz=[
-            Vector3d(4, 0, 4), Vector3d(4, 0, 6),
-            Vector3d(6, 0, 6), Vector3d(6, 0, 4)
+            Vector3d(x=4, y=0, z=4), Vector3d(x=4, y=0, z=6),
+            Vector3d(x=6, y=0, z=6), Vector3d(x=6, y=0, z=4)
         ], max_y=1, min_y=0),
         {'x': 0, 'y': 0, 'z': 0},
         [],
@@ -2691,8 +2691,8 @@ def test_validate_location_rect_not_inside_room():
     )
     assert not geometry.validate_location_rect(
         ObjectBounds(box_xz=[
-            Vector3d(-4, 0, -4), Vector3d(-4, 0, -6),
-            Vector3d(-6, 0, -6), Vector3d(-6, 0, -4)
+            Vector3d(x=-4, y=0, z=-4), Vector3d(x=-4, y=0, z=-6),
+            Vector3d(x=-6, y=0, z=-6), Vector3d(x=-6, y=0, z=-4)
         ], max_y=1, min_y=0),
         {'x': 0, 'y': 0, 'z': 0},
         [],
@@ -2700,8 +2700,8 @@ def test_validate_location_rect_not_inside_room():
     )
     assert not geometry.validate_location_rect(
         ObjectBounds(box_xz=[
-            Vector3d(4, 0, 0), Vector3d(4, 0, 2),
-            Vector3d(6, 0, 2), Vector3d(6, 0, 0)
+            Vector3d(x=4, y=0, z=0), Vector3d(x=4, y=0, z=2),
+            Vector3d(x=6, y=0, z=2), Vector3d(x=6, y=0, z=0)
         ], max_y=1, min_y=0),
         {'x': 0, 'y': 0, 'z': 0},
         [],
@@ -2709,8 +2709,8 @@ def test_validate_location_rect_not_inside_room():
     )
     assert not geometry.validate_location_rect(
         ObjectBounds(box_xz=[
-            Vector3d(-4, 0, 0), Vector3d(-4, 0, 2),
-            Vector3d(-6, 0, 2), Vector3d(-6, 0, 0)
+            Vector3d(x=-4, y=0, z=0), Vector3d(x=-4, y=0, z=2),
+            Vector3d(x=-6, y=0, z=2), Vector3d(x=-6, y=0, z=0)
         ], max_y=1, min_y=0),
         {'x': 0, 'y': 0, 'z': 0},
         [],
@@ -2718,8 +2718,8 @@ def test_validate_location_rect_not_inside_room():
     )
     assert not geometry.validate_location_rect(
         ObjectBounds(box_xz=[
-            Vector3d(0, 0, 4), Vector3d(0, 0, 6),
-            Vector3d(2, 0, 6), Vector3d(2, 0, 4)
+            Vector3d(x=0, y=0, z=4), Vector3d(x=0, y=0, z=6),
+            Vector3d(x=2, y=0, z=6), Vector3d(x=2, y=0, z=4)
         ], max_y=1, min_y=0),
         {'x': 0, 'y': 0, 'z': 0},
         [],
@@ -2727,8 +2727,8 @@ def test_validate_location_rect_not_inside_room():
     )
     assert not geometry.validate_location_rect(
         ObjectBounds(box_xz=[
-            Vector3d(0, 0, -4), Vector3d(0, 0, -6),
-            Vector3d(2, 0, -6), Vector3d(2, 0, -4)
+            Vector3d(x=0, y=0, z=-4), Vector3d(x=0, y=0, z=-6),
+            Vector3d(x=2, y=0, z=-6), Vector3d(x=2, y=0, z=-4)
         ], max_y=1, min_y=0),
         {'x': 0, 'y': 0, 'z': 0},
         [],
@@ -2736,8 +2736,8 @@ def test_validate_location_rect_not_inside_room():
     )
     assert not geometry.validate_location_rect(
         ObjectBounds(box_xz=[
-            Vector3d(5, 0, 5), Vector3d(5, 0, 6),
-            Vector3d(6, 0, 6), Vector3d(6, 0, 5)
+            Vector3d(x=5, y=0, z=5), Vector3d(x=5, y=0, z=6),
+            Vector3d(x=6, y=0, z=6), Vector3d(x=6, y=0, z=5)
         ], max_y=1, min_y=0),
         {'x': 0, 'y': 0, 'z': 0},
         [],
@@ -2745,8 +2745,8 @@ def test_validate_location_rect_not_inside_room():
     )
     assert not geometry.validate_location_rect(
         ObjectBounds(box_xz=[
-            Vector3d(6, 0, 6), Vector3d(6, 0, 9),
-            Vector3d(9, 0, 9), Vector3d(9, 0, 6)
+            Vector3d(x=6, y=0, z=6), Vector3d(x=6, y=0, z=9),
+            Vector3d(x=9, y=0, z=9), Vector3d(x=9, y=0, z=6)
         ], max_y=1, min_y=0),
         {'x': 0, 'y': 0, 'z': 0},
         [],
@@ -2756,8 +2756,8 @@ def test_validate_location_rect_not_inside_room():
 
 def test_validate_location_rect_overlaps_performer_agent():
     object_bounds = ObjectBounds(box_xz=[
-        Vector3d(1, 0, 1), Vector3d(1, 0, 2),
-        Vector3d(2, 0, 2), Vector3d(2, 0, 1)
+        Vector3d(x=1, y=0, z=1), Vector3d(x=1, y=0, z=2),
+        Vector3d(x=2, y=0, z=2), Vector3d(x=2, y=0, z=1)
     ], max_y=1, min_y=0)
     assert not geometry.validate_location_rect(
         object_bounds,
@@ -2791,8 +2791,8 @@ def test_validate_location_rect_overlaps_performer_agent():
     )
 
     object_bounds = ObjectBounds(box_xz=[
-        Vector3d(-3, 0, -3), Vector3d(-3, 0, -4),
-        Vector3d(-4, 0, -4), Vector3d(-4, 0, -3)
+        Vector3d(x=-3, y=0, z=-3), Vector3d(x=-3, y=0, z=-4),
+        Vector3d(x=-4, y=0, z=-4), Vector3d(x=-4, y=0, z=-3)
     ], max_y=1, min_y=0)
     assert not geometry.validate_location_rect(
         object_bounds,
@@ -2828,16 +2828,16 @@ def test_validate_location_rect_overlaps_performer_agent():
 
 def test_validate_location_rect_with_bounds_list():
     target_bounds = ObjectBounds(box_xz=[
-        Vector3d(1, 0, 1), Vector3d(1, 0, 2),
-        Vector3d(2, 0, 2), Vector3d(2, 0, 1)
+        Vector3d(x=1, y=0, z=1), Vector3d(x=1, y=0, z=2),
+        Vector3d(x=2, y=0, z=2), Vector3d(x=2, y=0, z=1)
     ], max_y=1, min_y=0)
     bounds_1 = ObjectBounds(box_xz=[
-        Vector3d(3, 0, 3), Vector3d(3, 0, 4),
-        Vector3d(4, 0, 4), Vector3d(4, 0, 3)
+        Vector3d(x=3, y=0, z=3), Vector3d(x=3, y=0, z=4),
+        Vector3d(x=4, y=0, z=4), Vector3d(x=4, y=0, z=3)
     ], max_y=1, min_y=0)
     bounds_2 = ObjectBounds(box_xz=[
-        Vector3d(-1, 0, -1), Vector3d(-1, 0, -2),
-        Vector3d(-2, 0, -2), Vector3d(-2, 0, -1)
+        Vector3d(x=-1, y=0, z=-1), Vector3d(x=-1, y=0, z=-2),
+        Vector3d(x=-2, y=0, z=-2), Vector3d(x=-2, y=0, z=-1)
     ], max_y=1, min_y=0)
     assert geometry.validate_location_rect(
         target_bounds,
@@ -2847,8 +2847,8 @@ def test_validate_location_rect_with_bounds_list():
     )
 
     bounds_3 = ObjectBounds(box_xz=[
-        Vector3d(1, 0, 1), Vector3d(1, 0, 2),
-        Vector3d(2, 0, 2), Vector3d(2, 0, 1)
+        Vector3d(x=1, y=0, z=1), Vector3d(x=1, y=0, z=2),
+        Vector3d(x=2, y=0, z=2), Vector3d(x=2, y=0, z=1)
     ], max_y=1, min_y=0)
     assert not geometry.validate_location_rect(
         target_bounds,
@@ -2858,8 +2858,8 @@ def test_validate_location_rect_with_bounds_list():
     )
 
     bounds_4 = ObjectBounds(box_xz=[
-        Vector3d(1.25, 0, 1.25), Vector3d(1.25, 0, 1.75),
-        Vector3d(1.75, 0, 1.75), Vector3d(1.75, 0, 1.25)
+        Vector3d(x=1.25, y=0, z=1.25), Vector3d(x=1.25, y=0, z=1.75),
+        Vector3d(x=1.75, y=0, z=1.75), Vector3d(x=1.75, y=0, z=1.25)
     ], max_y=1, min_y=0)
     assert not geometry.validate_location_rect(
         target_bounds,
@@ -2869,8 +2869,8 @@ def test_validate_location_rect_with_bounds_list():
     )
 
     bounds_5 = ObjectBounds(box_xz=[
-        Vector3d(1.75, 0, 1.75), Vector3d(1.75, 0, 2.25),
-        Vector3d(2.25, 0, 2.25), Vector3d(2.25, 0, 1.75)
+        Vector3d(x=1.75, y=0, z=1.75), Vector3d(x=1.75, y=0, z=2.25),
+        Vector3d(x=2.25, y=0, z=2.25), Vector3d(x=2.25, y=0, z=1.75)
     ], max_y=1, min_y=0)
     assert not geometry.validate_location_rect(
         target_bounds,
@@ -2880,8 +2880,8 @@ def test_validate_location_rect_with_bounds_list():
     )
 
     bounds_6 = ObjectBounds(box_xz=[
-        Vector3d(4.75, 0, 1.25), Vector3d(4.75, 0, 1.75),
-        Vector3d(-4.75, 0, 1.75), Vector3d(-4.75, 0, 1.25)
+        Vector3d(x=4.75, y=0, z=1.25), Vector3d(x=4.75, y=0, z=1.75),
+        Vector3d(x=-4.75, y=0, z=1.75), Vector3d(x=-4.75, y=0, z=1.25)
     ], max_y=1, min_y=0)
     assert not geometry.validate_location_rect(
         target_bounds,
@@ -2893,8 +2893,8 @@ def test_validate_location_rect_with_bounds_list():
 
 def test_validate_location_rect_performer_agent_with_y_bounds():
     object_bounds = ObjectBounds(box_xz=[
-        Vector3d(1, 0, 1), Vector3d(1, 0, 2),
-        Vector3d(2, 0, 2), Vector3d(2, 0, 1)
+        Vector3d(x=1, y=0, z=1), Vector3d(x=1, y=0, z=2),
+        Vector3d(x=2, y=0, z=2), Vector3d(x=2, y=0, z=1)
     ], max_y=0.99, min_y=0)
     assert not geometry.validate_location_rect(
         object_bounds,
@@ -2924,16 +2924,16 @@ def test_validate_location_rect_performer_agent_with_y_bounds():
 
 def test_validate_location_rect_with_y_bounds():
     target_bounds = ObjectBounds(box_xz=[
-        Vector3d(1, 0, 1), Vector3d(1, 0, 2),
-        Vector3d(2, 0, 2), Vector3d(2, 0, 1)
+        Vector3d(x=1, y=0, z=1), Vector3d(x=1, y=0, z=2),
+        Vector3d(x=2, y=0, z=2), Vector3d(x=2, y=0, z=1)
     ], max_y=1.99, min_y=1.01)
     bounds_1 = ObjectBounds(box_xz=[
-        Vector3d(1, 0, 1), Vector3d(1, 0, 2),
-        Vector3d(2, 0, 2), Vector3d(2, 0, 1)
+        Vector3d(x=1, y=0, z=1), Vector3d(x=1, y=0, z=2),
+        Vector3d(x=2, y=0, z=2), Vector3d(x=2, y=0, z=1)
     ], max_y=3, min_y=2)
     bounds_2 = ObjectBounds(box_xz=[
-        Vector3d(1, 0, 1), Vector3d(1, 0, 2),
-        Vector3d(2, 0, 2), Vector3d(2, 0, 1)
+        Vector3d(x=1, y=0, z=1), Vector3d(x=1, y=0, z=2),
+        Vector3d(x=2, y=0, z=2), Vector3d(x=2, y=0, z=1)
     ], max_y=1, min_y=0)
     assert geometry.validate_location_rect(
         target_bounds,
@@ -2943,8 +2943,8 @@ def test_validate_location_rect_with_y_bounds():
     )
 
     bounds_3 = ObjectBounds(box_xz=[
-        Vector3d(3, 0, 3), Vector3d(3, 0, 4),
-        Vector3d(4, 0, 4), Vector3d(4, 0, 3)
+        Vector3d(x=3, y=0, z=3), Vector3d(x=3, y=0, z=4),
+        Vector3d(x=4, y=0, z=4), Vector3d(x=4, y=0, z=3)
     ], max_y=1.75, min_y=1.25)
     assert geometry.validate_location_rect(
         target_bounds,
@@ -2954,8 +2954,8 @@ def test_validate_location_rect_with_y_bounds():
     )
 
     bounds_4 = ObjectBounds(box_xz=[
-        Vector3d(1, 0, 1), Vector3d(1, 0, 2),
-        Vector3d(2, 0, 2), Vector3d(2, 0, 1)
+        Vector3d(x=1, y=0, z=1), Vector3d(x=1, y=0, z=2),
+        Vector3d(x=2, y=0, z=2), Vector3d(x=2, y=0, z=1)
     ], max_y=1.75, min_y=1.25)
     assert not geometry.validate_location_rect(
         target_bounds,
@@ -3033,17 +3033,69 @@ def test_move_to_location():
 
 def test_generate_floor_area_bounds():
     bounds_1 = ObjectBounds(box_xz=[
-        Vector3d(0.5, 0, 0.5),
-        Vector3d(1.5, 0, 0.5),
-        Vector3d(1.5, 0, 1.5),
-        Vector3d(0.5, 0, 1.5)
+        Vector3d(x=0.5, y=0, z=0.5),
+        Vector3d(x=1.5, y=0, z=0.5),
+        Vector3d(x=1.5, y=0, z=1.5),
+        Vector3d(x=0.5, y=0, z=1.5)
     ], max_y=100, min_y=0)
     assert geometry.generate_floor_area_bounds(1, 1) == bounds_1
 
     bounds_2 = ObjectBounds(box_xz=[
-        Vector3d(-3.5, 0, -3.5),
-        Vector3d(-2.5, 0, -3.5),
-        Vector3d(-2.5, 0, -2.5),
-        Vector3d(-3.5, 0, -2.5)
+        Vector3d(x=-3.5, y=0, z=-3.5),
+        Vector3d(x=-2.5, y=0, z=-3.5),
+        Vector3d(x=-2.5, y=0, z=-2.5),
+        Vector3d(x=-3.5, y=0, z=-2.5)
     ], max_y=100, min_y=0)
     assert geometry.generate_floor_area_bounds(-3, -3) == bounds_2
+
+
+def test_object_x_to_occluder_x():
+    result = geometry.object_x_to_occluder_x(0, 2, 1, 0, -4)
+    assert result == 0
+
+    result = geometry.object_x_to_occluder_x(1, 2, 1, 0, -4)
+    assert result == pytest.approx(0.833333)
+
+    result = geometry.object_x_to_occluder_x(2, 2, 1, 0, -4)
+    assert result == pytest.approx(1.666667)
+
+    result = geometry.object_x_to_occluder_x(1, 2, 1, -1, -4)
+    assert result == pytest.approx(1.666667)
+
+    result = geometry.object_x_to_occluder_x(1, 4, 1, 0, -4)
+    assert result == pytest.approx(0.625)
+
+    result = geometry.object_x_to_occluder_x(1, 2, 1, 0, -6)
+    assert result == pytest.approx(0.875)
+
+    result = geometry.object_x_to_occluder_x(3, 4, 1, 0, -4)
+    assert result == pytest.approx(1.875)
+
+    result = geometry.object_x_to_occluder_x(1, 4, 2, 0, -4)
+    assert result == pytest.approx(0.75)
+
+
+def test_occluder_x_to_object_x():
+    result = geometry.occluder_x_to_object_x(0, 1, 2, 0, -4)
+    assert result == 0
+
+    result = geometry.occluder_x_to_object_x(1, 1, 2, 0, -4)
+    assert result == pytest.approx(1.2)
+
+    result = geometry.occluder_x_to_object_x(2, 1, 2, 0, -4)
+    assert result == pytest.approx(2.4)
+
+    result = geometry.occluder_x_to_object_x(1, 1, 2, -1, -4)
+    assert result == pytest.approx(2.4)
+
+    result = geometry.occluder_x_to_object_x(1, 1, 4, 0, -4)
+    assert result == pytest.approx(1.6)
+
+    result = geometry.occluder_x_to_object_x(1, 1, 2, 0, -6)
+    assert result == pytest.approx(1.142857)
+
+    result = geometry.occluder_x_to_object_x(3, 1, 4, 0, -4)
+    assert result == pytest.approx(4.8)
+
+    result = geometry.occluder_x_to_object_x(1, 2, 4, 0, -4)
+    assert result == pytest.approx(1.333333)

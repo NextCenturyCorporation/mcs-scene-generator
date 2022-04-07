@@ -10,7 +10,7 @@ goal:
 # Only the target can be a soccer ball.
 excluded_shapes: soccer_ball
 
-# Only generate large rooms.
+# Only generate medium or large rooms.
 room_dimensions:
     x:
         min: 10
@@ -20,22 +20,23 @@ room_dimensions:
         min: 10
         max: 30
 
-# Generate many holes, walls, and areas of lava, but no other structures.
+# Generate many holes, walls, and pools of lava, but no other structures.
 random_structural_objects:
     - type:
         - holes
         - lava
       num:
         min: 50
-        max: 300
+        max: 250
     - type:
         - walls
       num:
         min: 5
         max: 15
 
-# Override default to avoid randomly generating any more objects besides the
-# target. Remove this if you want to have randomly generated objects.
+# Override the defaults to avoid randomly generating any other interactable 
+# objects besides the target. Remove these lines if you want additional
+# randomly generated objects.
 keyword_objects:
     - num: 0
 

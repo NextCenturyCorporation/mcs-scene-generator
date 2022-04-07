@@ -10,9 +10,9 @@ goal:
 # Only the target can be a soccer ball.
 excluded_shapes: soccer_ball
 
-# Generate many obstacles and/or occluders (usually large interactable objects
-# like furniture) and zero or more context (distractor) objects.
-# One obstacle/occluder will always begin in front of the target.
+# Generate many obstacles and/or occluders, which are large interactable
+# objects like furniture, and zero or more context (distractor) objects.
+# One obstacle or occluder will always begin in front of the target.
 keyword_objects:
     - keyword:
         - obstacles
@@ -33,7 +33,7 @@ keyword_objects:
           min: 0
           max: 10
 
-# Override default to avoid randomly generating any structures. Remove this if
-# you want to have randomly generated structures.
+# Override the default to avoid randomly generating other structural objects.
+# Remove these lines if you want additional randomly generated objects.
 random_structural_objects:
     - num: 0

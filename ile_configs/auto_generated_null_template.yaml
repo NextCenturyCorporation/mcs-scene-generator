@@ -14,6 +14,7 @@ keyword_objects: null
 last_step: null
 lava:
     - num: 0
+num_random_agents: 0
 num_random_interactable_objects: null
 performer_start_position: null
 performer_start_rotation: null
@@ -23,12 +24,13 @@ random_structural_objects: null
 restrict_open_doors: False
 room_dimensions: null
 room_shape: null
+shortcut_agent_with_target: False
 shortcut_bisecting_platform: False
 shortcut_lava_room: False
 shortcut_lava_target_tool: False
-shortcut_ramp_to_platform: False
 shortcut_start_on_platform: False
 shortcut_triple_door_choice: False
+specific_agents: null
 specific_interactable_objects: null
 structural_droppers:
   num: 0

@@ -4,7 +4,7 @@ from enum import Enum, auto
 from typing import Any, Dict, List
 
 from .definitions import ObjectDefinition
-from .geometry import move_to_location
+from .geometry import create_bounds, move_to_location
 from .materials import MaterialTuple
 from .structures import finalize_structural_object
 
@@ -122,7 +122,8 @@ def _set_placer_or_placed_object_movement(
     instance: Dict[str, Any],
     move_distance: float,
     activation_step: int,
-    is_placer: bool = False
+    is_placer: bool = False,
+    deactivation_step: int = None
 ) -> int:
     """Add the placer/placed object movement of the given Y distance starting
     at the given activation step to the given object instance."""
@@ -134,7 +135,8 @@ def _set_placer_or_placed_object_movement(
 
     # The stepEnd is inclusive, so subtract 1 from the total steps.
     stop_step = activation_step + total_steps - 1
-    deactivation_step = stop_step + 1 + PLACER_WAIT_STEP
+    if deactivation_step is None or deactivation_step < stop_step:
+        deactivation_step = stop_step + 1 + PLACER_WAIT_STEP
 
     # Move the object the given distance across the corresponding steps.
     instance['moves'][0]['stepBegin'] = activation_step
@@ -200,8 +202,6 @@ def create_dropping_device(
         DEVICE_MATERIAL,
         ['dropper', 'device']
     )[0]
-    # The device's bounding box should occupy the entire vertical space.
-    device['shows'][0]['boundingBox'].extend_bottom_to_ground()
     return device
 
 
@@ -214,7 +214,8 @@ def create_placer(
     max_height: float,
     id_modifier: str = None,
     last_step: int = None,
-    placed_object_pole_offset_y: float = None
+    placed_object_placer_offset_y: float = None,
+    deactivation_step: int = None
 ) -> List[ObjectDefinition]:
     """Create and return an instance of a placer (cylinder) descending from the
     ceiling at the given max height on the given activation step to place an
@@ -229,12 +230,14 @@ def create_placer(
     - max_height: Height of room's ceiling.
     - id_modifier: String to append to placer's ID. Default: none
     - last_step: Scene's last step, used to record inactive state.
-    - placed_object_pole_offset_y: Placed object's poleOffsetY.
+    - placed_object_placer_offset_y: Placed object's placerOffsetY.
+    - deactivation_step: Step on which held object should be released.
+                         Default: At end of object's downward movement
     """
 
     object_bottom = placed_object_position['y'] - placed_object_offset_y
     object_top = object_bottom + placed_object_dimensions['y'] - (
-        placed_object_pole_offset_y or 0
+        placed_object_placer_offset_y or 0
     )
 
     placer = copy.deepcopy(PLACER_TEMPLATE)
@@ -268,7 +271,8 @@ def create_placer(
         placer,
         move_distance,
         activation_step,
-        is_placer=True
+        is_placer=True,
+        deactivation_step=deactivation_step
     )
 
     # The placer must change its color once it starts to move upward.
@@ -283,8 +287,6 @@ def create_placer(
     )
 
     placer = finalize_structural_object([placer], None, ['placer'])[0]
-    # The placer's bounding box should occupy the entire vertical space.
-    placer['shows'][0]['boundingBox'].extend_bottom_to_ground()
     return placer
 
 
@@ -331,7 +333,8 @@ def create_throwing_device(
     }
     device['shows'][0]['position'] = {
         'x': position_x,
-        'y': position_y,
+        # Device should not be positioned in or below the floor.
+        'y': max(position_y, tube_scale_radius / 2.0),
         'z': position_z
     }
     if throwing_step is not None:
@@ -355,6 +358,20 @@ def create_throwing_device(
     )[0]
 
 
+def rotate_x_for_cylinders_in_droppers_throwers(
+        instance: Dict[str, Any]) -> float:
+    """For cylinder shaped projectiles in droppers and throwers,
+    rotate 90 degrees along x-axis."""
+    x_rot = 0
+    if(instance['type'] in [
+        'cylinder', 'double_cone', 'dumbbell_1',
+        'dumbbell_2', 'tie_fighter', 'tube_narrow', 'tube_wide'
+    ]):
+        x_rot = 90
+
+    return x_rot
+
+
 def drop_object(
     instance: Dict[str, Any],
     dropping_device: Dict[str, Any],
@@ -364,9 +381,12 @@ def drop_object(
     """Modify and return the given object instance that will be dropped by the
     given device at the given step."""
     # Assign the object's location using its chosen corner.
+
+    x_rot = rotate_x_for_cylinders_in_droppers_throwers(instance)
+
     location = {
         'position': dropping_device['shows'][0]['position'].copy(),
-        'rotation': {'x': 0, 'y': rotation_y, 'z': 0}
+        'rotation': {'x': x_rot, 'y': rotation_y, 'z': 0}
     }
     move_to_location(instance, location)
     # The object starts immobile...
@@ -382,7 +402,8 @@ def place_object(
     instance: Dict[str, Any],
     activation_step: int,
     start_height: float = None,
-    end_height: float = 0
+    end_height: float = 0,
+    deactivation_step: int = None
 ) -> Dict[str, Any]:
     """Modify and return the given object instance so its top is positioned at
     the given height, will move downward with a placer (instantiated later) at
@@ -395,6 +416,8 @@ def place_object(
                     If none, just use given instance's Y position.
     - end_height: Y coordinate at which bottom of object should be placed.
                   Default: 0
+    - deactivation_step: Step on which held object should be released.
+                         Default: At end of object's downward movement
     """
     # Change the object's Y position so its top is at the given start height.
     if start_height is not None:
@@ -411,7 +434,16 @@ def place_object(
     deactivation_step = _set_placer_or_placed_object_movement(
         instance,
         move_distance,
-        activation_step
+        activation_step,
+        deactivation_step=deactivation_step
+    )
+    # Update the object's bounds.
+    instance['shows'][0]['boundingBox'] = create_bounds(
+        dimensions=instance['debug']['dimensions'],
+        offset=instance['debug'].get('offset'),
+        position=instance['shows'][0]['position'],
+        rotation=instance['shows'][0]['rotation'],
+        standing_y=instance['debug']['positionY']
     )
     # The object starts immobile...
     instance['kinematic'] = True
@@ -437,6 +469,9 @@ def throw_object(
     given device with the given force at the given step. The rotation_y should
     be the rotation needed to turn the object to face toward the left."""
     # Assign the object's location using its throwing device.
+
+    x_rot = rotate_x_for_cylinders_in_droppers_throwers(instance)
+
     location = {
         'position': {
             'x': (
@@ -455,7 +490,7 @@ def throw_object(
             )
         },
         'rotation': {
-            'x': 0,
+            'x': x_rot,
             'y': throwing_device['shows'][0]['rotation']['y'] + rotation_y,
             'z': rotation_z
         }

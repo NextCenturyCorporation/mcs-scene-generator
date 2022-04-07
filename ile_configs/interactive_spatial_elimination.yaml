@@ -1,0 +1,63 @@
+# Add a Retrieval goal with a soccer ball as the target object.
+goal:
+    category: retrieval
+    target:
+        shape: soccer_ball
+        scale:
+            min: 1.0
+            max: 3.0
+        keyword_location:
+            keyword:
+                - between
+                - behind
+            relative_object_label: [left_occluder, right_occluder]
+
+# Only the target can be a soccer ball.
+excluded_shapes: soccer_ball
+
+# Use a specific room size for this task.
+room_dimensions:
+    x: 8
+    y: 8
+    z: 12
+
+# Generate a platform bisecting the room.
+shortcut_bisecting_platform: True
+
+# Generate two occluding walls with a specific rotation but semi-random scale
+# and position (note that they may not always be in line with each other).
+# Each occluder will either be big enough to occlude the target (50%), be too
+# short to occlude the target (25%), or be too thin to occlue the target (25%).
+structural_occluding_walls:
+    - num: 1
+      position:
+          x:
+              min: -2.25
+              max: -1.5
+          y: 0
+          z:
+              min: 0.75
+              max: 2.5
+      rotation_y: 0
+      type: [occludes, occludes, short, thin]
+      labels: left_occluder
+    - num: 1
+      position:
+          x:
+              min: 1.5
+              max: 2.25
+          y: 0
+          z:
+              min: 0.75
+              max: 2.5
+      rotation_y: 0
+      type: [occludes, occludes, short, thin]
+      labels: right_occluder
+
+# Override the defaults to avoid randomly generating any other objects besides
+# the platform, occluders, and target. Remove these lines if you want
+# additional randomly generated objects.
+keyword_objects:
+    - num: 0
+random_structural_objects:
+    - num: 0

@@ -1,6 +1,7 @@
 import copy
 import logging
 import random
+from dataclasses import dataclass
 from typing import (
     Any,
     DefaultDict,
@@ -12,6 +13,8 @@ from typing import (
     Union,
 )
 
+from machine_common_sense.config_manager import PerformerStart, Vector3d
+
 from generator import (
     ObjectBounds,
     ObjectDefinition,
@@ -21,11 +24,17 @@ from generator import (
     instances,
 )
 from ideal_learning_env.choosers import choose_random
-from ideal_learning_env.defs import ILEDelayException, ILEException
+from ideal_learning_env.defs import (
+    ILEDelayException,
+    ILEException,
+    return_list,
+)
 
-from .numerics import VectorFloatConfig
+from .numerics import MinMaxFloat, VectorFloatConfig
 
 logger = logging.getLogger(__name__)
+
+DEBUG_FINAL_POSITION_KEY = 'final_position'
 
 
 class InstanceDefinitionLocationTuple(NamedTuple):
@@ -58,16 +67,17 @@ class ObjectRepository():
             raise Exception("This class is a singleton!")
         else:
             ObjectRepository.__instance = self
-
-    _labeled_object_store = DefaultDict(list)
+        self.clear()
 
     def clear(self):
         """clears the object repository.
         """
+        self._id_object_store = {}
         self._labeled_object_store = DefaultDict(list)
 
     def has_label(self, label: str):
-        return label in self._labeled_object_store
+        return (label in self._labeled_object_store or
+                label in self._id_object_store)
 
     def add_to_labeled_objects(
             self,
@@ -80,16 +90,21 @@ class ObjectRepository():
             labels = labels if isinstance(labels, list) else [labels]
             for label in labels:
                 logger.debug(
-                    f'Adding object {obj_defn_loc_tuple.instance["id"]} with '
-                    f'label {label} to the object repository'
+                    f"Adding object '{obj_defn_loc_tuple.instance['id']}' with"
+                    f" label '{label}' to the object repository"
                 )
                 self._labeled_object_store[label].append(obj_defn_loc_tuple)
+        if obj_defn_loc_tuple and obj_defn_loc_tuple.instance:
+            if id := obj_defn_loc_tuple.instance.get('id'):
+                self._id_object_store[id] = obj_defn_loc_tuple
 
     def get_one_from_labeled_objects(
             self,
             label: str) -> InstanceDefinitionLocationTuple:
         """Returns one of the objects associated with the label.  If there are
         more than one, one is chosen randomly.  If none exist, returns None"""
+        if label and label in self._id_object_store:
+            return self._id_object_store.get(label)
         if label and label in self._labeled_object_store:
             objs = self._labeled_object_store[label]
             return random.choice(objs)
@@ -99,8 +114,19 @@ class ObjectRepository():
         """Returns all objects associated with a given label.  If there are
         none, returns None.
         """
+        if label and label in self._id_object_store:
+            return [self._id_object_store.get(label)]
         if label and label in self._labeled_object_store:
             return self._labeled_object_store[label]
+
+    def remove_from_labeled_objects(self, instance_id: str, label: str):
+        """Removes the object with the given ID from the given label."""
+        if label and label in self._labeled_object_store:
+            logger.debug(f'Removing object {instance_id} from label {label}')
+            self._labeled_object_store[label] = [
+                idl for idl in self._labeled_object_store[label]
+                if idl.instance['id'] != instance_id
+            ]
 
 
 class KeywordLocation():
@@ -114,14 +140,16 @@ class KeywordLocation():
     OCCLUDE_OBJECT = "occlude"
     ON_OBJECT = "on_top"
     ON_OBJECT_CENTERED = "on_center"
+    RANDOM = "random"
+    ASSOCIATED_WITH_AGENT = "associated_with_agent"
 
     @staticmethod
     def get_keyword_location_object_tuple(
         keyword_location,
         definition: ObjectDefinition,
-        performer_start: Dict[str, Dict[str, float]],
+        performer_start: PerformerStart,
         bounds: List[ObjectBounds],
-        room_dimensions: Dict[str, float]
+        room_dimensions: Vector3d
     ) -> InstanceDefinitionLocationTuple:
         """Create and return an IDL using the given keyword location and
         object definition, or raise an error if unable to position it."""
@@ -129,26 +157,56 @@ class KeywordLocation():
             definition,
             copy.deepcopy(geometry.ORIGIN_LOCATION)
         )
-        # Location may be None; will raise an error if unable to position.
-        location = KeywordLocation.move_to_keyword_location(
-            keyword_location,
-            instance,
-            performer_start,
-            bounds,
-            room_dimensions,
-            definition
-        )
+        if keyword_location.keyword == KeywordLocation.ASSOCIATED_WITH_AGENT:
+            location = None
+            KeywordLocation.associate_with_agent(keyword_location, instance)
+        else:
+            # Location may be None; will raise an error if unable to position.
+            location = KeywordLocation.move_to_keyword_location(
+                keyword_location,
+                instance,
+                performer_start,
+                bounds,
+                room_dimensions,
+                definition
+            )
         idl = InstanceDefinitionLocationTuple(instance, definition, location)
-        idl.instance['debug']['positionedBy'] = keyword_location.keyword
+        idl.instance['debug'][DEBUG_FINAL_POSITION_KEY] = True
         return idl
+
+    @staticmethod
+    def associate_with_agent(keyword_location, instance):
+        label = keyword_location.relative_object_label
+        obj_repo = ObjectRepository.get_instance()
+        if not obj_repo.has_label(label):
+            raise ILEDelayException(
+                f'{instance["type"]} cannot find relative object label '
+                f'"{label}" for '
+                f'keyword location "{keyword_location.keyword}"')
+        agent_idl = obj_repo.get_one_from_labeled_objects(label=label)
+        agent = agent_idl.instance
+        if not agent['id'].startswith('agent'):
+            raise ILEException(
+                f"Found object with label='{label}' for keyword location "
+                f"'{keyword_location.keyword}', but object was not an agent.")
+        instance['associatedWithAgent'] = agent['id']
+        show = instance['shows'][0]
+        show['position'] = agent['shows'][0]['position']
+        x = show['position']['x']
+        y = show['position']['y']
+        z = show['position']['z']
+        show['boundingBox'] = ObjectBounds(
+            [Vector3d(x=x, y=y, z=z), Vector3d(x=x, y=y, z=z),
+             Vector3d(x=x, y=y, z=z), Vector3d(x=x, y=y, z=z)],
+            0, 0)
 
     @staticmethod
     def move_to_keyword_location(
         keyword_location,
         instance: Dict[str, Any],
-        performer_start: Dict[str, Dict[str, float]],
+        performer_start: PerformerStart,
         bounds: List[ObjectBounds],
-        room_dimensions: Dict[str, float],
+        room_dimensions: Vector3d,
         definition: ObjectDefinition = None
     ) -> Dict[str, Any]:
         """Change the position of the given object instance using the given
@@ -158,6 +216,12 @@ class KeywordLocation():
         con_tag = keyword_location.container_label
         obj_tag = keyword_location.relative_object_label
         obj_repo = ObjectRepository.get_instance()
+
+        # TODO MCS-815 or MCS-1236
+        # All uses below are in the generator folder and are not going to be
+        # updated to use classes yet.
+        performer_start = performer_start.dict()
+        room_dimensions = room_dimensions.dict()
 
         keyword = keyword_location.keyword
 
@@ -175,17 +239,15 @@ class KeywordLocation():
         if keyword != KeywordLocation.IN_CONTAINER:
             if not obj_tag or not obj_repo.has_label(obj_tag):
                 raise ILEDelayException(
-                    f'Cannot find relative object label "{obj_tag}" for '
-                    f'keyword location "{keyword}" (maybe you misspelled it?)'
+                    f'{instance["type"]} cannot find relative object label '
+                    f'"{obj_tag}" for keyword location "{keyword}"'
                 )
 
             idl = obj_repo.get_one_from_labeled_objects(obj_tag)
             relative_instance = idl.instance
             relative_defn = idl.definition
             rel_object_location = idl.location
-            relative_instance['debug']['positionedBy'] = (
-                f'relative_{instance["id"]}_{keyword}'
-            )
+            relative_instance['debug'][DEBUG_FINAL_POSITION_KEY] = True
 
         if keyword in [
             KeywordLocation.BETWEEN_PERFORMER_OBJECT,
@@ -246,16 +308,15 @@ class KeywordLocation():
 
         if not con_tag or not obj_repo.has_label(con_tag):
             raise ILEDelayException(
-                f'Cannot find container object label "{con_tag}" for '
-                f'keyword location "{keyword}" (maybe you misspelled it?)'
+                f'{instance["type"]} cannot find container object label '
+                f'"{con_tag}" for '
+                f'keyword location "{keyword}"'
             )
 
         idl = obj_repo.get_one_from_labeled_objects(con_tag)
         con_inst = idl.instance
         con_defn = idl.definition
-        con_inst['debug']['positionedBy'] = (
-            f'relative_{instance["id"]}_{keyword}'
-        )
+        con_inst['debug'][DEBUG_FINAL_POSITION_KEY] = True
 
         if keyword == KeywordLocation.IN_CONTAINER:
             indexes = containers.can_contain(con_defn, definition)
@@ -266,6 +327,13 @@ class KeywordLocation():
                 # Location will be None here because its dependent on the
                 # parent and shouldn't be used to locate other objects
                 return None
+            else:
+                raise ILEException(
+                    f'Unable to find a valid keyword location because the '
+                    f'container cannot hold the object:'
+                    f'\nCONTAINER={con_defn}'
+                    f'\nOBJECT={definition}'
+                )
         if keyword == KeywordLocation.IN_CONTAINER_WITH_OBJECT:
             tup = containers.can_contain_both(
                 con_defn,
@@ -279,7 +347,17 @@ class KeywordLocation():
                 containers.put_objects_in_container(
                     instance, relative_instance, con_inst, idx,
                     orientation, rots[0], rots[1])
-            return None
+                relative_instance['debug']['positionedBy'] = (
+                    keyword_location.keyword)
+                return None
+            else:
+                raise ILEException(
+                    f'Unable to find a valid keyword location because the '
+                    f'container cannot hold the object with a relative object:'
+                    f'\nCONTAINER={con_defn}'
+                    f'\nOBJECT={definition}'
+                    f'\nRELATIVE={relative_defn}'
+                )
 
         raise ILEException(
             "Unable to get valid keyword location.  Need to retry.")
@@ -293,7 +371,8 @@ class KeywordLocation():
         if not location:
             raise ILEException(
                 f'Unable to position an object of type "{instance["type"]}" '
-                f'with keyword location: "{keyword}" because location is null'
+                f'with keyword location: "{keyword}" because a valid location'
+                f' could not be found.'
             )
         geometry.move_to_location(instance, location)
         return location
@@ -339,7 +418,8 @@ def reconcile_template(default_template: T, source_template: T) -> T:
         val = getattr(obj_values, key, None)
         if val is None:
             new_val = getattr(default_template, key, None)
-            new_val = choose_random(new_val)
+            if new_val:
+                new_val = choose_random(new_val)
             setattr(obj_values, key, new_val)
     return obj_values
 
@@ -354,7 +434,55 @@ def add_random_placement_tag(objs: Union[list, dict],
             rand_x = pos.x is None or not isinstance(pos.x, (int, float))
             rand_z = pos.z is None or not isinstance(pos.z, (int, float))
             random = rand_x or rand_z
+    if hasattr(template, 'position_relative'):
+        position_relative = return_list(getattr(template, 'position_relative'))
+        for config in position_relative:
+            if hasattr(config, 'label'):
+                relative_labels = getattr(config, 'label')
+                if random and relative_labels:
+                    random = False
     objs = objs if isinstance(objs, list) else [objs]
     for obj in objs:
         debug = obj.get('debug', {})
         debug['random_position'] = random
+
+
+@dataclass
+class RelativePositionConfig():
+    """
+    Configure this object's position relative to an existing object in your
+    scene. All options require the relative object's `label` to be configured.
+
+    - `add_x` (float, or list of floats, or [MinMaxFloat](#MinMaxFloat)
+    dict, or list of MinMaxFloat dicts): The value added to this object's X
+    position after being positioned at the relative object's X position.
+    Default: 0
+    - `add_z` (float, or list of floats, or [MinMaxFloat](#MinMaxFloat)
+    dict, or list of MinMaxFloat dicts): The value added to this object's Z
+    position after being positioned at the relative object's Z position.
+    Default: 0
+    - `label` (str, or list of strs): The label for an existing object to use
+    as the "relative object" for positioning this object. Labels are not
+    unique, so if multiple objects share the same label, the ILE will choose
+    one of the available objects for each scene it generates.
+    - `use_x` (bool, or list of bools): Whether to use the relative object's
+    X position for this object's X position. Default: if `use_z` is not set,
+    then `true`; otherwise, `false`
+    - `use_z` (bool, or list of bools): Whether to use the relative object's
+    Z position for this object's Z position. Default: if `use_x` is not set,
+    then `true`; otherwise, `false`
+    - `view_angle_x` (bool, or list of bools): Whether to adjust this object's
+    X position based on the angle of view from the performer agent's starting
+    position and the relative object's position. Useful for positioning objects
+    behind occluders (especially in the passive physics tasks).
+    """
+    add_x: Union[
+        float, MinMaxFloat, List[Union[float, MinMaxFloat]]
+    ] = None
+    add_z: Union[
+        float, MinMaxFloat, List[Union[float, MinMaxFloat]]
+    ] = None
+    label: Union[str, List[str]] = None
+    use_x: Union[bool, List[bool]] = None
+    use_z: Union[bool, List[bool]] = None
+    view_angle_x: Union[bool, List[bool]] = None

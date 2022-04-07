@@ -1,5 +1,7 @@
 from abc import ABC, abstractmethod
-from typing import Any, Dict, get_type_hints
+from typing import Any, Dict, List, get_type_hints
+
+from generator.scene import Scene
 
 
 class ILEComponent(ABC):
@@ -24,7 +26,7 @@ class ILEComponent(ABC):
             setter_func(data.get(prop))
 
     @abstractmethod
-    def update_ile_scene(self, scene: Dict[str, Any]) -> Dict[str, Any]:
+    def update_ile_scene(self, scene: Scene) -> Scene:
         """Update and return the given scene with this component's config."""
         return scene
 
@@ -34,7 +36,14 @@ class ILEComponent(ABC):
         run_delayed_actions()."""
         return 0
 
-    def run_delayed_actions(self, scene: Dict[str, Any]) -> Dict[str, Any]:
+    def run_delayed_actions(self, scene: Scene) -> Scene:
         """Called to execute any delayed actions and execute them if possible.
         """
         return scene
+
+    def get_delayed_action_error_strings(self) -> List[str]:
+        """Called when the system is unable to execute any delayed actions and"
+        " must quit.  These strings help the user identify and solve the root"
+        " of the problem.ny delayed actions and execute them if possible.
+        """
+        return []

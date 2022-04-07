@@ -48,8 +48,8 @@ def create_test_object():
         'shows': [{
             'stepBegin': 0,
             'boundingBox': ObjectBounds(box_xz=[
-                Vector3d(2, 0, 3), Vector3d(2.5, 0, 3),
-                Vector3d(2.5, 0, 3.5), Vector3d(2, 0, 3.5)
+                Vector3d(x=2, y=0, z=3), Vector3d(x=2.5, y=0, z=3),
+                Vector3d(x=2.5, y=0, z=3.5), Vector3d(x=2, y=0, z=3.5)
             ], max_y=1, min_y=0)
         }]
     }

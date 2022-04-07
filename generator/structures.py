@@ -265,6 +265,7 @@ TOOL_TEMPLATE = {
     }]
 }
 
+GUIDE_RAIL_DEFAULT_POSITION_Y = 0.1
 GUIDE_RAIL_TEMPLATE = {
     'id': 'guide_rail_',
     'type': 'cube',
@@ -280,7 +281,7 @@ GUIDE_RAIL_TEMPLATE = {
         'stepBegin': 0,
         'position': {
             'x': 0,  # Set to necessary position
-            'y': 0.1,
+            'y': GUIDE_RAIL_DEFAULT_POSITION_Y,
             'z': 0  # Set to necessary position
         },
         'rotation': {
@@ -298,6 +299,7 @@ GUIDE_RAIL_TEMPLATE = {
 
 # door constants
 BASE_DOOR_HEIGHT = 2.0
+BASE_DOOR_WIDTH = 0.85
 BASE_WALL_WITH_DOOR_WIDTH = 1.0
 BASE_SIDE_WALL_POSITION = 0.21
 BASE_SIDE_WALL_SCALE = 0.08
@@ -655,11 +657,11 @@ def create_door(
         ['door'],
         bounds,
         override_scale={
-            'x': 0.85 * scale_x,
-            'y': 2 * scale_y,
+            'x': BASE_DOOR_WIDTH * scale_x,
+            'y': BASE_DOOR_HEIGHT * scale_y,
             # Ensure that both sides of the door's opening are big enough to
             # walk through, and that they're spaced away from other walls.
-            'z': 0.85 * scale_z * 2
+            'z': BASE_DOOR_WIDTH * scale_z * 2
         },
         override_offset={'x': 0, 'y': 1, 'z': 0},
         override_standing_y=0
@@ -800,7 +802,7 @@ def create_guide_rails_around(
         length: float,
         width: float,
         material_tuple: MaterialTuple,
-        position_y: float = 0,
+        position_y: float = GUIDE_RAIL_DEFAULT_POSITION_Y,
         bounds: ObjectBounds = None):
     """Provide a rectangle to put rails on the sides.  The rectangle will be
     centered on the position, rotated by the rotation_y and have size of
@@ -843,7 +845,7 @@ def create_guide_rail(
         rotation_y: float,
         length: float,
         material_tuple: MaterialTuple,
-        position_y: float = 0,
+        position_y: float = GUIDE_RAIL_DEFAULT_POSITION_Y,
         bounds: ObjectBounds = None):
     rail = copy.deepcopy(GUIDE_RAIL_TEMPLATE)
     rail['shows'][0]['position']['x'] = position_x

@@ -1,0 +1,74 @@
+# Add a Retrieval goal with a soccer ball as the target object.
+goal:
+    category: retrieval
+    target:
+        shape: soccer_ball
+        scale:
+            min: 1.0
+            max: 3.0
+        # Target is either positioned on top of a platform (50%), or in a
+        # random location (50%), randomized for each scene.
+        keyword_location:
+            keyword:
+                - on_top
+                - random
+            relative_object_label: start_structure
+
+# Only the target can be a soccer ball.
+excluded_shapes: soccer_ball
+
+# Only generate medium or large rooms.
+room_dimensions:
+    x:
+        min: 10
+        max: 30
+    y:
+        min: 4
+        max: 8
+    z:
+        min: 10
+        max: 30
+
+# Generate some holes, walls, and pools of lava.
+random_structural_objects:
+    - type:
+        - holes
+        - lava
+      num:
+        min: 25
+        max: 200
+    - type:
+        - walls
+      num:
+        min: 0
+        max: 5
+
+# Generate one or two independent platforms.
+structural_platforms:
+    num: [1, 2]
+    # Each platform has one or two attached ramps leading up to them.
+    attached_ramps: [1, 2]
+    # Each platform may or may not have a second level.
+    platform_underneath: [true, false]
+    # Each two-level platform also has attached ramps.
+    platform_underneath_attached_ramps: [1, 2]
+    # Each platform has lips around all its edges that prevent moving off the
+    # platform except by using the attached ramps.
+    lips:
+        front: true
+        back: true
+        left: true
+        right: true
+    labels: start_structure
+
+# Start either on top of a platform (50%) or on the floor (50%) in each scene.
+shortcut_start_on_platform: [true, false]
+
+# Override the defaults to avoid randomly generating any other interactable
+# objects besides the target. Remove these lines if you want additional
+# randomly generated objects.
+keyword_objects:
+    - num: 0
+
+# Ensure holes and lava don't completely obstruct the path to the target.
+check_valid_path: True

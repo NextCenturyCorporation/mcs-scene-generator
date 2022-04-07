@@ -113,7 +113,8 @@ def test_choose_counts_override_defaults():
 
 
 def test_choose_position():
-    assert choose_position(VectorFloatConfig(1, 2, 3)) == Vector3d(1, 2, 3)
+    assert choose_position(VectorFloatConfig(
+        1, 2, 3)) == Vector3d(x=1, y=2, z=3)
 
     result = choose_position(VectorFloatConfig(1, [2, 3], MinMaxFloat(4, 5)))
     assert isinstance(result, Vector3d)
@@ -125,9 +126,10 @@ def test_choose_position():
         VectorFloatConfig(1, 2, 3),
         VectorFloatConfig(4, 5, 6)
     ])
-    assert result in [Vector3d(1, 2, 3), Vector3d(4, 5, 6)]
+    assert result in [Vector3d(x=1, y=2, z=3), Vector3d(x=4, y=5, z=6)]
 
-    assert choose_position(VectorFloatConfig(1, None, 3)) == Vector3d(1, 0, 3)
+    assert choose_position(VectorFloatConfig(1, None, 3)
+                           ) == Vector3d(x=1, y=0, z=3)
     pos = choose_position(
         VectorFloatConfig(
             1,
@@ -204,10 +206,10 @@ def test_choose_random_tuple_to_material_tuple():
 
 def test_choose_random_converter_class():
     choice = choose_random(VectorFloatConfig(0.9, 0.8, 0.7))
-    assert choice == Vector3d(0.9, 0.8, 0.7)
+    assert choice == Vector3d(x=0.9, y=0.8, z=0.7)
 
     choice = choose_random(VectorIntConfig(1, 2, 3))
-    assert choice == Vector3d(1, 2, 3)
+    assert choice == Vector3d(x=1, y=2, z=3)
 
     choice = choose_random(VectorIntConfig(1, 2, [3, 4]))
     assert isinstance(choice, Vector3d)
@@ -257,11 +259,11 @@ def test_choose_random_class_variables():
     assert isinstance(choice.vector_prop, Vector3d)
     assert isinstance(choice.list_vector_prop, Vector3d)
     assert isinstance(choice.union_vector_prop, Vector3d)
-    assert choice.vector_prop == Vector3d(0.1, 0.2, 0.3)
+    assert choice.vector_prop == Vector3d(x=0.1, y=0.2, z=0.3)
     assert choice.list_vector_prop.x in [11, 12, 13]
     assert choice.list_vector_prop.y in [21, 22, 23]
     assert choice.list_vector_prop.z in [31, 32, 33]
-    assert choice.union_vector_prop == Vector3d(0.9, 0.8, 0.7)
+    assert choice.union_vector_prop == Vector3d(x=0.9, y=0.8, z=0.7)
 
 
 def test_choose_random_class_variables_in_list():
@@ -291,27 +293,30 @@ def test_choose_random_class_variables_in_list():
     assert isinstance(choice.vector_prop, Vector3d)
     assert isinstance(choice.list_vector_prop, Vector3d)
     assert isinstance(choice.union_vector_prop, Vector3d)
-    assert choice.vector_prop == Vector3d(0.1, 0.2, 0.3)
+    assert choice.vector_prop == Vector3d(x=0.1, y=0.2, z=0.3)
     assert choice.list_vector_prop.x in [11, 12, 13]
     assert choice.list_vector_prop.y in [21, 22, 23]
     assert choice.list_vector_prop.z in [31, 32, 33]
-    assert choice.union_vector_prop == Vector3d(0.9, 0.8, 0.7)
+    assert choice.union_vector_prop == Vector3d(x=0.9, y=0.8, z=0.7)
 
 
 def test_choose_rotation():
-    assert choose_rotation(VectorIntConfig(1, 2, 3)) == Vector3d(1, 2, 3)
+    assert choose_rotation(VectorIntConfig(1, 2, 3)) == Vector3d(x=1, y=2, z=3)
 
     result = choose_rotation(VectorIntConfig(1, [2, 3], MinMaxInt(4, 5)))
     assert (
-        result == Vector3d(1, 2, 4) or result == Vector3d(1, 3, 4) or
-        result == Vector3d(1, 2, 5) or result == Vector3d(1, 3, 5)
+        result == Vector3d(x=1, y=2, z=4) or
+        result == Vector3d(x=1, y=3, z=4) or
+        result == Vector3d(x=1, y=2, z=5) or
+        result == Vector3d(x=1, y=3, z=5)
     )
 
     result = choose_rotation([
         VectorIntConfig(1, 2, 3),
         VectorIntConfig(4, 5, 6)
     ])
-    assert result == Vector3d(1, 2, 3) or result == Vector3d(4, 5, 6)
+    assert result == Vector3d(
+        x=1, y=2, z=3) or result == Vector3d(x=4, y=5, z=6)
 
 
 def test_choose_rotation_random():
@@ -329,13 +334,14 @@ def test_choose_scale():
     assert choose_scale([0.5, 1.5], 'sofa_1') in [0.5, 1.5]
     assert (
         choose_scale(VectorFloatConfig(1, 1.5, 2), 'sofa_1') ==
-        Vector3d(1, 1.5, 2)
+        Vector3d(x=1, y=1.5, z=2)
     )
     result = choose_scale([
         VectorFloatConfig(1, 1.5, 2),
         VectorFloatConfig(3, 3, 3)
     ], 'sofa_1')
-    assert result == Vector3d(1, 1.5, 2) or result == Vector3d(3, 3, 3)
+    assert result == Vector3d(
+        x=1, y=1.5, z=2) or result == Vector3d(x=3, y=3, z=3)
     result = choose_scale(MinMaxFloat(1.4, 1.6), 'sofa_1')
     assert 1.4 <= result <= 1.6
     result = choose_scale([
@@ -359,7 +365,7 @@ def test_choose_scale_soccer_ball():
         VectorFloatConfig(1, 1.5, 2),
         VectorFloatConfig(3, 3, 3)
     ], 'soccer_ball')
-    assert result == Vector3d(3, 3, 3)
+    assert result == Vector3d(x=3, y=3, z=3)
     result = choose_scale(MinMaxFloat(1.4, 1.6), 'soccer_ball')
     assert 1.4 <= result <= 1.6
     result = choose_scale([

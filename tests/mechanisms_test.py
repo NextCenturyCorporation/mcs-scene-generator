@@ -13,6 +13,13 @@ DUCK_DEFINITION = base_objects.create_specific_definition_from_base(
     salient_materials=None,
     scale=2
 )
+CYLINDER_DEFINITION = base_objects.create_specific_definition_from_base(
+    type='cylinder',
+    color=['yellow'],
+    materials=['UnityAssetStore/Wooden_Toys_Bundle/ToyBlocks/meshes/Materials/yellow_1x1'],  # noqa: E501
+    salient_materials=None,
+    scale=1
+)
 # Adjust the duck definition's Y rotation so it's facing left by default.
 DUCK_DEFINITION.rotation.y = 180
 
@@ -58,7 +65,7 @@ def test_create_dropping_device():
         {'x': 0.86, 'y': 0, 'z': 2.14}
     )
     assert device_bounds.max_y == 3
-    assert device_bounds.min_y == 0
+    assert device_bounds.min_y == pytest.approx(2.72)
 
 
 def test_create_dropping_device_weird_shape():
@@ -101,7 +108,7 @@ def test_create_dropping_device_weird_shape():
         {'x': 0.725, 'y': 0, 'z': 2.275}
     )
     assert device_bounds.max_y == pytest.approx(3)
-    assert device_bounds.min_y == 0
+    assert device_bounds.min_y == pytest.approx(2.57)
 
 
 def test_create_dropping_device_with_step():
@@ -147,7 +154,7 @@ def test_create_dropping_device_with_step():
         {'x': 0.86, 'y': 0, 'z': 2.14}
     )
     assert device_bounds.max_y == 3
-    assert device_bounds.min_y == 0
+    assert device_bounds.min_y == pytest.approx(2.72)
 
 
 def test_create_placer():
@@ -184,7 +191,7 @@ def test_create_placer():
     assert vars(placer_bounds.box_xz[2]) == {'x': 0.9, 'y': 0, 'z': -1.1}
     assert vars(placer_bounds.box_xz[3]) == {'x': 0.9, 'y': 0, 'z': -0.9}
     assert placer_bounds.max_y == 7
-    assert placer_bounds.min_y == 0
+    assert placer_bounds.min_y == 5
 
     assert len(placer['moves']) == 2
     assert placer['moves'][0]['stepBegin'] == 10
@@ -195,6 +202,54 @@ def test_create_placer():
     assert placer['moves'][1]['vector'] == {'x': 0, 'y': 0.25, 'z': 0}
 
     assert placer['states'] == ([['active']] * 26) + [['inactive']]
+
+
+def test_create_placer_with_deactivation_step():
+    placer = mechanisms.create_placer(
+        {'x': 1, 'y': 3, 'z': -1},
+        {'x': 1, 'y': 1, 'z': 1},
+        0,
+        10,
+        0,
+        4,
+        deactivation_step=100
+    )
+
+    assert placer['id'].startswith('placer_')
+    assert placer['kinematic'] is True
+    assert placer['structure'] is True
+    assert placer['type'] == 'cylinder'
+    assert placer['mass'] == 10
+    assert placer['materials'] == ['Custom/Materials/Magenta']
+    assert placer['debug']['color'] == ['magenta', 'cyan']
+    assert placer['debug']['info'] == [
+        'magenta', 'cyan', 'placer', 'magenta placer', 'cyan placer',
+        'magenta cyan placer'
+    ]
+    assert placer['debug']['shape'] == ['placer']
+
+    assert len(placer['shows']) == 1
+    assert placer['shows'][0]['stepBegin'] == 0
+    assert placer['shows'][0]['position'] == {'x': 1, 'y': 6, 'z': -1}
+    assert placer['shows'][0]['rotation'] == {'x': 0, 'y': 0, 'z': 0}
+    assert placer['shows'][0]['scale'] == {'x': 0.2, 'y': 2, 'z': 0.2}
+    placer_bounds = placer['shows'][0]['boundingBox']
+    assert vars(placer_bounds.box_xz[0]) == {'x': 1.1, 'y': 0, 'z': -0.9}
+    assert vars(placer_bounds.box_xz[1]) == {'x': 1.1, 'y': 0, 'z': -1.1}
+    assert vars(placer_bounds.box_xz[2]) == {'x': 0.9, 'y': 0, 'z': -1.1}
+    assert vars(placer_bounds.box_xz[3]) == {'x': 0.9, 'y': 0, 'z': -0.9}
+    assert placer_bounds.max_y == 7
+    assert placer_bounds.min_y == 5
+
+    assert len(placer['moves']) == 2
+    assert placer['moves'][0]['stepBegin'] == 10
+    assert placer['moves'][0]['stepEnd'] == 21
+    assert placer['moves'][0]['vector'] == {'x': 0, 'y': -0.25, 'z': 0}
+    assert placer['moves'][1]['stepBegin'] == 105
+    assert placer['moves'][1]['stepEnd'] == 116
+    assert placer['moves'][1]['vector'] == {'x': 0, 'y': 0.25, 'z': 0}
+
+    assert placer['states'] == ([['active']] * 99) + [['inactive']]
 
 
 def test_create_placer_with_position_y_offset():
@@ -231,7 +286,7 @@ def test_create_placer_with_position_y_offset():
     assert vars(placer_bounds.box_xz[2]) == {'x': 0.9, 'y': 0, 'z': -1.1}
     assert vars(placer_bounds.box_xz[3]) == {'x': 0.9, 'y': 0, 'z': -0.9}
     assert placer_bounds.max_y == 7
-    assert placer_bounds.min_y == 0
+    assert placer_bounds.min_y == 5
 
     assert len(placer['moves']) == 2
     assert placer['moves'][0]['stepBegin'] == 10
@@ -244,7 +299,7 @@ def test_create_placer_with_position_y_offset():
     assert placer['states'] == ([['active']] * 26) + [['inactive']]
 
 
-def test_create_placer_with_pole_offset():
+def test_create_placer_with_placer_offset():
     placer = mechanisms.create_placer(
         {'x': 1, 'y': 3, 'z': -1},
         {'x': 1, 'y': 1, 'z': 1},
@@ -252,7 +307,7 @@ def test_create_placer_with_pole_offset():
         10,
         0,
         4,
-        placed_object_pole_offset_y=0.05
+        placed_object_placer_offset_y=0.05
     )
 
     assert placer['id'].startswith('placer_')
@@ -279,7 +334,7 @@ def test_create_placer_with_pole_offset():
     assert vars(placer_bounds.box_xz[2]) == {'x': 0.9, 'y': 0, 'z': -1.1}
     assert vars(placer_bounds.box_xz[3]) == {'x': 0.9, 'y': 0, 'z': -0.9}
     assert placer_bounds.max_y == 6.95
-    assert placer_bounds.min_y == 0
+    assert placer_bounds.min_y == 4.95
 
     assert len(placer['moves']) == 2
     assert placer['moves'][0]['stepBegin'] == 10
@@ -327,7 +382,7 @@ def test_create_placer_with_last_step():
     assert vars(placer_bounds.box_xz[2]) == {'x': 0.9, 'y': 0, 'z': -1.1}
     assert vars(placer_bounds.box_xz[3]) == {'x': 0.9, 'y': 0, 'z': -0.9}
     assert placer_bounds.max_y == 7
-    assert placer_bounds.min_y == 0
+    assert placer_bounds.min_y == 5
 
     assert len(placer['moves']) == 2
     assert placer['moves'][0]['stepBegin'] == 10
@@ -384,6 +439,52 @@ def test_create_throwing_device():
     )
     assert device_bounds.max_y == pytest.approx(2.14)
     assert device_bounds.min_y == pytest.approx(1.86)
+
+
+def test_create_throwing_device_too_low():
+    device = mechanisms.create_throwing_device(
+        1,
+        0,
+        3,
+        0,
+        0,
+        vars(BALL_DEFINITION.dimensions),
+        100,
+        is_round=True
+    )
+
+    assert device['id'].startswith('throwing_device_')
+    assert device['kinematic'] is True
+    assert device['structure'] is True
+    assert device['type'] == 'tube_wide'
+    assert device['mass'] == 3
+    assert device['materials'] == ['Custom/Materials/Grey']
+    assert device['debug']['color'] == ['grey']
+    assert device['debug']['info'] == [
+        'grey', 'thrower', 'device', 'grey thrower', 'grey device'
+    ]
+    assert device['states'] == ([['held']] * 100)
+
+    assert len(device['shows']) == 1
+    assert device['shows'][0]['stepBegin'] == 0
+    assert device['shows'][0]['position'] == {'x': 1, 'y': 0.14, 'z': 3}
+    assert device['shows'][0]['rotation'] == {'x': 0, 'y': 0, 'z': 90}
+    assert device['shows'][0]['scale'] == {'x': 0.28, 'y': 0.28, 'z': 0.28}
+    device_bounds = device['shows'][0]['boundingBox']
+    assert vars(device_bounds.box_xz[0]) == pytest.approx(
+        {'x': 1.14, 'y': 0, 'z': 3.14}
+    )
+    assert vars(device_bounds.box_xz[1]) == pytest.approx(
+        {'x': 1.14, 'y': 0, 'z': 2.86}
+    )
+    assert vars(device_bounds.box_xz[2]) == pytest.approx(
+        {'x': 0.86, 'y': 0, 'z': 2.86}
+    )
+    assert vars(device_bounds.box_xz[3]) == pytest.approx(
+        {'x': 0.86, 'y': 0, 'z': 3.14}
+    )
+    assert device_bounds.max_y == pytest.approx(0.28)
+    assert device_bounds.min_y == pytest.approx(0)
 
 
 def test_create_throwing_device_weird_shape():
@@ -603,6 +704,41 @@ def test_drop_object():
     assert target_bounds.min_y == 1.89
 
 
+def test_drop_object_cylinder():
+    mock_device = {
+        'shows': [{
+            'position': {'x': 1, 'y': 2, 'z': 3}
+        }]
+    }
+    target = instances.instantiate_object(
+        copy.deepcopy(CYLINDER_DEFINITION),
+        {'position': {'x': 0, 'y': 0, 'z': 0}}
+    )
+    target = mechanisms.drop_object(
+        target,
+        mock_device,
+        25
+    )
+    assert target['type'] == CYLINDER_DEFINITION.type
+    assert target['togglePhysics'] == [{'stepBegin': 25}]
+    assert target['kinematic'] is True
+
+    assert len(target['shows']) == 1
+    assert target['shows'][0]['position'] == {'x': 1, 'y': 2, 'z': 3}
+    assert target['shows'][0]['rotation'] == {'x': 90, 'y': 0, 'z': 0}
+    target_bounds = target['shows'][0]['boundingBox']
+    assert vars(target_bounds.box_xz[0]) == {
+        'x': pytest.approx(1.5), 'y': 0, 'z': 3.5}
+    assert vars(target_bounds.box_xz[1]) == {
+        'x': pytest.approx(1.5), 'y': 0, 'z': 2.5}
+    assert vars(target_bounds.box_xz[2]) == {
+        'x': pytest.approx(0.5), 'y': 0, 'z': 2.5}
+    assert vars(target_bounds.box_xz[3]) == {
+        'x': pytest.approx(0.5), 'y': 0, 'z': 3.5}
+    assert target_bounds.max_y == 2.5
+    assert target_bounds.min_y == 1.5
+
+
 def test_drop_object_weird_shape():
     mock_device = {
         'shows': [{
@@ -656,6 +792,41 @@ def test_place_object():
     assert mock_instance['shows'][0]['rotation'] == {'x': 0, 'y': 0, 'z': 0}
     assert mock_instance['shows'][0]['scale'] == {'x': 0.5, 'y': 0.5, 'z': 0.5}
 
+    bounds = mock_instance['shows'][0]['boundingBox']
+    assert bounds.max_y == pytest.approx(5)
+    assert bounds.min_y == pytest.approx(3)
+
+    assert len(mock_instance['moves']) == 1
+    assert mock_instance['moves'][0]['stepBegin'] == 10
+    assert mock_instance['moves'][0]['stepEnd'] == 21
+    assert mock_instance['moves'][0]['vector'] == {'x': 0, 'y': -0.25, 'z': 0}
+
+
+def test_place_object_with_deactivation_step():
+    mock_instance = {
+        'shows': [{
+            'position': {'x': 1, 'y': 3, 'z': -1},
+            'rotation': {'x': 0, 'y': 0, 'z': 0},
+            'scale': {'x': 0.5, 'y': 0.5, 'z': 0.5}
+        }],
+        'debug': {
+            'dimensions': {'x': 2, 'y': 2, 'z': 2},
+            'positionY': 0
+        }
+    }
+    mechanisms.place_object(mock_instance, 10, deactivation_step=100)
+    assert mock_instance['kinematic']
+    assert mock_instance['togglePhysics'] == [{'stepBegin': 100}]
+
+    assert len(mock_instance['shows']) == 1
+    assert mock_instance['shows'][0]['position'] == {'x': 1, 'y': 3, 'z': -1}
+    assert mock_instance['shows'][0]['rotation'] == {'x': 0, 'y': 0, 'z': 0}
+    assert mock_instance['shows'][0]['scale'] == {'x': 0.5, 'y': 0.5, 'z': 0.5}
+
+    bounds = mock_instance['shows'][0]['boundingBox']
+    assert bounds.max_y == pytest.approx(5)
+    assert bounds.min_y == pytest.approx(3)
+
     assert len(mock_instance['moves']) == 1
     assert mock_instance['moves'][0]['stepBegin'] == 10
     assert mock_instance['moves'][0]['stepEnd'] == 21
@@ -685,6 +856,10 @@ def test_place_object_with_position_y_offset():
     assert mock_instance['shows'][0]['rotation'] == {'x': 0, 'y': 0, 'z': 0}
     assert mock_instance['shows'][0]['scale'] == {'x': 0.5, 'y': 0.5, 'z': 0.5}
 
+    bounds = mock_instance['shows'][0]['boundingBox']
+    assert bounds.max_y == pytest.approx(5)
+    assert bounds.min_y == pytest.approx(3)
+
     assert len(mock_instance['moves']) == 1
     assert mock_instance['moves'][0]['stepBegin'] == 10
     assert mock_instance['moves'][0]['stepEnd'] == 21
@@ -711,6 +886,10 @@ def test_place_object_with_end_height():
     assert mock_instance['shows'][0]['position'] == {'x': 1, 'y': 3, 'z': -1}
     assert mock_instance['shows'][0]['rotation'] == {'x': 0, 'y': 0, 'z': 0}
     assert mock_instance['shows'][0]['scale'] == {'x': 0.5, 'y': 0.5, 'z': 0.5}
+
+    bounds = mock_instance['shows'][0]['boundingBox']
+    assert bounds.max_y == pytest.approx(5)
+    assert bounds.min_y == pytest.approx(3)
 
     assert len(mock_instance['moves']) == 1
     assert mock_instance['moves'][0]['stepBegin'] == 10
@@ -741,6 +920,10 @@ def test_place_object_with_end_height_position_y_offset():
     assert mock_instance['shows'][0]['rotation'] == {'x': 0, 'y': 0, 'z': 0}
     assert mock_instance['shows'][0]['scale'] == {'x': 0.5, 'y': 0.5, 'z': 0.5}
 
+    bounds = mock_instance['shows'][0]['boundingBox']
+    assert bounds.max_y == pytest.approx(5)
+    assert bounds.min_y == pytest.approx(3)
+
     assert len(mock_instance['moves']) == 1
     assert mock_instance['moves'][0]['stepBegin'] == 10
     assert mock_instance['moves'][0]['stepEnd'] == 17
@@ -770,6 +953,10 @@ def test_place_object_with_start_height():
     assert mock_instance['shows'][0]['rotation'] == {'x': 0, 'y': 0, 'z': 0}
     assert mock_instance['shows'][0]['scale'] == {'x': 0.5, 'y': 0.5, 'z': 0.5}
 
+    bounds = mock_instance['shows'][0]['boundingBox']
+    assert bounds.max_y == pytest.approx(4.995)
+    assert bounds.min_y == pytest.approx(2.995)
+
     assert len(mock_instance['moves']) == 1
     assert mock_instance['moves'][0]['stepBegin'] == 10
     assert mock_instance['moves'][0]['stepEnd'] == 20
@@ -798,6 +985,10 @@ def test_place_object_with_start_height_position_y_offset():
     )
     assert mock_instance['shows'][0]['rotation'] == {'x': 0, 'y': 0, 'z': 0}
     assert mock_instance['shows'][0]['scale'] == {'x': 0.5, 'y': 0.5, 'z': 0.5}
+
+    bounds = mock_instance['shows'][0]['boundingBox']
+    assert bounds.max_y == pytest.approx(4.995)
+    assert bounds.min_y == pytest.approx(2.995)
 
     assert len(mock_instance['moves']) == 1
     assert mock_instance['moves'][0]['stepBegin'] == 10
@@ -842,6 +1033,49 @@ def test_throw_object():
     assert vars(target_bounds.box_xz[3]) == {'x': 0.89, 'y': 0, 'z': 3.11}
     assert target_bounds.max_y == 2.11
     assert target_bounds.min_y == 1.89
+
+
+def test_throw_object_cylinder():
+    mock_device = {
+        'shows': [{
+            'position': {'x': 1, 'y': 2, 'z': 3},
+            'rotation': {'x': 0, 'y': 0, 'z': 90},
+            'scale': {'x': 0.28, 'y': 0.4, 'z': 0.28}
+        }]
+    }
+    target = instances.instantiate_object(
+        copy.deepcopy(CYLINDER_DEFINITION),
+        {'position': {'x': 0, 'y': 0, 'z': 0}}
+    )
+    target = mechanisms.throw_object(
+        target,
+        mock_device,
+        345,
+        25
+    )
+    assert target['type'] == CYLINDER_DEFINITION.type
+    assert target['forces'] == [{
+        'relative': True,
+        'stepBegin': 25,
+        'stepEnd': 25,
+        'vector': {'x': 345, 'y': 0, 'z': 0}
+    }]
+    assert target['maxAngularVelocity'] == 25
+
+    assert len(target['shows']) == 1
+    assert target['shows'][0]['position'] == {'x': 1, 'y': 2, 'z': 3}
+    assert target['shows'][0]['rotation'] == {'x': 90, 'y': 0, 'z': 0}
+    target_bounds = target['shows'][0]['boundingBox']
+    assert vars(target_bounds.box_xz[0]) == {
+        'x': pytest.approx(1.5), 'y': 0, 'z': 3.5}
+    assert vars(target_bounds.box_xz[1]) == {
+        'x': pytest.approx(1.5), 'y': 0, 'z': 2.5}
+    assert vars(target_bounds.box_xz[2]) == {
+        'x': pytest.approx(0.5), 'y': 0, 'z': 2.5}
+    assert vars(target_bounds.box_xz[3]) == {
+        'x': pytest.approx(0.5), 'y': 0, 'z': 3.5}
+    assert target_bounds.max_y == 2.5
+    assert target_bounds.min_y == 1.5
 
 
 def test_throw_object_downward():

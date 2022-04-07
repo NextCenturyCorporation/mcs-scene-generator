@@ -1,14 +1,14 @@
 # Can only use the Pass action through the whole scene.
 passive_scene: true
 
-# Max of 240 action steps in each "move across" scene.
+# Max of 240 action steps in each passive "move across" scene.
 last_step: 240
 
 # Large room with a high ceiling.
 room_dimensions:
     x: 16
     y: 8
-    z: 16
+    z: 10
 
 # Specific starting position and rotation used in passive physics tasks.
 performer_start_position:
@@ -32,7 +32,7 @@ structural_platforms:
         y: 0.738
         z: 0.5
 
-# Two moving-and-rotating occluding walls at semi-random locations.
+# Two moving-and-rotating occluding walls with semi-random width and position.
 structural_moving_occluders:
     - num: 2
       occluder_height: 3
@@ -45,8 +45,8 @@ structural_moving_occluders:
           min: -2.0
           max: 2.0
       position_z: 1
-      repeat_movement: false
-      reverse_direction: [true, false]
+      move_up_before_last_step: true
+      reverse_direction: false
       rotation_y: 0
 
 # Up to two throwers with random small objects at semi-random locations.
@@ -55,19 +55,48 @@ structural_throwers:
       wall: ['left', 'right']
       position_wall:
           min: 1.6
-          max: 7.4
+          max: 4.4
       height:
           min: 0
           max: 2
-      rotation: [0, 0, 0, 5, 10, 15]
+      # Choose randomly from shapes normally used in "move across" tasks.
+      # Remove shapes from this list you don't want to generate.
+      # Copy lines for shapes you want to generate more often than others.
+      projectile_shape:
+          - ball
+          - bus_1
+          - car_1
+          - car_2
+          - cylinder
+          - dog_on_wheels
+          - double_cone
+          - duck_on_wheels
+          - dumbbell_1
+          - dumbbell_2
+          - racecar_red
+          - sphere
+          - tie_fighter
+          - train_1
+          - trolley_1
+          - truck_1
+          - truck_2
+          - tube_narrow
+          - tube_wide
+          - turtle_on_wheels
+      rotation_y:
+          - 0
+          - min: -15
+            max: 15
+      # Same chance to throw straight across (50%) or at an angle (50%).
+      rotation_z: [0, 0, 0, 5, 10, 15]
       throw_force:
-          min: 1000
-          max: 1500
+          min: 1500
+          max: 2000
       throw_step:
-          min: 31
-          max: 40
+          min: 41
+          max: 60
 
-# Override the defaults to avoid randomly generating any unwanted objects.
+# Override the defaults to avoid randomly generating any other objects.
 keyword_objects:
     - num: 0
 random_structural_objects:

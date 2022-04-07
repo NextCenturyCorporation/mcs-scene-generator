@@ -535,6 +535,13 @@ def create_occluder(
     occluder[WALL]['debug']['color'] = wall_material.color
     occluder[POLE]['debug']['color'] = pole_material.color
 
+    occluder[WALL]['debug']['dimensions'] = copy.deepcopy(
+        occluder[WALL]['shows'][0]['scale']
+    )
+    occluder[POLE]['debug']['dimensions'] = copy.deepcopy(
+        occluder[POLE]['shows'][0]['scale']
+    )
+
     # Just set the occluder's info to its color for now.
     occluder[WALL]['debug']['info'] = wall_material.color
     occluder[POLE]['debug']['info'] = pole_material.color

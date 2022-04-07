@@ -121,8 +121,8 @@ _CYLINDER_NOVEL_SIZE = create_variable_definition_from_base(
 )
 _CYLINDER_NOVEL_SIZE.untrainedSize = True
 # Rotate the object onto its curved side so it can roll sideways.
-_CYLINDER.rotation = Vector3d(90, 0, 0)
-_CYLINDER_NOVEL_SIZE.rotation = Vector3d(90, 0, 0)
+_CYLINDER.rotation = Vector3d(x=90, y=0, z=0)
+_CYLINDER_NOVEL_SIZE.rotation = Vector3d(x=90, y=0, z=0)
 
 
 _PYRAMID = create_variable_definition_from_base(
@@ -141,7 +141,7 @@ _PYRAMID_NOVEL_SIZE.untrainedSize = True
 _RECT_PRISM = create_variable_definition_from_base(
     type='cube',
     size_multiplier_list=[
-        Vector3d(multiplier, multiplier / 2.0, multiplier)
+        Vector3d(x=multiplier, y=multiplier / 2.0, z=multiplier)
         for multiplier in TRAINED_SIZE_MULTIPLIER_LIST
     ],
     chosen_material_list=INTUITIVE_PHYSICS_OBJECT_CHOSEN_MATERIAL_LIST
@@ -149,7 +149,7 @@ _RECT_PRISM = create_variable_definition_from_base(
 _RECT_PRISM_NOVEL_SIZE = create_variable_definition_from_base(
     type='cube',
     size_multiplier_list=[
-        Vector3d(multiplier, multiplier / 2.0, multiplier)
+        Vector3d(x=multiplier, y=multiplier / 2.0, z=multiplier)
         for multiplier in NOVEL_SIZE_MULTIPLIER_LIST
     ],
     chosen_material_list=INTUITIVE_PHYSICS_OBJECT_CHOSEN_MATERIAL_LIST
@@ -198,8 +198,8 @@ _TUBE_NARROW_NOVEL_SIZE = create_variable_definition_from_base(
 )
 _TUBE_NARROW_NOVEL_SIZE.untrainedSize = True
 # Rotate the object onto its curved side so it can roll sideways.
-_TUBE_NARROW.rotation = Vector3d(90, 0, 0)
-_TUBE_NARROW_NOVEL_SIZE.rotation = Vector3d(90, 0, 0)
+_TUBE_NARROW.rotation = Vector3d(x=90, y=0, z=0)
+_TUBE_NARROW_NOVEL_SIZE.rotation = Vector3d(x=90, y=0, z=0)
 
 
 _TUBE_WIDE = create_variable_definition_from_base(
@@ -214,8 +214,8 @@ _TUBE_WIDE_NOVEL_SIZE = create_variable_definition_from_base(
 )
 _TUBE_WIDE_NOVEL_SIZE.untrainedSize = True
 # Rotate the object onto its curved side so it can roll sideways.
-_TUBE_WIDE.rotation = Vector3d(90, 0, 0)
-_TUBE_WIDE_NOVEL_SIZE.rotation = Vector3d(90, 0, 0)
+_TUBE_WIDE.rotation = Vector3d(x=90, y=0, z=0)
+_TUBE_WIDE_NOVEL_SIZE.rotation = Vector3d(x=90, y=0, z=0)
 
 
 _DUCK = create_variable_definition_from_base(
@@ -313,8 +313,8 @@ _DOUBLE_CONE_NOVEL_SIZE = create_variable_definition_from_base(
 )
 _DOUBLE_CONE_NOVEL_SIZE.untrainedSize = True
 # Rotate the object onto its curved side so it can roll sideways.
-_DOUBLE_CONE.rotation = Vector3d(90, 0, 0)
-_DOUBLE_CONE_NOVEL_SIZE.rotation = Vector3d(90, 0, 0)
+_DOUBLE_CONE.rotation = Vector3d(x=90, y=0, z=0)
+_DOUBLE_CONE_NOVEL_SIZE.rotation = Vector3d(x=90, y=0, z=0)
 
 
 _DUMBBELL_1 = create_variable_definition_from_base(
@@ -330,8 +330,8 @@ _DUMBBELL_1_NOVEL_SIZE = create_variable_definition_from_base(
 )
 _DUMBBELL_1_NOVEL_SIZE.untrainedSize = True
 # Rotate the object onto its curved side so it can roll sideways.
-_DUMBBELL_1.rotation = Vector3d(90, 0, 0)
-_DUMBBELL_1_NOVEL_SIZE.rotation = Vector3d(90, 0, 0)
+_DUMBBELL_1.rotation = Vector3d(x=90, y=0, z=0)
+_DUMBBELL_1_NOVEL_SIZE.rotation = Vector3d(x=90, y=0, z=0)
 
 
 _DUMBBELL_2 = create_variable_definition_from_base(
@@ -347,8 +347,8 @@ _DUMBBELL_2_NOVEL_SIZE = create_variable_definition_from_base(
 )
 _DUMBBELL_2_NOVEL_SIZE.untrainedSize = True
 # Rotate the object onto its curved side so it can roll sideways.
-_DUMBBELL_2.rotation = Vector3d(90, 0, 0)
-_DUMBBELL_2_NOVEL_SIZE.rotation = Vector3d(90, 0, 0)
+_DUMBBELL_2.rotation = Vector3d(x=90, y=0, z=0)
+_DUMBBELL_2_NOVEL_SIZE.rotation = Vector3d(x=90, y=0, z=0)
 
 
 _TIE_FIGHTER = create_variable_definition_from_base(
@@ -364,8 +364,8 @@ _TIE_FIGHTER_NOVEL_SIZE = create_variable_definition_from_base(
 )
 _TIE_FIGHTER_NOVEL_SIZE.untrainedSize = True
 # Rotate the object onto its curved side so it can roll sideways.
-_TIE_FIGHTER.rotation = Vector3d(90, 0, 0)
-_TIE_FIGHTER_NOVEL_SIZE.rotation = Vector3d(90, 0, 0)
+_TIE_FIGHTER.rotation = Vector3d(x=90, y=0, z=0)
+_TIE_FIGHTER_NOVEL_SIZE.rotation = Vector3d(x=90, y=0, z=0)
 
 
 _BUS_1 = create_variable_definition_from_base(

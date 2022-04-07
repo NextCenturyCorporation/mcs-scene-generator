@@ -33,8 +33,8 @@ def create_interesting_dataset():
             )
         ]),
         ObjectDefinition(type='c', chooseSizeList=[
-            SizeChoice(dimensions=Vector3d(1, 1, 1), mass=1),
-            SizeChoice(dimensions=Vector3d(2, 2, 2), mass=2)
+            SizeChoice(dimensions=Vector3d(x=1, y=1, z=1), mass=1),
+            SizeChoice(dimensions=Vector3d(x=2, y=2, z=2), mass=2)
         ])
     ], [
         ObjectDefinition(type='d', chooseMaterialList=[
@@ -47,8 +47,8 @@ def create_interesting_dataset():
                 salientMaterials=['wood']
             )
         ], chooseSizeList=[
-            SizeChoice(dimensions=Vector3d(3, 3, 3), mass=3),
-            SizeChoice(dimensions=Vector3d(4, 4, 4), mass=4)
+            SizeChoice(dimensions=Vector3d(x=3, y=3, z=3), mass=3),
+            SizeChoice(dimensions=Vector3d(x=4, y=4, z=4), mass=4)
         ])
     ]], unshuffled=True)
 
@@ -97,13 +97,13 @@ def test_create_dataset():
     assert len(dataset._definition_groups[0][3]) == 1
     for definition in dataset._definition_groups[0][3]:
         assert definition.type == 'c'
-        assert definition.dimensions == Vector3d(1, 1, 1)
+        assert definition.dimensions == Vector3d(x=1, y=1, z=1)
         assert definition.mass == 1
 
     assert len(dataset._definition_groups[0][4]) == 1
     for definition in dataset._definition_groups[0][4]:
         assert definition.type == 'c'
-        assert definition.dimensions == Vector3d(2, 2, 2)
+        assert definition.dimensions == Vector3d(x=2, y=2, z=2)
         assert definition.mass == 2
 
     assert len(dataset._definition_groups[1][0]) == 2
@@ -111,7 +111,7 @@ def test_create_dataset():
         assert definition.type == 'd'
         assert definition.materialCategory == ['rubber']
         assert definition.salientMaterials == ['rubber']
-        assert definition.dimensions == Vector3d(3, 3, 3)
+        assert definition.dimensions == Vector3d(x=3, y=3, z=3)
         assert definition.mass == 3
 
     assert len(dataset._definition_groups[1][1]) == 40
@@ -119,7 +119,7 @@ def test_create_dataset():
         assert definition.type == 'd'
         assert definition.materialCategory == ['wood']
         assert definition.salientMaterials == ['wood']
-        assert definition.dimensions == Vector3d(3, 3, 3)
+        assert definition.dimensions == Vector3d(x=3, y=3, z=3)
         assert definition.mass == 3
 
     assert len(dataset._definition_groups[1][2]) == 2
@@ -127,7 +127,7 @@ def test_create_dataset():
         assert definition.type == 'd'
         assert definition.materialCategory == ['rubber']
         assert definition.salientMaterials == ['rubber']
-        assert definition.dimensions == Vector3d(4, 4, 4)
+        assert definition.dimensions == Vector3d(x=4, y=4, z=4)
         assert definition.mass == 4
 
     assert len(dataset._definition_groups[1][3]) == 40
@@ -135,7 +135,7 @@ def test_create_dataset():
         assert definition.type == 'd'
         assert definition.materialCategory == ['wood']
         assert definition.salientMaterials == ['wood']
-        assert definition.dimensions == Vector3d(4, 4, 4)
+        assert definition.dimensions == Vector3d(x=4, y=4, z=4)
         assert definition.mass == 4
 
 
@@ -230,8 +230,8 @@ def test_finalize_each_definition_choice():
             )
         ],
         chooseSizeList=[
-            SizeChoice(dimensions=Vector3d(1, 1, 1), mass=1),
-            SizeChoice(dimensions=Vector3d(2, 2, 2), mass=2)
+            SizeChoice(dimensions=Vector3d(x=1, y=1, z=1), mass=1),
+            SizeChoice(dimensions=Vector3d(x=2, y=2, z=2), mass=2)
         ]
     )
     definition_list = finalize_each_definition_choice(
@@ -242,22 +242,22 @@ def test_finalize_each_definition_choice():
     assert definition_list[0].type == 'test_type'
     assert definition_list[0].materialCategory == ['metal']
     assert definition_list[0].salientMaterials == ['metal']
-    assert definition_list[0].dimensions == Vector3d(1, 1, 1)
+    assert definition_list[0].dimensions == Vector3d(x=1, y=1, z=1)
     assert definition_list[0].mass == 1
     assert definition_list[1].type == 'test_type'
     assert definition_list[1].materialCategory == ['plastic']
     assert definition_list[1].salientMaterials == ['plastic']
-    assert definition_list[1].dimensions == Vector3d(1, 1, 1)
+    assert definition_list[1].dimensions == Vector3d(x=1, y=1, z=1)
     assert definition_list[1].mass == 1
     assert definition_list[2].type == 'test_type'
     assert definition_list[2].materialCategory == ['metal']
     assert definition_list[2].salientMaterials == ['metal']
-    assert definition_list[2].dimensions == Vector3d(2, 2, 2)
+    assert definition_list[2].dimensions == Vector3d(x=2, y=2, z=2)
     assert definition_list[2].mass == 2
     assert definition_list[3].type == 'test_type'
     assert definition_list[3].materialCategory == ['plastic']
     assert definition_list[3].salientMaterials == ['plastic']
-    assert definition_list[3].dimensions == Vector3d(2, 2, 2)
+    assert definition_list[3].dimensions == Vector3d(x=2, y=2, z=2)
     assert definition_list[3].mass == 2
 
 
@@ -290,10 +290,10 @@ def test_finalize_object_materials_and_colors():
     definition = ObjectDefinition(
         type='test_type',
         mass=1,
-        dimensions=Vector3d(0.5, 0.5, 0.5),
+        dimensions=Vector3d(x=0.5, y=0.5, z=0.5),
         shape=['test_shape'],
         size='test_size',
-        scale=Vector3d(1, 1, 1),
+        scale=Vector3d(x=1, y=1, z=1),
         attributes=[],
         materialCategory=['test']
     )
@@ -320,10 +320,10 @@ def test_finalize_object_materials_and_colors_multiple_material_categories():
     definition = ObjectDefinition(
         type='test_type',
         mass=1,
-        dimensions=Vector3d(0.5, 0.5, 0.5),
+        dimensions=Vector3d(x=0.5, y=0.5, z=0.5),
         shape=['test_shape'],
         size='test_size',
-        scale=Vector3d(1, 1, 1),
+        scale=Vector3d(x=1, y=1, z=1),
         attributes=[],
         materialCategory=['test1', 'test2']
     )

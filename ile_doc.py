@@ -15,8 +15,16 @@ ILE_API_HEADER = """# ILE API
 [How to Use the ILE](./README.md)
 
 #### Table of Content
+- [Lists](#Lists)
 - [Classes](#Classes)
 - [Options](#Options)
+
+## Lists
+
+- [Agent settings](https://nextcenturycorporation.github.io/MCS/schema.html#agent-settings)
+- [Interactable shapes](https://nextcenturycorporation.github.io/MCS/schema.html#interactable-objects)
+- [Materials](https://nextcenturycorporation.github.io/MCS/schema.html#material-list)
+- [Tool shapes](https://nextcenturycorporation.github.io/MCS/schema.html#tool-objects)
 
 ## Classes
 

@@ -24,3 +24,4 @@ from .interactive_goals import (
     TraversalGoal,
 )
 from .materials import MaterialTuple
+from .scene import Scene

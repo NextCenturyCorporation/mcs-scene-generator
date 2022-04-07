@@ -29,7 +29,7 @@ keyword_objects:
           min: 0
           max: 10
 
-# Override default to avoid randomly generating any structures. Remove this if
-# you want to have randomly generated structures.
+# Override the default to avoid randomly generating other structural objects.
+# Remove these lines if you want additional randomly generated objects.
 random_structural_objects:
     - num: 0

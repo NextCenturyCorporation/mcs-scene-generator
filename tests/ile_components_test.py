@@ -1,5 +1,6 @@
 import pytest
 
+from generator.scene import Scene
 from ideal_learning_env import ILEException, VectorFloatConfig
 from ideal_learning_env.mock_component import MockClass, MockComponent
 
@@ -230,10 +231,10 @@ def test_ile_component_update():
         'union_int_prop': -100,
         'union_str_prop': 'the quick brown fox'
     })
-    scene = component.update_ile_scene({'existing_prop': True})
-    assert scene['existing_prop'] is True
-    assert scene['bool_prop'] is True
-    assert scene['class_prop'] == {
+    scene = component.update_ile_scene(Scene(debug={'existing_prop': True}))
+    assert scene.debug['existing_prop'] is True
+    assert scene.debug['bool_prop'] is True
+    assert scene.debug['class_prop'] == {
         'dict_prop': {'key1': 'value1'},
         'int_prop': 0,
         'list_dict_prop': [
@@ -248,10 +249,10 @@ def test_ile_component_update():
         'union_vector_prop': {'x': 0.3, 'y': 0.2, 'z': 0.1},
         'vector_prop': {'x': 0.1, 'y': 0.2, 'z': 0.3}
     }
-    assert scene['float_prop'] == 12.34
-    assert scene['int_prop'] == 100
-    assert scene['list_bool_prop'] == [False, True]
-    assert scene['list_class_prop'] == [{
+    assert scene.debug['float_prop'] == 12.34
+    assert scene.debug['int_prop'] == 100
+    assert scene.debug['list_bool_prop'] == [False, True]
+    assert scene.debug['list_class_prop'] == [{
         'dict_prop': None,
         'int_prop': None,
         'list_dict_prop': None,
@@ -275,12 +276,12 @@ def test_ile_component_update():
         'union_vector_prop': {'x': 0.7, 'y': 0.8, 'z': 0.9},
         'vector_prop': {'x': 0.9, 'y': 0.8, 'z': 0.7}
     }]
-    assert scene['list_float_prop'] == [-1, -0.5, 0, 0.5, 1]
-    assert scene['list_int_prop'] == [-2, -1, 0, 1, 2]
-    assert scene['list_str_prop'] == ['a', 'b', 'c', 'd']
-    assert scene['str_prop'] == 'foobar'
-    assert scene['union_bool_prop'] is False
-    assert scene['union_class_prop'] == {
+    assert scene.debug['list_float_prop'] == [-1, -0.5, 0, 0.5, 1]
+    assert scene.debug['list_int_prop'] == [-2, -1, 0, 1, 2]
+    assert scene.debug['list_str_prop'] == ['a', 'b', 'c', 'd']
+    assert scene.debug['str_prop'] == 'foobar'
+    assert scene.debug['union_bool_prop'] is False
+    assert scene.debug['union_class_prop'] == {
         'dict_prop': {'keyA': 'valueA'},
         'int_prop': 999,
         'list_dict_prop': [
@@ -295,9 +296,9 @@ def test_ile_component_update():
         'union_vector_prop': {'x': 0.6, 'y': 0.5, 'z': 0.4},
         'vector_prop': {'x': 0.4, 'y': 0.5, 'z': 0.6}
     }
-    assert scene['union_float_prop'] == -12.34
-    assert scene['union_int_prop'] == -100
-    assert scene['union_str_prop'] == 'the quick brown fox'
+    assert scene.debug['union_float_prop'] == -12.34
+    assert scene.debug['union_int_prop'] == -100
+    assert scene.debug['union_str_prop'] == 'the quick brown fox'
 
 
 def test_ile_component_validate_fail_bool():

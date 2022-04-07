@@ -2,12 +2,17 @@ import logging
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Union
 
-from generator import ALL_LARGE_BLOCK_TOOLS, MAX_TRIES, materials
-from ideal_learning_env.structural_object_generator import (
-    ALL_THROWABLE_SHAPES,
+from generator import ALL_LARGE_BLOCK_TOOLS, materials
+from generator.scene import Scene
+from ideal_learning_env.structural_object_service import (
     DOOR_MATERIAL_RESTRICTIONS,
+    DROPPER_SHAPES,
+    PLACER_SHAPES,
     PLATFORM_SCALE_MIN,
-    BaseStructuralObjectsConfig,
+    THROWER_SHAPES,
+    BaseFeatureConfig,
+    FeatureCreationService,
+    FeatureTypes,
     FloorAreaConfig,
     FloorMaterialConfig,
     OccludingWallType,
@@ -20,11 +25,9 @@ from ideal_learning_env.structural_object_generator import (
     StructuralPlatformConfig,
     StructuralRampConfig,
     StructuralThrowerConfig,
-    StructuralTypes,
     StructuralWallConfig,
     ToolConfig,
     WallSide,
-    add_structural_object_with_retries_or_throw,
 )
 
 from .choosers import choose_counts, choose_random
@@ -32,7 +35,7 @@ from .components import ILEComponent
 from .decorators import ile_config_setter
 from .defs import ILEDelayException, find_bounds, return_list
 from .goal_services import TARGET_LABEL
-from .interactable_object_config import KeywordLocationConfig
+from .interactable_object_service import KeywordLocationConfig
 from .numerics import MinMaxInt
 from .object_services import ObjectRepository
 from .validators import ValidateNumber, ValidateOptions
@@ -176,8 +179,8 @@ class SpecificStructuralObjectsComponent(ILEComponent):
         StructuralLOccluderConfig,
         List[StructuralLOccluderConfig]] = None
     """
-    ([StructuralOccluderConfig](#StructuralOccluderConfig) dict, or list of
-    [StructuralOccluderConfig](#StructuralOccluderConfig) dicts): Template(s)
+    ([StructuralLOccluderConfig](#StructuralLOccluderConfig) dict, or list of
+    [StructuralLOccluderConfig](#StructuralLOccluderConfig) dicts): Template(s)
     containing properties needed to create an L-shaped occluder.  Default: None
 
     Simple Example
@@ -300,7 +303,8 @@ class SpecificStructuralObjectsComponent(ILEComponent):
         - 1
         - 2
         - 1.5
-      rotation:
+      rotation_y: 0
+      rotation_z:
         min: 3
         max: 7
       throw_force: [600, 1000, 1200]
@@ -522,23 +526,23 @@ class SpecificStructuralObjectsComponent(ILEComponent):
             min: 0
             max: 2
         - num: 1
+          placed_object_material: PLASTIC_MATERIALS
           placed_object_position:
             x: 2
             y: [3, 4]
             z:
               min: -2
               max: 0
-          placed_object_scale: 1.2
           placed_object_rotation: 45
-          material: PLASTIC_MATERIALS
-          shape: case_1
+          placed_object_scale: 1.2
+          placed_object_shape: case_1
           activation_step:
             min: 3
             max: 8
           labels: [placed_object, placed_case]
         - num: [5, 10]
-          shape: ball
-          material: AI2-THOR/Materials/Metals/BrushedAluminum_Blue
+          placed_object_material: AI2-THOR/Materials/Plastics/BlueRubber
+          placed_object_shape: ball
 
     ```
     """
@@ -674,7 +678,7 @@ class SpecificStructuralObjectsComponent(ILEComponent):
     ))
     @ile_config_setter(validator=ValidateOptions(
         props=['projectile_shape'],
-        options=ALL_THROWABLE_SHAPES
+        options=DROPPER_SHAPES
     ))
     def set_structural_droppers(self, data: Any) -> None:
         self.structural_droppers = data
@@ -683,7 +687,9 @@ class SpecificStructuralObjectsComponent(ILEComponent):
         props=['throw_step', 'throw_force', 'height', 'projectile_scale'],
         min_value=0, null_ok=True))
     @ile_config_setter(validator=ValidateNumber(
-        props=['rotation'], min_value=0, max_value=15, null_ok=True))
+        props=['rotation_y'], min_value=-45, max_value=45, null_ok=True))
+    @ile_config_setter(validator=ValidateNumber(
+        props=['rotation_z'], min_value=0, max_value=15, null_ok=True))
     @ile_config_setter(validator=ValidateNumber(props=['num'], min_value=0))
     @ile_config_setter(validator=ValidateOptions(
         props=['projectile_material'],
@@ -691,7 +697,7 @@ class SpecificStructuralObjectsComponent(ILEComponent):
     ))
     @ile_config_setter(validator=ValidateOptions(
         props=['projectile_shape'],
-        options=ALL_THROWABLE_SHAPES
+        options=THROWER_SHAPES
     ))
     @ile_config_setter(validator=ValidateOptions(
         props=['wall'],
@@ -776,7 +782,7 @@ class SpecificStructuralObjectsComponent(ILEComponent):
     ))
     @ile_config_setter(validator=ValidateOptions(
         props=['placed_object_shape'],
-        options=ALL_THROWABLE_SHAPES
+        options=PLACER_SHAPES
     ))
     def set_placers(self, data: Any) -> None:
         self.placers = data
@@ -804,46 +810,42 @@ class SpecificStructuralObjectsComponent(ILEComponent):
         self.tools = data
 
     # Override
-    def update_ile_scene(self, scene: Dict[str, Any]) -> Dict[str, Any]:
+    def update_ile_scene(self, scene: Scene) -> Scene:
         logger.info('Configuring specific structural objects...')
         self._delayed_templates = []
 
-        scene['objects'] = scene.get('objects', [])
-        scene['floorTextures'] = scene.get('floorTextures', [])
-        scene['holes'] = scene.get('holes', [])
-        scene['lava'] = scene.get('lava', [])
         bounds = find_bounds(scene)
 
         structural_type_templates = [
-            (StructuralTypes.WALLS, self.structural_walls),
-            (StructuralTypes.PLATFORMS, self.structural_platforms),
-            (StructuralTypes.L_OCCLUDERS, self.structural_l_occluders),
-            (StructuralTypes.RAMPS, self.structural_ramps),
-            (StructuralTypes.DROPPERS, self.structural_droppers),
-            (StructuralTypes.THROWERS, self.structural_throwers),
-            (StructuralTypes.MOVING_OCCLUDERS,
+            (FeatureTypes.WALLS, self.structural_walls),
+            (FeatureTypes.PLATFORMS, self.structural_platforms),
+            (FeatureTypes.L_OCCLUDERS, self.structural_l_occluders),
+            (FeatureTypes.RAMPS, self.structural_ramps),
+            (FeatureTypes.DROPPERS, self.structural_droppers),
+            (FeatureTypes.THROWERS, self.structural_throwers),
+            (FeatureTypes.MOVING_OCCLUDERS,
              self.structural_moving_occluders),
-            (StructuralTypes.HOLES, self.holes),
-            (StructuralTypes.FLOOR_MATERIALS, self.floor_material_override),
-            (StructuralTypes.LAVA, self.lava),
-            (StructuralTypes.OCCLUDING_WALLS, self.structural_occluding_walls),
-            (StructuralTypes.PLACERS, self.placers),
-            (StructuralTypes.DOORS, self.doors),
-            (StructuralTypes.TOOLS, self.tools)
+            (FeatureTypes.HOLES, self.holes),
+            (FeatureTypes.FLOOR_MATERIALS, self.floor_material_override),
+            (FeatureTypes.LAVA, self.lava),
+            (FeatureTypes.OCCLUDING_WALLS, self.structural_occluding_walls),
+            (FeatureTypes.PLACERS, self.placers),
+            (FeatureTypes.DOORS, self.doors),
+            (FeatureTypes.TOOLS, self.tools)
         ]
 
         for s_type, templates in structural_type_templates:
             for template, num in choose_counts(return_list(templates)):
                 for i in range(num):
                     try:
-                        add_structural_object_with_retries_or_throw(
-                            scene, bounds, MAX_TRIES, template, s_type)
+                        FeatureCreationService.create_feature(
+                            scene, s_type, template, bounds)
                     except ILEDelayException as e:
                         logger.trace(
                             f"Failed to generate {s_type}"
                             f" due to needing delay.",
                             exc_info=e)
-                        self._delayed_templates.append((s_type, template))
+                        self._delayed_templates.append((s_type, template, e))
 
         return scene
 
@@ -855,13 +857,16 @@ class SpecificStructuralObjectsComponent(ILEComponent):
         self._delayed_templates = []
         if delayed:
             bounds = find_bounds(scene)
-            for s_type, template in delayed:
+            for s_type, template, _ in delayed:
                 try:
-                    add_structural_object_with_retries_or_throw(
-                        scene, bounds, MAX_TRIES, template, s_type)
-                except ILEDelayException:
-                    self._delayed_templates.append((s_type, template))
+                    FeatureCreationService.create_feature(
+                        scene, s_type, template, bounds)
+                except ILEDelayException as e:
+                    self._delayed_templates.append((s_type, template, e))
         return scene
+
+    def get_delayed_action_error_strings(self) -> List[str]:
+        return [str(err) for _, _, err in self._delayed_templates]
 
 
 class RandomStructuralObjectsComponent(ILEComponent):
@@ -896,6 +901,7 @@ class RandomStructuralObjectsComponent(ILEComponent):
           - platforms
           - ramps
           - throwers
+          - tools
           - walls
         num:
           min: 2
@@ -922,6 +928,7 @@ class RandomStructuralObjectsComponent(ILEComponent):
           - platforms
           - ramps
           - throwers
+          - tools
           - walls
         num:
             min: 0
@@ -933,14 +940,20 @@ class RandomStructuralObjectsComponent(ILEComponent):
     ```
     """
 
-    ALL_TYPES = [item.name.lower() for item in StructuralTypes]
-    ALL_TYPES_NO_TARGET = [
-        item.name.lower() for item in StructuralTypes
-        # The following StructuralTypes need a target object:
-        if item not in [StructuralTypes.OCCLUDING_WALLS]
+    ALL_STRUCTURAL_TYPES = [
+        item.name.lower() for item in FeatureTypes if item not in [
+            FeatureTypes.AGENT, FeatureTypes.INTERACTABLE]]
+    ALL_STRUCTURAL_TYPES_NO_TARGET = [
+        item.name.lower() for item in FeatureTypes
+        # The following FeatureTypes need a target object:
+        if item not in [FeatureTypes.OCCLUDING_WALLS,
+                        FeatureTypes.INTERACTABLE,
+                        FeatureTypes.AGENT]
     ]
+    # TODO MCS-1206 Include tools here for now, but move them to the default
+    #      keyword_objects setting in the future since they're not structures.
     DEFAULT_VALUE = [RandomStructuralObjectConfig(
-        ALL_TYPES_NO_TARGET,
+        ALL_STRUCTURAL_TYPES_NO_TARGET,
         MinMaxInt(2, 4)
     )]
 
@@ -948,13 +961,9 @@ class RandomStructuralObjectsComponent(ILEComponent):
         super().__init__(data)
 
     # Override
-    def update_ile_scene(self, scene: Dict[str, Any]) -> Dict[str, Any]:
+    def update_ile_scene(self, scene: Scene) -> Dict[str, Any]:
         logger.info('Configuring random structural objects...')
 
-        scene['floorTextures'] = scene.get('floorTextures', [])
-        scene['holes'] = scene.get('holes', [])
-        scene['lava'] = scene.get('lava', [])
-        scene['objects'] = scene.get('objects', [])
         bounds = find_bounds(scene)
         templates = return_list(
             self.random_structural_objects,
@@ -967,13 +976,14 @@ class RandomStructuralObjectsComponent(ILEComponent):
         # List all the valid types for randomly generated structural objects.
         target_exists = ObjectRepository.get_instance().has_label(TARGET_LABEL)
         all_types = (
-            self.ALL_TYPES if target_exists else self.ALL_TYPES_NO_TARGET
+            self.ALL_STRUCTURAL_TYPES if target_exists
+            else self.ALL_STRUCTURAL_TYPES_NO_TARGET
         )
 
         for template, num in choose_counts(templates):
             for i in range(num):
                 type = choose_random(template.type or all_types)
-                structural_type = StructuralTypes[type.upper()]
+                structural_type = FeatureTypes[type.upper()]
                 if using_default:
                     logger.info(
                         f'Using default setting to generate random '
@@ -987,8 +997,8 @@ class RandomStructuralObjectsComponent(ILEComponent):
                         f'{structural_type.name.lower().replace("_", " ")}'
                     )
                 random_template = self._create_random_template(type, template)
-                add_structural_object_with_retries_or_throw(
-                    scene, bounds, MAX_TRIES, random_template, structural_type)
+                FeatureCreationService.create_feature(
+                    scene, structural_type, random_template, bounds)
 
         return scene
 
@@ -996,44 +1006,44 @@ class RandomStructuralObjectsComponent(ILEComponent):
         self,
         type_string: str,
         template: RandomStructuralObjectConfig
-    ) -> Optional[BaseStructuralObjectsConfig]:
-        structural_type = StructuralTypes[type_string.upper()]
+    ) -> Optional[BaseFeatureConfig]:
+        structural_type = FeatureTypes[type_string.upper()]
         # If set, assign the config template's relative object label to the new
         # template that's passed into the structural object generator.
         relative_object_label = template.relative_object_label
-        if structural_type == StructuralTypes.DOORS:
+        if structural_type == FeatureTypes.DOORS:
             return StructuralDoorConfig(labels=template.labels)
-        if structural_type == StructuralTypes.DROPPERS:
+        if structural_type == FeatureTypes.DROPPERS:
             return StructuralDropperConfig(
                 labels=template.labels,
                 projectile_labels=relative_object_label
             )
-        if structural_type == StructuralTypes.PLACERS:
+        if structural_type == FeatureTypes.PLACERS:
             return StructuralPlacerConfig(
                 labels=template.labels,
                 placed_object_labels=relative_object_label
             )
-        if structural_type == StructuralTypes.L_OCCLUDERS:
+        if structural_type == FeatureTypes.L_OCCLUDERS:
             return StructuralLOccluderConfig(labels=template.labels)
-        if structural_type == StructuralTypes.MOVING_OCCLUDERS:
+        if structural_type == FeatureTypes.MOVING_OCCLUDERS:
             return StructuralMovingOccluderConfig(labels=template.labels)
-        if structural_type == StructuralTypes.OCCLUDING_WALLS:
+        if structural_type == FeatureTypes.OCCLUDING_WALLS:
             return StructuralOccludingWallConfig(
                 keyword_location=template.keyword_location,
                 labels=template.labels
             )
-        if structural_type == StructuralTypes.PLATFORMS:
+        if structural_type == FeatureTypes.PLATFORMS:
             return StructuralPlatformConfig(labels=template.labels)
-        if structural_type == StructuralTypes.RAMPS:
+        if structural_type == FeatureTypes.RAMPS:
             return StructuralRampConfig(labels=template.labels)
-        if structural_type == StructuralTypes.THROWERS:
+        if structural_type == FeatureTypes.THROWERS:
             return StructuralThrowerConfig(
                 labels=template.labels,
                 projectile_labels=relative_object_label
             )
-        if structural_type == StructuralTypes.TOOLS:
+        if structural_type == FeatureTypes.TOOLS:
             return ToolConfig(labels=template.labels)
-        if structural_type == StructuralTypes.WALLS:
+        if structural_type == FeatureTypes.WALLS:
             return StructuralWallConfig(labels=template.labels)
         # Otherwise return None; defaults will be used automatically.
         return None

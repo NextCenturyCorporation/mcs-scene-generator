@@ -3,8 +3,6 @@ import logging
 import random
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
-from machine_common_sense.config_manager import Vector3d
-
 from generator import (
     MAX_TRIES,
     DefinitionDataset,
@@ -18,12 +16,9 @@ from generator import (
     definitions,
     geometry,
     instances,
-    materials,
     specific_objects,
-    structures,
     tags,
 )
-from generator.separating_axis_theorem import sat_entry
 
 from .hypercubes import (
     Hypercube,
@@ -228,8 +223,6 @@ class InteractiveHypercube(Hypercube):
                 # Save the targets used in the hypercube that are not defined
                 # by the plan, if the goal has multiple targets.
                 self._common_target_list = []
-                # Save the interior walls used in the hypercube.
-                self._interior_wall_list = []
                 # Save the performer's start location in the hypercube.
                 self._performer_start = self._generate_performer_start()
                 # Save the small context objects used in the hypercube.
@@ -897,7 +890,7 @@ class InteractiveHypercube(Hypercube):
         given target and confusor data and whether it should be a valid or an
         invalid size to fit either or both of the objects inside of it."""
 
-        dataset = specific_objects.get_container_definition_dataset()
+        dataset = specific_objects.get_container_openable_definition_dataset()
         trained_dataset = dataset.filter_on_trained()
         untrained_dataset = dataset.filter_on_untrained(
             tags.SCENE.UNTRAINED_SHAPE
@@ -1083,112 +1076,6 @@ class InteractiveHypercube(Hypercube):
         logging.debug(
             f'{self.get_name()} target definition: '
             f'{target_data.trained_definition}')
-
-    def _create_interior_wall(
-        self,
-        wall_material: str,
-        wall_colors: List[str],
-        performer_start: Dict[str, Dict[str, float]],
-        bounds_list: List[ObjectBounds],
-        keep_unobstructed_list: List[Dict[str, Any]] = None
-    ) -> Optional[Dict[str, Any]]:
-        """Create and return a randomly positioned interior wall with the
-        given material and colors. If keep_unobstructed_list is not None, the
-        wall won't obstruct the line between the performer_start and the
-        objects in keep_unobstructed_list."""
-
-        tries = 0
-        performer_bounds = geometry.find_performer_bounds(
-            performer_start['position']
-        )
-        performer_poly = performer_bounds.polygon_xz
-
-        while tries < MAX_TRIES:
-            rotation = random.choice((0, 90, 180, 270))
-            x_position = geometry.random_position_x(ROOM_DIMENSIONS)
-            z_position = geometry.random_position_z(ROOM_DIMENSIONS)
-            x_width = round(
-                random.uniform(WALL_MIN_WIDTH, WALL_MAX_WIDTH),
-                geometry.POSITION_DIGITS
-            )
-
-            # Ensure the wall is not too close to the room's parallel walls.
-            if (
-                (rotation == 0 or rotation == 180) and
-                (
-                    z_position < (ROOM_Z_MIN + WALL_SEPARATION) or
-                    z_position > (ROOM_Z_MAX - WALL_SEPARATION)
-                )
-            ) or (
-                (rotation == 90 or rotation == 270) and
-                (
-                    x_position < (ROOM_X_MIN + WALL_SEPARATION) or
-                    x_position > (ROOM_X_MAX - WALL_SEPARATION)
-                )
-            ):
-                continue
-
-            wall_bounds = geometry.create_bounds(
-                dimensions={'x': x_width, 'y': WALL_HEIGHT, 'z': WALL_DEPTH},
-                offset={'x': 0, 'y': 0, 'z': 0},
-                position={'x': x_position, 'y': 0, 'z': z_position},
-                rotation={'x': 0, 'y': rotation, 'z': 0},
-                standing_y=(WALL_HEIGHT / 2.0)
-            )
-            wall_poly = wall_bounds.polygon_xz
-
-            # Ensure parallel walls are not too close one another.
-            boundary_rect = ObjectBounds(box_xz=[
-                Vector3d(
-                    corner.x + WALL_SEPARATION,
-                    0,
-                    corner.z + WALL_SEPARATION
-                ) for corner in wall_bounds.box_xz
-            ], max_y=wall_bounds.max_y, min_y=wall_bounds.min_y)
-
-            is_too_close = any(
-                sat_entry(boundary_rect.box_xz, bounds.box_xz)
-                for bounds in bounds_list
-            )
-
-            is_ok = (
-                wall_bounds.is_within_room(ROOM_DIMENSIONS) and
-                not wall_poly.intersects(performer_poly) and
-                not is_too_close
-            )
-
-            if is_ok and keep_unobstructed_list:
-                for instance in keep_unobstructed_list:
-                    if (
-                        'locationParent' not in instance and
-                        geometry.does_fully_obstruct_target(
-                            performer_start['position'],
-                            instance,
-                            wall_poly
-                        )
-                    ):
-                        is_ok = False
-                        break
-
-            if is_ok:
-                break
-
-            tries += 1
-
-        if tries < MAX_TRIES:
-            interior_wall = structures.create_interior_wall(
-                x_position,
-                z_position,
-                rotation,
-                x_width,
-                WALL_HEIGHT,
-                materials.MaterialTuple(wall_material, wall_colors),
-                thickness=WALL_DEPTH,
-                bounds=wall_bounds
-            )
-            return interior_wall
-
-        return None
 
     def _create_target_list(
         self,
@@ -1614,36 +1501,6 @@ class InteractiveHypercube(Hypercube):
             )
             self._small_context_object_list.append(small_context_instance)
 
-    def _initialize_interior_walls(self) -> None:
-        """Create this hypercube's interior walls. Changes the
-        interior_wall_list and the bounds_list."""
-
-        # All scenes will have the same room wall material/colors.
-        room_wall_material_name = self._scene_1['wallMaterial']
-        room_wall_colors = self._scene_1['debug']['wallColors']
-
-        keep_unobstructed_list = [self._target_data.trained_definition]
-        if self._confusor_data:
-            keep_unobstructed_list.extend([
-                self._confusor_data.trained_definition,
-                self._confusor_data.untrained_definition
-            ])
-
-        number = random.choices(WALL_CHOICES, weights=WALL_WEIGHTS, k=1)[0]
-        logging.debug(f'{self.get_name()} {number} interior walls')
-
-        for _ in range(number + 1):
-            wall = self._create_interior_wall(
-                room_wall_material_name,
-                room_wall_colors,
-                self._performer_start,
-                self._bounds_list,
-                keep_unobstructed_list
-            )
-            if wall:
-                self._interior_wall_list.append(wall)
-                self._bounds_list.append(wall['shows'][0]['boundingBox'])
-
     def _choose_each_object_definition(self) -> None:
         """Choose each object's definition to use across scenes."""
 
@@ -1801,7 +1658,7 @@ class InteractiveHypercube(Hypercube):
 
         # Please note that an enclosable receptacle (that can have objects
         # positioned inside of it) may also be called a "container".
-        dataset = specific_objects.get_container_definition_dataset()
+        dataset = specific_objects.get_container_openable_definition_dataset()
 
         for receptacle_definition in dataset.definitions():
             valid_containment = containers.can_contain(
@@ -1888,7 +1745,6 @@ class InteractiveHypercube(Hypercube):
             object_data.instance_list[scene_index] for object_data in
             self._data['occluder'] if object_data.instance_list[scene_index]
         ]
-        role_to_object_list[tags.ROLES.WALL] = self._interior_wall_list
         update_scene_objects(scene, role_to_object_list)
 
         scene['goal']['sceneInfo'][tags.SCENE.ID] = [

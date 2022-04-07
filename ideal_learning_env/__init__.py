@@ -1,4 +1,5 @@
 from .actions_component import ActionRestrictionsComponent
+from .agent_component import RandomAgentComponent, SpecificAgentComponent
 from .choosers import (
     choose_counts,
     choose_position,
@@ -17,8 +18,8 @@ from .defs import (
     return_list,
 )
 from .global_settings_component import GlobalSettingsComponent
-from .goal_services import TARGET_LABEL, GoalConfig, get_target_object
-from .interactable_object_config import InteractableObjectConfig
+from .goal_services import TARGET_LABEL, GoalConfig
+from .interactable_object_service import InteractableObjectConfig
 from .interactable_objects_component import (
     KeywordLocationConfig,
     KeywordObjectsConfig,

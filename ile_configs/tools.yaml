@@ -1,10 +1,13 @@
-# Generate a pool of lava with an island in the center; a randomly-sized soccer
-# ball retrieval target positioned on the island; and a large block tool on
-# wheels positioned near the lava.
+# Generate a randomly sized and positioned pool of lava with an island in the
+# center; a randomly sized soccer ball retrieval target; and a large block tool
+# on wheels positioned nearby the lava. See the ILE_API for all config options.
 shortcut_lava_target_tool:
-    random_performer_position: true
-    # Equal chance for the tool to begin facing the target, or not.
-    tool_rotation: [0, 0, 0, 0, 0, 0, 15, 30, 45, 60, 75, 90]
+    # Start next to the tool (50%) or in a random location (50%).
+    random_performer_position: [true, false]
+    # Target positioned on the island (50%) or in a random location (50%).
+    random_target_position: [true, false]
+    # Tool begins facing the target (rotation=0) or not.
+    tool_rotation: [0, 15, 30, 45, 60, 75, 90]
 
 # Only generate medium or large rooms.
 room_dimensions:
@@ -17,8 +20,9 @@ room_dimensions:
         max: 30
 room_shape: square
 
-# Override default behavior to avoid randomly generating any other structures
-# beside the platform.
+# Override the defaults to avoid randomly generating any other objects besides
+# the tool, target, and lava. Remove these lines if you want additional
+# randomly generated objects.
 random_structural_objects:
     - num: 0
 keyword_objects:

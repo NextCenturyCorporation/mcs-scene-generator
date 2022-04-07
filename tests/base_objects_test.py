@@ -31,7 +31,7 @@ def test_create_specific_definition_from_base():
     assert ball.mass == 2
     assert ball.materials == ['blue_yellow_material']
     assert ball.salientMaterials == ['plastic', 'hollow']
-    assert ball.scale == Vector3d(2, 2, 2)
+    assert ball.scale == Vector3d(x=2, y=2, z=2)
     assert ball.shape == ['ball']
 
 
@@ -41,7 +41,7 @@ def test_create_specific_definition_from_base_scale_vector():
         color=[],
         materials=[],
         salient_materials=[],
-        scale=Vector3d(0.5, 1, 0.5)
+        scale=Vector3d(x=0.5, y=1, z=0.5)
     )
     assert isinstance(ball, ObjectDefinition)
     assert ball.type == 'ball'
@@ -52,7 +52,7 @@ def test_create_specific_definition_from_base_scale_vector():
     assert ball.mass == 0.6667
     assert ball.materials == []
     assert ball.salientMaterials == []
-    assert ball.scale == Vector3d(0.5, 1, 0.5)
+    assert ball.scale == Vector3d(x=0.5, y=1, z=0.5)
     assert ball.shape == ['ball']
 
 
@@ -73,7 +73,7 @@ def test_create_specific_definition_from_base_unconfigurable_material():
     assert ball.mass == 2
     assert ball.materials == []
     assert ball.salientMaterials == ['rubber']
-    assert ball.scale == Vector3d(2, 2, 2)
+    assert ball.scale == Vector3d(x=2, y=2, z=2)
     assert ball.shape == ['ball']
 
 
@@ -95,14 +95,14 @@ def test_create_specific_definition_from_base_mass_override():
     assert ball.mass == 10
     assert ball.materials == ['grey_material']
     assert ball.salientMaterials == ['metal']
-    assert ball.scale == Vector3d(2, 2, 2)
+    assert ball.scale == Vector3d(x=2, y=2, z=2)
     assert ball.shape == ['ball']
 
 
 def test_create_variable_definition_from_base():
     ball = base_objects.create_variable_definition_from_base(
         type='ball',
-        size_multiplier_list=[0.5, 1, 2, Vector3d(0.5, 1, 0.5)],
+        size_multiplier_list=[0.5, 1, 2, Vector3d(x=0.5, y=1, z=0.5)],
         chosen_material_list=[ChosenMaterial.METAL, ChosenMaterial.PLASTIC]
     )
     assert isinstance(ball, ObjectDefinition)
@@ -123,25 +123,25 @@ def test_create_variable_definition_from_base():
     assert ball.chooseMaterialList[1].salientMaterials == ['plastic']
 
     assert len(ball.chooseSizeList) == 4
-    assert ball.chooseSizeList[0].dimensions == Vector3d(0.5, 0.5, 0.5)
+    assert ball.chooseSizeList[0].dimensions == Vector3d(x=0.5, y=0.5, z=0.5)
     assert ball.chooseSizeList[0].mass == 0.5
-    assert ball.chooseSizeList[0].scale == Vector3d(0.5, 0.5, 0.5)
-    assert ball.chooseSizeList[1].dimensions == Vector3d(1, 1, 1)
+    assert ball.chooseSizeList[0].scale == Vector3d(x=0.5, y=0.5, z=0.5)
+    assert ball.chooseSizeList[1].dimensions == Vector3d(x=1, y=1, z=1)
     assert ball.chooseSizeList[1].mass == 1
-    assert ball.chooseSizeList[1].scale == Vector3d(1, 1, 1)
-    assert ball.chooseSizeList[2].dimensions == Vector3d(2, 2, 2)
+    assert ball.chooseSizeList[1].scale == Vector3d(x=1, y=1, z=1)
+    assert ball.chooseSizeList[2].dimensions == Vector3d(x=2, y=2, z=2)
     assert ball.chooseSizeList[2].mass == 2
-    assert ball.chooseSizeList[2].scale == Vector3d(2, 2, 2)
-    assert ball.chooseSizeList[3].dimensions == Vector3d(0.5, 1, 0.5)
+    assert ball.chooseSizeList[2].scale == Vector3d(x=2, y=2, z=2)
+    assert ball.chooseSizeList[3].dimensions == Vector3d(x=0.5, y=1, z=0.5)
     assert ball.chooseSizeList[3].mass == 0.6667
-    assert ball.chooseSizeList[3].scale == Vector3d(0.5, 1, 0.5)
+    assert ball.chooseSizeList[3].scale == Vector3d(x=0.5, y=1, z=0.5)
 
 
 def test_create_variable_definition_from_base_attributes_overrides():
     ball = base_objects.create_variable_definition_from_base(
         type='ball',
         attributes_overrides=[],
-        size_multiplier_list=[0.5, 1, 2, Vector3d(0.5, 1, 0.5)],
+        size_multiplier_list=[0.5, 1, 2, Vector3d(x=0.5, y=1, z=0.5)],
         chosen_material_list=[ChosenMaterial.METAL, ChosenMaterial.PLASTIC]
     )
     assert isinstance(ball, ObjectDefinition)
@@ -152,7 +152,7 @@ def test_create_variable_definition_from_base_attributes_overrides():
 def test_create_variable_definition_from_base_cylinder():
     cylinder = base_objects.create_variable_definition_from_base(
         type='cylinder',
-        size_multiplier_list=[0.5, 1, 2, Vector3d(0.5, 1, 0.5)],
+        size_multiplier_list=[0.5, 1, 2, Vector3d(x=0.5, y=1, z=0.5)],
         chosen_material_list=[ChosenMaterial.METAL, ChosenMaterial.PLASTIC]
     )
     assert isinstance(cylinder, ObjectDefinition)
@@ -165,18 +165,19 @@ def test_create_variable_definition_from_base_cylinder():
     assert cylinder.shape == ['cylinder']
 
     assert len(cylinder.chooseSizeList) == 4
-    assert cylinder.chooseSizeList[0].dimensions == Vector3d(0.5, 0.5, 0.5)
+    assert cylinder.chooseSizeList[0].dimensions == Vector3d(
+        x=0.5, y=0.5, z=0.5)
     assert cylinder.chooseSizeList[0].mass == 0.5
-    assert cylinder.chooseSizeList[0].scale == Vector3d(0.5, 0.25, 0.5)
-    assert cylinder.chooseSizeList[1].dimensions == Vector3d(1, 1, 1)
+    assert cylinder.chooseSizeList[0].scale == Vector3d(x=0.5, y=0.25, z=0.5)
+    assert cylinder.chooseSizeList[1].dimensions == Vector3d(x=1, y=1, z=1)
     assert cylinder.chooseSizeList[1].mass == 1
-    assert cylinder.chooseSizeList[1].scale == Vector3d(1, 0.5, 1)
-    assert cylinder.chooseSizeList[2].dimensions == Vector3d(2, 2, 2)
+    assert cylinder.chooseSizeList[1].scale == Vector3d(x=1, y=0.5, z=1)
+    assert cylinder.chooseSizeList[2].dimensions == Vector3d(x=2, y=2, z=2)
     assert cylinder.chooseSizeList[2].mass == 2
-    assert cylinder.chooseSizeList[2].scale == Vector3d(2, 1, 2)
-    assert cylinder.chooseSizeList[3].dimensions == Vector3d(0.5, 1, 0.5)
+    assert cylinder.chooseSizeList[2].scale == Vector3d(x=2, y=1, z=2)
+    assert cylinder.chooseSizeList[3].dimensions == Vector3d(x=0.5, y=1, z=0.5)
     assert cylinder.chooseSizeList[3].mass == 0.6667
-    assert cylinder.chooseSizeList[3].scale == Vector3d(0.5, 0.5, 0.5)
+    assert cylinder.chooseSizeList[3].scale == Vector3d(x=0.5, y=0.5, z=0.5)
 
 
 def test_create_variable_definition_from_base_primitive_shape_number():
@@ -225,13 +226,13 @@ def test_create_soccer_ball():
     assert ball.type == 'soccer_ball'
     assert ball.attributes == ['moveable', 'pickupable']
     assert ball.color == ['white', 'black']
-    assert ball.dimensions == Vector3d(0.22, 0.22, 0.22)
+    assert ball.dimensions == Vector3d(x=0.22, y=0.22, z=0.22)
     assert ball.mass == 1
     assert ball.materials == []
-    assert ball.offset == Vector3d(0, 0.11, 0)
+    assert ball.offset == Vector3d(x=0, y=0.11, z=0)
     assert ball.positionY == 0.11
     assert ball.salientMaterials == ['rubber']
-    assert ball.scale == Vector3d(1, 1, 1)
+    assert ball.scale == Vector3d(x=1, y=1, z=1)
     assert ball.shape == ['ball']
 
 

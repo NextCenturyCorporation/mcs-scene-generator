@@ -1,51 +1,16 @@
 import logging
-from dataclasses import dataclass
 from typing import Any, Dict, List, Union
 
-from ideal_learning_env.defs import ILEConfigurationException, ILEException
-from ideal_learning_env.numerics import MinMaxFloat
+from generator import tags
+from ideal_learning_env.defs import ILEConfigurationException
 
-from .action_generator import StepBeginEnd, add_freezes
+from .action_service import ActionService, StepBeginEnd, TeleportConfig
 from .choosers import choose_random
 from .components import ILEComponent
 from .decorators import ile_config_setter
-from .numerics import MinMaxInt
 from .validators import ValidateNumber
 
 logger = logging.getLogger(__name__)
-
-
-@dataclass
-class TeleportConfig():
-    """
-    Contains data to describe when and where a teleport occurs.
-
-    - `step` (int, or list of ints, or [MinMaxInt](#MinMaxInt) dict, or list of
-    MinMaxInt dicts): The step when the performer agent is teleported.
-    This field is required for teleport action restrictions.
-    - `position_x` (float, or list of floats, or [MinMaxFloat](#MinMaxFloat)
-    dict, or list of MinMaxFloat dicts):
-    Position in X direction where the performer agent
-    is teleported.  This field along with `position_z` are required
-    if `rotation_y` is not set.
-    - `position_z` (float, or list of floats, or [MinMaxFloat](#MinMaxFloat)
-    dict, or list of MinMaxFloat dicts):
-    Position in Z direction where the performer agent
-    is teleported.  This field along with `position_x` are required
-    if `rotation_y` is not set.
-    - `rotation_y` (float, or list of floats, or [MinMaxFloat](#MinMaxFloat)
-    dict, or list of MinMaxFloat dicts):
-    Rotation in Y direction where the performer agent
-    is teleported.  This field is required for teleport action
-    restrictions if `position_x` and `position_z` are not both set.
-    """
-    step: Union[int, MinMaxInt, List[Union[int, MinMaxInt]]] = None
-    position_x: Union[float, MinMaxFloat,
-                      List[Union[float, MinMaxFloat]]] = None
-    position_z: Union[float, MinMaxFloat,
-                      List[Union[float, MinMaxFloat]]] = None
-    rotation_y: Union[float, MinMaxFloat,
-                      List[Union[float, MinMaxFloat]]] = None
 
 
 class ActionRestrictionsComponent(ILEComponent):
@@ -173,9 +138,7 @@ class ActionRestrictionsComponent(ILEComponent):
     def set_swivels(self, data: Any) -> None:
         self.swivels = data
 
-    def get_swivels(self) -> List[
-        StepBeginEnd
-    ]:
+    def get_swivels(self) -> List[StepBeginEnd]:
         return [choose_random(s) for s in (self.swivels or [])]
 
     @ile_config_setter(validator=ValidateNumber(
@@ -186,17 +149,14 @@ class ActionRestrictionsComponent(ILEComponent):
     def set_teleports(self, data: Any) -> None:
         self.teleports = data
 
-    def get_teleports(self) -> List[
-        TeleportConfig
-    ]:
+    def get_teleports(self) -> List[TeleportConfig]:
         return [choose_random(t) for t in (self.teleports or [])]
 
     # Override
     def update_ile_scene(self, scene: Dict[str, Any]) -> Dict[str, Any]:
         logger.info('Configuring action restrictions for the scene...')
 
-        scene['objects'] = scene.get('objects', [])
-        goal = scene.get('goal', {})
+        goal = scene.goal or {}
         total_steps = goal.get('last_step')
         freezes = sorted(self.get_freezes(), key=lambda x: x.begin)
         swivels = sorted(self.get_swivels(), key=lambda x: x.begin)
@@ -204,89 +164,21 @@ class ActionRestrictionsComponent(ILEComponent):
         self._restriction_validation(freezes, swivels, teleports, total_steps)
         passive = self.get_passive_scene()
         if passive:
+            goal['category'] = tags.tag_to_label(
+                tags.SCENE.INTUITIVE_PHYSICS)
             goal['action_list'] = [['Pass']] * total_steps
             logger.trace('Setting whole scene as passive')
         if freezes:
-            add_freezes(goal, freezes)
+            ActionService.add_freezes(goal, freezes)
             logger.trace(f'Adding {len(freezes)} freezes to scene')
         if swivels:
-            self._add_swivels(goal, swivels)
+            ActionService.add_swivels(goal, swivels)
             logger.trace(
                 f'Adding {len(swivels)} swivels to scene')
         if teleports:
-            self._add_teleports(goal, teleports, passive)
+            ActionService.add_teleports(goal, teleports, passive)
             logger.trace(f'Adding {len(teleports)} teleports to scene')
         return scene
-
-    def _add_teleports(self, goal, teleports, passive):
-        goal['action_list'] = goal.get('action_list', [])
-        al = goal['action_list']
-        for t in teleports:
-            step = t.step
-            cmd = "EndHabituation"
-            cmd += f",xPosition={t.position_x}" if t.position_x else ""
-            cmd += f",zPosition={t.position_z}" if t.position_z else ""
-            cmd += f",yRotation={t.rotation_y}" if t.rotation_y else ""
-            length = len(al)
-            if step > length:
-                al += ([[]] * (step - length))
-            if al[step - 1] != [] and not passive:
-                raise ILEException(
-                    f"Cannot teleport during freeze or swivel "
-                    f"at step={step - 1}")
-            al[step - 1] = [cmd]
-
-    def _add_swivels(self, goal, swivels):
-        swivel_actions = ['LookDown', 'LookUp', 'RotateLeft', 'RotateRight']
-        goal['action_list'] = goal.get('action_list', [])
-        al = goal['action_list']
-
-        # check if actions already exist in action list
-        # at the start
-        al_length = len(al)
-        no_actions = al_length == 0
-
-        limit = 1
-        for s in swivels:
-            s.begin = 1 if s.begin is None else s.begin
-            if s.end is None:
-                if goal['last_step'] is None:
-                    raise ILEConfigurationException(
-                        "Configuration error.  A swivel without an 'end' "
-                        "requires 'last_step' to be set.")
-                else:
-                    # Add one so we include the last step.  End is exclusive.
-                    s.end = goal['last_step'] + 1
-            if (limit > s.begin):
-                raise ILEException(f"Swivels overlapped at {limit}")
-            if s.begin >= s.end:
-                raise ILEException(
-                    f"Swivels has begin >= end ({s.begin} >= {s.end})")
-
-            if(no_actions or s.begin > al_length):
-                num_free = s.begin - \
-                    limit if no_actions else (s.begin - al_length - 1)
-                num_limited = s.end - s.begin
-                al += ([[]] * (num_free))
-                al += ([swivel_actions] * (num_limited))
-
-            else:
-                step = s.begin
-
-                while(step < s.end):
-                    if(len(al) >= step):
-                        if(al[step - 1] != []):
-                            raise ILEException(
-                                f"Swivels with begin {s.begin} and end "
-                                f"{s.end} overlap with existing action "
-                                f"in action_list")
-                        al[step - 1] = swivel_actions
-                    else:
-                        al += swivel_actions
-
-                    step = step + 1
-
-            limit = s.end
 
     def _restriction_validation(
             self, freezes, swivels, teleports, total_steps):

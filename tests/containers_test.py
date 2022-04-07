@@ -22,12 +22,12 @@ from generator.containers import (
 DEFAULT_CONTAINER = definitions.finalize_object_definition(ObjectDefinition(
     type='box',
     attributes=['receptacle', 'openable'],
-    dimensions=Vector3d(1, 1, 1),
-    scale=Vector3d(1, 1, 1),
+    dimensions=Vector3d(x=1, y=1, z=1),
+    scale=Vector3d(x=1, y=1, z=1),
     enclosedAreas=[ObjectInteractableArea(
         area_id='',
-        dimensions=Vector3d(1, 1, 1),
-        position=Vector3d(0, 0.5, 0)
+        dimensions=Vector3d(x=1, y=1, z=1),
+        position=Vector3d(x=0, y=0.5, z=0)
     ).to_dict()]
 ))
 
@@ -37,7 +37,9 @@ PICKUPABLE_OBJECTS_WITHOUT_CONTAINMENTS = [
 ]
 
 
-CONTAINERS = specific_objects.get_container_definition_dataset(unshuffled=True)
+CONTAINERS = specific_objects.get_container_openable_definition_dataset(
+    unshuffled=True
+)
 CONTAINER_DEFINITIONS = [
     # Just use the first variation (color) of each object for faster testing.
     definition_variations[0]
@@ -174,16 +176,16 @@ def test_put_objects_in_container():
 
 
 def test_can_enclose():
-    small = ObjectDefinition(dimensions=Vector3d(1, 1, 1))
-    big = ObjectDefinition(dimensions=Vector3d(42, 42, 42))
+    small = ObjectDefinition(dimensions=Vector3d(x=1, y=1, z=1))
+    big = ObjectDefinition(dimensions=Vector3d(x=42, y=42, z=42))
     assert can_enclose({'dimensions': vars(big.dimensions)}, small) is not None
     assert can_enclose({'dimensions': vars(small.dimensions)}, big) is None
 
 
 def test_can_contain():
-    small1 = ObjectDefinition(dimensions=Vector3d(0.01, 0.01, 0.01))
-    small2 = ObjectDefinition(dimensions=Vector3d(0.02, 0.02, 0.02))
-    big = ObjectDefinition(dimensions=Vector3d(42, 42, 42))
+    small1 = ObjectDefinition(dimensions=Vector3d(x=0.01, y=0.01, z=0.01))
+    small2 = ObjectDefinition(dimensions=Vector3d(x=0.02, y=0.02, z=0.02))
+    big = ObjectDefinition(dimensions=Vector3d(x=42, y=42, z=42))
     container_def = copy.deepcopy(DEFAULT_CONTAINER)
     assert can_contain(container_def, small1, small2) is not None
     assert can_contain(container_def, small1, big) is None
@@ -192,9 +194,9 @@ def test_can_contain():
 
 
 def test_can_contain_both():
-    small1 = ObjectDefinition(dimensions=Vector3d(0.01, 0.01, 0.01))
-    small2 = ObjectDefinition(dimensions=Vector3d(0.02, 0.02, 0.02))
-    big = ObjectDefinition(dimensions=Vector3d(42, 42, 42))
+    small1 = ObjectDefinition(dimensions=Vector3d(x=0.01, y=0.01, z=0.01))
+    small2 = ObjectDefinition(dimensions=Vector3d(x=0.02, y=0.02, z=0.02))
+    big = ObjectDefinition(dimensions=Vector3d(x=42, y=42, z=42))
     container_def = copy.deepcopy(DEFAULT_CONTAINER)
     assert can_contain_both(container_def, small1, small2) is not None
     assert can_contain_both(container_def, small1, big) is None

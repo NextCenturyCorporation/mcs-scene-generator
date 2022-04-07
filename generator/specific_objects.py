@@ -5,10 +5,7 @@ from typing import List, Union
 
 from machine_common_sense.config_manager import Vector3d
 
-from .base_objects import (
-    create_soccer_ball,
-    create_variable_definition_from_base,
-)
+from .base_objects import create_variable_definition_from_base
 from .definitions import (
     ChosenMaterial,
     DefinitionDataset,
@@ -20,9 +17,14 @@ from .structures import DOOR_TEMPLATE
 
 
 def multiply(one: Vector3d, two: Vector3d) -> Vector3d:
-    return Vector3d(one.x * two.x, one.y * two.y, one.z * two.z)
+    return Vector3d(x=one.x * two.x, y=one.y * two.y, z=one.z * two.z)
 
 
+_BALL_SOCCER = create_variable_definition_from_base(
+    type='soccer_ball',
+    size_multiplier_list=[1, 1.5, 2],
+    chosen_material_list=[]
+)
 _BALL_PLASTIC = create_variable_definition_from_base(
     type='ball',
     size_multiplier_list=[0.05, 0.1, 0.25, 0.5],
@@ -41,12 +43,12 @@ _BALL_NON_PLASTIC = create_variable_definition_from_base(
 
 _BLOCK_BLANK_CUBE = create_variable_definition_from_base(
     type='block_blank_wood_cube',
-    size_multiplier_list=[1, Vector3d(1, 2, 1), Vector3d(2, 1, 2)],
+    size_multiplier_list=[1, Vector3d(x=1, y=2, z=1), Vector3d(x=2, y=1, z=2)],
     chosen_material_list=[ChosenMaterial.BLOCK_WOOD, ChosenMaterial.WOOD]
 )
 _BLOCK_BLANK_CYLINDER = create_variable_definition_from_base(
     type='block_blank_wood_cylinder',
-    size_multiplier_list=[1, Vector3d(1, 2, 1), Vector3d(2, 1, 2)],
+    size_multiplier_list=[1, Vector3d(x=1, y=2, z=1), Vector3d(x=2, y=1, z=2)],
     chosen_material_list=[ChosenMaterial.BLOCK_WOOD, ChosenMaterial.WOOD]
 )
 _BLOCK_LETTER = create_variable_definition_from_base(
@@ -313,11 +315,11 @@ _BOOKCASE = ObjectDefinition(
         ),
         create_variable_definition_from_base(
             type='bookcase_1_shelf',
-            size_multiplier_list=[Vector3d(0.5, 1, 1)]
+            size_multiplier_list=[Vector3d(x=0.5, y=1, z=1)]
         ),
         create_variable_definition_from_base(
             type='bookcase_1_shelf',
-            size_multiplier_list=[Vector3d(2, 1, 1)]
+            size_multiplier_list=[Vector3d(x=2, y=1, z=1)]
         ),
         create_variable_definition_from_base(
             type='bookcase_2_shelf',
@@ -325,11 +327,11 @@ _BOOKCASE = ObjectDefinition(
         ),
         create_variable_definition_from_base(
             type='bookcase_2_shelf',
-            size_multiplier_list=[Vector3d(0.5, 1, 1)]
+            size_multiplier_list=[Vector3d(x=0.5, y=1, z=1)]
         ),
         create_variable_definition_from_base(
             type='bookcase_2_shelf',
-            size_multiplier_list=[Vector3d(2, 1, 1)]
+            size_multiplier_list=[Vector3d(x=2, y=1, z=1)]
         ),
         create_variable_definition_from_base(
             type='bookcase_3_shelf',
@@ -337,11 +339,11 @@ _BOOKCASE = ObjectDefinition(
         ),
         create_variable_definition_from_base(
             type='bookcase_3_shelf',
-            size_multiplier_list=[Vector3d(0.5, 1, 1)]
+            size_multiplier_list=[Vector3d(x=0.5, y=1, z=1)]
         ),
         create_variable_definition_from_base(
             type='bookcase_3_shelf',
-            size_multiplier_list=[Vector3d(2, 1, 1)]
+            size_multiplier_list=[Vector3d(x=2, y=1, z=1)]
         ),
         create_variable_definition_from_base(
             type='bookcase_4_shelf',
@@ -349,11 +351,11 @@ _BOOKCASE = ObjectDefinition(
         ),
         create_variable_definition_from_base(
             type='bookcase_4_shelf',
-            size_multiplier_list=[Vector3d(0.5, 1, 1)]
+            size_multiplier_list=[Vector3d(x=0.5, y=1, z=1)]
         ),
         create_variable_definition_from_base(
             type='bookcase_4_shelf',
-            size_multiplier_list=[Vector3d(2, 1, 1)]
+            size_multiplier_list=[Vector3d(x=2, y=1, z=1)]
         )
     ],
     chooseMaterialList=[
@@ -372,11 +374,11 @@ _BOOKCASE_SIDELESS = ObjectDefinition(
         ),
         create_variable_definition_from_base(
             type='bookcase_1_shelf_sideless',
-            size_multiplier_list=[Vector3d(0.5, 1, 1)]
+            size_multiplier_list=[Vector3d(x=0.5, y=1, z=1)]
         ),
         create_variable_definition_from_base(
             type='bookcase_1_shelf_sideless',
-            size_multiplier_list=[Vector3d(2, 1, 1)]
+            size_multiplier_list=[Vector3d(x=2, y=1, z=1)]
         ),
         create_variable_definition_from_base(
             type='bookcase_2_shelf_sideless',
@@ -384,11 +386,11 @@ _BOOKCASE_SIDELESS = ObjectDefinition(
         ),
         create_variable_definition_from_base(
             type='bookcase_2_shelf_sideless',
-            size_multiplier_list=[Vector3d(0.5, 1, 1)]
+            size_multiplier_list=[Vector3d(x=0.5, y=1, z=1)]
         ),
         create_variable_definition_from_base(
             type='bookcase_2_shelf_sideless',
-            size_multiplier_list=[Vector3d(2, 1, 1)]
+            size_multiplier_list=[Vector3d(x=2, y=1, z=1)]
         ),
         create_variable_definition_from_base(
             type='bookcase_3_shelf_sideless',
@@ -396,11 +398,11 @@ _BOOKCASE_SIDELESS = ObjectDefinition(
         ),
         create_variable_definition_from_base(
             type='bookcase_3_shelf_sideless',
-            size_multiplier_list=[Vector3d(0.5, 1, 1)]
+            size_multiplier_list=[Vector3d(x=0.5, y=1, z=1)]
         ),
         create_variable_definition_from_base(
             type='bookcase_3_shelf_sideless',
-            size_multiplier_list=[Vector3d(2, 1, 1)]
+            size_multiplier_list=[Vector3d(x=2, y=1, z=1)]
         ),
         create_variable_definition_from_base(
             type='bookcase_4_shelf_sideless',
@@ -408,11 +410,11 @@ _BOOKCASE_SIDELESS = ObjectDefinition(
         ),
         create_variable_definition_from_base(
             type='bookcase_4_shelf_sideless',
-            size_multiplier_list=[Vector3d(0.5, 1, 1)]
+            size_multiplier_list=[Vector3d(x=0.5, y=1, z=1)]
         ),
         create_variable_definition_from_base(
             type='bookcase_4_shelf_sideless',
-            size_multiplier_list=[Vector3d(2, 1, 1)]
+            size_multiplier_list=[Vector3d(x=2, y=1, z=1)]
         )
     ],
     chooseMaterialList=[
@@ -455,9 +457,9 @@ _CHAIR_2_STOOL_CIRCLE_BABY_SCALED = create_variable_definition_from_base(
     type='chair_2',
     attributes_overrides=['pickupable', 'receptacle'],
     size_multiplier_list=[
-        Vector3d(0.25, 0.5, 0.25),
-        Vector3d(0.5, 0.5, 0.5),
-        Vector3d(0.75, 0.5, 0.75)
+        Vector3d(x=0.25, y=0.5, z=0.25),
+        Vector3d(x=0.5, y=0.5, z=0.5),
+        Vector3d(x=0.75, y=0.5, z=0.75)
     ],
     chosen_material_list=[
         ChosenMaterial.METAL,
@@ -468,9 +470,9 @@ _CHAIR_2_STOOL_CIRCLE_BABY_SCALED = create_variable_definition_from_base(
 _CHAIR_2_STOOL_CIRCLE = create_variable_definition_from_base(
     type='chair_2',
     size_multiplier_list=[
-        Vector3d(0.75, 0.75, 0.75),
-        Vector3d(1, 0.75, 1),
-        Vector3d(1, 1, 1)
+        Vector3d(x=0.75, y=0.75, z=0.75),
+        Vector3d(x=1, y=0.75, z=1),
+        Vector3d(x=1, y=1, z=1)
     ],
     chosen_material_list=[
         ChosenMaterial.METAL,
@@ -483,9 +485,9 @@ _CHAIR_2_STOOL_CIRCLE = create_variable_definition_from_base(
 _CHAIR_3_STOOL_RECT = create_variable_definition_from_base(
     type='chair_3',
     size_multiplier_list=[
-        Vector3d(0.5, 0.5, 0.5),
-        Vector3d(0.667, 0.667, 0.667),
-        Vector3d(0.75, 0.75, 0.75)
+        Vector3d(x=0.5, y=0.5, z=0.5),
+        Vector3d(x=0.667, y=0.667, z=0.667),
+        Vector3d(x=0.75, y=0.75, z=0.75)
     ],
     chosen_material_list=[
         ChosenMaterial.METAL,
@@ -498,9 +500,9 @@ _CHAIR_3_STOOL_RECT = create_variable_definition_from_base(
 _CHAIR_4_OFFICE = create_variable_definition_from_base(
     type='chair_4',
     size_multiplier_list=[
-        Vector3d(0.7, 0.7, 0.7),
-        Vector3d(0.9, 0.9, 0.9),
-        Vector3d(1.1, 1.1, 1.1)
+        Vector3d(x=0.7, y=0.7, z=0.7),
+        Vector3d(x=0.9, y=0.9, z=0.9),
+        Vector3d(x=1.1, y=1.1, z=1.1)
     ],
     chosen_material_list=[ChosenMaterial.METAL, ChosenMaterial.PLASTIC]
 )
@@ -553,13 +555,13 @@ _CHAIR_8 = create_variable_definition_from_base(
 _BLOCK_BLANK_CUBE_NOT_PICKUPABLE = create_variable_definition_from_base(
     type='block_blank_wood_cube',
     attributes_overrides=['moveable'],
-    size_multiplier_list=[2, Vector3d(2, 4, 2), Vector3d(4, 2, 4)],
+    size_multiplier_list=[2, Vector3d(x=2, y=4, z=2), Vector3d(x=4, y=2, z=4)],
     chosen_material_list=[ChosenMaterial.BLOCK_WOOD, ChosenMaterial.WOOD]
 )
 _BLOCK_BLANK_CYLINDER_NOT_PICKUPABLE = create_variable_definition_from_base(
     type='block_blank_wood_cylinder',
     attributes_overrides=['moveable'],
-    size_multiplier_list=[2, Vector3d(2, 4, 2), Vector3d(4, 2, 4)],
+    size_multiplier_list=[2, Vector3d(x=2, y=4, z=2), Vector3d(x=4, y=2, z=4)],
     chosen_material_list=[ChosenMaterial.BLOCK_WOOD, ChosenMaterial.WOOD]
 )
 
@@ -572,27 +574,27 @@ _CRIB = create_variable_definition_from_base(
 
 
 # Set the default X to 1.175 so the table's shape is an exact 1:2 ratio.
-_TABLE_1_RECT_VECTOR = Vector3d(1.175, 1, 1)
+_TABLE_1_RECT_VECTOR = Vector3d(x=1.175, y=1, z=1)
 _TABLE_1_RECT_BABY_SCALED = create_variable_definition_from_base(
     type='table_1',
     attributes_overrides=['pickupable', 'receptacle'],
     size_multiplier_list=[
-        multiply(_TABLE_1_RECT_VECTOR, Vector3d(0.5, 0.5, 0.5)),
-        multiply(_TABLE_1_RECT_VECTOR, Vector3d(0.5, 0.333, 0.5)),
-        multiply(_TABLE_1_RECT_VECTOR, Vector3d(0.5, 0.5, 0.25)),
-        multiply(_TABLE_1_RECT_VECTOR, Vector3d(0.5, 0.333, 0.25))
+        multiply(_TABLE_1_RECT_VECTOR, Vector3d(x=0.5, y=0.5, z=0.5)),
+        multiply(_TABLE_1_RECT_VECTOR, Vector3d(x=0.5, y=0.333, z=0.5)),
+        multiply(_TABLE_1_RECT_VECTOR, Vector3d(x=0.5, y=0.5, z=0.25)),
+        multiply(_TABLE_1_RECT_VECTOR, Vector3d(x=0.5, y=0.333, z=0.25))
     ],
     chosen_material_list=[ChosenMaterial.METAL, ChosenMaterial.WOOD]
 )
 _TABLE_1_RECT_ACCESSIBLE = create_variable_definition_from_base(
     type='table_1',
     size_multiplier_list=[
-        multiply(_TABLE_1_RECT_VECTOR, Vector3d(1, 0.5, 0.5)),
-        multiply(_TABLE_1_RECT_VECTOR, Vector3d(1, 0.5, 1)),
-        multiply(_TABLE_1_RECT_VECTOR, Vector3d(2, 0.5, 1)),
-        multiply(_TABLE_1_RECT_VECTOR, Vector3d(1, 1, 0.5)),
-        multiply(_TABLE_1_RECT_VECTOR, Vector3d(1, 1, 1)),
-        multiply(_TABLE_1_RECT_VECTOR, Vector3d(2, 1, 1))
+        multiply(_TABLE_1_RECT_VECTOR, Vector3d(x=1, y=0.5, z=0.5)),
+        multiply(_TABLE_1_RECT_VECTOR, Vector3d(x=1, y=0.5, z=1)),
+        multiply(_TABLE_1_RECT_VECTOR, Vector3d(x=2, y=0.5, z=1)),
+        multiply(_TABLE_1_RECT_VECTOR, Vector3d(x=1, y=1, z=0.5)),
+        multiply(_TABLE_1_RECT_VECTOR, Vector3d(x=1, y=1, z=1)),
+        multiply(_TABLE_1_RECT_VECTOR, Vector3d(x=2, y=1, z=1))
     ],
     chosen_material_list=[ChosenMaterial.METAL, ChosenMaterial.WOOD]
 )
@@ -602,8 +604,8 @@ _TABLE_2_CIRCLE_BABY_SCALED = create_variable_definition_from_base(
     type='table_2',
     attributes_overrides=['pickupable', 'receptacle'],
     size_multiplier_list=[
-        Vector3d(0.333, 0.333, 0.333),
-        Vector3d(0.5, 0.333, 0.5)
+        Vector3d(x=0.333, y=0.333, z=0.333),
+        Vector3d(x=0.5, y=0.333, z=0.5)
     ],
     chosen_material_list=[
         ChosenMaterial.METAL,
@@ -614,12 +616,12 @@ _TABLE_2_CIRCLE_BABY_SCALED = create_variable_definition_from_base(
 _TABLE_2_CIRCLE_ACCESSIBLE = create_variable_definition_from_base(
     type='table_2',
     size_multiplier_list=[
-        Vector3d(0.5, 0.5, 0.5),
-        Vector3d(1, 0.5, 1),
-        Vector3d(0.75, 0.75, 0.75),
-        Vector3d(1.5, 0.75, 1.5),
-        Vector3d(1, 1, 1),
-        Vector3d(2, 1, 2)
+        Vector3d(x=0.5, y=0.5, z=0.5),
+        Vector3d(x=1, y=0.5, z=1),
+        Vector3d(x=0.75, y=0.75, z=0.75),
+        Vector3d(x=1.5, y=0.75, z=1.5),
+        Vector3d(x=1, y=1, z=1),
+        Vector3d(x=2, y=1, z=2)
     ],
     chosen_material_list=[
         ChosenMaterial.METAL,
@@ -632,18 +634,19 @@ _TABLE_2_CIRCLE_ACCESSIBLE = create_variable_definition_from_base(
 _TABLE_3_CIRCLE_BABY_SCALED = create_variable_definition_from_base(
     type='table_3',
     attributes_overrides=['pickupable', 'receptacle'],
-    size_multiplier_list=[Vector3d(0.5, 0.5, 0.5), Vector3d(1, 0.5, 1)],
+    size_multiplier_list=[
+        Vector3d(x=0.5, y=0.5, z=0.5), Vector3d(x=1, y=0.5, z=1)],
     chosen_material_list=[ChosenMaterial.METAL, ChosenMaterial.WOOD]
 )
 _TABLE_3_CIRCLE_ACCESSIBLE = create_variable_definition_from_base(
     type='table_3',
     size_multiplier_list=[
-        Vector3d(1.5, 0.5, 1.5),
-        Vector3d(2, 0.5, 2),
-        Vector3d(1, 1, 1),
-        Vector3d(1.5, 1, 1.5),
-        Vector3d(2, 1, 2),
-        Vector3d(2.5, 1, 2.5)
+        Vector3d(x=1.5, y=0.5, z=1.5),
+        Vector3d(x=2, y=0.5, z=2),
+        Vector3d(x=1, y=1, z=1),
+        Vector3d(x=1.5, y=1, z=1.5),
+        Vector3d(x=2, y=1, z=2),
+        Vector3d(x=2.5, y=1, z=2.5)
     ],
     chosen_material_list=[ChosenMaterial.METAL, ChosenMaterial.WOOD]
 )
@@ -652,14 +655,14 @@ _TABLE_3_CIRCLE_ACCESSIBLE = create_variable_definition_from_base(
 _TABLE_4_SEMICIRCLE_ACCESSIBLE = create_variable_definition_from_base(
     type='table_4',
     size_multiplier_list=[
-        Vector3d(0.75, 0.75, 0.75),
-        Vector3d(1, 0.75, 1),
-        Vector3d(1.25, 0.75, 1.25),
-        Vector3d(1.5, 0.75, 1.5),
-        Vector3d(1, 1, 1),
-        Vector3d(1.25, 1, 1.25),
-        Vector3d(1.5, 1, 1.5),
-        Vector3d(2, 1, 2)
+        Vector3d(x=0.75, y=0.75, z=0.75),
+        Vector3d(x=1, y=0.75, z=1),
+        Vector3d(x=1.25, y=0.75, z=1.25),
+        Vector3d(x=1.5, y=0.75, z=1.5),
+        Vector3d(x=1, y=1, z=1),
+        Vector3d(x=1.25, y=1, z=1.25),
+        Vector3d(x=1.5, y=1, z=1.5),
+        Vector3d(x=2, y=1, z=2)
     ],
     chosen_material_list=[
         ChosenMaterial.METAL,
@@ -670,54 +673,54 @@ _TABLE_4_SEMICIRCLE_ACCESSIBLE = create_variable_definition_from_base(
 
 
 # Set the default Z to 0.667 so the table's shape is an exact 2:1 ratio.
-_TABLE_5_RECT_VECTOR = Vector3d(1, 1, 0.667)
+_TABLE_5_RECT_VECTOR = Vector3d(x=1, y=1, z=0.667)
 _TABLE_5_RECT_ACCESSIBLE = create_variable_definition_from_base(
     type='table_5',
     size_multiplier_list=[
-        multiply(_TABLE_5_RECT_VECTOR, Vector3d(0.25, 0.5, 0.5)),
-        multiply(_TABLE_5_RECT_VECTOR, Vector3d(0.5, 0.5, 0.5)),
-        multiply(_TABLE_5_RECT_VECTOR, Vector3d(0.5, 0.5, 1)),
-        multiply(_TABLE_5_RECT_VECTOR, Vector3d(1, 0.5, 1)),
-        multiply(_TABLE_5_RECT_VECTOR, Vector3d(0.25, 1, 0.5)),
-        multiply(_TABLE_5_RECT_VECTOR, Vector3d(0.5, 1, 0.5)),
-        multiply(_TABLE_5_RECT_VECTOR, Vector3d(0.5, 1, 1)),
-        multiply(_TABLE_5_RECT_VECTOR, Vector3d(1, 1, 1))
+        multiply(_TABLE_5_RECT_VECTOR, Vector3d(x=0.25, y=0.5, z=0.5)),
+        multiply(_TABLE_5_RECT_VECTOR, Vector3d(x=0.5, y=0.5, z=0.5)),
+        multiply(_TABLE_5_RECT_VECTOR, Vector3d(x=0.5, y=0.5, z=1)),
+        multiply(_TABLE_5_RECT_VECTOR, Vector3d(x=1, y=0.5, z=1)),
+        multiply(_TABLE_5_RECT_VECTOR, Vector3d(x=0.25, y=1, z=0.5)),
+        multiply(_TABLE_5_RECT_VECTOR, Vector3d(x=0.5, y=1, z=0.5)),
+        multiply(_TABLE_5_RECT_VECTOR, Vector3d(x=0.5, y=1, z=1)),
+        multiply(_TABLE_5_RECT_VECTOR, Vector3d(x=1, y=1, z=1))
     ],
     chosen_material_list=[ChosenMaterial.METAL, ChosenMaterial.WOOD]
 )
 
 
 # Set the default X and Z so the table's shape is an exact 2:1 ratio.
-_TABLE_7_RECT_VECTOR = Vector3d(0.98, 1, 0.769)
+_TABLE_7_RECT_VECTOR = Vector3d(x=0.98, y=1, z=0.769)
 _TABLE_7_RECT_ACCESSIBLE = create_variable_definition_from_base(
     type='table_7',
     size_multiplier_list=[
-        multiply(_TABLE_7_RECT_VECTOR, Vector3d(0.5, 1, 1)),
-        multiply(_TABLE_7_RECT_VECTOR, Vector3d(1, 1, 1)),
-        multiply(_TABLE_7_RECT_VECTOR, Vector3d(1, 1, 2)),
-        multiply(_TABLE_7_RECT_VECTOR, Vector3d(2, 1, 2)),
-        multiply(_TABLE_7_RECT_VECTOR, Vector3d(0.5, 2, 1)),
-        multiply(_TABLE_7_RECT_VECTOR, Vector3d(1, 2, 1)),
-        multiply(_TABLE_7_RECT_VECTOR, Vector3d(1, 2, 2)),
-        multiply(_TABLE_7_RECT_VECTOR, Vector3d(2, 2, 2))
+        multiply(_TABLE_7_RECT_VECTOR, Vector3d(x=0.5, y=1, z=1)),
+        multiply(_TABLE_7_RECT_VECTOR, Vector3d(x=1, y=1, z=1)),
+        multiply(_TABLE_7_RECT_VECTOR, Vector3d(x=1, y=1, z=2)),
+        multiply(_TABLE_7_RECT_VECTOR, Vector3d(x=2, y=1, z=2)),
+        multiply(_TABLE_7_RECT_VECTOR, Vector3d(x=0.5, y=2, z=1)),
+        multiply(_TABLE_7_RECT_VECTOR, Vector3d(x=1, y=2, z=1)),
+        multiply(_TABLE_7_RECT_VECTOR, Vector3d(x=1, y=2, z=2)),
+        multiply(_TABLE_7_RECT_VECTOR, Vector3d(x=2, y=2, z=2))
     ],
     chosen_material_list=[ChosenMaterial.METAL, ChosenMaterial.WOOD]
 )
 
 
 # Set the default X and Z so the table's shape is an exact 1:2 ratio.
-_TABLE_8_RECT_VECTOR = Vector3d(0.769, 1, 0.98)
+_TABLE_8_RECT_VECTOR = Vector3d(x=0.769, y=1, z=0.98)
 _TABLE_8_RECT_ACCESSIBLE = create_variable_definition_from_base(
     type='table_8',
     size_multiplier_list=[
-        multiply(_TABLE_8_RECT_VECTOR, Vector3d(1, 1, 0.5)),
-        multiply(_TABLE_8_RECT_VECTOR, Vector3d(1, 1, 1)),
-        multiply(_TABLE_8_RECT_VECTOR, Vector3d(2, 1, 1)),
-        multiply(_TABLE_8_RECT_VECTOR, Vector3d(2, 1, 2)),
-        multiply(_TABLE_8_RECT_VECTOR, Vector3d(1, 2, 0.5)),
-        multiply(_TABLE_8_RECT_VECTOR, Vector3d(1, 2, 1)),
-        multiply(_TABLE_8_RECT_VECTOR, Vector3d(2, 2, 1)),
-        multiply(_TABLE_8_RECT_VECTOR, Vector3d(2, 2, 2))
+        multiply(_TABLE_8_RECT_VECTOR, Vector3d(x=1, y=1, z=0.5)),
+        multiply(_TABLE_8_RECT_VECTOR, Vector3d(x=1, y=1, z=1)),
+        multiply(_TABLE_8_RECT_VECTOR, Vector3d(x=2, y=1, z=1)),
+        multiply(_TABLE_8_RECT_VECTOR, Vector3d(x=2, y=1, z=2)),
+        multiply(_TABLE_8_RECT_VECTOR, Vector3d(x=1, y=2, z=0.5)),
+        multiply(_TABLE_8_RECT_VECTOR, Vector3d(x=1, y=2, z=1)),
+        multiply(_TABLE_8_RECT_VECTOR, Vector3d(x=2, y=2, z=1)),
+        multiply(_TABLE_8_RECT_VECTOR, Vector3d(x=2, y=2, z=2))
     ],
     chosen_material_list=[ChosenMaterial.METAL, ChosenMaterial.WOOD]
 )
@@ -726,10 +729,10 @@ _TABLE_8_RECT_ACCESSIBLE = create_variable_definition_from_base(
 _TABLE_11_T_LEGS = create_variable_definition_from_base(
     type='table_11',
     size_multiplier_list=[
-        Vector3d(0.5, 0.5, 0.5),
-        Vector3d(0.5, 1, 0.5),
-        Vector3d(1, 0.5, 1),
-        Vector3d(1, 1, 1),
+        Vector3d(x=0.5, y=0.5, z=0.5),
+        Vector3d(x=0.5, y=1, z=0.5),
+        Vector3d(x=1, y=0.5, z=1),
+        Vector3d(x=1, y=1, z=1),
     ],
     chosen_material_list=[
         ChosenMaterial.METAL,
@@ -740,10 +743,10 @@ _TABLE_11_T_LEGS = create_variable_definition_from_base(
 _TABLE_12_X_LEGS = create_variable_definition_from_base(
     type='table_12',
     size_multiplier_list=[
-        Vector3d(0.5, 0.5, 0.5),
-        Vector3d(0.5, 1, 0.5),
-        Vector3d(1, 0.5, 1),
-        Vector3d(1, 1, 1),
+        Vector3d(x=0.5, y=0.5, z=0.5),
+        Vector3d(x=0.5, y=1, z=0.5),
+        Vector3d(x=1, y=0.5, z=1),
+        Vector3d(x=1, y=1, z=1),
     ],
     chosen_material_list=[
         ChosenMaterial.METAL,
@@ -755,7 +758,8 @@ _TABLE_12_X_LEGS = create_variable_definition_from_base(
 
 _TABLE_13_SMALL_CIRCLE = create_variable_definition_from_base(
     type='table_13',
-    size_multiplier_list=[1, Vector3d(2, 1, 2), 2, Vector3d(3, 2, 3)],
+    size_multiplier_list=[1, Vector3d(
+        x=2, y=1, z=2), 2, Vector3d(x=3, y=2, z=3)],
     chosen_material_list=[
         ChosenMaterial.METAL,
         ChosenMaterial.PLASTIC,
@@ -768,11 +772,11 @@ _TABLE_14_SMALL_RECT = create_variable_definition_from_base(
     type='table_14',
     size_multiplier_list=[
         1,
-        Vector3d(2, 1, 1),
-        Vector3d(1, 1, 2),
+        Vector3d(x=2, y=1, z=1),
+        Vector3d(x=1, y=1, z=2),
         2,
-        Vector3d(3, 2, 2),
-        Vector3d(2, 2, 3)
+        Vector3d(x=3, y=2, z=2),
+        Vector3d(x=2, y=2, z=3)
     ],
     chosen_material_list=[
         ChosenMaterial.METAL,
@@ -786,14 +790,14 @@ _TABLE_15_RECT = create_variable_definition_from_base(
     type='table_15',
     size_multiplier_list=[
         0.75,
-        Vector3d(1, 0.75, 0.75),
-        Vector3d(0.75, 0.75, 1),
+        Vector3d(x=1, y=0.75, z=0.75),
+        Vector3d(x=0.75, y=0.75, z=1),
         1,
-        Vector3d(1.25, 1, 1),
-        Vector3d(1, 1, 1.25),
+        Vector3d(x=1.25, y=1, z=1),
+        Vector3d(x=1, y=1, z=1.25),
         1.25,
-        Vector3d(1, 1.25, 1.25),
-        Vector3d(1.25, 1.25, 1)
+        Vector3d(x=1, y=1.25, z=1.25),
+        Vector3d(x=1.25, y=1.25, z=1)
     ],
     chosen_material_list=[
         ChosenMaterial.METAL,
@@ -807,11 +811,11 @@ _TABLE_16_CIRCLE = create_variable_definition_from_base(
     type='table_16',
     size_multiplier_list=[
         0.75,
-        Vector3d(1, 0.75, 1),
+        Vector3d(x=1, y=0.75, z=1),
         1,
-        Vector3d(1.25, 1, 1.25),
+        Vector3d(x=1.25, y=1, z=1.25),
         1.25,
-        Vector3d(1, 1.25, 1)
+        Vector3d(x=1, y=1.25, z=1)
     ],
     chosen_material_list=[
         ChosenMaterial.METAL,
@@ -829,16 +833,17 @@ _TV = create_variable_definition_from_base(
 
 _SHELF_2_TABLE_SQUARE = create_variable_definition_from_base(
     type='shelf_2',
-    size_multiplier_list=[Vector3d(0.5, 1, 0.5), Vector3d(1, 1, 1)],
+    size_multiplier_list=[
+        Vector3d(x=0.5, y=1, z=0.5), Vector3d(x=1, y=1, z=1)],
     chosen_material_list=[ChosenMaterial.METAL, ChosenMaterial.WOOD]
 )
 _SHELF_2_TABLE_RECT = create_variable_definition_from_base(
     type='shelf_2',
     size_multiplier_list=[
-        Vector3d(1, 2, 0.5),
-        Vector3d(2, 2, 0.5),
-        Vector3d(2, 3, 0.5),
-        Vector3d(3, 3, 0.5)
+        Vector3d(x=1, y=2, z=0.5),
+        Vector3d(x=2, y=2, z=0.5),
+        Vector3d(x=2, y=3, z=0.5),
+        Vector3d(x=3, y=3, z=0.5)
     ],
     chosen_material_list=[ChosenMaterial.METAL, ChosenMaterial.WOOD]
 )
@@ -847,18 +852,19 @@ _SHELF_2_TABLE_RECT = create_variable_definition_from_base(
 _SHELF_1_CUBBY_BABY_SCALED = create_variable_definition_from_base(
     type='shelf_1',
     attributes_overrides=['pickupable', 'receptacle'],
-    size_multiplier_list=[Vector3d(0.5, 0.5, 0.5), Vector3d(0.75, 0.75, 0.75)],
+    size_multiplier_list=[
+        Vector3d(x=0.5, y=0.5, z=0.5), Vector3d(x=0.75, y=0.75, z=0.75)],
     chosen_material_list=[ChosenMaterial.METAL, ChosenMaterial.WOOD]
 )
 _SHELF_1_CUBBY = create_variable_definition_from_base(
     type='shelf_1',
     size_multiplier_list=[
-        Vector3d(1, 1, 1),
-        Vector3d(1.5, 1.5, 1),
-        Vector3d(1.5, 1.5, 1.5),
-        Vector3d(2, 2, 1),
-        Vector3d(2, 2, 1.5),
-        Vector3d(2, 2, 2)
+        Vector3d(x=1, y=1, z=1),
+        Vector3d(x=1.5, y=1.5, z=1),
+        Vector3d(x=1.5, y=1.5, z=1.5),
+        Vector3d(x=2, y=2, z=1),
+        Vector3d(x=2, y=2, z=1.5),
+        Vector3d(x=2, y=2, z=2)
     ],
     chosen_material_list=[ChosenMaterial.METAL, ChosenMaterial.WOOD]
 )
@@ -902,19 +908,22 @@ _SOFA_BABY_SCALED = ObjectDefinition(
 
 _SOFA_1 = create_variable_definition_from_base(
     type='sofa_1',
-    size_multiplier_list=[Vector3d(0.75, 1, 1), 1, Vector3d(1.25, 1, 1)]
+    size_multiplier_list=[
+        Vector3d(x=0.75, y=1, z=1), 1, Vector3d(x=1.25, y=1, z=1)]
 )
 
 
 _SOFA_2 = create_variable_definition_from_base(
     type='sofa_2',
-    size_multiplier_list=[Vector3d(0.75, 1, 1), 1, Vector3d(1.25, 1, 1)]
+    size_multiplier_list=[
+        Vector3d(x=0.75, y=1, z=1), 1, Vector3d(x=1.25, y=1, z=1)]
 )
 
 
 _SOFA_3 = create_variable_definition_from_base(
     type='sofa_3',
-    size_multiplier_list=[Vector3d(0.75, 1, 1), 1, Vector3d(1.25, 1, 1)]
+    size_multiplier_list=[
+        Vector3d(x=0.75, y=1, z=1), 1, Vector3d(x=1.25, y=1, z=1)]
 )
 
 
@@ -1350,7 +1359,11 @@ _TOOLBOX_2 = create_variable_definition_from_base(
 # }
 
 
-_PICKUPABLE_BALLS = [_BALL_PLASTIC, _BALL_NON_PLASTIC, create_soccer_ball()]
+_PICKUPABLE_BALLS = [
+    _BALL_SOCCER,
+    _BALL_PLASTIC,
+    _BALL_NON_PLASTIC
+]
 _PICKUPABLE_BLOCKS = [
     _BLOCK_BLANK_CUBE,
     _BLOCK_BLANK_CYLINDER,
@@ -1387,13 +1400,7 @@ _PICKUPABLE_TOYS = [
 ]
 
 
-# 25% balls, 25% blocks, 50% toys
-_THROWABLES = [
-    _PICKUPABLE_BALLS,
-    _PICKUPABLE_BLOCKS,
-    _PICKUPABLE_TOYS,
-    _PICKUPABLE_TOYS
-]
+_ROLLABLES = [_PICKUPABLE_BALLS + _PICKUPABLE_TOYS]
 
 
 _PICKUPABLES = [
@@ -1459,30 +1466,32 @@ _NOT_PICKUPABLES = [
 ]
 
 
-_CONTAINERS = [
-    [_CASE_1_SUITCASE],
-    [_CASE_3],
-    [_CHEST_1_CUBOID],
-    [_CHEST_2_SEMICYLINDER],
-    [_CHEST_3_CUBOID],
-    [_CHEST_8_SEMICYLINDER],
+_CONTAINERS_OPENABLE = [
+    _CASE_1_SUITCASE,
+    _CASE_3,
+    _CHEST_1_CUBOID,
+    _CHEST_2_SEMICYLINDER,
+    _CHEST_3_CUBOID,
+    _CHEST_8_SEMICYLINDER,
     # Eval 4 novel containers
-    [_CASE_2],
-    [_CHEST_4_ROUNDED_LID],
-    [_CHEST_5_ROUNDED_LID],
-    [_CHEST_6_TRAPEZOID_LID],
-    [_CHEST_7_PIRATE_TREASURE],
-    [_CHEST_9_TRAPEZOID_LID],
-    [_TOOLBOX_1],
-    [_TOOLBOX_2],
+    _CASE_2,
+    _CHEST_4_ROUNDED_LID,
+    _CHEST_5_ROUNDED_LID,
+    _CHEST_6_TRAPEZOID_LID,
+    _CHEST_7_PIRATE_TREASURE,
+    _CHEST_9_TRAPEZOID_LID,
+    _TOOLBOX_1,
+    _TOOLBOX_2
 ]
 
-_CONTAINERS_OPEN_TOPPED = [[
+
+_CONTAINERS_BINS = [
     # Each definition has multiple available sizes: the first is the smallest
     # size that can fit the soccer ball, and the rest are bigger sizes.
     create_variable_definition_from_base(
         type='bowl_3',
-        size_multiplier_list=[Vector3d(3, 3, 3), Vector3d(3.5, 3.5, 3.5)],
+        size_multiplier_list=[
+            Vector3d(x=3, y=3, z=3), Vector3d(x=3.5, y=3.5, z=3.5)],
         chosen_material_list=[
             ChosenMaterial.METAL,
             ChosenMaterial.PLASTIC,
@@ -1491,7 +1500,8 @@ _CONTAINERS_OPEN_TOPPED = [[
     ),
     create_variable_definition_from_base(
         type='bowl_4',
-        size_multiplier_list=[Vector3d(2.5, 5, 2.5), Vector3d(3, 6, 3)],
+        size_multiplier_list=[
+            Vector3d(x=2.5, y=5, z=2.5), Vector3d(x=3, y=6, z=3)],
         chosen_material_list=[
             ChosenMaterial.METAL,
             ChosenMaterial.PLASTIC,
@@ -1500,7 +1510,8 @@ _CONTAINERS_OPEN_TOPPED = [[
     ),
     create_variable_definition_from_base(
         type='bowl_6',
-        size_multiplier_list=[Vector3d(3, 4, 3), Vector3d(3.5, 4.5, 3.5)],
+        size_multiplier_list=[
+            Vector3d(x=3, y=4, z=3), Vector3d(x=3.5, y=4.5, z=3.5)],
         chosen_material_list=[
             ChosenMaterial.METAL,
             ChosenMaterial.PLASTIC,
@@ -1509,7 +1520,8 @@ _CONTAINERS_OPEN_TOPPED = [[
     ),
     create_variable_definition_from_base(
         type='cup_2',
-        size_multiplier_list=[Vector3d(4, 2.5, 4), Vector3d(4.5, 3, 4.5)],
+        size_multiplier_list=[
+            Vector3d(x=4, y=2.5, z=4), Vector3d(x=4.5, y=3, z=4.5)],
         chosen_material_list=[
             ChosenMaterial.METAL,
             ChosenMaterial.PLASTIC,
@@ -1518,7 +1530,8 @@ _CONTAINERS_OPEN_TOPPED = [[
     ),
     create_variable_definition_from_base(
         type='cup_3',
-        size_multiplier_list=[Vector3d(4, 2.5, 4), Vector3d(4.5, 3, 4.5)],
+        size_multiplier_list=[
+            Vector3d(x=4, y=2.5, z=4), Vector3d(x=4.5, y=3, z=4.5)],
         chosen_material_list=[
             ChosenMaterial.METAL,
             ChosenMaterial.PLASTIC,
@@ -1527,14 +1540,61 @@ _CONTAINERS_OPEN_TOPPED = [[
     ),
     create_variable_definition_from_base(
         type='cup_6',
-        size_multiplier_list=[Vector3d(4, 3, 4), Vector3d(4, 3.5, 4)],
+        size_multiplier_list=[
+            Vector3d(x=4, y=3, z=4), Vector3d(x=4, y=3.5, z=4)],
         chosen_material_list=[
             ChosenMaterial.METAL,
             ChosenMaterial.PLASTIC,
             ChosenMaterial.WOOD
         ]
     )
-]]
+]
+
+
+_CONTAINERS_ASYMMETRIC = [
+    create_variable_definition_from_base(
+        type=f'container_asymmetric_{suffix}',
+        size_multiplier_list=[1],
+        chosen_material_list=[
+            ChosenMaterial.METAL,
+            ChosenMaterial.PLASTIC,
+            ChosenMaterial.WOOD
+        ]
+    ) for suffix in [
+        '01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12'
+    ]
+]
+
+
+_CONTAINERS_SYMMETRIC = [
+    create_variable_definition_from_base(
+        type=f'container_symmetric_{suffix}',
+        size_multiplier_list=[1],
+        chosen_material_list=[
+            ChosenMaterial.METAL,
+            ChosenMaterial.PLASTIC,
+            ChosenMaterial.WOOD
+        ]
+    ) for suffix in [
+        '01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12'
+    ]
+]
+
+
+_CONTAINERS_OPEN_TOPPED = [
+    # Same chance each type.
+    _CONTAINERS_ASYMMETRIC, _CONTAINERS_BINS, _CONTAINERS_SYMMETRIC
+]
+
+
+_CONTAINERS = [
+    # Same chance openable versus open-topped.
+    _CONTAINERS_OPENABLE,
+    [
+        definition for definition_list in _CONTAINERS_OPEN_TOPPED
+        for definition in definition_list
+    ]
+]
 
 
 _OBSTACLES = list(filter(lambda filtered_list: len(filtered_list) > 0, [
@@ -1555,7 +1615,7 @@ _STACK_TARGETS = list(filter(lambda filtered_list: len(filtered_list) > 0, [
 ]))
 
 
-_ALL = _PICKUPABLES + _NOT_PICKUPABLES
+_ALL_NON_CONTAINERS = _PICKUPABLES + _NOT_PICKUPABLES
 
 
 def _get(prop: str) -> Union[
@@ -1580,6 +1640,32 @@ def get_container_definition_dataset(
     )
 
 
+def get_container_asymmetric_definition_dataset(
+    # We should only ever set unshuffled to True in a unit test.
+    unshuffled: bool = False
+) -> DefinitionDataset:
+    """Returns an immutable dataset of all open topped asymmetric container
+    definitions."""
+    return get_dataset(
+        [_get('CONTAINERS_ASYMMETRIC')],
+        'CONTAINERS_ASYMMETRIC',
+        unshuffled=unshuffled
+    )
+
+
+def get_container_bin_definition_dataset(
+    # We should only ever set unshuffled to True in a unit test.
+    unshuffled: bool = False
+) -> DefinitionDataset:
+    """Returns an immutable dataset of all open topped bin container
+    definitions."""
+    return get_dataset(
+        [_get('CONTAINERS_BINS')],
+        'CONTAINERS_BINS',
+        unshuffled=unshuffled
+    )
+
+
 def get_container_open_topped_definition_dataset(
     # We should only ever set unshuffled to True in a unit test.
     unshuffled: bool = False
@@ -1593,20 +1679,53 @@ def get_container_open_topped_definition_dataset(
     )
 
 
+def get_container_openable_definition_dataset(
+    # We should only ever set unshuffled to True in a unit test.
+    unshuffled: bool = False
+) -> DefinitionDataset:
+    """Returns an immutable dataset of all openable/closable container
+    definitions."""
+    return get_dataset(
+        [_get('CONTAINERS_OPENABLE')],
+        'CONTAINERS_OPENABLE',
+        unshuffled=unshuffled
+    )
+
+
+def get_container_symmetric_definition_dataset(
+    # We should only ever set unshuffled to True in a unit test.
+    unshuffled: bool = False
+) -> DefinitionDataset:
+    """Returns an immutable dataset of all open topped symmetric container
+    definitions."""
+    return get_dataset(
+        [_get('CONTAINERS_SYMMETRIC')],
+        'CONTAINERS_SYMMETRIC',
+        unshuffled=unshuffled
+    )
+
+
 def get_interactable_definition_dataset(
     # We should only ever set unshuffled to True in a unit test.
     unshuffled: bool = False
 ) -> DefinitionDataset:
-    """Returns an immutable dataset of all interactable definitions."""
-    return get_dataset(_get('ALL'), 'ALL', unshuffled=unshuffled)
+    """Returns an immutable dataset of all non-container interactable
+    definitions. Intentionally excludes containers due to use cases with
+    Eval 3 retrieval hypercubes."""
+    return get_dataset(
+        _get('ALL_NON_CONTAINERS'),
+        'ALL_NON_CONTAINERS',
+        unshuffled=unshuffled
+    )
 
 
-def get_throwable_definition_dataset(
+def get_rollable_definition_dataset(
     # We should only ever set unshuffled to True in a unit test.
     unshuffled: bool = False
 ) -> DefinitionDataset:
-    """Returns an immutable dataset of all interactable definitions."""
-    return get_dataset(_get('THROWABLES'), 'THROWABLES', unshuffled=unshuffled)
+    """Returns an immutable dataset of all rollable interactable
+    definitions."""
+    return get_dataset(_get('ROLLABLES'), 'ROLLABLES', unshuffled=unshuffled)
 
 
 def get_non_pickupable_definition_dataset(

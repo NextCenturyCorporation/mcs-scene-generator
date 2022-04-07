@@ -1,0 +1,7 @@
+# Generate one interactive simulation-controlled agent that begins holding the
+# soccer ball retrieval target. The agent makes the target available for a
+# PickupObject action only after you use an InteractWithAgent action on it.
+shortcut_agent_with_target: true
+
+# Only the target can be a soccer ball.
+excluded_shapes: soccer_ball

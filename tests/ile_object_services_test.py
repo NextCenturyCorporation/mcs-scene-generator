@@ -27,9 +27,13 @@ def test_object_repository_clear():
 
     assert repo.get_one_from_labeled_objects("label") == fake
     assert len(repo._labeled_object_store) == 1
+    assert repo.get_one_from_labeled_objects("fake") == fake
+    assert len(repo._labeled_object_store) == 1
     repo.clear()
     assert repo.get_one_from_labeled_objects("label") is None
     assert len(repo._labeled_object_store) == 0
+    assert repo.get_one_from_labeled_objects("fake") is None
+    assert len(repo._id_object_store) == 0
 
 
 def test_object_repository_add_none_tuple():
@@ -58,6 +62,8 @@ def test_object_repository_add_array():
     assert repo.get_one_from_labeled_objects("label3") is None
     assert len(repo._labeled_object_store) == 2
 
+    assert repo.get_one_from_labeled_objects("fake") == fake
+
 
 def test_object_repository_get_single():
     repo = ObjectRepository.get_instance()
@@ -83,6 +89,37 @@ def test_object_repository_get_multiple():
     assert repo.get_all_from_labeled_objects("label2") == [fake, fake2]
     assert repo.get_all_from_labeled_objects("label3") == [fake2]
     assert repo.get_all_from_labeled_objects("label4") is None
+
+
+def test_object_repository_remove():
+    repo = ObjectRepository.get_instance()
+    assert len(repo._labeled_object_store) == 0
+
+    idl_1 = InstanceDefinitionLocationTuple({'id': 'object_1'}, {}, {})
+    idl_2 = InstanceDefinitionLocationTuple({'id': 'object_2'}, {}, {})
+    repo.add_to_labeled_objects(idl_1, ['label_a', 'label_b'])
+    repo.add_to_labeled_objects(idl_2, ['label_a'])
+    assert repo.get_all_from_labeled_objects('label_a') == [idl_1, idl_2]
+    assert repo.get_all_from_labeled_objects('label_b') == [idl_1]
+
+    repo.remove_from_labeled_objects('object_1', 'label_a')
+    assert repo.get_all_from_labeled_objects('label_a') == [idl_2]
+    assert repo.get_all_from_labeled_objects('label_b') == [idl_1]
+
+    repo.remove_from_labeled_objects('object_1', 'label_b')
+    assert repo.get_all_from_labeled_objects('label_a') == [idl_2]
+    assert repo.get_all_from_labeled_objects('label_b') == []
+
+    repo.remove_from_labeled_objects('object_2', 'label_a')
+    assert repo.get_all_from_labeled_objects('label_a') == []
+    assert repo.get_all_from_labeled_objects('label_b') == []
+
+    repo.remove_from_labeled_objects('object_2', 'label_b')
+    assert repo.get_all_from_labeled_objects('label_a') == []
+    assert repo.get_all_from_labeled_objects('label_b') == []
+
+    repo.remove_from_labeled_objects('object_2', 'label_c')
+    assert repo.get_all_from_labeled_objects('label_c') is None
 
 
 def test_object_repository_singleton():

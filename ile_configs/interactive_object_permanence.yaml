@@ -1,0 +1,95 @@
+# Add a Retrieval goal with a soccer ball as the target object.
+goal:
+    category: retrieval
+    target:
+        shape: soccer_ball
+        scale:
+            min: 1.0
+            max: 3.0
+
+# Only the target can be a soccer ball.
+excluded_shapes: soccer_ball
+
+# Use a specific room size for this task.
+room_dimensions:
+    x: 8
+    y: 8
+    z: 12
+
+# Generate a platform bisecting the room.
+shortcut_bisecting_platform: True
+
+# Generate two L-occluders with a specific rotation and scale but semi-random
+# position (note that they may not always be in line with each other).
+structural_l_occluders:
+    - num: 1
+      position:
+          x:
+              min: -2.25
+              max: -1.5
+          y: 0
+          z:
+              min: 0.75
+              max: 2.5
+      rotation_y: 0
+      scale_front_x: 1
+      scale_front_z: 1
+      scale_side_x: 0.25
+      scale_side_z: 2
+      scale_y: 1
+      backwards: true
+      labels: left_occluder
+    - num: 1
+      position:
+          x:
+              min: 1.5
+              max: 2.25
+          y: 0
+          z:
+              min: 0.75
+              max: 2.5
+      rotation_y: 0
+      scale_front_x: 1
+      scale_front_z: 1
+      scale_side_x: 0.25
+      scale_side_z: 2
+      scale_y: 1
+      backwards: false
+      labels: right_occluder
+
+# Generate one throwing device that begins holding the target object (soccer
+# ball) positioned on either the left wall or the right wall with a semi-random
+# depth, height, rotation, and throw force.
+structural_throwers:
+    - num: 1
+      wall: [left, right]
+      height:
+          min: 2.5
+          max: 4
+      projectile_labels: target
+      rotation_y:
+          - 0
+          - min: -15
+            max: 15
+      rotation_z: [0, 15]
+      throw_force:
+          # Use either a small throw force so the target is thrown on the same
+          # side as the thrower (50%)...
+          - 300
+          # ...or a large throw force so the target is thrown to the opposite
+          # side (50%), which may or may not be behind the L-occluder.
+          - min: 700
+            max: 1250
+      throw_step: 1
+      # Position the thrower relative to one of the L-occluders.
+      position_relative:
+          label: [left_occluder, right_occluder]
+          add_z: 2
+
+# Override the defaults to avoid randomly generating any other objects besides
+# the L-occluders, thrower, and target. Remove these lines if you want
+# additional randomly generated objects.
+keyword_objects:
+    - num: 0
+random_structural_objects:
+    - num: 0

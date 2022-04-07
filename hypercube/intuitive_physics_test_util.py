@@ -36,6 +36,12 @@ OPPOSITE_MATERIAL_STRING_LIST = [
 ]
 
 
+CYLINDRICAL_SHAPES = [
+    'cylinder', 'double_cone', 'dumbbell_1', 'dumbbell_2', 'tie_fighter',
+    'tube_narrow', 'tube_wide'
+]
+
+
 def verify_scene(
     scene,
     is_move_across,
@@ -406,6 +412,18 @@ def verify_hypercube_SpatioTemporalContinuity(
 def verify_object_fall_down(instance, name):
     verify_object_fall_down_position(instance, name)
 
+    # Verify object X and Z rotation.
+    expected_rotation_x = 90 if instance['type'] in CYLINDRICAL_SHAPES else 0
+    rotation = instance['shows'][0]['rotation']
+    if rotation['x'] != expected_rotation_x:
+        print(f'[ERROR] {name} X ROTATION SHOULD BE {expected_rotation_x} BUT '
+              f'WAS {rotation["x"]}\n{name}={instance}')
+        return False
+    if rotation['z'] != 0:
+        print(f'[ERROR] {name} Z ROTATION SHOULD BE ZERO BUT WAS '
+              f'{rotation["z"]}\n{name}={instance}')
+        return False
+
     if not (name == 'TARGET' and instance.get('ignoreShowStep', False)):
         # Verify object show step.
         min_begin = intuitive_physics_hypercubes.EARLIEST_ACTION_STEP
@@ -491,6 +509,18 @@ def verify_object_move_across(instance, name):
     left_to_right = (instance['shows'][0]['position']['x'] < 0)
     last_action_step = intuitive_physics_hypercubes.LAST_STEP_MOVE_ACROSS - \
         occluders.OCCLUDER_MOVEMENT_TIME
+
+    # Verify object X and Z rotation.
+    expected_rotation_x = 90 if instance['type'] in CYLINDRICAL_SHAPES else 0
+    rotation = instance['shows'][0]['rotation']
+    if rotation['x'] != expected_rotation_x:
+        print(f'[ERROR] {name} X ROTATION SHOULD BE {expected_rotation_x} BUT '
+              f'WAS {rotation["x"]}\n{name}={instance}')
+        return False
+    if rotation['z'] != 0:
+        print(f'[ERROR] {name} Z ROTATION SHOULD BE ZERO BUT WAS '
+              f'{rotation["z"]}\n{name}={instance}')
+        return False
 
     if not (name == 'TARGET' and instance.get('ignorePosition', False)):
         # Verify object X and Z position.

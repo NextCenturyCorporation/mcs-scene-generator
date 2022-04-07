@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import random
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, List, NamedTuple, Tuple, Union
@@ -100,6 +101,8 @@ class ObjectBaseSize():
     sideways: ObjectSidewaysSize = None
     closed_dimensions: Vector3d = None
     closed_offset: Vector3d = None
+    placer_offset_x: List[float] = None
+    placer_offset_y: float = 0
 
     def make(self, size_multiplier: Union[float, Vector3d]) -> SizeChoice:
         is_vector = isinstance(size_multiplier, Vector3d)
@@ -120,9 +123,9 @@ class ObjectBaseSize():
             y_sideways = z_multiplier
             z_sideways = y_multiplier
         dimensions = Vector3d(
-            self.dimensions.x * x_multiplier,
-            self.dimensions.y * y_multiplier,
-            self.dimensions.z * z_multiplier
+            x=self.dimensions.x * x_multiplier,
+            y=self.dimensions.y * y_multiplier,
+            z=self.dimensions.z * z_multiplier
         )
         enclosedAreas = [area.to_dict(
             x_multiplier,
@@ -133,33 +136,41 @@ class ObjectBaseSize():
             self.mass * (x_multiplier + y_multiplier + z_multiplier) / 3.0
         ), 4) if self.mass else None
         offset = Vector3d(
-            self.offset.x * x_multiplier,
-            self.offset.y * y_multiplier,
-            self.offset.z * z_multiplier
+            x=self.offset.x * x_multiplier,
+            y=self.offset.y * y_multiplier,
+            z=self.offset.z * z_multiplier
         )
         openAreas = [area.to_dict(
             x_multiplier,
             y_multiplier,
             z_multiplier
         ) for area in (self.open_area_list or [])]
+        placer_offset_x = [
+            (offset_x * x_multiplier) for offset_x in
+            (self.placer_offset_x or [0])
+        ]
+        placer_offset_y = [
+            (offset_y * y_multiplier) for offset_y in
+            (self.placer_offset_y or [0])
+        ]
         positionY = (self.positionY * y_multiplier)
-        scale = Vector3d(x_multiplier, y_multiplier, z_multiplier)
+        scale = Vector3d(x=x_multiplier, y=y_multiplier, z=z_multiplier)
         sideways = {
             'dimensions': Vector3d(
-                self.sideways.dimensions.x * x_sideways,
-                self.sideways.dimensions.y * y_sideways,
-                self.sideways.dimensions.z * z_sideways
+                x=self.sideways.dimensions.x * x_sideways,
+                y=self.sideways.dimensions.y * y_sideways,
+                z=self.sideways.dimensions.z * z_sideways
             ),
             'offset': Vector3d(
-                self.sideways.offset.x * x_sideways,
-                self.sideways.offset.y * y_sideways,
-                self.sideways.offset.z * z_sideways
+                x=self.sideways.offset.x * x_sideways,
+                y=self.sideways.offset.y * y_sideways,
+                z=self.sideways.offset.z * z_sideways
             ),
             'positionY': self.sideways.positionY * y_sideways,
             'rotation': Vector3d(
-                self.sideways.rotation.x,
-                self.sideways.rotation.y,
-                self.sideways.rotation.z
+                x=self.sideways.rotation.x,
+                y=self.sideways.rotation.y,
+                z=self.sideways.rotation.z
             )
         } if self.sideways else None
         size = _choose_size_text(dimensions)
@@ -171,6 +182,8 @@ class ObjectBaseSize():
             mass=mass,
             offset=offset,
             openAreas=openAreas,
+            placerOffsetX=placer_offset_x,
+            placerOffsetY=placer_offset_y,
             positionY=positionY,
             scale=scale,
             sideways=sideways,
@@ -186,1166 +199,1527 @@ class _FunctionArgs():
 
 
 _APPLE_1_SIZE = ObjectBaseSize(
-    dimensions=Vector3d(0.111, 0.12, 0.122),
+    dimensions=Vector3d(x=0.111, y=0.12, z=0.122),
     mass=0.5,
-    offset=Vector3d(0, 0.005, 0),
+    offset=Vector3d(x=0, y=0.005, z=0),
+    placer_offset_y=[0.04],
     positionY=0.03
 )
 _APPLE_2_SIZE = ObjectBaseSize(
-    dimensions=Vector3d(0.117, 0.121, 0.116),
+    dimensions=Vector3d(x=0.117, y=0.121, z=0.116),
     mass=0.5,
-    offset=Vector3d(0, 0.002, 0),
+    offset=Vector3d(x=0, y=0.002, z=0),
+    placer_offset_y=[0.04],
     positionY=0.03
 )
 _BED_1_SIZE = ObjectBaseSize(
-    dimensions=Vector3d(1.299, 1.015, 2.108),
+    dimensions=Vector3d(x=1.299, y=1.015, z=2.108),
     mass=20,
-    offset=Vector3d(0, 0.508, 0),
+    offset=Vector3d(x=0, y=0.508, z=0),
     positionY=0,
     open_area_list=[
         ObjectInteractableArea(
-            dimensions=Vector3d(1.15, 0, 1.93),
-            position=Vector3d(0, 0.56, 0)
+            dimensions=Vector3d(x=1.15, y=0, z=1.93),
+            position=Vector3d(x=0, y=0.56, z=0)
         )
     ]
 )
 _BED_2_SIZE = ObjectBaseSize(
-    dimensions=Vector3d(1.536, 1.096, 2.429),
+    dimensions=Vector3d(x=1.536, y=1.096, z=2.429),
     mass=25,
-    offset=Vector3d(0, 0.546, 0),
+    offset=Vector3d(x=0, y=0.546, z=0),
     positionY=0,
     open_area_list=[
         ObjectInteractableArea(
-            dimensions=Vector3d(1.43, 0, 2.27),
-            position=Vector3d(0, 0.82, 0)
+            dimensions=Vector3d(x=1.43, y=0, z=2.27),
+            position=Vector3d(x=0, y=0.82, z=0)
         )
     ]
 )
 _BED_3_SIZE = ObjectBaseSize(
-    dimensions=Vector3d(1.475, 0.726, 2.113),
+    dimensions=Vector3d(x=1.475, y=0.726, z=2.113),
     mass=25,
-    offset=Vector3d(0, 0.367, 0),
+    offset=Vector3d(x=0, y=0.367, z=0),
     positionY=0,
     open_area_list=[
         ObjectInteractableArea(
-            dimensions=Vector3d(1.33, 0, 1.98),
-            position=Vector3d(0, 0.52, 0)
+            dimensions=Vector3d(x=1.33, y=0, z=1.98),
+            position=Vector3d(x=0, y=0.52, z=0)
         )
     ]
 )
 _BED_4_SIZE = ObjectBaseSize(
-    dimensions=Vector3d(1.947, 1.751, 2.275),
+    dimensions=Vector3d(x=1.947, y=1.751, z=2.275),
     mass=30,
-    offset=Vector3d(0, 0.875, 0),
+    offset=Vector3d(x=0, y=0.875, z=0),
     positionY=0,
     open_area_list=[
         ObjectInteractableArea(
-            dimensions=Vector3d(1.78, 0, 2.14),
-            position=Vector3d(0, 0.85, 0)
+            dimensions=Vector3d(x=1.78, y=0, z=2.14),
+            position=Vector3d(x=0, y=0.85, z=0)
         )
     ]
 )
 _BED_5_SIZE = ObjectBaseSize(
-    dimensions=Vector3d(1.261, 1.044, 2.371),
+    dimensions=Vector3d(x=1.261, y=1.044, z=2.371),
     mass=20,
-    offset=Vector3d(0, 0.511, 0),
+    offset=Vector3d(x=0, y=0.511, z=0),
     positionY=0,
     open_area_list=[
         ObjectInteractableArea(
-            dimensions=Vector3d(1.19, 0, 2.19),
-            position=Vector3d(0, 0.85, 0)
+            dimensions=Vector3d(x=1.19, y=0, z=2.19),
+            position=Vector3d(x=0, y=0.85, z=0)
         )
     ]
 )
 _BED_6_SIZE = ObjectBaseSize(
-    dimensions=Vector3d(1.15, 2.2, 2.534),
+    dimensions=Vector3d(x=1.15, y=2.2, z=2.534),
     mass=30,
-    offset=Vector3d(0, 1.1, 0),
+    offset=Vector3d(x=0, y=1.1, z=0),
     positionY=0
 )
 _BLOCK_BLANK_SIZE = ObjectBaseSize(
-    dimensions=Vector3d(0.1, 0.1, 0.1),
+    dimensions=Vector3d(x=0.1, y=0.1, z=0.1),
     mass=0.333,
-    offset=Vector3d(0, 0.05, 0),
+    offset=Vector3d(x=0, y=0.05, z=0),
     positionY=0.05
 )
 _BLOCK_SIZE = ObjectBaseSize(
-    dimensions=Vector3d(0.1, 0.1, 0.1),
+    dimensions=Vector3d(x=0.1, y=0.1, z=0.1),
     mass=0.333,
-    offset=Vector3d(0, 0.05, 0),
+    offset=Vector3d(x=0, y=0.05, z=0),
     positionY=0
 )
 _BOOKCASE_1_SHELF_SIZE = ObjectBaseSize(
-    dimensions=Vector3d(1, 1, 0.5),
+    dimensions=Vector3d(x=1, y=1, z=0.5),
     mass=6,
-    offset=Vector3d(0, 0.5, 0),
+    offset=Vector3d(x=0, y=0.5, z=0),
     positionY=0,
     open_area_list=[
         ObjectInteractableArea(
-            dimensions=Vector3d(0.5, 0, 0.25),
-            position=Vector3d(0, 0.04, 0)
+            dimensions=Vector3d(x=0.5, y=0, z=0.25),
+            position=Vector3d(x=0, y=0.04, z=0)
         ),
         ObjectInteractableArea(
             area_id='shelf_1',
-            dimensions=Vector3d(0.5, 0, 0.25),
-            position=Vector3d(0, 0.52, 0)
+            dimensions=Vector3d(x=0.5, y=0, z=0.25),
+            position=Vector3d(x=0, y=0.52, z=0)
         )
     ]
 )
 _BOOKCASE_2_SHELF_SIZE = ObjectBaseSize(
-    dimensions=Vector3d(1, 1.5, 0.5),
+    dimensions=Vector3d(x=1, y=1.5, z=0.5),
     mass=12,
-    offset=Vector3d(0, 0.75, 0),
+    offset=Vector3d(x=0, y=0.75, z=0),
     positionY=0,
     open_area_list=[
         ObjectInteractableArea(
-            dimensions=Vector3d(0.5, 0, 0.25),
-            position=Vector3d(0, 0.04, 0)
+            dimensions=Vector3d(x=0.5, y=0, z=0.25),
+            position=Vector3d(x=0, y=0.04, z=0)
         ),
         ObjectInteractableArea(
             area_id='shelf_1',
-            dimensions=Vector3d(0.5, 0, 0.25),
-            position=Vector3d(0, 0.52, 0)
+            dimensions=Vector3d(x=0.5, y=0, z=0.25),
+            position=Vector3d(x=0, y=0.52, z=0)
         ),
         ObjectInteractableArea(
             area_id='shelf_2',
-            dimensions=Vector3d(0.5, 0, 0.25),
-            position=Vector3d(0, 1.02, 0)
+            dimensions=Vector3d(x=0.5, y=0, z=0.25),
+            position=Vector3d(x=0, y=1.02, z=0)
         )
     ]
 )
 _BOOKCASE_3_SHELF_SIZE = ObjectBaseSize(
-    dimensions=Vector3d(1, 2, 0.5),
+    dimensions=Vector3d(x=1, y=2, z=0.5),
     mass=18,
-    offset=Vector3d(0, 1, 0),
+    offset=Vector3d(x=0, y=1, z=0),
     positionY=0,
     open_area_list=[
         ObjectInteractableArea(
-            dimensions=Vector3d(0.5, 0, 0.25),
-            position=Vector3d(0, 0.04, 0)
+            dimensions=Vector3d(x=0.5, y=0, z=0.25),
+            position=Vector3d(x=0, y=0.04, z=0)
         ),
         ObjectInteractableArea(
             area_id='shelf_1',
-            dimensions=Vector3d(0.5, 0, 0.25),
-            position=Vector3d(0, 0.52, 0)
+            dimensions=Vector3d(x=0.5, y=0, z=0.25),
+            position=Vector3d(x=0, y=0.52, z=0)
         ),
         ObjectInteractableArea(
             area_id='shelf_2',
-            dimensions=Vector3d(0.5, 0, 0.25),
-            position=Vector3d(0, 1.02, 0)
+            dimensions=Vector3d(x=0.5, y=0, z=0.25),
+            position=Vector3d(x=0, y=1.02, z=0)
             # Performer agent is too short to reach these areas effectively.
             # ),
             # ObjectInteractableArea(
             #     area_id='shelf_3',
-            #     dimensions=Vector3d(0.5, 0, 0.25),
-            #     position=Vector3d(0, 1.52, 0)
+            #     dimensions=Vector3d(x=0.5, y=0, z=0.25),
+            #     position=Vector3d(x=0, y=1.52, z=0)
         )
     ]
 )
 _BOOKCASE_4_SHELF_SIZE = ObjectBaseSize(
-    dimensions=Vector3d(1, 2.5, 0.5),
+    dimensions=Vector3d(x=1, y=2.5, z=0.5),
     mass=24,
-    offset=Vector3d(0, 1, 0),
+    offset=Vector3d(x=0, y=1, z=0),
     positionY=0,
     open_area_list=[
         ObjectInteractableArea(
-            dimensions=Vector3d(0.5, 0, 0.25),
-            position=Vector3d(0, 0.04, 0)
+            dimensions=Vector3d(x=0.5, y=0, z=0.25),
+            position=Vector3d(x=0, y=0.04, z=0)
         ),
         ObjectInteractableArea(
             area_id='shelf_1',
-            dimensions=Vector3d(0.5, 0, 0.25),
-            position=Vector3d(0, 0.52, 0)
+            dimensions=Vector3d(x=0.5, y=0, z=0.25),
+            position=Vector3d(x=0, y=0.52, z=0)
         ),
         ObjectInteractableArea(
             area_id='shelf_2',
-            dimensions=Vector3d(0.5, 0, 0.25),
-            position=Vector3d(0, 1.02, 0)
+            dimensions=Vector3d(x=0.5, y=0, z=0.25),
+            position=Vector3d(x=0, y=1.02, z=0)
             # Performer agent is too short to reach these areas effectively.
             # ),
             # ObjectInteractableArea(
             #     area_id='shelf_3',
-            #     dimensions=Vector3d(0.5, 0, 0.25),
-            #     position=Vector3d(0, 1.52, 0)
+            #     dimensions=Vector3d(x=0.5, y=0, z=0.25),
+            #     position=Vector3d(x=0, y=1.52, z=0)
             # ),
             # ObjectInteractableArea(
             #     area_id='shelf_4',
-            #     dimensions=Vector3d(0.5, 0, 0.25),
-            #     position=Vector3d(0, 2.02, 0)
+            #     dimensions=Vector3d(x=0.5, y=0, z=0.25),
+            #     position=Vector3d(x=0, y=2.02, z=0)
         )
     ]
 )
 _BOWL_3_SIZE = ObjectBaseSize(
-    dimensions=Vector3d(0.175, 0.116, 0.171),
+    dimensions=Vector3d(x=0.175, y=0.116, z=0.171),
     mass=0.5,
-    offset=Vector3d(0, 0.055, 0),
+    offset=Vector3d(x=0, y=0.055, z=0),
+    placer_offset_y=[0.07],
     positionY=0.005,
     enclosed_area_list=[
         ObjectInteractableArea(
-            dimensions=Vector3d(0.138, 0.2, 0.138),
-            position=Vector3d(0, 0.102, 0)
+            dimensions=Vector3d(x=0.138, y=0.2, z=0.138),
+            position=Vector3d(x=0, y=0.102, z=0)
         )
     ]
 )
 _BOWL_4_SIZE = ObjectBaseSize(
-    dimensions=Vector3d(0.209, 0.059, 0.206),
+    dimensions=Vector3d(x=0.209, y=0.059, z=0.206),
     mass=0.5,
-    offset=Vector3d(0, 0.027, 0),
+    offset=Vector3d(x=0, y=0.027, z=0),
+    placer_offset_y=[0.02],
     positionY=0.005,
     enclosed_area_list=[
         ObjectInteractableArea(
-            dimensions=Vector3d(0.18, 0.1, 0.18),
-            position=Vector3d(0, 0.052, 0)
+            dimensions=Vector3d(x=0.18, y=0.1, z=0.18),
+            position=Vector3d(x=0, y=0.052, z=0)
         )
     ]
 )
 _BOWL_6_SIZE = ObjectBaseSize(
-    dimensions=Vector3d(0.19, 0.1, 0.19),
+    dimensions=Vector3d(x=0.19, y=0.1, z=0.19),
     mass=0.5,
-    offset=Vector3d(0, 0.052, 0),
+    offset=Vector3d(x=0, y=0.052, z=0),
+    placer_offset_y=[0.06],
     positionY=0.005,
     enclosed_area_list=[
         ObjectInteractableArea(
-            dimensions=Vector3d(0.07, .18, 0.07),
-            position=Vector3d(0, 0.092, 0)
+            dimensions=Vector3d(x=0.07, y=.18, z=0.07),
+            position=Vector3d(x=0, y=0.092, z=0)
         )
     ]
 )
 _CAKE_SIZE = ObjectBaseSize(
-    dimensions=Vector3d(0.22, 0.22, 0.22),
+    dimensions=Vector3d(x=0.22, y=0.22, z=0.22),
     mass=1,
-    offset=Vector3d(0, 0.05, 0),
+    offset=Vector3d(x=0, y=0.05, z=0),
     positionY=0.005
 )
 _CART_SIZE = ObjectBaseSize(
-    dimensions=Vector3d(0.725, 1.29, 0.55),
+    dimensions=Vector3d(x=0.725, y=1.29, z=0.55),
     mass=4,
-    offset=Vector3d(0, 0.645, 0),
+    offset=Vector3d(x=0, y=0.645, z=0),
     positionY=0,
     open_area_list=[
         ObjectInteractableArea(
-            dimensions=Vector3d(0.38, 0, 0.38),
-            position=Vector3d(0, 0.34, 0)
+            dimensions=Vector3d(x=0.38, y=0, z=0.38),
+            position=Vector3d(x=0, y=0.34, z=0)
         )
     ]
 )
 _CASE_1_SUITCASE_SIZE = ObjectBaseSize(
-    dimensions=Vector3d(0.71, 0.19, 0.42),
+    dimensions=Vector3d(x=0.71, y=0.19, z=0.42),
     mass=5,
-    offset=Vector3d(0, 0.095, 0),
+    offset=Vector3d(x=0, y=0.095, z=0),
     positionY=0,
     enclosed_area_list=[
         ObjectInteractableArea(
-            dimensions=Vector3d(0.69, 0.175, 0.4),
-            position=Vector3d(0, 0.0925, 0)
+            dimensions=Vector3d(x=0.69, y=0.175, z=0.4),
+            position=Vector3d(x=0, y=0.0925, z=0)
         )
     ]
 )
 _CASE_2_SIZE = ObjectBaseSize(
-    dimensions=Vector3d(0.78, 0.16, 0.48),
+    dimensions=Vector3d(x=0.78, y=0.16, z=0.48),
     mass=5,
-    offset=Vector3d(0, 0.08, 0),
+    offset=Vector3d(x=0, y=0.08, z=0),
     positionY=0,
     enclosed_area_list=[
         ObjectInteractableArea(
-            dimensions=Vector3d(0.7, 0.135, 0.4),
-            position=Vector3d(0, 0.0775, 0)
+            dimensions=Vector3d(x=0.7, y=0.135, z=0.4),
+            position=Vector3d(x=0, y=0.0775, z=0)
         )
     ]
 )
 _CASE_3_SIZE = ObjectBaseSize(
-    dimensions=Vector3d(0.81, 0.21, 0.56),
+    dimensions=Vector3d(x=0.81, y=0.21, z=0.56),
     mass=5,
-    offset=Vector3d(0, 0.105, 0),
+    offset=Vector3d(x=0, y=0.105, z=0),
     positionY=0,
     enclosed_area_list=[
         ObjectInteractableArea(
-            dimensions=Vector3d(0.79, 0.17, 0.53),
-            position=Vector3d(0, 0.105, 0)
+            dimensions=Vector3d(x=0.79, y=0.17, z=0.53),
+            position=Vector3d(x=0, y=0.105, z=0)
         )
     ]
 )
 _CART_2_SIZE = ObjectBaseSize(
-    dimensions=Vector3d(0.42, 0.7, 0.51),
+    dimensions=Vector3d(x=0.42, y=0.7, z=0.51),
     mass=2,
-    offset=Vector3d(0, 0.35, 0),
+    offset=Vector3d(x=0, y=0.35, z=0),
+    placer_offset_y=[0.6],
     positionY=0.005
 )
 _CHAIR_1_SIZE = ObjectBaseSize(
-    dimensions=Vector3d(0.54, 1.04, 0.46),
+    dimensions=Vector3d(x=0.54, y=1.04, z=0.46),
     mass=4,
-    offset=Vector3d(0, 0.51, 0),
+    offset=Vector3d(x=0, y=0.51, z=0),
     positionY=0,
     open_area_list=[
         ObjectInteractableArea(
-            dimensions=Vector3d(0.38, 0, 0.38),
-            position=Vector3d(0.01, 0.5, -0.02)
+            dimensions=Vector3d(x=0.38, y=0, z=0.38),
+            position=Vector3d(x=0.01, y=0.5, z=-0.02)
         )
     ]
 )
 _CHAIR_2_STOOL_CIRCLE_SIZE = ObjectBaseSize(
-    dimensions=Vector3d(0.3, 0.75, 0.3),
+    dimensions=Vector3d(x=0.3, y=0.75, z=0.3),
     mass=4,
-    offset=Vector3d(0, 0.375, 0),
+    offset=Vector3d(x=0, y=0.375, z=0),
     positionY=0,
     open_area_list=[
         ObjectInteractableArea(
-            dimensions=Vector3d(0.2, 0, 0.2),
-            position=Vector3d(0, 0.75, 0)
+            dimensions=Vector3d(x=0.2, y=0, z=0.2),
+            position=Vector3d(x=0, y=0.75, z=0)
         )
     ]
 )
 _CHAIR_3_STOOL_RECT_SIZE = ObjectBaseSize(
-    dimensions=Vector3d(0.42, 0.8, 0.63),
+    dimensions=Vector3d(x=0.42, y=0.8, z=0.63),
     mass=4,
-    offset=Vector3d(0, 0.4, 0),
+    offset=Vector3d(x=0, y=0.4, z=0),
     positionY=0,
     open_area_list=[
         ObjectInteractableArea(
-            dimensions=Vector3d(0.3, 0, 0.6),
-            position=Vector3d(0, 1.3, 0)
+            dimensions=Vector3d(x=0.3, y=0, z=0.6),
+            position=Vector3d(x=0, y=1.3, z=0)
         )
     ]
 )
 _CHAIR_4_OFFICE_SIZE = ObjectBaseSize(
-    dimensions=Vector3d(0.54, 0.88, 0.44),
+    dimensions=Vector3d(x=0.54, y=0.88, z=0.44),
     mass=4,
-    offset=Vector3d(0, 0.44, 0),
+    offset=Vector3d(x=0, y=0.44, z=0),
     positionY=0,
     open_area_list=[
         ObjectInteractableArea(
-            dimensions=Vector3d(0.32, 0, 0.32),
-            position=Vector3d(-0.01, 1.06, 0.015)
+            dimensions=Vector3d(x=0.32, y=0, z=0.32),
+            position=Vector3d(x=-0.01, y=1.06, z=0.015)
         )
     ]
 )
 _CHAIR_5_SIZE = ObjectBaseSize(
-    dimensions=Vector3d(0.489, 0.864, 0.577),
+    dimensions=Vector3d(x=0.489, y=0.864, z=0.577),
     mass=4,
-    offset=Vector3d(0, 0.416, 0),
+    offset=Vector3d(x=0, y=0.416, z=0),
     positionY=0,
     open_area_list=[
         ObjectInteractableArea(
-            dimensions=Vector3d(0.378, 0, 0.448),
-            position=Vector3d(0, 0.383, 0.04)
+            dimensions=Vector3d(x=0.378, y=0, z=0.448),
+            position=Vector3d(x=0, y=0.383, z=0.04)
         )
     ]
 )
 _CHAIR_6_SIZE = ObjectBaseSize(
-    dimensions=Vector3d(0.513, 0.984, 0.539),
+    dimensions=Vector3d(x=0.513, y=0.984, z=0.539),
     mass=4,
-    offset=Vector3d(0, 0.492, 0),
+    offset=Vector3d(x=0, y=0.492, z=0),
     positionY=0,
     open_area_list=[
         ObjectInteractableArea(
-            dimensions=Vector3d(0.414, 0, 0.392),
-            position=Vector3d(0, 0.492, 0.047)
+            dimensions=Vector3d(x=0.414, y=0, z=0.392),
+            position=Vector3d(x=0, y=0.492, z=0.047)
         )
     ]
 )
 _CHAIR_7_SIZE = ObjectBaseSize(
-    dimensions=Vector3d(0.447, 0.891, 0.443),
+    dimensions=Vector3d(x=0.447, y=0.891, z=0.443),
     mass=4,
-    offset=Vector3d(0, 0.446, 0),
+    offset=Vector3d(x=0, y=0.446, z=0),
     positionY=0,
     open_area_list=[
         ObjectInteractableArea(
-            dimensions=Vector3d(0.413, 0, 0.309),
-            position=Vector3d(0, 0.425, 0.049)
+            dimensions=Vector3d(x=0.413, y=0, z=0.309),
+            position=Vector3d(x=0, y=0.425, z=0.049)
         )
     ]
 )
 _CHAIR_8_SIZE = ObjectBaseSize(
-    dimensions=Vector3d(0.549, 0.781, 0.537),
+    dimensions=Vector3d(x=0.549, y=0.781, z=0.537),
     mass=4,
-    offset=Vector3d(0, 0.391, 0),
+    offset=Vector3d(x=0, y=0.391, z=0),
     positionY=0,
     open_area_list=[
         ObjectInteractableArea(
-            dimensions=Vector3d(0.5, 0, 0.395),
-            position=Vector3d(0, 0.389, 0.059)
+            dimensions=Vector3d(x=0.5, y=0, z=0.395),
+            position=Vector3d(x=0, y=0.389, z=0.059)
         )
     ]
 )
 _CHANGING_TABLE_SIZE = ObjectBaseSize(
-    closed_dimensions=Vector3d(1.1, 0.96, 0.58),
-    closed_offset=Vector3d(0, 0.48, 0),
-    dimensions=Vector3d(1.1, 0.96, 0.89),
+    closed_dimensions=Vector3d(x=1.1, y=0.96, z=0.58),
+    closed_offset=Vector3d(x=0, y=0.48, z=0),
+    dimensions=Vector3d(x=1.1, y=0.96, z=0.89),
     mass=50,
-    offset=Vector3d(0, 0.48, 0.155),
+    offset=Vector3d(x=0, y=0.48, z=0.155),
     positionY=0,
     enclosed_area_list=[
         ObjectInteractableArea(
-            dimensions=Vector3d(0.68, 0.22, 0.41),
-            position=Vector3d(0.165, 0.47, -0.03),
+            dimensions=Vector3d(x=0.68, y=0.22, z=0.41),
+            position=Vector3d(x=0.165, y=0.47, z=-0.03),
             area_id='_drawer_top'
         ),
         ObjectInteractableArea(
-            dimensions=Vector3d(0.68, 0.2, 0.41),
-            position=Vector3d(0.175, 0.19, -0.03),
+            dimensions=Vector3d(x=0.68, y=0.2, z=0.41),
+            position=Vector3d(x=0.175, y=0.19, z=-0.03),
             area_id='_drawer_bottom'
         )
     ],
     open_area_list=[
         # Performer agent is too short to reach these areas effectively.
         # ObjectInteractableArea(
-        #     dimensions=Vector3d(1, 0, 0.55),
-        #     position=Vector3d(0, 0.85, 0),
+        #     dimensions=Vector3d(x=1, y=0, z=0.55),
+        #     position=Vector3d(x=0, y=0.85, z=0),
         # ),
         # ObjectInteractableArea(
-        #     dimensions=Vector3d(1.05, 0.2, 0.44),
-        #     position=Vector3d(0, 0.725, -0.05),
+        #     dimensions=Vector3d(x=1.05, y=0.2, z=0.44),
+        #     position=Vector3d(x=0, y=0.725, z=-0.05),
         #     area_id='_shelf_top'
         # ),
         ObjectInteractableArea(
-            dimensions=Vector3d(0.32, 0.25, 0.44),
-            position=Vector3d(-0.365, 0.475, -0.05),
+            dimensions=Vector3d(x=0.32, y=0.25, z=0.44),
+            position=Vector3d(x=-0.365, y=0.475, z=-0.05),
             area_id='_shelf_middle'
         ),
         ObjectInteractableArea(
-            dimensions=Vector3d(0.32, 0.25, 0.44),
-            position=Vector3d(-0.365, 0.2, -0.05),
+            dimensions=Vector3d(x=0.32, y=0.25, z=0.44),
+            position=Vector3d(x=-0.365, y=0.2, z=-0.05),
             area_id='_shelf_bottom'
         )
     ]
 )
 _CHEST_1_CUBOID_SIZE = ObjectBaseSize(
-    dimensions=Vector3d(0.83, 0.42, 0.55),
+    dimensions=Vector3d(x=0.83, y=0.42, z=0.55),
     mass=5,
-    offset=Vector3d(0, 0.205, 0),
+    offset=Vector3d(x=0, y=0.205, z=0),
     positionY=0,
     enclosed_area_list=[
         ObjectInteractableArea(
-            dimensions=Vector3d(0.77, 0.33, 0.49),
-            position=Vector3d(0, 0.195, 0)
+            dimensions=Vector3d(x=0.77, y=0.33, z=0.49),
+            position=Vector3d(x=0, y=0.195, z=0)
         )
     ]
 )
 _CHEST_2_SEMICYLINDER_SIZE = ObjectBaseSize(
-    dimensions=Vector3d(0.52, 0.42, 0.31),
+    dimensions=Vector3d(x=0.52, y=0.42, z=0.31),
     mass=5,
-    offset=Vector3d(0, 0.165, 0),
+    offset=Vector3d(x=0, y=0.165, z=0),
     positionY=0,
     enclosed_area_list=[
         ObjectInteractableArea(
-            dimensions=Vector3d(0.44, 0.25, 0.31),
-            position=Vector3d(0, 0.165, 0)
+            dimensions=Vector3d(x=0.44, y=0.25, z=0.31),
+            position=Vector3d(x=0, y=0.165, z=0)
         )
     ]
 )
 _CHEST_3_CUBOID_SIZE = ObjectBaseSize(
-    dimensions=Vector3d(0.46, 0.26, 0.32),
+    dimensions=Vector3d(x=0.46, y=0.26, z=0.32),
     mass=5,
-    offset=Vector3d(0, 0.13, 0),
+    offset=Vector3d(x=0, y=0.13, z=0),
     positionY=0,
     enclosed_area_list=[
         ObjectInteractableArea(
-            dimensions=Vector3d(0.35, 0.12, 0.21),
-            position=Vector3d(0, 0.09, 0)
+            dimensions=Vector3d(x=0.35, y=0.12, z=0.21),
+            position=Vector3d(x=0, y=0.09, z=0)
         )
     ]
 )
 _CHEST_4_ROUNDED_LID_SIZE = ObjectBaseSize(
-    dimensions=Vector3d(0.72, 0.35, 0.34),
+    dimensions=Vector3d(x=0.72, y=0.35, z=0.34),
     mass=5,
-    offset=Vector3d(0, 0.175, 0),
+    offset=Vector3d(x=0, y=0.175, z=0),
     positionY=0,
     enclosed_area_list=[
         ObjectInteractableArea(
-            dimensions=Vector3d(0.64, 0.24, 0.24),
-            position=Vector3d(0, 0.16, 0)
+            dimensions=Vector3d(x=0.64, y=0.24, z=0.24),
+            position=Vector3d(x=0, y=0.16, z=0)
         )
     ]
 )
 _CHEST_5_ROUNDED_LID_SIZE = ObjectBaseSize(
-    dimensions=Vector3d(0.46, 0.28, 0.42),
+    dimensions=Vector3d(x=0.46, y=0.28, z=0.42),
     mass=5,
-    offset=Vector3d(0, 0.14, 0),
+    offset=Vector3d(x=0, y=0.14, z=0),
     positionY=0,
     enclosed_area_list=[
         ObjectInteractableArea(
-            dimensions=Vector3d(0.34, 0.23, 0.28),
-            position=Vector3d(0, 0.135, -0.01)
+            dimensions=Vector3d(x=0.34, y=0.23, z=0.28),
+            position=Vector3d(x=0, y=0.135, z=-0.01)
         )
     ]
 )
 _CHEST_6_TRAPEZOID_LID_SIZE = ObjectBaseSize(
-    dimensions=Vector3d(0.5, 0.36, 0.38),
+    dimensions=Vector3d(x=0.5, y=0.36, z=0.38),
     mass=5,
-    offset=Vector3d(0, 0.18, 0),
+    offset=Vector3d(x=0, y=0.18, z=0),
     positionY=0,
     enclosed_area_list=[
         ObjectInteractableArea(
-            dimensions=Vector3d(0.37, 0.21, 0.245),
-            position=Vector3d(0, 0.15, -0.01)
+            dimensions=Vector3d(x=0.37, y=0.21, z=0.245),
+            position=Vector3d(x=0, y=0.15, z=-0.01)
         )
     ]
 )
 _CHEST_7_PIRATE_TREASURE_SIZE = ObjectBaseSize(
-    dimensions=Vector3d(0.59, 0.49, 0.42),
+    dimensions=Vector3d(x=0.59, y=0.49, z=0.42),
     mass=5,
-    offset=Vector3d(0, 0.245, 0),
+    offset=Vector3d(x=0, y=0.245, z=0),
     positionY=0,
     enclosed_area_list=[
         ObjectInteractableArea(
-            dimensions=Vector3d(0.38, 0.34, 0.26),
-            position=Vector3d(0, 0.185, 0)
+            dimensions=Vector3d(x=0.38, y=0.34, z=0.26),
+            position=Vector3d(x=0, y=0.185, z=0)
         )
     ]
 )
 _CHEST_8_SEMICYLINDER_SIZE = ObjectBaseSize(
-    dimensions=Vector3d(0.42, 0.32, 0.36),
+    dimensions=Vector3d(x=0.42, y=0.32, z=0.36),
     mass=5,
-    offset=Vector3d(0, 0.16, 0),
+    offset=Vector3d(x=0, y=0.16, z=0),
     positionY=0,
     enclosed_area_list=[
         ObjectInteractableArea(
-            dimensions=Vector3d(0.36, 0.135, 0.28),
-            position=Vector3d(0, 0.09, 0)
+            dimensions=Vector3d(x=0.36, y=0.135, z=0.28),
+            position=Vector3d(x=0, y=0.09, z=0)
         )
     ]
 )
 _CHEST_9_TRAPEZOID_LID_SIZE = ObjectBaseSize(
-    dimensions=Vector3d(0.84, 0.41, 0.42),
+    dimensions=Vector3d(x=0.84, y=0.41, z=0.42),
     mass=5,
-    offset=Vector3d(0, 0.205, 0),
+    offset=Vector3d(x=0, y=0.205, z=0),
     positionY=0,
     enclosed_area_list=[
         ObjectInteractableArea(
-            dimensions=Vector3d(0.77, 0.28, 0.38),
-            position=Vector3d(0, 0.16, 0)
+            dimensions=Vector3d(x=0.77, y=0.28, z=0.38),
+            position=Vector3d(x=0, y=0.16, z=0)
+        )
+    ]
+)
+_CONTAINER_ASYMMETRIC_01_SIZE = ObjectBaseSize(
+    dimensions=Vector3d(x=1, y=0.6, z=1),
+    mass=10,
+    offset=Vector3d(x=0, y=0.3, z=0),
+    placer_offset_x=[0.4, -0.4],
+    placer_offset_y=[0.4, 0],
+    positionY=0,
+    enclosed_area_list=[
+        ObjectInteractableArea(
+            dimensions=Vector3d(x=0.6, y=0.6, z=0.8),
+            position=Vector3d(x=0, y=0.405, z=0)
+        )
+    ]
+)
+_CONTAINER_ASYMMETRIC_02_SIZE = ObjectBaseSize(
+    dimensions=Vector3d(x=1, y=1, z=1),
+    mass=10,
+    offset=Vector3d(x=0, y=0.5, z=0),
+    placer_offset_x=[0.4, -0.4],
+    placer_offset_y=[0.8, 0],
+    positionY=0,
+    enclosed_area_list=[
+        ObjectInteractableArea(
+            dimensions=Vector3d(x=0.6, y=0.6, z=0.8),
+            position=Vector3d(x=0, y=0.405, z=0)
+        )
+    ]
+)
+_CONTAINER_ASYMMETRIC_03_SIZE = ObjectBaseSize(
+    dimensions=Vector3d(x=1, y=1, z=1),
+    mass=10,
+    offset=Vector3d(x=0, y=0.5, z=0),
+    placer_offset_x=[0.4, -0.4],
+    placer_offset_y=[0.4, 0],
+    positionY=0,
+    enclosed_area_list=[
+        ObjectInteractableArea(
+            dimensions=Vector3d(x=0.6, y=0.6, z=0.8),
+            position=Vector3d(x=0, y=0.405, z=0)
+        )
+    ]
+)
+_CONTAINER_ASYMMETRIC_04_SIZE = ObjectBaseSize(
+    dimensions=Vector3d(x=1.4, y=0.6, z=1),
+    mass=10,
+    offset=Vector3d(x=0, y=0.3, z=0),
+    placer_offset_x=[0.6, -0.6],
+    placer_offset_y=[0.4, 0],
+    positionY=0,
+    enclosed_area_list=[
+        ObjectInteractableArea(
+            dimensions=Vector3d(x=1, y=0.6, z=0.8),
+            position=Vector3d(x=0, y=0.405, z=0)
+        )
+    ]
+)
+_CONTAINER_ASYMMETRIC_05_SIZE = ObjectBaseSize(
+    dimensions=Vector3d(x=1.4, y=1, z=1),
+    mass=10,
+    offset=Vector3d(x=0, y=0.5, z=0),
+    placer_offset_x=[0.6, -0.6],
+    placer_offset_y=[0.8, 0],
+    positionY=0,
+    enclosed_area_list=[
+        ObjectInteractableArea(
+            dimensions=Vector3d(x=1, y=0.6, z=0.8),
+            position=Vector3d(x=0, y=0.405, z=0)
+        )
+    ]
+)
+_CONTAINER_ASYMMETRIC_06_SIZE = ObjectBaseSize(
+    dimensions=Vector3d(x=1.4, y=1, z=1),
+    mass=10,
+    offset=Vector3d(x=0, y=0.5, z=0),
+    placer_offset_x=[0.6, -0.6],
+    placer_offset_y=[0.4, 0],
+    positionY=0,
+    enclosed_area_list=[
+        ObjectInteractableArea(
+            dimensions=Vector3d(x=1, y=0.6, z=0.8),
+            position=Vector3d(x=0, y=0.405, z=0)
+        )
+    ]
+)
+_CONTAINER_ASYMMETRIC_07_SIZE = ObjectBaseSize(
+    dimensions=Vector3d(x=1.4, y=0.8, z=1),
+    mass=10,
+    offset=Vector3d(x=0, y=0.4, z=0),
+    placer_offset_x=[0.6, -0.6],
+    placer_offset_y=[0.4, 0],
+    positionY=0,
+    enclosed_area_list=[
+        ObjectInteractableArea(
+            dimensions=Vector3d(x=0.6, y=0.6, z=0.8),
+            position=Vector3d(x=0, y=0.605, z=0)
+        )
+    ]
+)
+_CONTAINER_ASYMMETRIC_08_SIZE = ObjectBaseSize(
+    dimensions=Vector3d(x=1.4, y=1.2, z=1),
+    mass=10,
+    offset=Vector3d(x=0, y=0.6, z=0),
+    placer_offset_x=[0.6, -0.6],
+    placer_offset_y=[0.8, 0],
+    positionY=0,
+    enclosed_area_list=[
+        ObjectInteractableArea(
+            dimensions=Vector3d(x=0.6, y=0.6, z=0.8),
+            position=Vector3d(x=0, y=0.605, z=0)
+        )
+    ]
+)
+_CONTAINER_ASYMMETRIC_09_SIZE = ObjectBaseSize(
+    dimensions=Vector3d(x=1.4, y=1.2, z=1),
+    mass=10,
+    offset=Vector3d(x=0, y=0.6, z=0),
+    placer_offset_x=[0.6, -0.6],
+    placer_offset_y=[0.4, 0],
+    positionY=0,
+    enclosed_area_list=[
+        ObjectInteractableArea(
+            dimensions=Vector3d(x=0.6, y=0.6, z=0.8),
+            position=Vector3d(x=0, y=0.605, z=0)
+        )
+    ]
+)
+_CONTAINER_ASYMMETRIC_10_SIZE = ObjectBaseSize(
+    dimensions=Vector3d(x=1.2, y=0.4, z=1),
+    mass=10,
+    offset=Vector3d(x=0, y=0.2, z=0),
+    placer_offset_x=[0.5, -0.5],
+    placer_offset_y=[0, 0],
+    positionY=0,
+    enclosed_area_list=[
+        ObjectInteractableArea(
+            dimensions=Vector3d(x=0.6, y=0.6, z=0.8),
+            position=Vector3d(x=0.1, y=0.605, z=0)
+        )
+    ]
+)
+_CONTAINER_ASYMMETRIC_11_SIZE = ObjectBaseSize(
+    dimensions=Vector3d(x=1.2, y=0.8, z=1),
+    mass=10,
+    offset=Vector3d(x=0, y=0.4, z=0),
+    placer_offset_x=[0.5, -0.5],
+    placer_offset_y=[0.4, 0],
+    positionY=0,
+    enclosed_area_list=[
+        ObjectInteractableArea(
+            dimensions=Vector3d(x=0.6, y=0.6, z=0.8),
+            position=Vector3d(x=0.1, y=0.605, z=0)
+        )
+    ]
+)
+_CONTAINER_ASYMMETRIC_12_SIZE = ObjectBaseSize(
+    dimensions=Vector3d(x=1.2, y=1.2, z=1),
+    mass=10,
+    offset=Vector3d(x=0, y=0.6, z=0),
+    placer_offset_x=[0.5, -0.5],
+    placer_offset_y=[0.8, 0],
+    positionY=0,
+    enclosed_area_list=[
+        ObjectInteractableArea(
+            dimensions=Vector3d(x=0.6, y=0.6, z=0.8),
+            position=Vector3d(x=0.1, y=0.605, z=0)
+        )
+    ]
+)
+_CONTAINER_SYMMETRIC_01_SIZE = ObjectBaseSize(
+    dimensions=Vector3d(x=1, y=0.2, z=1),
+    mass=10,
+    offset=Vector3d(x=0, y=0.1, z=0),
+    placer_offset_x=[0.4, -0.4],
+    placer_offset_y=[0, 0],
+    positionY=0,
+    enclosed_area_list=[
+        ObjectInteractableArea(
+            dimensions=Vector3d(x=0.6, y=0.6, z=0.8),
+            position=Vector3d(x=0, y=0.405, z=0)
+        )
+    ]
+)
+_CONTAINER_SYMMETRIC_02_SIZE = ObjectBaseSize(
+    dimensions=Vector3d(x=1, y=0.6, z=1),
+    mass=10,
+    offset=Vector3d(x=0, y=0.3, z=0),
+    placer_offset_x=[0.4, -0.4],
+    placer_offset_y=[0, 0],
+    positionY=0,
+    enclosed_area_list=[
+        ObjectInteractableArea(
+            dimensions=Vector3d(x=0.6, y=0.6, z=0.8),
+            position=Vector3d(x=0, y=0.405, z=0)
+        )
+    ]
+)
+_CONTAINER_SYMMETRIC_03_SIZE = ObjectBaseSize(
+    dimensions=Vector3d(x=1, y=1, z=1),
+    mass=10,
+    offset=Vector3d(x=0, y=0.5, z=0),
+    placer_offset_x=[0.4, -0.4],
+    placer_offset_y=[0, 0],
+    positionY=0,
+    enclosed_area_list=[
+        ObjectInteractableArea(
+            dimensions=Vector3d(x=0.6, y=0.6, z=0.8),
+            position=Vector3d(x=0, y=0.405, z=0)
+        )
+    ]
+)
+_CONTAINER_SYMMETRIC_04_SIZE = ObjectBaseSize(
+    dimensions=Vector3d(x=1.4, y=0.2, z=1),
+    mass=10,
+    offset=Vector3d(x=0, y=0.1, z=0),
+    placer_offset_x=[0.6, -0.6],
+    placer_offset_y=[0, 0],
+    positionY=0,
+    enclosed_area_list=[
+        ObjectInteractableArea(
+            dimensions=Vector3d(x=1, y=0.6, z=0.8),
+            position=Vector3d(x=0, y=0.405, z=0)
+        )
+    ]
+)
+_CONTAINER_SYMMETRIC_05_SIZE = ObjectBaseSize(
+    dimensions=Vector3d(x=1.4, y=0.2, z=1),
+    mass=10,
+    offset=Vector3d(x=0, y=0.1, z=0),
+    placer_offset_x=[0.6, -0.6],
+    placer_offset_y=[0, 0],
+    positionY=0,
+    enclosed_area_list=[
+        ObjectInteractableArea(
+            dimensions=Vector3d(x=0.6, y=0.6, z=0.8),
+            position=Vector3d(x=0, y=0.405, z=0)
+        )
+    ]
+)
+_CONTAINER_SYMMETRIC_06_SIZE = ObjectBaseSize(
+    dimensions=Vector3d(x=1.4, y=0.6, z=1),
+    mass=10,
+    offset=Vector3d(x=0, y=0.3, z=0),
+    placer_offset_x=[0.6, -0.6],
+    placer_offset_y=[0, 0],
+    positionY=0,
+    enclosed_area_list=[
+        ObjectInteractableArea(
+            dimensions=Vector3d(x=1, y=0.6, z=0.8),
+            position=Vector3d(x=0, y=0.405, z=0)
+        )
+    ]
+)
+_CONTAINER_SYMMETRIC_07_SIZE = ObjectBaseSize(
+    dimensions=Vector3d(x=1.4, y=1, z=1),
+    mass=10,
+    offset=Vector3d(x=0, y=0.5, z=0),
+    placer_offset_x=[0.6, -0.6],
+    placer_offset_y=[0, 0],
+    positionY=0,
+    enclosed_area_list=[
+        ObjectInteractableArea(
+            dimensions=Vector3d(x=1, y=0.6, z=0.8),
+            position=Vector3d(x=0, y=0.405, z=0)
+        )
+    ]
+)
+_CONTAINER_SYMMETRIC_08_SIZE = ObjectBaseSize(
+    dimensions=Vector3d(x=1, y=0.4, z=1),
+    mass=10,
+    offset=Vector3d(x=0, y=0.2, z=0),
+    placer_offset_x=[0.4, -0.4],
+    placer_offset_y=[0, 0],
+    positionY=0,
+    enclosed_area_list=[
+        ObjectInteractableArea(
+            dimensions=Vector3d(x=0.6, y=0.6, z=0.8),
+            position=Vector3d(x=0, y=0.605, z=0)
+        )
+    ]
+)
+_CONTAINER_SYMMETRIC_09_SIZE = ObjectBaseSize(
+    dimensions=Vector3d(x=1.4, y=0.4, z=1),
+    mass=10,
+    offset=Vector3d(x=0, y=0.2, z=0),
+    placer_offset_x=[0.6, -0.6],
+    placer_offset_y=[0, 0],
+    positionY=0,
+    enclosed_area_list=[
+        ObjectInteractableArea(
+            dimensions=Vector3d(x=1, y=0.6, z=0.8),
+            position=Vector3d(x=0, y=0.605, z=0)
+        )
+    ]
+)
+_CONTAINER_SYMMETRIC_10_SIZE = ObjectBaseSize(
+    dimensions=Vector3d(x=1.4, y=0.4, z=1),
+    mass=10,
+    offset=Vector3d(x=0, y=0.2, z=0),
+    placer_offset_x=[0.6, -0.6],
+    placer_offset_y=[0, 0],
+    positionY=0,
+    enclosed_area_list=[
+        ObjectInteractableArea(
+            dimensions=Vector3d(x=0.6, y=0.6, z=0.8),
+            position=Vector3d(x=0, y=0.605, z=0)
+        )
+    ]
+)
+_CONTAINER_SYMMETRIC_11_SIZE = ObjectBaseSize(
+    dimensions=Vector3d(x=1.4, y=0.8, z=1),
+    mass=10,
+    offset=Vector3d(x=0, y=0.4, z=0),
+    placer_offset_x=[0.6, -0.6],
+    placer_offset_y=[0, 0],
+    positionY=0,
+    enclosed_area_list=[
+        ObjectInteractableArea(
+            dimensions=Vector3d(x=0.6, y=0.6, z=0.8),
+            position=Vector3d(x=0, y=0.605, z=0)
+        )
+    ]
+)
+_CONTAINER_SYMMETRIC_12_SIZE = ObjectBaseSize(
+    dimensions=Vector3d(x=1.4, y=1.2, z=1),
+    mass=10,
+    offset=Vector3d(x=0, y=0.6, z=0),
+    placer_offset_x=[0.6, -0.6],
+    placer_offset_y=[0, 0],
+    positionY=0,
+    enclosed_area_list=[
+        ObjectInteractableArea(
+            dimensions=Vector3d(x=0.6, y=0.6, z=0.8),
+            position=Vector3d(x=0, y=0.605, z=0)
         )
     ]
 )
 _CRAYON_SIZE = ObjectBaseSize(
-    dimensions=Vector3d(0.01, 0.085, 0.01),
+    dimensions=Vector3d(x=0.01, y=0.085, z=0.01),
     mass=0.125,
-    offset=Vector3d(0, 0.0425, 0),
+    offset=Vector3d(x=0, y=0.0425, z=0),
     positionY=0.005
 )
 _CRIB_SIZE = ObjectBaseSize(
-    dimensions=Vector3d(0.65, 0.9, 1.25),
+    dimensions=Vector3d(x=0.65, y=0.9, z=1.25),
     mass=10,
-    offset=Vector3d(0, 0.45, 0),
+    offset=Vector3d(x=0, y=0.45, z=0),
     positionY=0,
 )
 _CUP_2_SIZE = ObjectBaseSize(
-    dimensions=Vector3d(0.105, 0.135, 0.104),
+    dimensions=Vector3d(x=0.105, y=0.135, z=0.104),
     mass=0.5,
-    offset=Vector3d(0, 0.064, 0),
+    offset=Vector3d(x=0, y=0.064, z=0),
+    placer_offset_y=[0.04],
     positionY=0.005,
     enclosed_area_list=[
         ObjectInteractableArea(
-            dimensions=Vector3d(0.05, .18, 0.05),
-            position=Vector3d(0, 0.092, 0)
+            dimensions=Vector3d(x=0.05, y=.18, z=0.05),
+            position=Vector3d(x=0, y=0.092, z=0)
         )
     ]
 )
 _CUP_3_SIZE = ObjectBaseSize(
-    dimensions=Vector3d(0.123, 0.149, 0.126),
+    dimensions=Vector3d(x=0.123, y=0.149, z=0.126),
     mass=0.5,
-    offset=Vector3d(0, 0.072, 0),
+    offset=Vector3d(x=0, y=0.072, z=0),
+    placer_offset_y=[0.04],
     positionY=0.005,
     enclosed_area_list=[
         ObjectInteractableArea(
-            dimensions=Vector3d(0.04, 2, 0.04),
-            position=Vector3d(0, 0.12, 0)
+            dimensions=Vector3d(x=0.04, y=2, z=0.04),
+            position=Vector3d(x=0, y=0.12, z=0)
         )
     ]
 )
 _CUP_6_SIZE = ObjectBaseSize(
-    dimensions=Vector3d(0.106, 0.098, 0.106),
+    dimensions=Vector3d(x=0.106, y=0.098, z=0.106),
     mass=0.5,
-    offset=Vector3d(0, 0.046, 0),
+    offset=Vector3d(x=0, y=0.046, z=0),
+    placer_offset_y=[0.04],
     positionY=0.005,
     enclosed_area_list=[
         ObjectInteractableArea(
-            dimensions=Vector3d(0.05, .14, 0.05),
-            position=Vector3d(0, 0.09, 0)
+            dimensions=Vector3d(x=0.05, y=.14, z=0.05),
+            position=Vector3d(x=0, y=0.09, z=0)
         )
     ]
 )
 _DOG_ON_WHEELS_SIZE = ObjectBaseSize(
-    dimensions=Vector3d(0.355, 0.134, 0.071),
+    dimensions=Vector3d(x=0.355, y=0.134, z=0.071),
     mass=2,
-    offset=Vector3d(0, 0.067, 0),
+    offset=Vector3d(x=0, y=0.067, z=0),
+    placer_offset_y=[0.03],
     positionY=0.005
 )
 _DUCK_ON_WHEELS_SIZE = ObjectBaseSize(
-    dimensions=Vector3d(0.21, 0.17, 0.065),
+    dimensions=Vector3d(x=0.21, y=0.17, z=0.065),
     mass=1,
-    offset=Vector3d(0, 0.085, 0),
+    offset=Vector3d(x=0, y=0.085, z=0),
+    placer_offset_y=[0.01],
     positionY=0.005
 )
 _FOAM_FLOOR_TILES_SIZE = ObjectBaseSize(
-    dimensions=Vector3d(9, 0.01, 9),
+    dimensions=Vector3d(x=9, y=0.01, z=9),
     mass=2,
-    offset=Vector3d(0, 0.01, 0),
+    offset=Vector3d(x=0, y=0.01, z=0),
     positionY=0.01
 )
 _PACIFIER_SIZE = ObjectBaseSize(
-    dimensions=Vector3d(0.07, 0.04, 0.05),
+    dimensions=Vector3d(x=0.07, y=0.04, z=0.05),
     mass=0.125,
-    offset=Vector3d(0, 0.02, 0),
+    offset=Vector3d(x=0, y=0.02, z=0),
     positionY=0.005
 )
 _PLATE_1_SIZE = ObjectBaseSize(
-    dimensions=Vector3d(0.208, 0.117, 0.222),
+    dimensions=Vector3d(x=0.208, y=0.117, z=0.222),
     mass=0.5,
-    offset=Vector3d(0, 0.057, 0),
+    offset=Vector3d(x=0, y=0.057, z=0),
+    placer_offset_y=[0.1],
     positionY=0.005
 )
 _PLATE_3_SIZE = ObjectBaseSize(
-    dimensions=Vector3d(0.304, 0.208, 0.305),
+    dimensions=Vector3d(x=0.304, y=0.208, z=0.305),
     mass=0.5,
-    offset=Vector3d(0, 0.098, 0),
+    offset=Vector3d(x=0, y=0.098, z=0),
+    placer_offset_y=[0.19],
     positionY=0.005
 )
 _PLATE_4_SIZE = ObjectBaseSize(
-    dimensions=Vector3d(0.202, 0.113, 0.206),
+    dimensions=Vector3d(x=0.202, y=0.113, z=0.206),
     mass=0.5,
-    offset=Vector3d(0, 0.053, 0),
+    offset=Vector3d(x=0, y=0.053, z=0),
+    placer_offset_y=[0.1],
     positionY=0.005
 )
 _PRIMITIVE_SIZE = ObjectBaseSize(
-    dimensions=Vector3d(1, 1, 1),
+    dimensions=Vector3d(x=1, y=1, z=1),
     mass=1,
-    offset=Vector3d(0, 0.5, 0),
+    offset=Vector3d(x=0, y=0.5, z=0),
     positionY=0.5
 )
 _PRIMITIVE_ON_GROUND_SIZE = ObjectBaseSize(
-    dimensions=Vector3d(1, 1, 1),
+    dimensions=Vector3d(x=1, y=1, z=1),
     mass=1,
-    offset=Vector3d(0, 0.5, 0),
+    offset=Vector3d(x=0, y=0.5, z=0),
     positionY=0
 )
 _PRIMITIVE_TALL_NARROW_SIZE = ObjectBaseSize(
-    dimensions=Vector3d(0.5, 1, 0.5),
+    dimensions=Vector3d(x=0.5, y=1, z=0.5),
     mass=1,
-    offset=Vector3d(0, 0.5, 0),
+    offset=Vector3d(x=0, y=0.5, z=0),
+    placer_offset_x=[0.2],
+    positionY=0.5
+)
+_PRIMITIVE_TRIANGLE_SIZE = ObjectBaseSize(
+    dimensions=Vector3d(x=1, y=1, z=1),
+    mass=1,
+    offset=Vector3d(x=0, y=0.5, z=0),
+    placer_offset_x=[-0.45],
     positionY=0.5
 )
 _PRIMITIVE_WIDE_TALL_SIZE = ObjectBaseSize(
-    dimensions=Vector3d(1, 2, 1),
+    dimensions=Vector3d(x=1, y=2, z=1),
     mass=1,
-    offset=Vector3d(0, 1, 0),
+    offset=Vector3d(x=0, y=1, z=0),
     positionY=1
 )
 _SHELF_1_CUBBY_SIZE = ObjectBaseSize(
-    dimensions=Vector3d(0.78, 0.77, 0.4),
+    dimensions=Vector3d(x=0.78, y=0.77, z=0.4),
     mass=3,
-    offset=Vector3d(0, 0.385, 0),
+    offset=Vector3d(x=0, y=0.385, z=0),
     positionY=0,
     open_area_list=[
         # Remove the top of the shelf from this object because it's not
         # reachable by the performer agent at larger scales.
         # ObjectInteractableArea(
-        #     dimensions=Vector3d(0.77, 0, 0.39),
-        #     position=Vector3d(0, 0.78, 0)
+        #     dimensions=Vector3d(x=0.77, y=0, z=0.39),
+        #     position=Vector3d(x=0, y=0.78, z=0)
         # ),
         ObjectInteractableArea(
-            dimensions=Vector3d(0.38, 0.33, 0.33),
-            position=Vector3d(0.175, 0.56, 0),
+            dimensions=Vector3d(x=0.38, y=0.33, z=0.33),
+            position=Vector3d(x=0.175, y=0.56, z=0),
             area_id='top_right_shelf'
         ),
         ObjectInteractableArea(
-            dimensions=Vector3d(0.38, 0.33, 0.33),
-            position=Vector3d(-0.175, 0.56, 0),
+            dimensions=Vector3d(x=0.38, y=0.33, z=0.33),
+            position=Vector3d(x=-0.175, y=0.56, z=0),
             area_id='top_left_shelf'
         ),
         ObjectInteractableArea(
-            dimensions=Vector3d(0.38, 0.33, 0.33),
-            position=Vector3d(0.175, 0.21, 0),
+            dimensions=Vector3d(x=0.38, y=0.33, z=0.33),
+            position=Vector3d(x=0.175, y=0.21, z=0),
             area_id='bottom_right_shelf'
         ),
         ObjectInteractableArea(
-            dimensions=Vector3d(0.38, 0.33, 0.33),
-            position=Vector3d(-0.175, 0.21, 0),
+            dimensions=Vector3d(x=0.38, y=0.33, z=0.33),
+            position=Vector3d(x=-0.175, y=0.21, z=0),
             area_id='bottom_left_shelf'
         )
     ]
 )
 _SHELF_2_TABLE_SIZE = ObjectBaseSize(
-    dimensions=Vector3d(0.93, 0.73, 1.02),
+    dimensions=Vector3d(x=0.93, y=0.73, z=1.02),
     mass=4,
-    offset=Vector3d(0, 0.355, 0),
+    offset=Vector3d(x=0, y=0.355, z=0),
     positionY=0,
     open_area_list=[
         # Remove the top of the shelf from this object because it's not
         # reachable by the performer agent at larger scales.
         # ObjectInteractableArea(
-        #     dimensions=Vector3d(0.92, 0, 1.01),
-        #     position=Vector3d(0, 0.73, 0)
+        #     dimensions=Vector3d(x=0.92, y=0, z=1.01),
+        #     position=Vector3d(x=0, y=0.73, z=0)
         # ),
         ObjectInteractableArea(
-            dimensions=Vector3d(0.65, 0.22, 0.87),
-            position=Vector3d(0, 0.52, 0),
+            dimensions=Vector3d(x=0.65, y=0.22, z=0.87),
+            position=Vector3d(x=0, y=0.52, z=0),
             area_id='middle_shelf'
         ),
         ObjectInteractableArea(
-            dimensions=Vector3d(0.8, 0.235, 0.95),
-            position=Vector3d(0, 0.225, 0),
+            dimensions=Vector3d(x=0.8, y=0.235, z=0.95),
+            position=Vector3d(x=0, y=0.225, z=0),
             area_id='lower_shelf'
         )
     ]
 )
 _SOCCER_BALL_SIZE = ObjectBaseSize(
-    dimensions=Vector3d(0.22, 0.22, 0.22),
+    dimensions=Vector3d(x=0.22, y=0.22, z=0.22),
     mass=1,
-    offset=Vector3d(0, 0.11, 0),
+    offset=Vector3d(x=0, y=0.11, z=0),
     positionY=0.11
 )
 _SOFA_1_SIZE = ObjectBaseSize(
-    dimensions=Vector3d(2.64, 1.15, 1.23),
+    dimensions=Vector3d(x=2.64, y=1.15, z=1.23),
     mass=45,
-    offset=Vector3d(0, 0.575, 0),
+    offset=Vector3d(x=0, y=0.575, z=0),
     positionY=0,
     open_area_list=[
         ObjectInteractableArea(
-            dimensions=Vector3d(1.95, 0, 0.6),
-            position=Vector3d(0, 0.62, 0.24)
+            dimensions=Vector3d(x=1.95, y=0, z=0.6),
+            position=Vector3d(x=0, y=0.62, z=0.24)
         )
     ]
 )
 _SOFA_2_SIZE = ObjectBaseSize(
-    dimensions=Vector3d(2.55, 1.25, 0.95),
+    dimensions=Vector3d(x=2.55, y=1.25, z=0.95),
     mass=45,
-    offset=Vector3d(0, 0.625, 0),
+    offset=Vector3d(x=0, y=0.625, z=0),
     positionY=0,
     open_area_list=[
         ObjectInteractableArea(
-            dimensions=Vector3d(1.95, 0, 0.625),
-            position=Vector3d(0, 0.59, 0.15)
+            dimensions=Vector3d(x=1.95, y=0, z=0.625),
+            position=Vector3d(x=0, y=0.59, z=0.15)
         )
     ]
 )
 _SOFA_3_SIZE = ObjectBaseSize(
-    dimensions=Vector3d(2.4, 1.25, 0.95),
+    dimensions=Vector3d(x=2.4, y=1.25, z=0.95),
     mass=45,
-    offset=Vector3d(0, 0.625, 0),
+    offset=Vector3d(x=0, y=0.625, z=0),
     positionY=0,
     open_area_list=[
         ObjectInteractableArea(
-            dimensions=Vector3d(1.95, 0, 0.625),
-            position=Vector3d(0, 0.59, 0.15)
+            dimensions=Vector3d(x=1.95, y=0, z=0.625),
+            position=Vector3d(x=0, y=0.59, z=0.15)
         )
     ]
 )
 _SOFA_4_SIZE = ObjectBaseSize(
-    dimensions=Vector3d(1.594, 0.837, 1.007),
+    dimensions=Vector3d(x=1.594, y=0.837, z=1.007),
     mass=30,
-    offset=Vector3d(0, 0.419, 0),
+    offset=Vector3d(x=0, y=0.419, z=0),
     positionY=0,
     open_area_list=[
         ObjectInteractableArea(
-            dimensions=Vector3d(1.214, 0, 0.552),
-            position=Vector3d(0, 0.422, 0.049)
+            dimensions=Vector3d(x=1.214, y=0, z=0.552),
+            position=Vector3d(x=0, y=0.422, z=0.049)
         )
     ]
 )
 _SOFA_5_SIZE = ObjectBaseSize(
-    dimensions=Vector3d(1.862, 0.902, 1),
+    dimensions=Vector3d(x=1.862, y=0.902, z=1),
     mass=30,
-    offset=Vector3d(0, 0.451, 0),
+    offset=Vector3d(x=0, y=0.451, z=0),
     positionY=0,
     open_area_list=[
         ObjectInteractableArea(
-            dimensions=Vector3d(1.444, 0, 0.639),
-            position=Vector3d(0, 0.496, 0.126)
+            dimensions=Vector3d(x=1.444, y=0, z=0.639),
+            position=Vector3d(x=0, y=0.496, z=0.126)
         )
     ]
 )
 _SOFA_6_SIZE = ObjectBaseSize(
-    dimensions=Vector3d(1.692, 0.723, 0.916),
+    dimensions=Vector3d(x=1.692, y=0.723, z=0.916),
     mass=30,
-    offset=Vector3d(0, 0.361, 0),
+    offset=Vector3d(x=0, y=0.361, z=0),
     positionY=0,
     open_area_list=[
         ObjectInteractableArea(
-            dimensions=Vector3d(1.097, 0, 0.787),
-            position=Vector3d(0, 0.388, 0.057)
+            dimensions=Vector3d(x=1.097, y=0, z=0.787),
+            position=Vector3d(x=0, y=0.388, z=0.057)
         )
     ]
 )
 _SOFA_7_SIZE = ObjectBaseSize(
-    dimensions=Vector3d(1.607, 0.848, 0.933),
+    dimensions=Vector3d(x=1.607, y=0.848, z=0.933),
     mass=30,
-    offset=Vector3d(0, 0.424, 0),
+    offset=Vector3d(x=0, y=0.424, z=0),
     positionY=0,
     open_area_list=[
         ObjectInteractableArea(
-            dimensions=Vector3d(1.294, 0, 0.762),
-            position=Vector3d(0, 0.459, 0.05)
+            dimensions=Vector3d(x=1.294, y=0, z=0.762),
+            position=Vector3d(x=0, y=0.459, z=0.05)
         )
     ]
 )
 _SOFA_CHAIR_1_SIZE = ObjectBaseSize(
-    dimensions=Vector3d(1.43, 1.15, 1.23),
+    dimensions=Vector3d(x=1.43, y=1.15, z=1.23),
     mass=30,
-    offset=Vector3d(0, 0.575, 0),
+    offset=Vector3d(x=0, y=0.575, z=0),
     positionY=0,
     open_area_list=[
         ObjectInteractableArea(
-            dimensions=Vector3d(0.77, 0, 0.6),
-            position=Vector3d(0, 0.62, 0.24)
+            dimensions=Vector3d(x=0.77, y=0, z=0.6),
+            position=Vector3d(x=0, y=0.62, z=0.24)
         )
     ]
 )
 _SOFA_CHAIR_2_SIZE = ObjectBaseSize(
-    dimensions=Vector3d(1.425, 1.25, 0.95),
+    dimensions=Vector3d(x=1.425, y=1.25, z=0.95),
     mass=30,
-    offset=Vector3d(0, 0.625, 0),
+    offset=Vector3d(x=0, y=0.625, z=0),
     positionY=0,
     open_area_list=[
         ObjectInteractableArea(
-            dimensions=Vector3d(0.975, 0, 0.65),
-            position=Vector3d(0, 0.59, 0.15)
+            dimensions=Vector3d(x=0.975, y=0, z=0.65),
+            position=Vector3d(x=0, y=0.59, z=0.15)
         )
     ]
 )
 _SOFA_CHAIR_3_SIZE = ObjectBaseSize(
-    dimensions=Vector3d(1.425, 1.25, 0.95),
+    dimensions=Vector3d(x=1.425, y=1.25, z=0.95),
     mass=30,
-    offset=Vector3d(0, 0.625, 0),
+    offset=Vector3d(x=0, y=0.625, z=0),
     positionY=0,
     open_area_list=[
         ObjectInteractableArea(
-            dimensions=Vector3d(0.975, 0, 0.65),
-            position=Vector3d(0, 0.59, 0.15)
+            dimensions=Vector3d(x=0.975, y=0, z=0.65),
+            position=Vector3d(x=0, y=0.59, z=0.15)
         )
     ]
 )
 _SOFA_CHAIR_4_SIZE = ObjectBaseSize(
-    dimensions=Vector3d(1, 0.857, 0.873),
+    dimensions=Vector3d(x=1, y=0.857, z=0.873),
     mass=20,
-    offset=Vector3d(0, 0.429, 0),
+    offset=Vector3d(x=0, y=0.429, z=0),
     positionY=0,
     open_area_list=[
         ObjectInteractableArea(
-            dimensions=Vector3d(0.5, 0, 0.736),
-            position=Vector3d(0, 0.393, 0.064)
+            dimensions=Vector3d(x=0.5, y=0, z=0.736),
+            position=Vector3d(x=0, y=0.393, z=0.064)
         )
     ]
 )
 _SOFA_CHAIR_5_SIZE = ObjectBaseSize(
-    dimensions=Vector3d(0.957, 0.915, 1),
+    dimensions=Vector3d(x=0.957, y=0.915, z=1),
     mass=20,
-    offset=Vector3d(0, 0.458, 0),
+    offset=Vector3d(x=0, y=0.458, z=0),
     positionY=0,
     open_area_list=[
         ObjectInteractableArea(
-            dimensions=Vector3d(0.708, 0, 0.655),
-            position=Vector3d(0, 0.423, 0.132)
+            dimensions=Vector3d(x=0.708, y=0, z=0.655),
+            position=Vector3d(x=0, y=0.423, z=0.132)
         )
     ]
 )
 _SOFA_CHAIR_6_SIZE = ObjectBaseSize(
-    dimensions=Vector3d(0.667, 0.637, 0.667),
+    dimensions=Vector3d(x=0.667, y=0.637, z=0.667),
     mass=20,
-    offset=Vector3d(0, 0.318, 0),
+    offset=Vector3d(x=0, y=0.318, z=0),
     positionY=0,
     open_area_list=[
         ObjectInteractableArea(
-            dimensions=Vector3d(0.5, 0, 0.446),
-            position=Vector3d(0, 0.27, 0.006)
+            dimensions=Vector3d(x=0.5, y=0, z=0.446),
+            position=Vector3d(x=0, y=0.27, z=0.006)
         )
     ]
 )
 _SOFA_CHAIR_7_SIZE = ObjectBaseSize(
-    dimensions=Vector3d(0.691, 0.681, 0.634),
+    dimensions=Vector3d(x=0.691, y=0.681, z=0.634),
     mass=20,
-    offset=Vector3d(0, 0.335, 0),
+    offset=Vector3d(x=0, y=0.335, z=0),
     positionY=0,
     open_area_list=[
         ObjectInteractableArea(
-            dimensions=Vector3d(0.449, 0, 0.325),
-            position=Vector3d(0, 0.324, 0.087)
+            dimensions=Vector3d(x=0.449, y=0, z=0.325),
+            position=Vector3d(x=0, y=0.324, z=0.087)
         )
     ]
 )
 _TABLE_1_RECT_SIZE = ObjectBaseSize(
-    dimensions=Vector3d(0.69, 0.88, 1.63),
+    dimensions=Vector3d(x=0.69, y=0.88, z=1.63),
     mass=3,
-    offset=Vector3d(0, 0.44, 0),
+    offset=Vector3d(x=0, y=0.44, z=0),
     positionY=0,
     open_area_list=[
         ObjectInteractableArea(
-            dimensions=Vector3d(0.68, 0, 1.62),
-            position=Vector3d(0.065, 0.88, -0.07)
+            dimensions=Vector3d(x=0.68, y=0, z=1.62),
+            position=Vector3d(x=0.065, y=0.88, z=-0.07)
         )
     ]
 )
 _TABLE_2_CIRCLE_SIZE = ObjectBaseSize(
-    dimensions=Vector3d(0.67, 0.74, 0.67),
+    dimensions=Vector3d(x=0.67, y=0.74, z=0.67),
     mass=1,
-    offset=Vector3d(0, 0.37, 0),
+    offset=Vector3d(x=0, y=0.37, z=0),
     positionY=0,
     open_area_list=[
         ObjectInteractableArea(
-            dimensions=Vector3d(0.5, 0, 0.5),
-            position=Vector3d(0, 0.74, 0)
+            dimensions=Vector3d(x=0.5, y=0, z=0.5),
+            position=Vector3d(x=0, y=0.74, z=0)
         )
     ]
 )
 _TABLE_3_CIRCLE_SIZE = ObjectBaseSize(
-    dimensions=Vector3d(0.573, 1.018, 0.557),
+    dimensions=Vector3d(x=0.573, y=1.018, z=0.557),
     mass=0.5,
-    offset=Vector3d(0, 0.509, 0),
+    offset=Vector3d(x=0, y=0.509, z=0),
     positionY=0,
     open_area_list=[
         ObjectInteractableArea(
-            dimensions=Vector3d(0.4, 0, 0.4),
-            position=Vector3d(0, 0.84, 0)
+            dimensions=Vector3d(x=0.4, y=0, z=0.4),
+            position=Vector3d(x=0, y=0.84, z=0)
         )
     ]
 )
 _TABLE_4_SEMICIRCLE_SIZE = ObjectBaseSize(
-    dimensions=Vector3d(0.62, 0.62, 1.17),
+    dimensions=Vector3d(x=0.62, y=0.62, z=1.17),
     mass=4,
-    offset=Vector3d(0, 0.31, 0),
+    offset=Vector3d(x=0, y=0.31, z=0),
     positionY=0,
     open_area_list=[
         ObjectInteractableArea(
-            dimensions=Vector3d(0.45, 0, 0.8),
-            position=Vector3d(0, 0.62, 0)
+            dimensions=Vector3d(x=0.45, y=0, z=0.8),
+            position=Vector3d(x=0, y=0.62, z=0)
         )
     ]
 )
 _TABLE_5_RECT_SIZE = ObjectBaseSize(
-    dimensions=Vector3d(1.2, 0.7, 0.9),
+    dimensions=Vector3d(x=1.2, y=0.7, z=0.9),
     mass=8,
-    offset=Vector3d(0, 0.35, 0),
+    offset=Vector3d(x=0, y=0.35, z=0),
     positionY=0,
     open_area_list=[
         ObjectInteractableArea(
-            dimensions=Vector3d(1.2, 0, 0.9),
-            position=Vector3d(0, 0.7, 0)
+            dimensions=Vector3d(x=1.2, y=0, z=0.9),
+            position=Vector3d(x=0, y=0.7, z=0)
         )
     ]
 )
 _TABLE_7_RECT_SIZE = ObjectBaseSize(
-    dimensions=Vector3d(1.02, 0.45, 0.65),
+    dimensions=Vector3d(x=1.02, y=0.45, z=0.65),
     mass=3,
-    offset=Vector3d(0, 0.22, 0),
+    offset=Vector3d(x=0, y=0.22, z=0),
     positionY=0,
     open_area_list=[
         ObjectInteractableArea(
-            dimensions=Vector3d(1.02, 0, 0.65),
-            position=Vector3d(0, 0.45, 0)
+            dimensions=Vector3d(x=1.02, y=0, z=0.65),
+            position=Vector3d(x=0, y=0.45, z=0)
         )
     ]
 )
 _TABLE_8_RECT_SIZE = ObjectBaseSize(
-    dimensions=Vector3d(0.65, 0.45, 1.02),
+    dimensions=Vector3d(x=0.65, y=0.45, z=1.02),
     mass=6,
-    offset=Vector3d(0, 0.22, 0),
+    offset=Vector3d(x=0, y=0.22, z=0),
     positionY=0,
     open_area_list=[
         ObjectInteractableArea(
-            dimensions=Vector3d(0.65, 0, 1.02),
-            position=Vector3d(0, 0.45, 0)
+            dimensions=Vector3d(x=0.65, y=0, z=1.02),
+            position=Vector3d(x=0, y=0.45, z=0)
         )
     ]
 )
 _TABLE_11_AND_12_SIZE = ObjectBaseSize(
-    dimensions=Vector3d(1, 0.5, 1),
+    dimensions=Vector3d(x=1, y=0.5, z=1),
     mass=12,
-    offset=Vector3d(0, 0.5, 0),
+    offset=Vector3d(x=0, y=0.5, z=0),
     positionY=0,
     open_area_list=[
         ObjectInteractableArea(
-            dimensions=Vector3d(1, 0, 1),
-            position=Vector3d(0, 0.5, 0)
+            dimensions=Vector3d(x=1, y=0, z=1),
+            position=Vector3d(x=0, y=0.5, z=0)
         )
     ]
 )
 _TABLE_13_SMALL_CIRCLE_SIZE = ObjectBaseSize(
-    dimensions=Vector3d(0.579, 0.622, 0.587),
+    dimensions=Vector3d(x=0.579, y=0.622, z=0.587),
     mass=6,
-    offset=Vector3d(0, 0.311, 0),
+    offset=Vector3d(x=0, y=0.311, z=0),
     positionY=0,
     open_area_list=[
         ObjectInteractableArea(
-            dimensions=Vector3d(0.3, 0, 0.3),
-            position=Vector3d(0, 0.52, 0)
+            dimensions=Vector3d(x=0.3, y=0, z=0.3),
+            position=Vector3d(x=0, y=0.52, z=0)
         )
     ]
 )
 _TABLE_14_SMALL_RECT_SIZE = ObjectBaseSize(
-    dimensions=Vector3d(0.534, 0.59, 0.526),
+    dimensions=Vector3d(x=0.534, y=0.59, z=0.526),
     mass=6,
-    offset=Vector3d(0, 0.295, 0),
+    offset=Vector3d(x=0, y=0.295, z=0),
     positionY=0,
     open_area_list=[
         ObjectInteractableArea(
-            dimensions=Vector3d(0.5, 0, 0.5),
-            position=Vector3d(0, 0.485, 0)
+            dimensions=Vector3d(x=0.5, y=0, z=0.5),
+            position=Vector3d(x=0, y=0.485, z=0)
         )
     ]
 )
 _TABLE_15_RECT_SIZE = ObjectBaseSize(
-    dimensions=Vector3d(1.334, 0.901, 0.791),
+    dimensions=Vector3d(x=1.334, y=0.901, z=0.791),
     mass=15,
-    offset=Vector3d(0, 0.451, 0),
+    offset=Vector3d(x=0, y=0.451, z=0),
     positionY=0,
     open_area_list=[
         ObjectInteractableArea(
-            dimensions=Vector3d(1.3, 0, 0.749),
-            position=Vector3d(0, 0.739, 0.02)
+            dimensions=Vector3d(x=1.3, y=0, z=0.749),
+            position=Vector3d(x=0, y=0.739, z=0.02)
         )
     ]
 )
 _TABLE_16_CIRCLE_SIZE = ObjectBaseSize(
-    dimensions=Vector3d(1.058, 0.833, 1.054),
+    dimensions=Vector3d(x=1.058, y=0.833, z=1.054),
     mass=15,
-    offset=Vector3d(0, 0.417, 0),
+    offset=Vector3d(x=0, y=0.417, z=0),
     positionY=0,
     open_area_list=[
         ObjectInteractableArea(
-            dimensions=Vector3d(0.75, 0, 0.75),
-            position=Vector3d(0, 0.7, 0)
+            dimensions=Vector3d(x=0.75, y=0, z=0.75),
+            position=Vector3d(x=0, y=0.7, z=0)
         )
     ]
 )
 _TOOLBOX_1_SIZE = ObjectBaseSize(
-    dimensions=Vector3d(0.51, 0.29, 0.21),
+    dimensions=Vector3d(x=0.51, y=0.29, z=0.21),
     mass=5,
-    offset=Vector3d(0, 0.145, 0),
+    offset=Vector3d(x=0, y=0.145, z=0),
     positionY=0,
     enclosed_area_list=[
         ObjectInteractableArea(
-            dimensions=Vector3d(0.5, 0.19, 0.19),
-            position=Vector3d(0, 0.1, 0)
+            dimensions=Vector3d(x=0.5, y=0.19, z=0.19),
+            position=Vector3d(x=0, y=0.1, z=0)
         )
     ]
 )
 _TOOLBOX_2_SIZE = ObjectBaseSize(
-    dimensions=Vector3d(0.58, 0.33, 0.32),
+    dimensions=Vector3d(x=0.58, y=0.33, z=0.32),
     mass=5,
-    offset=Vector3d(0, 0.165, 0),
+    offset=Vector3d(x=0, y=0.165, z=0),
     positionY=0,
     enclosed_area_list=[
         ObjectInteractableArea(
-            dimensions=Vector3d(0.51, 0.3, 0.27),
-            position=Vector3d(0, 0.165, 0)
+            dimensions=Vector3d(x=0.51, y=0.3, z=0.27),
+            position=Vector3d(x=0, y=0.165, z=0)
         )
     ]
 )
 _TOY_BUS_1_SIZE = ObjectBaseSize(
-    dimensions=Vector3d(0.28, 0.28, 0.52),
+    dimensions=Vector3d(x=0.28, y=0.28, z=0.52),
     mass=0.5,
-    offset=Vector3d(0, 0.14, 0),
+    offset=Vector3d(x=0, y=0.14, z=0),
     positionY=0.005
 )
 _TOY_CAR_2_SIZE = ObjectBaseSize(
-    dimensions=Vector3d(0.25, 0.2, 0.41),
+    dimensions=Vector3d(x=0.25, y=0.2, z=0.41),
     mass=0.5,
-    offset=Vector3d(0, 0.1, 0),
+    offset=Vector3d(x=0, y=0.1, z=0),
+    placer_offset_y=[0.01],
     positionY=0.005
 )
 _TOY_RACECAR_SIZE = ObjectBaseSize(
-    dimensions=Vector3d(0.07, 0.06, 0.15),
+    dimensions=Vector3d(x=0.07, y=0.06, z=0.15),
     mass=0.5,
-    offset=Vector3d(0, 0.03, 0),
+    offset=Vector3d(x=0, y=0.03, z=0),
     positionY=0.005
 )
 _TOY_SEDAN_SIZE = ObjectBaseSize(
-    dimensions=Vector3d(0.075, 0.065, 0.14),
+    dimensions=Vector3d(x=0.075, y=0.065, z=0.14),
     mass=0.5,
-    offset=Vector3d(0, 0.0325, 0),
+    offset=Vector3d(x=0, y=0.0325, z=0),
     positionY=0.005
 )
 _TOY_TRAIN_SIZE = ObjectBaseSize(
-    dimensions=Vector3d(0.16, 0.2, 0.23),
+    dimensions=Vector3d(x=0.16, y=0.2, z=0.23),
     mass=1,
-    offset=Vector3d(0, 0.1, 0),
+    offset=Vector3d(x=0, y=0.1, z=0),
     positionY=0.005
 )
 _TOY_TROLLEY_SIZE = ObjectBaseSize(
-    dimensions=Vector3d(0.16, 0.2, 0.23),
+    dimensions=Vector3d(x=0.16, y=0.2, z=0.23),
     mass=1,
-    offset=Vector3d(0, 0.1, 0),
+    offset=Vector3d(x=0, y=0.1, z=0),
+    placer_offset_y=[0.12],
     positionY=0.005
 )
 _TOY_TRUCK_1_SIZE = ObjectBaseSize(
-    dimensions=Vector3d(0.2, 0.2, 0.25),
+    dimensions=Vector3d(x=0.2, y=0.2, z=0.25),
     mass=1,
-    offset=Vector3d(0, 0.1, 0),
+    offset=Vector3d(x=0, y=0.1, z=0),
     positionY=0.1
 )
 _TOY_TRUCK_2_SIZE = ObjectBaseSize(
-    dimensions=Vector3d(0.14, 0.2, 0.28),
+    dimensions=Vector3d(x=0.14, y=0.2, z=0.28),
     mass=1,
-    offset=Vector3d(0, 0.1, 0),
+    offset=Vector3d(x=0, y=0.1, z=0),
     positionY=0.005
 )
 _TROPHY_SIZE = ObjectBaseSize(
-    dimensions=Vector3d(0.19, 0.3, 0.14),
+    dimensions=Vector3d(x=0.19, y=0.3, z=0.14),
     mass=1,
-    offset=Vector3d(0, 0.15, 0),
+    offset=Vector3d(x=0, y=0.15, z=0),
+    placer_offset_y=[0.05],
     positionY=0.005,
     sideways=ObjectSidewaysSize(
-        dimensions=Vector3d(0.19, 0.14, 0.3),
-        offset=Vector3d(0, 0, 0.15),
+        dimensions=Vector3d(x=0.19, y=0.14, z=0.3),
+        offset=Vector3d(x=0, y=0, z=0.15),
         positionY=0.075,
-        rotation=Vector3d(90, 0, 0),
+        rotation=Vector3d(x=90, y=0, z=0),
         switch_y_with_z=True
     )
 )
 _TURTLE_ON_WHEELS_SIZE = ObjectBaseSize(
-    dimensions=Vector3d(0.24, 0.14, 0.085),
+    dimensions=Vector3d(x=0.24, y=0.14, z=0.085),
     mass=1,
-    offset=Vector3d(0, 0.07, 0),
+    offset=Vector3d(x=0, y=0.07, z=0),
     positionY=0.005
 )
 _TV_SIZE = ObjectBaseSize(
-    dimensions=Vector3d(1.234, 0.896, 0.256),
+    dimensions=Vector3d(x=1.234, y=0.896, z=0.256),
     mass=5,
-    offset=Vector3d(0, 0.5, 0),
+    offset=Vector3d(x=0, y=0.5, z=0),
     positionY=0.5,
 )
 _WARDROBE_SIZE = ObjectBaseSize(
-    closed_dimensions=Vector3d(1.07, 2.1, 0.49),
-    closed_offset=Vector3d(0, 1.05, 0),
-    dimensions=Vector3d(1.07, 2.1, 1),
+    closed_dimensions=Vector3d(x=1.07, y=2.1, z=0.49),
+    closed_offset=Vector3d(x=0, y=1.05, z=0),
+    dimensions=Vector3d(x=1.07, y=2.1, z=1),
     mass=100,
-    offset=Vector3d(0, 1.05, 0.17),
+    offset=Vector3d(x=0, y=1.05, z=0.17),
     positionY=0,
     enclosed_area_list=[
         # Performer agent is too short to reach these areas effectively.
         # ObjectInteractableArea(
-        #     dimensions=Vector3d(0.49, 1.24, 0.46),
-        #     position=Vector3d(0.255, 1.165, 0.005),
+        #     dimensions=Vector3d(x=0.49, y=1.24, z=0.46),
+        #     position=Vector3d(x=0.255, y=1.165, z=0.005),
         #     area_id='_middle_shelf_right'
         # ),
         # ObjectInteractableArea(
-        #     dimensions=Vector3d(0.49, 0.98, 0.46),
-        #     position=Vector3d(-0.255, 1.295, 0.005),
+        #     dimensions=Vector3d(x=0.49, y=0.98, z=0.46),
+        #     position=Vector3d(x=-0.255, y=1.295, z=0.005),
         #     area_id='_middle_shelf_left'
         # ),
         # ObjectInteractableArea(
-        #     dimensions=Vector3d(0.49, 0.24, 0.46),
-        #     position=Vector3d(-0.255, 0.665, 0.005),
+        #     dimensions=Vector3d(x=0.49, y=0.24, z=0.46),
+        #     position=Vector3d(x=-0.255, y=0.665, z=0.005),
         #     area_id='_bottom_shelf_left'
         # ),
         ObjectInteractableArea(
-            dimensions=Vector3d(0.445, 0.16, 0.425),
-            position=Vector3d(-0.265, 0.42, 0.015),
+            dimensions=Vector3d(x=0.445, y=0.16, z=0.425),
+            position=Vector3d(x=-0.265, y=0.42, z=0.015),
             area_id='_lower_drawer_top_left'
         ),
         ObjectInteractableArea(
-            dimensions=Vector3d(0.445, 0.16, 0.425),
-            position=Vector3d(0.265, 0.42, 0.015),
+            dimensions=Vector3d(x=0.445, y=0.16, z=0.425),
+            position=Vector3d(x=0.265, y=0.42, z=0.015),
             area_id='_lower_drawer_top_right'
         ),
         ObjectInteractableArea(
-            dimensions=Vector3d(0.445, 0.16, 0.425),
-            position=Vector3d(-0.265, 0.21, 0.015),
+            dimensions=Vector3d(x=0.445, y=0.16, z=0.425),
+            position=Vector3d(x=-0.265, y=0.21, z=0.015),
             area_id='_lower_drawer_bottom_left'
         ),
         ObjectInteractableArea(
-            dimensions=Vector3d(0.445, 0.16, 0.425),
-            position=Vector3d(0.265, 0.21, 0.015),
+            dimensions=Vector3d(x=0.445, y=0.16, z=0.425),
+            position=Vector3d(x=0.265, y=0.21, z=0.015),
             area_id='_lower_drawer_bottom_right'
         ),
     ]
@@ -1355,18 +1729,18 @@ _WARDROBE_SIZE = ObjectBaseSize(
 def turn_sideways(definition: ObjectDefinition) -> ObjectDefinition:
     """Set the Y rotation to 90 in the given definition and switch its X and Z
     dimensions."""
-    definition.rotation = Vector3d(0, 90, 0)
+    definition.rotation = Vector3d(x=0, y=90, z=0)
     if definition.dimensions:
         definition.dimensions = Vector3d(
-            definition.dimensions.z,
-            definition.dimensions.y,
-            definition.dimensions.x
+            x=definition.dimensions.z,
+            y=definition.dimensions.y,
+            z=definition.dimensions.x
         )
     for size in definition.chooseSizeList:
         size.dimensions = Vector3d(
-            size.dimensions.z,
-            size.dimensions.y,
-            size.dimensions.x
+            x=size.dimensions.z,
+            y=size.dimensions.y,
+            z=size.dimensions.x
         )
     return definition
 
@@ -1377,7 +1751,6 @@ def _create_apple_1(args: _FunctionArgs) -> ObjectDefinition:
         attributes=['moveable', 'pickupable'],
         color=['red'],
         materialCategory=[],
-        poleOffsetY=0.04,
         salientMaterials=['food'],
         shape=['apple'],
         chooseSizeList=[
@@ -1392,7 +1765,6 @@ def _create_apple_2(args: _FunctionArgs) -> ObjectDefinition:
         attributes=['moveable', 'pickupable'],
         color=['green'],
         materialCategory=[],
-        poleOffsetY=0.04,
         salientMaterials=['food'],
         shape=['apple'],
         chooseSizeList=[
@@ -1688,7 +2060,6 @@ def _create_bowl_3(args: _FunctionArgs) -> ObjectDefinition:
     return ObjectDefinition(
         type='bowl_3',
         attributes=['moveable', 'pickupable', 'receptacle'],
-        poleOffsetY=0.07,
         shape=['bowl'],
         stackTarget=True,
         chooseMaterialList=[item.copy() for item in args.chosen_material_list],
@@ -1702,7 +2073,6 @@ def _create_bowl_4(args: _FunctionArgs) -> ObjectDefinition:
     return ObjectDefinition(
         type='bowl_4',
         attributes=['moveable', 'pickupable', 'receptacle'],
-        poleOffsetY=0.02,
         shape=['bowl'],
         stackTarget=True,
         chooseMaterialList=[item.copy() for item in args.chosen_material_list],
@@ -1716,7 +2086,6 @@ def _create_bowl_6(args: _FunctionArgs) -> ObjectDefinition:
     return ObjectDefinition(
         type='bowl_6',
         attributes=['moveable', 'pickupable', 'receptacle'],
-        poleOffsetY=0.06,
         shape=['bowl'],
         stackTarget=True,
         chooseMaterialList=[item.copy() for item in args.chosen_material_list],
@@ -1801,7 +2170,6 @@ def _create_cart_2(args: _FunctionArgs) -> ObjectDefinition:
         type='cart_2',
         untrainedShape=True,
         attributes=['moveable', 'pickupable'],
-        poleOffsetY=0.6,
         shape=['cart'],
         chooseMaterialList=[item.copy() for item in args.chosen_material_list],
         chooseSizeList=[
@@ -2079,6 +2447,318 @@ def _create_chest_9(args: _FunctionArgs) -> ObjectDefinition:
     )
 
 
+def _create_container_asymmetric_01(args: _FunctionArgs) -> ObjectDefinition:
+    return ObjectDefinition(
+        type='container_asymmetric_01',
+        attributes=['moveable', 'receptacle'],
+        shape=['container'],
+        chooseMaterialList=[item.copy() for item in args.chosen_material_list],
+        chooseSizeList=[
+            _CONTAINER_ASYMMETRIC_01_SIZE.make(size) for size in
+            args.size_multiplier_list
+        ]
+    )
+
+
+def _create_container_asymmetric_02(args: _FunctionArgs) -> ObjectDefinition:
+    return ObjectDefinition(
+        type='container_asymmetric_02',
+        attributes=['moveable', 'receptacle'],
+        shape=['container'],
+        chooseMaterialList=[item.copy() for item in args.chosen_material_list],
+        chooseSizeList=[
+            _CONTAINER_ASYMMETRIC_02_SIZE.make(size) for size in
+            args.size_multiplier_list
+        ]
+    )
+
+
+def _create_container_asymmetric_03(args: _FunctionArgs) -> ObjectDefinition:
+    return ObjectDefinition(
+        type='container_asymmetric_03',
+        attributes=['moveable', 'receptacle'],
+        shape=['container'],
+        chooseMaterialList=[item.copy() for item in args.chosen_material_list],
+        chooseSizeList=[
+            _CONTAINER_ASYMMETRIC_03_SIZE.make(size) for size in
+            args.size_multiplier_list
+        ]
+    )
+
+
+def _create_container_asymmetric_04(args: _FunctionArgs) -> ObjectDefinition:
+    return ObjectDefinition(
+        type='container_asymmetric_04',
+        attributes=['moveable', 'receptacle'],
+        shape=['container'],
+        chooseMaterialList=[item.copy() for item in args.chosen_material_list],
+        chooseSizeList=[
+            _CONTAINER_ASYMMETRIC_04_SIZE.make(size) for size in
+            args.size_multiplier_list
+        ]
+    )
+
+
+def _create_container_asymmetric_05(args: _FunctionArgs) -> ObjectDefinition:
+    return ObjectDefinition(
+        type='container_asymmetric_05',
+        attributes=['moveable', 'receptacle'],
+        shape=['container'],
+        chooseMaterialList=[item.copy() for item in args.chosen_material_list],
+        chooseSizeList=[
+            _CONTAINER_ASYMMETRIC_05_SIZE.make(size) for size in
+            args.size_multiplier_list
+        ]
+    )
+
+
+def _create_container_asymmetric_06(args: _FunctionArgs) -> ObjectDefinition:
+    return ObjectDefinition(
+        type='container_asymmetric_06',
+        attributes=['moveable', 'receptacle'],
+        shape=['container'],
+        chooseMaterialList=[item.copy() for item in args.chosen_material_list],
+        chooseSizeList=[
+            _CONTAINER_ASYMMETRIC_06_SIZE.make(size) for size in
+            args.size_multiplier_list
+        ]
+    )
+
+
+def _create_container_asymmetric_07(args: _FunctionArgs) -> ObjectDefinition:
+    return ObjectDefinition(
+        type='container_asymmetric_07',
+        attributes=['moveable', 'receptacle'],
+        shape=['container'],
+        chooseMaterialList=[item.copy() for item in args.chosen_material_list],
+        chooseSizeList=[
+            _CONTAINER_ASYMMETRIC_07_SIZE.make(size) for size in
+            args.size_multiplier_list
+        ]
+    )
+
+
+def _create_container_asymmetric_08(args: _FunctionArgs) -> ObjectDefinition:
+    return ObjectDefinition(
+        type='container_asymmetric_08',
+        attributes=['moveable', 'receptacle'],
+        shape=['container'],
+        chooseMaterialList=[item.copy() for item in args.chosen_material_list],
+        chooseSizeList=[
+            _CONTAINER_ASYMMETRIC_08_SIZE.make(size) for size in
+            args.size_multiplier_list
+        ]
+    )
+
+
+def _create_container_asymmetric_09(args: _FunctionArgs) -> ObjectDefinition:
+    return ObjectDefinition(
+        type='container_asymmetric_09',
+        attributes=['moveable', 'receptacle'],
+        shape=['container'],
+        chooseMaterialList=[item.copy() for item in args.chosen_material_list],
+        chooseSizeList=[
+            _CONTAINER_ASYMMETRIC_09_SIZE.make(size) for size in
+            args.size_multiplier_list
+        ]
+    )
+
+
+def _create_container_asymmetric_10(args: _FunctionArgs) -> ObjectDefinition:
+    return ObjectDefinition(
+        type='container_asymmetric_10',
+        attributes=['moveable', 'receptacle'],
+        shape=['container'],
+        chooseMaterialList=[item.copy() for item in args.chosen_material_list],
+        chooseSizeList=[
+            _CONTAINER_ASYMMETRIC_10_SIZE.make(size) for size in
+            args.size_multiplier_list
+        ]
+    )
+
+
+def _create_container_asymmetric_11(args: _FunctionArgs) -> ObjectDefinition:
+    return ObjectDefinition(
+        type='container_asymmetric_11',
+        attributes=['moveable', 'receptacle'],
+        shape=['container'],
+        chooseMaterialList=[item.copy() for item in args.chosen_material_list],
+        chooseSizeList=[
+            _CONTAINER_ASYMMETRIC_11_SIZE.make(size) for size in
+            args.size_multiplier_list
+        ]
+    )
+
+
+def _create_container_asymmetric_12(args: _FunctionArgs) -> ObjectDefinition:
+    return ObjectDefinition(
+        type='container_asymmetric_12',
+        attributes=['moveable', 'receptacle'],
+        shape=['container'],
+        chooseMaterialList=[item.copy() for item in args.chosen_material_list],
+        chooseSizeList=[
+            _CONTAINER_ASYMMETRIC_12_SIZE.make(size) for size in
+            args.size_multiplier_list
+        ]
+    )
+
+
+def _create_container_symmetric_01(args: _FunctionArgs) -> ObjectDefinition:
+    return ObjectDefinition(
+        type='container_symmetric_01',
+        attributes=['moveable', 'receptacle'],
+        shape=['container'],
+        chooseMaterialList=[item.copy() for item in args.chosen_material_list],
+        chooseSizeList=[
+            _CONTAINER_SYMMETRIC_01_SIZE.make(size) for size in
+            args.size_multiplier_list
+        ]
+    )
+
+
+def _create_container_symmetric_02(args: _FunctionArgs) -> ObjectDefinition:
+    return ObjectDefinition(
+        type='container_symmetric_02',
+        attributes=['moveable', 'receptacle'],
+        shape=['container'],
+        chooseMaterialList=[item.copy() for item in args.chosen_material_list],
+        chooseSizeList=[
+            _CONTAINER_SYMMETRIC_02_SIZE.make(size) for size in
+            args.size_multiplier_list
+        ]
+    )
+
+
+def _create_container_symmetric_03(args: _FunctionArgs) -> ObjectDefinition:
+    return ObjectDefinition(
+        type='container_symmetric_03',
+        attributes=['moveable', 'receptacle'],
+        shape=['container'],
+        chooseMaterialList=[item.copy() for item in args.chosen_material_list],
+        chooseSizeList=[
+            _CONTAINER_SYMMETRIC_03_SIZE.make(size) for size in
+            args.size_multiplier_list
+        ]
+    )
+
+
+def _create_container_symmetric_04(args: _FunctionArgs) -> ObjectDefinition:
+    return ObjectDefinition(
+        type='container_symmetric_04',
+        attributes=['moveable', 'receptacle'],
+        shape=['container'],
+        chooseMaterialList=[item.copy() for item in args.chosen_material_list],
+        chooseSizeList=[
+            _CONTAINER_SYMMETRIC_04_SIZE.make(size) for size in
+            args.size_multiplier_list
+        ]
+    )
+
+
+def _create_container_symmetric_05(args: _FunctionArgs) -> ObjectDefinition:
+    return ObjectDefinition(
+        type='container_symmetric_05',
+        attributes=['moveable', 'receptacle'],
+        shape=['container'],
+        chooseMaterialList=[item.copy() for item in args.chosen_material_list],
+        chooseSizeList=[
+            _CONTAINER_SYMMETRIC_05_SIZE.make(size) for size in
+            args.size_multiplier_list
+        ]
+    )
+
+
+def _create_container_symmetric_06(args: _FunctionArgs) -> ObjectDefinition:
+    return ObjectDefinition(
+        type='container_symmetric_06',
+        attributes=['moveable', 'receptacle'],
+        shape=['container'],
+        chooseMaterialList=[item.copy() for item in args.chosen_material_list],
+        chooseSizeList=[
+            _CONTAINER_SYMMETRIC_06_SIZE.make(size) for size in
+            args.size_multiplier_list
+        ]
+    )
+
+
+def _create_container_symmetric_07(args: _FunctionArgs) -> ObjectDefinition:
+    return ObjectDefinition(
+        type='container_symmetric_07',
+        attributes=['moveable', 'receptacle'],
+        shape=['container'],
+        chooseMaterialList=[item.copy() for item in args.chosen_material_list],
+        chooseSizeList=[
+            _CONTAINER_SYMMETRIC_07_SIZE.make(size) for size in
+            args.size_multiplier_list
+        ]
+    )
+
+
+def _create_container_symmetric_08(args: _FunctionArgs) -> ObjectDefinition:
+    return ObjectDefinition(
+        type='container_symmetric_08',
+        attributes=['moveable', 'receptacle'],
+        shape=['container'],
+        chooseMaterialList=[item.copy() for item in args.chosen_material_list],
+        chooseSizeList=[
+            _CONTAINER_SYMMETRIC_08_SIZE.make(size) for size in
+            args.size_multiplier_list
+        ]
+    )
+
+
+def _create_container_symmetric_09(args: _FunctionArgs) -> ObjectDefinition:
+    return ObjectDefinition(
+        type='container_symmetric_09',
+        attributes=['moveable', 'receptacle'],
+        shape=['container'],
+        chooseMaterialList=[item.copy() for item in args.chosen_material_list],
+        chooseSizeList=[
+            _CONTAINER_SYMMETRIC_09_SIZE.make(size) for size in
+            args.size_multiplier_list
+        ]
+    )
+
+
+def _create_container_symmetric_10(args: _FunctionArgs) -> ObjectDefinition:
+    return ObjectDefinition(
+        type='container_symmetric_10',
+        attributes=['moveable', 'receptacle'],
+        shape=['container'],
+        chooseMaterialList=[item.copy() for item in args.chosen_material_list],
+        chooseSizeList=[
+            _CONTAINER_SYMMETRIC_10_SIZE.make(size) for size in
+            args.size_multiplier_list
+        ]
+    )
+
+
+def _create_container_symmetric_11(args: _FunctionArgs) -> ObjectDefinition:
+    return ObjectDefinition(
+        type='container_symmetric_11',
+        attributes=['moveable', 'receptacle'],
+        shape=['container'],
+        chooseMaterialList=[item.copy() for item in args.chosen_material_list],
+        chooseSizeList=[
+            _CONTAINER_SYMMETRIC_11_SIZE.make(size) for size in
+            args.size_multiplier_list
+        ]
+    )
+
+
+def _create_container_symmetric_12(args: _FunctionArgs) -> ObjectDefinition:
+    return ObjectDefinition(
+        type='container_symmetric_12',
+        attributes=['moveable', 'receptacle'],
+        shape=['container'],
+        chooseMaterialList=[item.copy() for item in args.chosen_material_list],
+        chooseSizeList=[
+            _CONTAINER_SYMMETRIC_12_SIZE.make(size) for size in
+            args.size_multiplier_list
+        ]
+    )
+
+
 def _create_crayon(args: _FunctionArgs) -> ObjectDefinition:
     color = args.type.replace('crayon_', '')
     return ObjectDefinition(
@@ -2112,7 +2792,6 @@ def _create_cup_2(args: _FunctionArgs) -> ObjectDefinition:
     return ObjectDefinition(
         type='cup_2',
         attributes=['moveable', 'pickupable', 'receptacle'],
-        poleOffsetY=0.04,
         shape=['cup'],
         stackTarget=True,
         chooseMaterialList=[item.copy() for item in args.chosen_material_list],
@@ -2126,7 +2805,6 @@ def _create_cup_3(args: _FunctionArgs) -> ObjectDefinition:
     return ObjectDefinition(
         type='cup_3',
         attributes=['moveable', 'pickupable', 'receptacle'],
-        poleOffsetY=0.04,
         shape=['cup'],
         stackTarget=True,
         chooseMaterialList=[item.copy() for item in args.chosen_material_list],
@@ -2140,7 +2818,6 @@ def _create_cup_6(args: _FunctionArgs) -> ObjectDefinition:
     return ObjectDefinition(
         type='cup_6',
         attributes=['moveable', 'pickupable', 'receptacle'],
-        poleOffsetY=0.04,
         shape=['cup'],
         stackTarget=True,
         chooseMaterialList=[item.copy() for item in args.chosen_material_list],
@@ -2155,7 +2832,6 @@ def _create_dog_on_wheels(args: _FunctionArgs) -> ObjectDefinition:
         type='dog_on_wheels',
         untrainedShape=True,
         attributes=['moveable', 'pickupable'],
-        poleOffsetY=0.03,
         shape=['dog'],
         chooseMaterialList=[item.copy() for item in args.chosen_material_list],
         chooseSizeList=[
@@ -2169,7 +2845,6 @@ def _create_duck_on_wheels(args: _FunctionArgs) -> ObjectDefinition:
     return ObjectDefinition(
         type='duck_on_wheels',
         attributes=['moveable', 'pickupable'],
-        poleOffsetY=0.01,
         shape=['duck'],
         chooseMaterialList=[item.copy() for item in args.chosen_material_list],
         chooseSizeList=[
@@ -2205,7 +2880,6 @@ def _create_letter_l_narrow_tall(args: _FunctionArgs) -> ObjectDefinition:
             args.size_multiplier_list
         ]
     )
-    definition.poleOffsetX = -0.2
     definition.poly = geometry.Polygon([
         (0.25, -0.5),
         (-0.25, -0.5),
@@ -2270,7 +2944,6 @@ def _create_plate_1(args: _FunctionArgs) -> ObjectDefinition:
     return ObjectDefinition(
         type='plate_1',
         attributes=['moveable', 'pickupable', 'receptacle'],
-        poleOffsetY=0.1,
         shape=['plate'],
         stackTarget=True,
         chooseMaterialList=[item.copy() for item in args.chosen_material_list],
@@ -2284,7 +2957,6 @@ def _create_plate_3(args: _FunctionArgs) -> ObjectDefinition:
     return ObjectDefinition(
         type='plate_3',
         attributes=['moveable', 'pickupable', 'receptacle'],
-        poleOffsetY=0.19,
         shape=['plate'],
         stackTarget=True,
         chooseMaterialList=[item.copy() for item in args.chosen_material_list],
@@ -2298,7 +2970,6 @@ def _create_plate_4(args: _FunctionArgs) -> ObjectDefinition:
     return ObjectDefinition(
         type='plate_4',
         attributes=['moveable', 'pickupable', 'receptacle'],
-        poleOffsetY=0.1,
         shape=['plate'],
         stackTarget=True,
         chooseMaterialList=[item.copy() for item in args.chosen_material_list],
@@ -2328,11 +2999,14 @@ def _create_primitive_cylinder(args: _FunctionArgs) -> ObjectDefinition:
     size_list = [
         _PRIMITIVE_SIZE.make(size) for size in args.size_multiplier_list
     ]
+    cylinder_size_list = []
     for size in size_list:
+        size_copy = copy.deepcopy(size)
         # Halve the Y scale here, but not its dimensions or other properties,
         # because Unity will automatically double a cylinder's height.
-        size.scale.y *= 0.5
-    return _create_primitive_helper(args, size_list)
+        size_copy.scale.y *= 0.5
+        cylinder_size_list.append(size_copy)
+    return _create_primitive_helper(args, cylinder_size_list)
 
 
 # Size data for non-cylinder primitive objects (cones, cubes, spheres, etc.)
@@ -2345,6 +3019,13 @@ def _create_primitive_non_cylinder(args: _FunctionArgs) -> ObjectDefinition:
 def _create_primitive_on_ground(args: _FunctionArgs) -> ObjectDefinition:
     return _create_primitive_helper(args, [
         _PRIMITIVE_ON_GROUND_SIZE.make(size)
+        for size in args.size_multiplier_list
+    ])
+
+
+def _create_primitive_triangle(args: _FunctionArgs) -> ObjectDefinition:
+    return _create_primitive_helper(args, [
+        _PRIMITIVE_TRIANGLE_SIZE.make(size)
         for size in args.size_multiplier_list
     ])
 
@@ -2858,9 +3539,9 @@ LARGE_BLOCK_TOOLS_TO_DIMENSIONS = {
 def _create_tool(args: _FunctionArgs) -> ObjectDefinition:
     dimensions = LARGE_BLOCK_TOOLS_TO_DIMENSIONS[args.type]
     base_size = ObjectBaseSize(
-        dimensions=Vector3d(dimensions[0], 0.6, dimensions[1]),
+        dimensions=Vector3d(x=dimensions[0], y=0.6, z=dimensions[1]),
         mass=None,
-        offset=Vector3d(0, 0.3, 0),
+        offset=Vector3d(x=0, y=0.3, z=0),
         positionY=0.3
     )
     return ObjectDefinition(
@@ -2924,7 +3605,6 @@ def _create_toy_car_2(args: _FunctionArgs) -> ObjectDefinition:
         type='car_2',
         untrainedShape=True,
         attributes=['moveable', 'pickupable'],
-        poleOffsetY=0.01,
         shape=['car'],
         chooseMaterialList=[item.copy() for item in args.chosen_material_list],
         chooseSizeList=[
@@ -2974,7 +3654,6 @@ def _create_toy_trolley(args: _FunctionArgs) -> ObjectDefinition:
     return turn_sideways(ObjectDefinition(
         type='trolley_1',
         attributes=['moveable', 'pickupable'],
-        poleOffsetY=0.12,
         shape=['trolley'],
         chooseMaterialList=[item.copy() for item in args.chosen_material_list],
         chooseSizeList=[
@@ -3017,7 +3696,6 @@ def _create_trophy(args: _FunctionArgs) -> ObjectDefinition:
         attributes=['moveable', 'pickupable'],
         color=['grey'],
         materials=[],
-        poleOffsetY=0.05,
         salientMaterials=['metal'],
         shape=['trophy'],
         chooseSizeList=[
@@ -3275,6 +3953,78 @@ _TYPES_TO_DETAILS: Dict[str, TypeDetailsTuple] = {
     ), 'chest_9': TypeDetailsTuple(
         _create_chest_9,
         METAL_MATERIALS + PLASTIC_MATERIALS + WOOD_MATERIALS
+    ), 'container_asymmetric_01': TypeDetailsTuple(
+        _create_container_asymmetric_01,
+        METAL_MATERIALS + PLASTIC_MATERIALS + WOOD_MATERIALS
+    ), 'container_asymmetric_02': TypeDetailsTuple(
+        _create_container_asymmetric_02,
+        METAL_MATERIALS + PLASTIC_MATERIALS + WOOD_MATERIALS
+    ), 'container_asymmetric_03': TypeDetailsTuple(
+        _create_container_asymmetric_03,
+        METAL_MATERIALS + PLASTIC_MATERIALS + WOOD_MATERIALS
+    ), 'container_asymmetric_04': TypeDetailsTuple(
+        _create_container_asymmetric_04,
+        METAL_MATERIALS + PLASTIC_MATERIALS + WOOD_MATERIALS
+    ), 'container_asymmetric_05': TypeDetailsTuple(
+        _create_container_asymmetric_05,
+        METAL_MATERIALS + PLASTIC_MATERIALS + WOOD_MATERIALS
+    ), 'container_asymmetric_06': TypeDetailsTuple(
+        _create_container_asymmetric_06,
+        METAL_MATERIALS + PLASTIC_MATERIALS + WOOD_MATERIALS
+    ), 'container_asymmetric_07': TypeDetailsTuple(
+        _create_container_asymmetric_07,
+        METAL_MATERIALS + PLASTIC_MATERIALS + WOOD_MATERIALS
+    ), 'container_asymmetric_08': TypeDetailsTuple(
+        _create_container_asymmetric_08,
+        METAL_MATERIALS + PLASTIC_MATERIALS + WOOD_MATERIALS
+    ), 'container_asymmetric_09': TypeDetailsTuple(
+        _create_container_asymmetric_09,
+        METAL_MATERIALS + PLASTIC_MATERIALS + WOOD_MATERIALS
+    ), 'container_asymmetric_10': TypeDetailsTuple(
+        _create_container_asymmetric_10,
+        METAL_MATERIALS + PLASTIC_MATERIALS + WOOD_MATERIALS
+    ), 'container_asymmetric_11': TypeDetailsTuple(
+        _create_container_asymmetric_11,
+        METAL_MATERIALS + PLASTIC_MATERIALS + WOOD_MATERIALS
+    ), 'container_asymmetric_12': TypeDetailsTuple(
+        _create_container_asymmetric_12,
+        METAL_MATERIALS + PLASTIC_MATERIALS + WOOD_MATERIALS
+    ), 'container_symmetric_01': TypeDetailsTuple(
+        _create_container_symmetric_01,
+        METAL_MATERIALS + PLASTIC_MATERIALS + WOOD_MATERIALS
+    ), 'container_symmetric_02': TypeDetailsTuple(
+        _create_container_symmetric_02,
+        METAL_MATERIALS + PLASTIC_MATERIALS + WOOD_MATERIALS
+    ), 'container_symmetric_03': TypeDetailsTuple(
+        _create_container_symmetric_03,
+        METAL_MATERIALS + PLASTIC_MATERIALS + WOOD_MATERIALS
+    ), 'container_symmetric_04': TypeDetailsTuple(
+        _create_container_symmetric_04,
+        METAL_MATERIALS + PLASTIC_MATERIALS + WOOD_MATERIALS
+    ), 'container_symmetric_05': TypeDetailsTuple(
+        _create_container_symmetric_05,
+        METAL_MATERIALS + PLASTIC_MATERIALS + WOOD_MATERIALS
+    ), 'container_symmetric_06': TypeDetailsTuple(
+        _create_container_symmetric_06,
+        METAL_MATERIALS + PLASTIC_MATERIALS + WOOD_MATERIALS
+    ), 'container_symmetric_07': TypeDetailsTuple(
+        _create_container_symmetric_07,
+        METAL_MATERIALS + PLASTIC_MATERIALS + WOOD_MATERIALS
+    ), 'container_symmetric_08': TypeDetailsTuple(
+        _create_container_symmetric_08,
+        METAL_MATERIALS + PLASTIC_MATERIALS + WOOD_MATERIALS
+    ), 'container_symmetric_09': TypeDetailsTuple(
+        _create_container_symmetric_09,
+        METAL_MATERIALS + PLASTIC_MATERIALS + WOOD_MATERIALS
+    ), 'container_symmetric_10': TypeDetailsTuple(
+        _create_container_symmetric_10,
+        METAL_MATERIALS + PLASTIC_MATERIALS + WOOD_MATERIALS
+    ), 'container_symmetric_11': TypeDetailsTuple(
+        _create_container_symmetric_11,
+        METAL_MATERIALS + PLASTIC_MATERIALS + WOOD_MATERIALS
+    ), 'container_symmetric_12': TypeDetailsTuple(
+        _create_container_symmetric_12,
+        METAL_MATERIALS + PLASTIC_MATERIALS + WOOD_MATERIALS
     ), 'crayon_black': TypeDetailsTuple(
         _create_crayon,
         []  # No material
@@ -3484,7 +4234,7 @@ _PRIMITIVE_TUPLES = [
     ('sphere', _create_primitive_non_cylinder),
     ('square_frustum', _create_primitive_non_cylinder),
     ('tie_fighter', _create_primitive_non_cylinder),
-    ('triangle', _create_primitive_non_cylinder),
+    ('triangle', _create_primitive_triangle),
     ('tube_narrow', _create_primitive_non_cylinder),
     ('tube_wide', _create_primitive_non_cylinder)
 ]

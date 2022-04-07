@@ -3,12 +3,13 @@
 import argparse
 import logging
 import sys
-from typing import Any, Dict, List, Type
+from typing import List, Type
 
 import yaml
 from machine_common_sense.logging_config import LoggingConfig
 
 from generator import MAX_TRIES, SceneException
+from generator.scene import Scene
 from generator.scene_saver import find_next_filename, save_scene_files
 from ideal_learning_env import (
     ActionRestrictionsComponent,
@@ -22,7 +23,11 @@ from ideal_learning_env import (
     SpecificInteractableObjectsComponent,
     ValidPathComponent,
 )
-from ideal_learning_env.interactable_object_config import ObjectRepository
+from ideal_learning_env.agent_component import (
+    RandomAgentComponent,
+    SpecificAgentComponent,
+)
+from ideal_learning_env.interactable_object_service import ObjectRepository
 from ideal_learning_env.structural_objects_component import (
     SpecificStructuralObjectsComponent,
 )
@@ -32,9 +37,11 @@ ILE_COMPONENTS: List[Type[ILEComponent]] = [
     ShortcutComponent,
     SpecificInteractableObjectsComponent,
     SpecificStructuralObjectsComponent,
+    SpecificAgentComponent,
     RandomStructuralObjectsComponent,
     RandomKeywordObjectsComponent,
     RandomInteractableObjectsComponent,
+    RandomAgentComponent,
     ActionRestrictionsComponent,
     ValidPathComponent,
 ]
@@ -43,25 +50,15 @@ ILE_COMPONENTS: List[Type[ILEComponent]] = [
 def generate_ile_scene(
     component_list: List[ILEComponent],
     scene_index: int
-) -> Dict[str, Any]:
+) -> Scene:
     """Generate and return an ILE scene using the given ILE components that
     were initialized with the config data."""
     # Create a scene template.
-    scene = {
-        'name': '',  # The name will be set later
-        'version': 2,
-        'objects': [],
-        'goal': {
-            'domainsInfo': {},
-            'objectsInfo': {},
-            'sceneInfo': {},
-            'metadata': {}
-        },
-        'debug': {
-            'sceneNumber': scene_index,
-            'training': True
-        }
-    }
+    scene = Scene()
+    scene.version = 2
+    scene.debug['sceneNumber'] = scene_index
+    scene.debug['training'] = True
+
     ObjectRepository.get_instance().clear()
     # Each component will update the scene template based on the config data.
     for component in component_list:
@@ -87,7 +84,17 @@ def _handle_delayed_actions(component_list, scene):
         # If we didn't completed a delayed action last run, we're in an
         # infinite loop and should quit.
         if new_sum == previous_sum:
-            raise ILEException("Failed to reduce delayed actions")
+            reasons = []
+            for component in component_list:
+                reasons += component.get_delayed_action_error_strings()
+
+            # backslash isn't allowed in fstring.
+            nl = '\n'
+            raise ILEException(
+                f"Failed to execute any delayed actions.  This can occur when"
+                f" a required label doesn't exist, a label is mispelled, or "
+                f"there is a circular dependency.  Please verify all spellings"
+                f".{nl}Reasons:{nl}  {f'{nl}  '.join(reasons)}")
         # Loop through components and run delayed actions if the components
         # have any.
         for component in component_list:
@@ -95,97 +102,6 @@ def _handle_delayed_actions(component_list, scene):
                 scene = component.run_delayed_actions(scene)
         previous_sum = new_sum
     return scene
-
-
-def get_default_logging_config(root_level: str = None):
-    """Creates default logging for ILE which only reports to the console"""
-    root_level = root_level or "INFO"
-    return {
-        "version": 1,
-        "root": {
-            "level": root_level,
-            "handlers": ["console"],
-            "propagate": False
-        },
-        "loggers": {
-            "ideal_learning_env": {
-                "level": root_level,
-                "handlers": ["console"],
-                "propagate": False
-            }
-        },
-        "handlers": {
-            "console": {
-                "class": "logging.StreamHandler",
-                "formatter": "precise",
-                "level": root_level,
-                "stream": "ext://sys.stdout"
-            }
-        },
-        "formatters": {
-            "precise": {
-                "format": "%(asctime)s <%(levelname)s>: %(message)s"
-            }
-        }
-    }
-
-
-def get_dev_logging_config(root_level: str = None):
-    '''Note: This logging configuration needs the log directory to be
-    created relative to the current working directory of the python
-    execution.
-    '''
-    return {
-        "version": 1,
-        "root": {
-            "level": root_level or 'DEBUG',
-            "handlers": ["console", "debug-file"],
-            "propagate": False
-        },
-        "loggers": {
-            "ideal_learning_env": {
-                "level": root_level or 'DEBUG',
-                "handlers": ["console", "debug-file"],
-                "propagate": False
-            }
-        },
-        "handlers": {
-            "console": {
-                "class": "logging.StreamHandler",
-                "formatter": "precise",
-                "level": root_level or 'DEBUG',
-                "stream": "ext://sys.stdout"
-            },
-            "debug-file": {
-                "level": "DEBUG",
-                "class": "logging.handlers.RotatingFileHandler",
-                "formatter": "precise",
-                "filename": "logs/mcs.debug.log",
-                "maxBytes": 10240000,
-                "backupCount": 3
-            },
-            "info-file": {
-                "level": "INFO",
-                "class": "logging.handlers.RotatingFileHandler",
-                "formatter": "precise",
-                "filename": "logs/mcs.info.log",
-                "maxBytes": 10240000,
-                "backupCount": 3
-            }
-        },
-        "formatters": {
-            "brief": {
-                "format": "%(message)s"
-            },
-            "precise": {
-                "format": "%(asctime)s <%(levelname)s>: %(message)s"
-            },
-            "full": {
-                "format": "[%(name)s] %(asctime)s <%(levelname)s>: " +
-                "%(message)s"
-            }
-        }
-    }
 
 
 def main(args):
@@ -245,8 +161,10 @@ def main(args):
                 ZeroDivisionError
             ) as e:
                 exc = e if logger.isEnabledFor(logging.DEBUG) else None
+                cause = getattr(e, '__cause__', '') or ''
+                cause = f" caused by '{cause}'" if cause else cause
                 reason = "" if logger.isEnabledFor(
-                    logging.DEBUG) else f" due to '{e}'"
+                    logging.DEBUG) else f" due to '{e}'{cause}"
 
                 if tries >= MAX_TRIES:
                     logger.error(
@@ -254,6 +172,10 @@ def main(args):
                         f"after {MAX_TRIES} tries{reason}.",
                         exc_info=exc
                     )
+                    # The ultimate cause gets hidden higher up so lets repeat
+                    # it.
+                    if cause and logger.isEnabledFor(logging.DEBUG):
+                        logger.error(f"Failure reason: '{e}'{cause}")
                 else:
                     logger.debug(
                         f'Failed to generate scene '
@@ -261,21 +183,10 @@ def main(args):
                         exc_info=exc
                     )
                 if args.throw_error or tries >= MAX_TRIES:
-                    # Used to 'raise e' which worked but threw a whole
-                    # stacktrace. which probably isn't helpful for TA1
-                    if logger.isEnabledFor(logging.DEBUG):
-                        # Will give full stacktrace if DEBUG is on
-                        logger.error(
-                            "Exiting unsuccessfully due to error:",
-                            exc_info=e)
-                    else:
-                        # Will give exception message without stacktrace.
-                        logger.error(
-                            f"Exiting unsuccessfully due to error:\n  {e}")
                     sys.exit()
 
         # If successful, save the normal and debug JSON scene files.
-        save_scene_files(scene, scene_filename)
+        save_scene_files(scene.to_dict(), scene_filename)
         logger.info(
             f'Finished generating scene {index + 1} of {args.number}, '
             f'filename: {scene_filename}{suffix}'
@@ -328,11 +239,28 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     if args.log_config == "dev":
-        dev = get_dev_logging_config(args.log_level)
+        dev = LoggingConfig.get_configurable_logging_config(
+            log_level=args.log_level or 'DEBUG',
+            logger_names=['ideal_learning_env'],
+            console=True, debug_file=True, info_file=False,
+            log_file_name="mcs", file_format='precise',
+            console_format='precise'
+        )
+        # Remove after fix in MCS is released (0.5.2)
+        if args.log_level == 'TRACE':
+            dev['handlers']['console']['level'] = 'TRACE'
         LoggingConfig.init_logging(log_config=dev)
     elif not args.log_config:
-        # default logging specifically for TA1
-        std = get_default_logging_config(args.log_level)
+        std = LoggingConfig.get_configurable_logging_config(
+            log_level=args.log_level or 'INFO',
+            logger_names=['ideal_learning_env'],
+            console=True, debug_file=False, info_file=False,
+            log_file_name="mcs", file_format='precise',
+            console_format='precise'
+        )
+        # Remove after fix in MCS is released (0.5.2)
+        if args.log_level == 'TRACE':
+            std['handlers']['console']['level'] = 'TRACE'
         LoggingConfig.init_logging(log_config=std)
     else:
         LoggingConfig.init_logging(

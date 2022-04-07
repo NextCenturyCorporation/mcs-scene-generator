@@ -66,6 +66,9 @@ class ObjectBounds():
         self._update_poly()
 
     def _update_poly(self) -> None:
+        for point in self.box_xz:
+            for attr in ['x', 'y', 'z']:
+                setattr(point, attr, round(getattr(point, attr), 6))
         points = [(point.x, point.z) for point in self.box_xz]
         self.polygon_xz = geometry.Polygon(points)
 
@@ -77,7 +80,7 @@ class ObjectBounds():
             join_style=geometry.JOIN_STYLE.mitre
         )
         self.box_xz = [
-            Vector3d(point[0], 0, point[1]) for point in
+            Vector3d(x=point[0], y=0, z=point[1]) for point in
             self.polygon_xz.exterior.coords
         ][:-1]
 
@@ -98,7 +101,7 @@ class ObjectBounds():
 
 
 def __dict_to_vector(data: Dict[str, float]) -> Vector3d:
-    return Vector3d(data['x'], data['y'], data['z'])
+    return Vector3d(x=data['x'], y=data['y'], z=data['z'])
 
 
 def create_bounds(
@@ -127,24 +130,24 @@ def create_bounds(
     z_minus = -(dimensions.z / 2.0) + offset.z
 
     a = Vector3d(
-        position.x + x_plus * rotate_cos - z_plus * rotate_sin,
-        0,
-        position.z + x_plus * rotate_sin + z_plus * rotate_cos
+        x=position.x + x_plus * rotate_cos - z_plus * rotate_sin,
+        y=0,
+        z=position.z + x_plus * rotate_sin + z_plus * rotate_cos
     )
     b = Vector3d(
-        position.x + x_plus * rotate_cos - z_minus * rotate_sin,
-        0,
-        position.z + x_plus * rotate_sin + z_minus * rotate_cos
+        x=position.x + x_plus * rotate_cos - z_minus * rotate_sin,
+        y=0,
+        z=position.z + x_plus * rotate_sin + z_minus * rotate_cos
     )
     c = Vector3d(
-        position.x + x_minus * rotate_cos - z_minus * rotate_sin,
-        0,
-        position.z + x_minus * rotate_sin + z_minus * rotate_cos
+        x=position.x + x_minus * rotate_cos - z_minus * rotate_sin,
+        y=0,
+        z=position.z + x_minus * rotate_sin + z_minus * rotate_cos
     )
     d = Vector3d(
-        position.x + x_minus * rotate_cos - z_plus * rotate_sin,
-        0,
-        position.z + x_minus * rotate_sin + z_plus * rotate_cos
+        x=position.x + x_minus * rotate_cos - z_plus * rotate_sin,
+        y=0,
+        z=position.z + x_minus * rotate_sin + z_plus * rotate_cos
     )
 
     y_min = position.y - standing_y
@@ -635,6 +638,7 @@ def generate_location_in_line_with_object(
     ) if (obstruct or unreachable) else diagonal_distance_between_objects
 
     # Find the angle drawn between the static object and the performer start.
+    # Shapely angle: 0 = right, 90 = front, 180 = left, 270 = back
     performer_angle = math.degrees(math.atan2(
         (static_z - performer_start['position']['z']),
         (static_x - performer_start['position']['x'])
@@ -646,6 +650,14 @@ def generate_location_in_line_with_object(
         else [performer_angle + 180]
     )
     random.shuffle(line_rotation_list)
+
+    # Rotate the object to align with the performer. Needed for obstacle tasks.
+    object_rotation = {
+        'x': rotation['x'],
+        # Transform the Shapely angle into a Unity rotation.
+        'y': 450 - performer_angle,
+        'z': rotation['z']
+    }
 
     location = None
     for line_rotation in line_rotation_list:
@@ -664,7 +676,7 @@ def generate_location_in_line_with_object(
                 dimensions=dimensions,
                 offset=offset,
                 position={'x': x, 'y': position_y, 'z': z},
-                rotation=static_location['rotation'],
+                rotation=object_rotation,
                 standing_y=position_y
             )
             # Ensure the location is within the room and doesn't overlap with
@@ -709,14 +721,7 @@ def generate_location_in_line_with_object(
                         'y': position_y,
                         'z': z
                     },
-                    'rotation': {
-                        'x': rotation['x'],
-                        # Rotate the object to align with the performer.
-                        # This is needed for obstacle tasks.
-                        # Transform geometric angle into Unity rotation.
-                        'y': 450 - performer_angle,
-                        'z': rotation['z']
-                    },
+                    'rotation': object_rotation,
                     'boundingBox': object_bounds
                 }
                 break
@@ -799,21 +804,21 @@ def find_performer_bounds(
 ) -> ObjectBounds:
     return ObjectBounds(
         box_xz=[Vector3d(
-            performer_position['x'] - PERFORMER_HALF_WIDTH,
-            0,
-            performer_position['z'] - PERFORMER_HALF_WIDTH
+            x=performer_position['x'] - PERFORMER_HALF_WIDTH,
+            y=0,
+            z=performer_position['z'] - PERFORMER_HALF_WIDTH
         ), Vector3d(
-            performer_position['x'] - PERFORMER_HALF_WIDTH,
-            0,
-            performer_position['z'] + PERFORMER_HALF_WIDTH
+            x=performer_position['x'] - PERFORMER_HALF_WIDTH,
+            y=0,
+            z=performer_position['z'] + PERFORMER_HALF_WIDTH
         ), Vector3d(
-            performer_position['x'] + PERFORMER_HALF_WIDTH,
-            0,
-            performer_position['z'] + PERFORMER_HALF_WIDTH
+            x=performer_position['x'] + PERFORMER_HALF_WIDTH,
+            y=0,
+            z=performer_position['z'] + PERFORMER_HALF_WIDTH
         ), Vector3d(
-            performer_position['x'] + PERFORMER_HALF_WIDTH,
-            0,
-            performer_position['z'] - PERFORMER_HALF_WIDTH
+            x=performer_position['x'] + PERFORMER_HALF_WIDTH,
+            y=0,
+            z=performer_position['z'] - PERFORMER_HALF_WIDTH
         )],
         max_y=performer_position['y'] + PERFORMER_HEIGHT,
         min_y=performer_position['y']
@@ -867,7 +872,8 @@ def _does_obstruct_target_helper(performer_start_position: Dict[str, float],
 
     target_poly = bounds.polygon_xz
     target_center = target_poly.centroid.coords[0]
-    points = bounds.box_xz + [Vector3d(target_center[0], 0, target_center[1])]
+    points = bounds.box_xz + \
+        [Vector3d(x=target_center[0], y=0, z=target_center[1])]
 
     if not fully:
         for index, next_point in enumerate(bounds.box_xz):
@@ -877,7 +883,7 @@ def _does_obstruct_target_helper(performer_start_position: Dict[str, float],
                 (next_point.x, next_point.z)
             ])
             full_center = line_full.centroid.coords[0]
-            center_point = Vector3d(full_center[0], 0, full_center[1])
+            center_point = Vector3d(x=full_center[0], y=0, z=full_center[1])
             points.append(center_point)
             for point_1, point_2 in [
                 (previous_point, center_point), (center_point, next_point)
@@ -886,7 +892,8 @@ def _does_obstruct_target_helper(performer_start_position: Dict[str, float],
                     (point_1.x, point_1.z), (point_2.x, point_2.z)
                 ])
                 line_center = line.centroid.coords[0]
-                points.append(Vector3d(line_center[0], 0, line_center[1]))
+                points.append(
+                    Vector3d(x=line_center[0], y=0, z=line_center[1]))
 
     for point in points:
         target_corner_coordinates = (point.x, point.z)
@@ -950,10 +957,42 @@ def generate_floor_area_bounds(area_x: float, area_z: float) -> ObjectBounds:
     """Generate and return an ObjectBounds for a floor area (a hole or lava)
     with the given coordinates."""
     points = [
-        Vector3d(area_x - 0.5, 0, area_z - 0.5),
-        Vector3d(area_x + 0.5, 0, area_z - 0.5),
-        Vector3d(area_x + 0.5, 0, area_z + 0.5),
-        Vector3d(area_x - 0.5, 0, area_z + 0.5)
+        Vector3d(x=area_x - 0.5, y=0, z=area_z - 0.5),
+        Vector3d(x=area_x + 0.5, y=0, z=area_z - 0.5),
+        Vector3d(x=area_x + 0.5, y=0, z=area_z + 0.5),
+        Vector3d(x=area_x - 0.5, y=0, z=area_z + 0.5)
     ]
     # Just use an arbitrarily high number for the max_y.
     return ObjectBounds(box_xz=points, max_y=100, min_y=0)
+
+
+def object_x_to_occluder_x(
+    object_x: float,
+    object_z: float,
+    occluder_z: float,
+    performer_start_x: float,
+    performer_start_z: float
+) -> float:
+    """Return the X position for an occluder in front of an object at the given
+    X/Z position."""
+    object_distance_x = object_x - performer_start_x
+    object_distance_z = object_z - performer_start_z
+    occluder_distance_z = occluder_z - performer_start_z
+    # Note: This may need to change if we adjust the camera's field of view.
+    return (object_distance_x / object_distance_z) * occluder_distance_z
+
+
+def occluder_x_to_object_x(
+    occluder_x: float,
+    occluder_z: float,
+    object_z: float,
+    performer_start_x: float,
+    performer_start_z: float
+) -> float:
+    """Return the X position for an object at the given Z position behind an
+    occluder at the given X position."""
+    object_distance_z = object_z - performer_start_z
+    occluder_distance_x = occluder_x - performer_start_x
+    occluder_distance_z = occluder_z - performer_start_z
+    # Note: This may need to change if we adjust the camera's field of view.
+    return (occluder_distance_x / occluder_distance_z) * object_distance_z

@@ -82,6 +82,8 @@ class SizeChoice(_DefinitionChoice):
     notSideways: Dict[str, Any] = None
     offset: Vector3d = None
     openAreas: List[Dict[str, Any]] = None
+    placerOffsetX: List[float] = None
+    placerOffsetY: List[float] = None
     positionY: float = None
     scale: Vector3d = None
     sideways: Dict[str, Any] = None
@@ -96,6 +98,8 @@ class SizeChoice(_DefinitionChoice):
         'enclosedAreas',
         'offset',
         'openAreas',
+        'placerOffsetX',
+        'placerOffsetY',
         'positionY',
         'scale',
         'sideways',
@@ -114,6 +118,8 @@ class SizeChoice(_DefinitionChoice):
         mass: float = 1,
         offset: Vector3d = None,
         openAreas: List[Dict[str, Any]] = None,
+        placerOffsetX: List[float] = None,
+        placerOffsetY: List[float] = None,
         positionY: float = 0,
         scale: Vector3d = None,
         sideways: Dict[str, Any] = None,
@@ -128,8 +134,10 @@ class SizeChoice(_DefinitionChoice):
         self.mass = mass
         self.offset = offset or Vector3d()
         self.openAreas = openAreas or []
+        self.placerOffsetX = placerOffsetX
+        self.placerOffsetY = placerOffsetY
         self.positionY = positionY
-        self.scale = scale or Vector3d(1, 1, 1)
+        self.scale = scale or Vector3d(x=1, y=1, z=1)
         self.sideways = sideways
         self.size = size
         self.untrainedShape = untrainedShape
@@ -167,8 +175,6 @@ class TypeChoice(_DefinitionChoice):
 
     # Debug properties set post-initialization by hypercubes or utility code.
     difference: str = None
-    poleOffsetX: float = None
-    poleOffsetY: float = None
     poly = None
     prettyName: str = None
 
@@ -178,8 +184,6 @@ class TypeChoice(_DefinitionChoice):
         'difference',
         'obstacle',
         'occluder',
-        'poleOffsetX',
-        'poleOffsetY',
         'poly',
         'prettyName',
         'rotation',
@@ -239,9 +243,9 @@ class ObjectDefinition(
         occluder: bool = False,
         offset: Vector3d = None,
         openAreas: List[Dict[str, Any]] = None,
-        poleOffsetX: float = None,
-        poleOffsetY: float = None,
         poly=None,
+        placerOffsetX: List[float] = None,
+        placerOffsetY: List[float] = None,
         positionY: float = 0,
         prettyName: str = None,
         rotation: Vector3d = None,
@@ -275,9 +279,9 @@ class ObjectDefinition(
         self.notSideways = notSideways
         self.offset = offset or Vector3d()
         self.openAreas = openAreas
-        self.poleOffsetX = poleOffsetX
-        self.poleOffsetY = poleOffsetY
         self.poly = poly
+        self.placerOffsetX = placerOffsetX
+        self.placerOffsetY = placerOffsetY
         self.positionY = positionY
         self.prettyName = prettyName
         self.rotation = rotation or Vector3d()

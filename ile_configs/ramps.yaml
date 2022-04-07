@@ -6,15 +6,12 @@ goal:
         scale:
             min: 1.0
             max: 3.0
-        # Target is either positioned on top of a platform (50%), in front of
-        # the performer agent (25%), or in back of the performer agent (25%),
-        # randomized for each scene.
+        # Target is either positioned on top of a platform (50%), or in a
+        # random location (50%), randomized for each scene.
         keyword_location:
             keyword:
                 - on_top
-                - on_top
-                - back
-                - front
+                - random
             relative_object_label: start_structure
 
 # Only the target can be a soccer ball.
@@ -50,10 +47,16 @@ structural_platforms:
         right: true
     labels: start_structure
 
-# Start the performer on top of one of the platforms in 50% of all scenes.
+# Start either on top of a platform (50%) or on the floor (50%) in each scene.
 shortcut_start_on_platform: [true, false]
 
-# Override default to avoid randomly generating any additional structures
-# besides the ramp and platform.
+# Override the defaults to avoid randomly generating any other objects besides
+# the ramps, platforms, and target. Remove these lines if you want additional
+# randomly generated objects.
+keyword_objects:
+    - num: 0
 random_structural_objects:
     - num: 0
+
+# Ensure a valid path from the performer's starting position to the target.
+check_valid_path: True

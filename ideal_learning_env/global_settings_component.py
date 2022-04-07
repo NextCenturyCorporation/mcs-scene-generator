@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Union
 from machine_common_sense.config_manager import Vector3d
 
 from generator import MaterialTuple, geometry, materials
+from generator.scene import Scene
 from ideal_learning_env.numerics import MinMaxInt
 
 from .choosers import (
@@ -16,17 +17,20 @@ from .choosers import (
 )
 from .components import ILEComponent
 from .decorators import ile_config_setter
-from .defs import ILEDelayException, ILESharedConfiguration
+from .defs import (
+    ROOM_MAX_XZ,
+    ROOM_MAX_Y,
+    ROOM_MIN_XZ,
+    ROOM_MIN_Y,
+    ILEDelayException,
+    ILESharedConfiguration,
+)
 from .goal_services import GoalConfig, GoalServices
 from .numerics import VectorFloatConfig, VectorIntConfig
 from .validators import ValidateNoNullProp, ValidateNumber, ValidateOptions
 
 logger = logging.getLogger(__name__)
 
-ROOM_MAX_XZ = 100
-ROOM_MIN_XZ = 2
-ROOM_MAX_Y = 10
-ROOM_MIN_Y = 2
 # Limit the possible random room dimensions to more typical choices.
 ROOM_RANDOM_XZ = MinMaxInt(5, 30)
 ROOM_RANDOM_Y = MinMaxInt(3, 8)
@@ -212,7 +216,7 @@ class GlobalSettingsComponent(ILEComponent):
     which one is chosen at random for each scene. Rooms are always rectangular
     or square. The X and Z must each be within [2, 100] and the Y must be
     within [2, 10]. The room's bounds will be [-X/2, X/2] and [-Z/2, Z/2].
-    Default: random
+    Default: random X from 5 to 30, random Y from 3 to 8, random Z from 5 to 30
 
     Simple Example:
     ```
@@ -318,9 +322,10 @@ class GlobalSettingsComponent(ILEComponent):
     def __init__(self, data: Dict[str, Any]):
         super().__init__(data)
         self._delayed_goal = False
+        self._delayed_goal_reason = None
 
     # Override
-    def update_ile_scene(self, scene: Dict[str, Any]) -> Dict[str, Any]:
+    def update_ile_scene(self, scene: Scene) -> Scene:
         logger.info('Configuring global settings for the scene...')
 
         excluded_shapes = self.get_excluded_shapes()
@@ -329,41 +334,38 @@ class GlobalSettingsComponent(ILEComponent):
         )
         logger.trace(f'Setting excluded shapes = {excluded_shapes}')
 
-        # TODO MCS-696 Once we define a Scene class, we can probably give it
-        # the Python classes rather than calling vars() on them.
-        scene['roomDimensions'] = vars(self.get_room_dimensions())
-        logger.trace(f'Setting room dimensions = {scene["roomDimensions"]}')
-        scene['performerStart'] = {
-            'position': vars(self.get_performer_start_position(
-                scene['roomDimensions']
-            )),
-            'rotation': vars(self.get_performer_start_rotation())
-        }
-        logger.trace(f'Setting performer start = {scene["performerStart"]}')
+        scene.room_dimensions = self.get_room_dimensions()
+        logger.trace(f'Setting room dimensions = {scene.room_dimensions}')
+        scene.set_performer_start(
+            self.get_performer_start_position(
+                scene.room_dimensions),
+            self.get_performer_start_rotation())
+        logger.trace(f'Setting performer start = {scene.performer_start}')
 
         ceiling_material_tuple = self.get_ceiling_material()
-        scene['ceilingMaterial'] = ceiling_material_tuple.material
-        scene['debug']['ceilingColors'] = ceiling_material_tuple.color
+        scene.ceiling_material = ceiling_material_tuple.material
+        scene.debug['ceilingColors'] = ceiling_material_tuple.color
+
         floor_material_tuple = self.get_floor_material()
-        scene['floorMaterial'] = floor_material_tuple.material
-        scene['debug']['floorColors'] = floor_material_tuple.color
+        scene.floor_material = floor_material_tuple.material
+        scene.debug['floorColors'] = floor_material_tuple.color
         wall_material_data = self.get_wall_material_data()
-        scene['roomMaterials'] = dict([
+        scene.room_materials = dict([
             (key, value.material) for key, value in wall_material_data.items()
         ])
-        scene['restrictOpenDoors'] = self.get_restrict_open_doors()
-        scene['debug']['wallColors'] = list(set([
+        scene.restrict_open_doors = self.get_restrict_open_doors()
+        scene.debug['wallColors'] = list(set([
             color for value in wall_material_data.values()
             for color in value.color
         ]))
         logger.trace(
-            f'Setting room materials...\nCEILING={scene["ceilingMaterial"]}'
-            f'\nFLOOR={scene["floorMaterial"]}\nWALL={scene["roomMaterials"]}'
+            f'Setting room materials...\nCEILING={scene.ceiling_material}'
+            f'\nFLOOR={scene.floor_material}\nWALL={scene.room_materials}'
         )
 
         last_step = self.get_last_step()
         if last_step:
-            scene['goal']['last_step'] = last_step
+            scene.goal['last_step'] = last_step
             logger.trace(f'Setting last step = {last_step}')
         self._attempt_goal(scene)
         return scene
@@ -371,11 +373,14 @@ class GlobalSettingsComponent(ILEComponent):
     def _attempt_goal(self, scene):
         try:
             goal_template = self.goal
-            GoalServices.attempt_to_add_goal(scene, goal_template)
+            goal_specific: GoalConfig = choose_random(goal_template)
+            GoalServices.attempt_to_add_goal(scene, goal_specific)
             self._delayed_goal = False
+            self._delayed_goal_reason = None
         except ILEDelayException as e:
             logger.trace("Goal failed and needs delay.", exc_info=e)
             self._delayed_goal = True
+            self._delayed_goal_reason = e
 
     def get_ceiling_material(self) -> MaterialTuple:
         return (
@@ -436,8 +441,8 @@ class GlobalSettingsComponent(ILEComponent):
             self.performer_start_position,
             geometry.PERFORMER_WIDTH,
             geometry.PERFORMER_WIDTH,
-            room_dimensions['x'],
-            room_dimensions['z']
+            room_dimensions.x,
+            room_dimensions.z
         )
 
     # allow partial setting of start position.  I.E.  only setting X
@@ -462,7 +467,7 @@ class GlobalSettingsComponent(ILEComponent):
             data.z or 0
         ) if data is not None else None
 
-    def get_room_dimensions(self) -> VectorIntConfig:
+    def get_room_dimensions(self) -> Vector3d:
         has_none = False
         rd = self.room_dimensions or VectorIntConfig()
         template = VectorIntConfig(rd.x, rd.y, rd.z)
@@ -484,7 +489,7 @@ class GlobalSettingsComponent(ILEComponent):
             isinstance(template.z, (list, MinMaxInt))
         )
         if not has_none and not has_random:
-            return template
+            return Vector3d(x=template.x, y=template.y, z=template.z)
 
         good = False
         while not good:
@@ -497,7 +502,7 @@ class GlobalSettingsComponent(ILEComponent):
                 good = False
             if self.room_shape == 'rectangle' and x == z:
                 good = False
-        return VectorIntConfig(x, dims.y, z)
+        return Vector3d(x=x, y=dims.y, z=z)
 
     @ile_config_setter()
     def set_restrict_open_doors(self, data: Any) -> None:
@@ -589,3 +594,8 @@ class GlobalSettingsComponent(ILEComponent):
         if self._delayed_goal:
             self._attempt_goal(scene)
         return scene
+
+    def get_delayed_action_error_strings(self):
+        return ([
+            str(self._delayed_goal_reason)] if self._delayed_goal and
+            self._delayed_goal_reason else [])

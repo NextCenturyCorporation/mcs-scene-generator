@@ -1,9 +1,11 @@
+import copy
 import logging
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from typing import Any, Dict, List, Union
 
+from machine_common_sense.config_manager import PerformerStart, Vector3d
+
 from generator import (
-    MAX_TRIES,
     ObjectBounds,
     ObjectDefinition,
     base_objects,
@@ -11,29 +13,37 @@ from generator import (
     instances,
     specific_objects,
 )
+from generator.materials import MaterialTuple
+from generator.scene import Scene
 from ideal_learning_env.defs import (
     ILEDelayException,
     ILEException,
     ILESharedConfiguration,
 )
+from ideal_learning_env.feature_creation_service import (
+    BaseFeatureConfig,
+    BaseObjectCreationService,
+    FeatureCreationService,
+    FeatureTypes,
+    log_feature_template,
+    position_relative_to,
+)
 from ideal_learning_env.object_services import (
     InstanceDefinitionLocationTuple,
     KeywordLocation,
     ObjectRepository,
+    RelativePositionConfig,
+    add_random_placement_tag,
 )
 
 from .choosers import (
+    choose_material_tuple_from_material,
     choose_position,
     choose_rotation,
     choose_scale,
     choose_shape_material,
 )
-from .numerics import (
-    MinMaxFloat,
-    MinMaxInt,
-    VectorFloatConfig,
-    VectorIntConfig,
-)
+from .numerics import MinMaxFloat, VectorFloatConfig, VectorIntConfig
 
 logger = logging.getLogger(__name__)
 
@@ -85,6 +95,10 @@ class KeywordLocationConfig():
         (I.E. two bowls), use 'on_center'.  The object must be referenced by
         the 'relative_object_label' field.  If multiple objects have this
         label, one will be randomly chosen.
+        - `random` - The object will be positioned in a random location, as if
+        it did not have a keyword location.
+        - `associated_with_agent` - This object will be held by an agent
+        referenced by the  'relative_object_label' field.
     - `container_label` (string, or list of strings): The label of a container
     object that already exists in your configuration. Only required by some
     keyword locations.
@@ -98,7 +112,7 @@ class KeywordLocationConfig():
 
 
 @dataclass
-class InteractableObjectConfig():
+class InteractableObjectConfig(BaseFeatureConfig):
     """Represents the template for a specific object (with one or more possible
     variations) that will be added to each scene. Each template can have the
     following optional properties:
@@ -106,6 +120,12 @@ class InteractableObjectConfig():
     of objects with this template to generate in each scene. For a list or a
     MinMaxInt, a new number will be randomly chosen for each scene.
     Default: `1`
+    - `identical_to` (str): Used to match to another object with
+    the specified label, so that this definition can share that object's
+    exact shape, scale, and material. Overrides `identical_except_color`
+    - `identical_except_color` (str): Used to match to another object with
+    the specified label, so that this definition can share that object's
+    exact shape and scale, but not its material (color/texture).
     - `keyword_location`: ([KeywordLocationConfig](#KeywordLocationConfig)):
     Used to identify one of the qualitative locations specified by keywords.
     This field should not be set when `position` or `rotation` are also set.
@@ -114,6 +134,9 @@ class InteractableObjectConfig():
     of objects.  Labels do not need to be unique and when objects share a
     labels, components have options to randomly choose one or choose all.  See
     specific label options for details.
+    - `locked` (bool or list of bools): If true and the resulting object is
+    lockable, like a container or door, the object will be locked.  If the
+    object is not lockable, this field has no affect.
     - `material` (string, or list of strings): The material (color/texture) to
     use on this object in each scene. For a list, a new material will be
     randomly chosen for each scene. Default: random
@@ -121,13 +144,16 @@ class InteractableObjectConfig():
     VectorFloatConfig dicts): The position of this object in each scene. For a
     list, a new position will be randomly chosen for each scene.
     Default: random
+    - `position_relative` ([RelativePositionConfig](#RelativePositionConfig)
+    dict, or list of RelativePositionConfig dicts): Configuration options for
+    positioning this object relative to another object, rather than using
+    `position`. If configuring this as a list, then all listed options will be
+    applied to each scene in the listed order, with later options overriding
+    earlier options if necessary. Default: not used
     - `rotation` ([VectorIntConfig](#VectorIntConfig) dict, or list of
     VectorIntConfig dicts): The rotation of this object in each scene. For a
     list, a new rotation will be randomly chosen for each scene.
     Default: random
-    - `identical_to` (str): used to match to another object with
-    the specified label, so that this definition can share that object's
-    exact shape, scale, and material.
     - `scale` (float, or list of floats, or [MinMaxFloat](#MinMaxFloat) dict,
     or list of MinMaxFloat dicts, or [VectorFloatConfig](#VectorFloatConfig)
     dict, or list of VectorFloatConfig dicts): The scale of this object in each
@@ -137,9 +163,6 @@ class InteractableObjectConfig():
     - `shape` (string, or list of strings): The shape (object type) of this
     object in each scene. For a list, a new shape will be randomly chosen for
     each scene. Default: random
-    - `locked` (bool or list of bools): If true and the resulting object is
-    lockable, like a container or door, the object will be locked.  If the
-    object is not lockable, this field has no affect.
 
     Example:
     ```
@@ -190,120 +213,187 @@ class InteractableObjectConfig():
     """
 
     material: Union[str, List[str]] = None
-    num: Union[int, List[int], MinMaxInt] = 1
     scale: Union[float, MinMaxFloat, VectorFloatConfig,
-                 List[Union[float, MinMaxFloat, VectorFloatConfig]]] = 1
+                 List[Union[float, MinMaxFloat, VectorFloatConfig]]] = None
     shape: Union[str, List[str]] = None
     position: Union[VectorFloatConfig, List[VectorFloatConfig]] = None
     rotation: Union[VectorIntConfig, List[VectorIntConfig]] = None
     keyword_location: Union[KeywordLocationConfig,
                             List[KeywordLocationConfig]] = None
     locked: Union[bool, List[bool]] = False
-    labels: Union[str, List[str]] = None
     identical_to: str = None
+    identical_except_color: str = None
+    position_relative: Union[
+        RelativePositionConfig,
+        List[RelativePositionConfig]
+    ] = None
 
-    def create_instance(
-        self,
-        room_dimensions: Dict[str, float],
-        performer_start: Dict[str, Dict[str, float]],
-        bounds: List[ObjectBounds]
-    ) -> Dict[str, Any]:
-        return self.create_instance_definition_location_tuple(
-            room_dimensions, performer_start, bounds).instance
 
-    def create_instance_definition_location_tuple(
-        self,
-        room_dimensions: Dict[str, float],
-        performer_start: Dict[str, Dict[str, float]],
-        bounds: List[ObjectBounds]
-    ) -> InstanceDefinitionLocationTuple:
-        """Create and return an instance along with definition and location
-        objects in a tuple of this specific configured object."""
-        shared_config = ILESharedConfiguration.get_instance()
-        idl = None
-        for _ in range(MAX_TRIES):
-            # Try choosing a new random definition AND location each loop, in
-            # case the randomly chosen definition is just too big.
-            if self.shape:
-                defn = self._create_definition()
+DEFAULT_TEMPLATE_INTERACTABLE = InteractableObjectConfig(
+    num=1, material=None, scale=1, shape=None, position=None, rotation=None,
+    keyword_location=None, locked=False, labels=None, identical_to=None,
+    identical_except_color=None)
+
+
+class InteractableObjectCreationService(BaseObjectCreationService):
+    shared_config = None
+    bounds = []
+
+    def __init__(self):
+        self._default_template = DEFAULT_TEMPLATE_INTERACTABLE
+        self._type = FeatureTypes.INTERACTABLE
+        self.shared_config = ILESharedConfiguration.get_instance()
+        self.defn = None
+
+    def _handle_dependent_defaults(
+            self, scene: Scene, reconciled: InteractableObjectConfig,
+            source_template: InteractableObjectConfig
+    ) -> InteractableObjectConfig:
+
+        (reconciled.shape, mat) = choose_shape_material(
+            reconciled.shape, reconciled.material)
+        reconciled.material = mat[0] if isinstance(mat, MaterialTuple) else mat
+        reconciled.scale = choose_scale(
+            source_template.scale,
+            reconciled.shape
+        )
+        defn = self._create_definition(reconciled)
+        self.defn = defn
+        reconciled.scale = defn.scale
+
+        if (
+            not reconciled.keyword_location or
+            reconciled.keyword_location.keyword == KeywordLocation.RANDOM
+        ):
+            reconciled.position = choose_position(
+                reconciled.position,
+                defn.dimensions.x,
+                defn.dimensions.z,
+                scene.room_dimensions.x,
+                scene.room_dimensions.z
+            )
+            reconciled.rotation = choose_rotation(reconciled.rotation)
+
+        # If needed, adjust this device's position relative to another object.
+        if source_template.position_relative:
+            position_x, position_z = position_relative_to(
+                # Use the config list from the source template.
+                source_template.position_relative,
+                (reconciled.position.x, reconciled.position.z),
+                scene.performer_start.position,
+                'dropping device'
+            )
+            if position_x is not None:
+                reconciled.position.x = position_x
+            if position_z is not None:
+                reconciled.position.z = position_z
+
+        return reconciled
+
+    def create_feature_from_specific_values(
+            self, scene: Scene, reconciled: InteractableObjectConfig,
+            source_template: InteractableObjectConfig):
+        defn = self._create_definition(reconciled)
+        if (
+            reconciled.keyword_location and
+            reconciled.keyword_location.keyword != KeywordLocation.RANDOM
+        ):
+            try:
+                idl = KeywordLocation.get_keyword_location_object_tuple(
+                    reconciled.keyword_location,
+                    defn, scene.performer_start, self.bounds,
+                    scene.room_dimensions)
+                if idl:
+                    self.idl = idl
+                    add_random_placement_tag(idl.instance, source_template)
+                    return idl.instance
+            except ILEException as e:
+                # If location can't be found, try again and therefore log
+                # but don't let exception continue.  However, if the
+                # Exception is a Delay Exception, we want ot pass it up.
+                if isinstance(e, ILEDelayException):
+                    raise e from e
+                logger.debug(
+                    f"Failed to place object with keyword location="
+                    f"{reconciled.keyword_location}",
+                    exc_info=e)
+        else:
+            location = self._attach_location(
+                reconciled,
+                defn,
+                scene.room_dimensions,
+                scene.performer_start,
+                self.bounds or []
+            )
+            if location:
+                obj = instances.instantiate_object(
+                    defn, location) if location else None
+                if obj:
+                    # All interactable objects should be moveable.
+                    obj['moveable'] = True
+                    self.idl = InstanceDefinitionLocationTuple(
+                        obj, defn, location)
+                    add_random_placement_tag(
+                        self.idl.instance, source_template)
+                    return self.idl.instance
+                else:
+                    msg = (f"Failed to create instance. template="
+                           f"{reconciled} location={location}")
+                    logger.debug(msg)
+                    raise ILEException(msg)
             else:
-                # If a specific object shape was not set (self.shape is None),
-                # ensure that the randomly chosen shape has not been excluded.
-                defn = shared_config.choose_definition_from_included_shapes(
-                    self._create_definition
-                )
-            if self.keyword_location:
-                try:
-                    idl = KeywordLocation.get_keyword_location_object_tuple(
-                        self.keyword_location,
-                        defn, performer_start, bounds, room_dimensions)
-                    if idl:
-                        break
-                except ILEException as e:
-                    # If location can't be found, try again and therefore log
-                    # but don't let exception continue.  However, if the
-                    # Exception is a Delay Exception, we want ot pass it up.
-                    if isinstance(e, ILEDelayException):
-                        raise e from e
-                    logger.debug(
-                        f"Failed to place object with keyword location="
-                        f"{self.keyword_location}",
-                        exc_info=e)
-            else:
-                location = self._attach_location(
-                    defn,
-                    room_dimensions,
-                    performer_start,
-                    bounds
-                )
-                if location:
-                    obj = instances.instantiate_object(
-                        defn, location) if location else None
-                    if obj:
-                        # All interactable objects should be moveable.
-                        obj['moveable'] = True
-                        idl = InstanceDefinitionLocationTuple(
-                            obj, defn, location)
-                        break
-        if not idl:
-            location_str = f"location={self.keyword_location or self.position}"
-            raise ILEException(
-                "Failed to create object instance. "
-                f"shape={self.shape} {location_str}")
-        if idl.instance['type'] in specific_objects.get_lockable_shapes():
-            idl.instance['locked'] = self.locked
+                msg = (f"Failed to find object location. template="
+                       f"{reconciled}")
+                logger.debug(msg)
+                raise ILEException(msg)
+        raise ILEException(
+            f"Failed to create object from template={reconciled}")
 
-        object_repo = ObjectRepository.get_instance()
-        object_repo.add_to_labeled_objects(idl, self.labels)
-        return idl
+    def _on_valid_instances(
+            self, scene: Scene,
+            reconciled_template: InteractableObjectConfig,
+            new_obj: dict, key: str = 'objects'):
+        if new_obj is not None:
+            for obj in new_obj:
+                if (obj['type']
+                        in specific_objects.get_lockable_shapes()):
+                    obj['locked'] = reconciled_template.locked
+                object_repo = ObjectRepository.get_instance()
+                object_repo.add_to_labeled_objects(
+                    self.idl, reconciled_template.labels)
+                scene.objects.append(obj)
+
+        log_feature_template(
+            self._get_type().lower().replace('_', ' '),
+            'ids' if len(new_obj) > 1 else 'id',
+            [part['id'] for part in new_obj] if len(new_obj) > 1 else
+            new_obj[0]['id'],
+            [None, reconciled_template]
+        )
 
     def _attach_location(
         self,
+        template,
         defn: ObjectDefinition,
-        room_dimensions: Dict[str, float],
-        performer_start: Dict[str, Dict[str, float]],
+        room_dimensions: Vector3d,
+        performer_start: PerformerStart,
         bounds: List[ObjectBounds]
     ) -> Dict[str, Any]:
         """Create and return an object location with properties randomly
         chosen from the config in this class."""
-        if self.position or self.rotation:
+        if template.position or template.rotation:
             location = {
-                'position': vars(choose_position(
-                    self.position,
-                    defn.dimensions.x,
-                    defn.dimensions.z,
-                    room_dimensions['x'],
-                    room_dimensions['z']
-                )),
-                'rotation': vars(choose_rotation(self.rotation))
+                'position': vars(template.position),
+                'rotation': vars(template.rotation)
             }
             location['position']['y'] += defn.positionY
         else:
             return geometry.calc_obj_pos(
-                performer_start['position'],
-                bounds,
+                asdict(performer_start.position),
+                # calc_obj_pos addes to bounds, but we don't want this.
+                copy.deepcopy(bounds),
                 defn,
-                room_dimensions=room_dimensions
+                room_dimensions=asdict(room_dimensions)
             )
         location['boundingBox'] = geometry.create_bounds(
             dimensions=vars(defn.dimensions),
@@ -312,21 +402,17 @@ class InteractableObjectConfig():
             rotation=location['rotation'],
             standing_y=defn.positionY
         )
-        if geometry.validate_location_rect(
-            location['boundingBox'],
-            performer_start['position'],
-            bounds,
-            room_dimensions
-        ):
-            bounds.append(location['boundingBox'])
-            return location
-        return None
+        return location
 
-    def _create_definition(self) -> ObjectDefinition:
+    def _create_definition(self, template) -> ObjectDefinition:
         """Create and return an object definition with properties randomly
         chosen from the config in this class."""
         salient_materials = []
-        (shape, mat) = choose_shape_material(self.shape, self.material)
+        mat = (
+            None if template.material is None
+            else choose_material_tuple_from_material(
+                template.material))
+        shape = template.shape
         if mat is None:
             mat = []
             colors = []
@@ -339,5 +425,9 @@ class InteractableObjectConfig():
             mat,
             colors,
             salient_materials,
-            choose_scale(self.scale, shape)
+            template.scale
         )
+
+
+FeatureCreationService.register_creation_service(
+    FeatureTypes.INTERACTABLE, InteractableObjectCreationService)

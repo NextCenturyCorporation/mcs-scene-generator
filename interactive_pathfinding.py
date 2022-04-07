@@ -280,8 +280,7 @@ def try_early_pickup(controller, step_metadata, action_list, index):
 
 def main(args):
     # Identify all the _debug.json MCS scene files.
-    filename_list = glob.glob(args.file_path_prefix + '*_debug.json')
-    filename_list.sort()
+    filename_list = sorted(glob.glob(args.file_path_prefix + '*_debug.json'))
 
     if len(filename_list) == 0:
         print(f'No files ending in _debug.json with prefix: '
@@ -289,8 +288,7 @@ def main(args):
         return
 
     # Start a single MCS controller for testing all the MCS scene files.
-    controller = mcs.create_controller(args.mcs_unity_build, debug=True,
-                                       history_enabled=False)
+    controller = mcs.create_controller({}, args.mcs_unity_build)
 
     finished_file_list = []
     failed_file_list = []

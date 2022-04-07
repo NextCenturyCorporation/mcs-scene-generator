@@ -206,26 +206,25 @@ def choose_position_z(
 def object_x_to_occluder_x(object_x: float, object_z: float):
     """Return the X position for an occluder in front of an object at the given
     X/Z position."""
-    object_distance_z = object_z - PERFORMER_START['position']['z']
-    occluder_distance_z = (
-        occluders.OCCLUDER_POSITION_Z - PERFORMER_START['position']['z']
+    return geometry.object_x_to_occluder_x(
+        object_x,
+        object_z,
+        occluders.OCCLUDER_POSITION_Z,
+        PERFORMER_START['position']['x'],
+        PERFORMER_START['position']['z']
     )
-    try:
-        camera_angle = math.asin(object_x / object_distance_z)
-    except ValueError:
-        return None
-    return math.sin(camera_angle) * occluder_distance_z
 
 
 def occluder_x_to_object_x(occluder_x: float, object_z: float):
     """Return the X position for an object at the given Z position in back of
     an occluder at the given X position."""
-    object_distance_z = object_z - PERFORMER_START['position']['z']
-    occluder_distance_z = (
-        occluders.OCCLUDER_POSITION_Z - PERFORMER_START['position']['z']
+    return geometry.occluder_x_to_object_x(
+        occluder_x,
+        occluders.OCCLUDER_POSITION_Z,
+        object_z,
+        PERFORMER_START['position']['x'],
+        PERFORMER_START['position']['z']
     )
-    camera_angle = math.asin(occluder_x / occluder_distance_z)
-    return math.sin(camera_angle) * object_distance_z
 
 
 def retrieve_off_screen_position_x(position_z: float) -> float:
@@ -2229,6 +2228,9 @@ class GravitySupportHypercube(IntuitivePhysicsHypercube):
             (VARIATIONS.ASYMMETRIC_RIGHT, target_asymmetric_right, -1)
         ]:
             target_definition = target_variations._definitions[name]
+            # Assume all gravity support objects will only need one placer.
+            placer_offset_x = (target_definition.placerOffsetX or [0])[0]
+            placer_offset_y = (target_definition.placerOffsetY or [0])[0]
             pole_instances[name] = mechanisms.create_placer(
                 placed_object_position=target['shows'][0]['position'],
                 placed_object_dimensions=target['debug']['dimensions'],
@@ -2236,7 +2238,7 @@ class GravitySupportHypercube(IntuitivePhysicsHypercube):
                 activation_step=target['shows'][0]['stepBegin'],
                 end_height=visible_support['debug']['dimensions']['y'],
                 max_height=MAX_TARGET_Y,
-                placed_object_pole_offset_y=target_definition.poleOffsetY
+                placed_object_placer_offset_y=placer_offset_y
             )
             # Each pole variation should have the same ID.
             pole_instances[name]['id'] = pole_id
@@ -2245,7 +2247,7 @@ class GravitySupportHypercube(IntuitivePhysicsHypercube):
             # The pole is normally positioned over the middle of the target,
             # but may be adjusted with asymmetric shapes like triangles or Ls.
             target_rotation = target_definition.rotation.y
-            target_offset_x = (target_definition.poleOffsetX or 0) * (
+            target_offset_x = placer_offset_x * (
                 target['shows'][0]['scale']['z']
                 if (target_rotation == -90 or target_rotation == 90)
                 else target['shows'][0]['scale']['x']
@@ -2595,7 +2597,8 @@ class GravitySupportHypercube(IntuitivePhysicsHypercube):
         target_asymmetric_show['position']['x'] -= asymmetric_center
         target_asymmetric_show['boundingBox'] = ObjectBounds(
             box_xz=[
-                Vector3d(corner.x - asymmetric_center, corner.y, corner.z)
+                Vector3d(x=corner.x - asymmetric_center,
+                         y=corner.y, z=corner.z)
                 for corner in target_asymmetric_show['boundingBox'].box_xz
             ],
             max_y=target_asymmetric_show['boundingBox'].max_y,

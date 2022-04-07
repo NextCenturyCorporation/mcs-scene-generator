@@ -1,3 +1,15 @@
+# Add a Retrieval goal with a soccer ball as the target object.
+goal:
+    category: retrieval
+    target:
+        shape: soccer_ball
+        scale:
+            min: 1.0
+            max: 3.0
+
+# Only the target can be a soccer ball.
+excluded_shapes: soccer_ball
+
 # Between 1 and 100 areas of the floor will be colored randomly.
 floor_material_override:
     - num:

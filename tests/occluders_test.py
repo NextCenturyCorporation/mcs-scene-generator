@@ -78,6 +78,10 @@ def verify_pole(
     assert pole['materials'] == [TEST_MATERIAL_POLE[0]]
     assert pole['debug']['info'] == TEST_MATERIAL_POLE[1]
 
+    assert pole['debug']['dimensions']['x'] == scale_x
+    assert pole['debug']['dimensions']['y'] == scale_y
+    assert pole['debug']['dimensions']['z'] == scale_z
+
     assert pole['shows'][0]['position']['x'] == position_x
     assert pole['shows'][0]['position']['y'] == position_y
     assert pole['shows'][0]['position']['z'] == position_z
@@ -126,6 +130,10 @@ def verify_pole_sideways(
     assert pole['type'] == 'cylinder'
     assert pole['materials'] == [TEST_MATERIAL_POLE[0]]
     assert pole['debug']['info'] == TEST_MATERIAL_POLE[1]
+
+    assert pole['debug']['dimensions']['x'] == scale_x
+    assert pole['debug']['dimensions']['y'] == scale_y
+    assert pole['debug']['dimensions']['z'] == scale_z
 
     assert pole['shows'][0]['position']['x'] == position_x
     assert pole['shows'][0]['position']['y'] == position_y
@@ -177,6 +185,10 @@ def verify_wall(
     assert wall['type'] == 'cube'
     assert wall['materials'] == [TEST_MATERIAL_WALL[0]]
     assert wall['debug']['info'] == TEST_MATERIAL_WALL[1]
+
+    assert wall['debug']['dimensions']['x'] == scale_x
+    assert wall['debug']['dimensions']['y'] == scale_y
+    assert wall['debug']['dimensions']['z'] == scale_z
 
     assert wall['shows'][0]['position']['x'] == position_x
     assert wall['shows'][0]['position']['y'] == position_y

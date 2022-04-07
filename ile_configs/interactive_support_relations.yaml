@@ -1,0 +1,86 @@
+# Add a Retrieval goal with a soccer ball as the target object.
+goal:
+    category: retrieval
+    target:
+        shape: soccer_ball
+        scale:
+            min: 1.0
+            max: 2.5
+        # The soccer ball is always positioned in the container object.
+        keyword_location:
+            keyword: in
+            container_label: container_for_target
+
+# Only the target can be a soccer ball.
+excluded_shapes: soccer_ball
+
+# Use a specific room size for this task.
+room_dimensions:
+    x: 8
+    y: 8
+    z: 12
+
+# Generate an occluding wall containing three doors (called a "door occluder")
+# and a tall platform bisecting the room.
+shortcut_triple_door_choice:
+    # Make the far end of the platform taller and wider.
+    bigger_far_end: true
+    # Freeze until the door occluder has finished descending.
+    add_freeze: true
+    # Allow only one door to be opened in each scene (forced choice).
+    restrict_open_doors: true
+    # The door occluder starts to descend at a specific action/step.
+    start_drop_step: 26
+
+# Generate placers that begin holding a container object (that itself holds
+# the target object), descend into the room, wait, and then release it.
+placers:
+    - num: 1
+      placed_object_labels: container_for_target
+      placed_object_position:
+          # Position the container either directly over the platform (X=0),
+          # partially over the platform, or not over the platform at all.
+          x: [-2.25, -1.25, -0.75, -0.25, 0, 0, 0.25, 0.75, 1.25, 2.25]
+          # Ensure the container has room above it for the target object.
+          y: 7.305
+          z: 0.75
+      placed_object_rotation: [0, 180]
+      placed_object_shape:
+          - container_symmetric_01
+          - container_symmetric_02
+          - container_symmetric_03
+          - container_symmetric_04
+          - container_symmetric_05
+          - container_symmetric_06
+          - container_symmetric_07
+          - container_symmetric_08
+          - container_symmetric_09
+          - container_symmetric_10
+          - container_symmetric_11
+          - container_symmetric_12
+          - container_asymmetric_01
+          - container_asymmetric_02
+          - container_asymmetric_03
+          - container_asymmetric_04
+          - container_asymmetric_05
+          - container_asymmetric_06
+          - container_asymmetric_07
+          - container_asymmetric_08
+          - container_asymmetric_09
+          - container_asymmetric_10
+          - container_asymmetric_11
+          - container_asymmetric_12
+      # The placer activates on the first action/step, and deactivates
+      # (releases) after the door occluder has finished its downward movement.
+      activation_step: 1
+      deactivation_step: 60
+      # Deactivate (release the target) at a height above the platform.
+      end_height: 2.3
+
+# Override the defaults to avoid randomly generating any other objects besides
+# the platform, door occluder, placers, container, and target. Remove these
+# lines if you want additional randomly generated objects.
+keyword_objects:
+    - num: 0
+random_structural_objects:
+    - num: 0

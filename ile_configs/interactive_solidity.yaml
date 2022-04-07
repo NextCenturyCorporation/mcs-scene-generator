@@ -1,0 +1,59 @@
+# Add a Retrieval goal with a soccer ball as the target object.
+goal:
+    category: retrieval
+    target:
+        shape: soccer_ball
+        scale:
+            min: 1.0
+            max: 3.0
+
+# Only the target can be a soccer ball.
+excluded_shapes: soccer_ball
+
+# Use a specific room size for this task.
+room_dimensions:
+    x: 8
+    y: 8
+    z: 12
+
+# Generate an occluding wall containing three doors (called a "door occluder")
+# and a tall platform bisecting the room.
+shortcut_triple_door_choice:
+    # Add a random extension to one side of the far end of the platform. Use
+    # "extension_length" and "extension_position" to manually configure its
+    # size or position, respectively (see the ILE_API for details).
+    add_extension: true
+    # Freeze until the door occluder has finished descending.
+    add_freeze: true
+    # Add lips (edges) to the far end of the platform.
+    add_lips: true
+    # Allow only one door to be opened in each scene (forced choice).
+    restrict_open_doors: true
+    # The door occluder starts to descend at a specific action/step.
+    start_drop_step: 26
+
+# Generate a placer that begins holding the target object (soccer ball),
+# descends into the room, waits, and then releases it.
+placers:
+    - num: 1
+      placed_object_labels: target
+      # Position the placer's Z either in line with the platform extension
+      # (50%) or off by 1 (50%), but let its X be randomized across the room.
+      position_relative:
+          label: platform_extension
+          use_z: true
+          add_z: [-1, 0, 0, 1]
+      # The placer activates on the first action/step, and deactivates
+      # (releases) after the door occluder has finished its downward movement.
+      activation_step: 1
+      deactivation_step: 60
+      # Deactivate (release the target) at a height above the platform.
+      end_height: 2.3
+
+# Override the defaults to avoid randomly generating any other objects besides
+# the platform, door occluder, placer, and target. Remove these lines if you
+# want additional randomly generated objects.
+keyword_objects:
+    - num: 0
+random_structural_objects:
+    - num: 0

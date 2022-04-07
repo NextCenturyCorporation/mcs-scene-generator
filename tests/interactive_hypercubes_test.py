@@ -2,7 +2,6 @@ import os
 
 import pytest
 import shapely
-from machine_common_sense.config_manager import Vector3d
 from shapely import affinity
 
 from generator import RetrievalGoal, definitions, geometry, scene_saver
@@ -12,13 +11,6 @@ from hypercube import (
     InteractiveObstacleEvaluationHypercubeFactory,
     InteractiveOccluderEvaluationHypercubeFactory,
     InteractiveSingleSceneFactory,
-)
-from hypercube.interactive_hypercubes import (
-    ROOM_DIMENSIONS,
-    WALL_DEPTH,
-    WALL_HEIGHT,
-    WALL_MAX_WIDTH,
-    WALL_MIN_WIDTH,
 )
 
 BODY_TEMPLATE = {
@@ -132,124 +124,6 @@ def save_scene_debug_files(scene_dict, descriptor):
             f'temp_{descriptor}',
             only_debug_file=True
         )
-
-
-def test_generate_wall():
-    hypercube = InteractiveSingleSceneFactory(RetrievalGoal(''))._build(
-        BODY_TEMPLATE,
-        {'container': None, 'obstacle': None, 'occluder': None}
-    )
-    wall = hypercube._create_interior_wall(
-        'test_material',
-        ['black', 'white'],
-        geometry.ORIGIN_LOCATION,
-        []
-    )
-
-    assert wall
-    assert wall['id']
-    assert wall['materials'] == ['test_material']
-    assert wall['type'] == 'cube'
-    assert wall['kinematic'] is True
-    assert wall['structure'] is True
-    # Calculated by structures._calculate_mass
-    assert wall['mass'] >= 37.5
-    assert wall['debug']['info'] == [
-        'black', 'white', 'wall', 'black wall', 'white wall',
-        'black white wall'
-    ]
-
-    assert len(wall['shows']) == 1
-    assert wall['shows'][0]['stepBegin'] == 0
-    assert wall['shows'][0]['scale']['x'] >= WALL_MIN_WIDTH and \
-        wall['shows'][0]['scale']['x'] <= WALL_MAX_WIDTH
-    assert wall['shows'][0]['scale']['y'] == WALL_HEIGHT
-    assert wall['shows'][0]['scale']['z'] == WALL_DEPTH
-    assert wall['shows'][0]['rotation']['x'] == 0
-    assert wall['shows'][0]['rotation']['y'] % 90 == 0
-    assert wall['shows'][0]['rotation']['z'] == 0
-    assert wall['shows'][0]['position']['x'] is not None
-    assert wall['shows'][0]['position']['y'] == (WALL_HEIGHT / 2.0)
-    assert wall['shows'][0]['position']['z'] is not None
-    assert wall['shows'][0]['boundingBox'] is not None
-
-    assert 'hides' not in wall
-    assert 'moves' not in wall
-    assert 'rotates' not in wall
-    assert 'teleports' not in wall
-
-    player_poly = geometry.find_performer_bounds(geometry.ORIGIN).polygon_xz
-    wall_poly = wall['shows'][0]['boundingBox'].polygon_xz
-    assert not wall_poly.intersects(player_poly)
-    assert wall['shows'][0]['boundingBox'].is_within_room(ROOM_DIMENSIONS)
-
-
-def test_generate_wall_multiple():
-    hypercube = InteractiveSingleSceneFactory(RetrievalGoal(''))._build(
-        BODY_TEMPLATE,
-        {'container': None, 'obstacle': None, 'occluder': None}
-    )
-    wall_1 = hypercube._create_interior_wall(
-        'test_material',
-        [],
-        geometry.ORIGIN_LOCATION,
-        []
-    )
-    wall_2 = hypercube._create_interior_wall(
-        'test_material',
-        [],
-        geometry.ORIGIN_LOCATION,
-        [wall_1['shows'][0]['boundingBox']]
-    )
-    wall_1_poly = wall_1['shows'][0]['boundingBox'].polygon_xz
-    wall_2_poly = wall_2['shows'][0]['boundingBox'].polygon_xz
-    assert not wall_1_poly.intersects(wall_2_poly)
-
-
-def test_generate_wall_with_bounds_list():
-    bounds = geometry.ObjectBounds(box_xz=[
-        Vector3d(**{'x': 4, 'y': 0, 'z': 4}),
-        Vector3d(**{'x': 4, 'y': 0, 'z': 1}),
-        Vector3d(**{'x': 1, 'y': 0, 'z': 1}),
-        Vector3d(**{'x': 1, 'y': 0, 'z': 4})
-    ], max_y=0, min_y=0)
-    hypercube = InteractiveSingleSceneFactory(RetrievalGoal(''))._build(
-        BODY_TEMPLATE,
-        {'container': None, 'obstacle': None, 'occluder': None}
-    )
-    wall = hypercube._create_interior_wall(
-        'test_material',
-        [],
-        geometry.ORIGIN_LOCATION,
-        [bounds]
-    )
-    poly = bounds.polygon_xz
-    wall_poly = wall['shows'][0]['boundingBox'].polygon_xz
-    assert not wall_poly.intersects(poly)
-
-
-def test_generate_wall_with_target_list():
-    bounds = geometry.ObjectBounds(box_xz=[
-        Vector3d(**{'x': 4, 'y': 0, 'z': 4}),
-        Vector3d(**{'x': 4, 'y': 0, 'z': 3}),
-        Vector3d(**{'x': 3, 'y': 0, 'z': 3}),
-        Vector3d(**{'x': 3, 'y': 0, 'z': 4})
-    ], max_y=0, min_y=0)
-    target = {'shows': [{'boundingBox': bounds}]}
-    hypercube = InteractiveSingleSceneFactory(RetrievalGoal(''))._build(
-        BODY_TEMPLATE,
-        {'container': None, 'obstacle': None, 'occluder': None}
-    )
-    wall = hypercube._create_interior_wall(
-        'test_material',
-        [],
-        geometry.ORIGIN_LOCATION,
-        [bounds],
-        [target]
-    )
-    wall_poly = wall['shows'][0]['boundingBox'].polygon_xz
-    assert not geometry.does_fully_obstruct_target(
-        geometry.ORIGIN, target, wall_poly)
 
 
 def get_parent(object_instance, object_list):

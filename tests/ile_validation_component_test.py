@@ -1,80 +1,12 @@
 import pytest
 from machine_common_sense.config_manager import Vector3d
 
-from generator import ObjectBounds, specific_objects
-from ideal_learning_env.defs import ILEConfigurationException, ILEException
-from ideal_learning_env.goal_services import TARGET_LABEL
-from ideal_learning_env.object_services import (
-    InstanceDefinitionLocationTuple,
-    ObjectRepository,
-)
+from generator import ObjectBounds
+from ideal_learning_env.defs import ILEException
+from ideal_learning_env.object_services import ObjectRepository
 from ideal_learning_env.validation_component import ValidPathComponent
 
-
-def prior_scene(start_x=0, start_z=0):
-    return {'debug': {}, 'goal': {}, 'performerStart':
-            {'position':
-             {'x': start_x, 'y': 0, 'z': start_z},
-             'rotation': {'x': 0, 'y': 0, 'z': 0}},
-            'roomDimensions': {'x': 10, 'y': 3, 'z': 10}}
-
-
-def prior_scene_custom_size(x, z):
-    return {'debug': {}, 'goal': {}, 'performerStart':
-            {'position':
-             {'x': 0, 'y': 0, 'z': 0}},
-            'roomDimensions': {'x': x, 'y': 3, 'z': z}}
-
-
-def prior_scene_with_target(start_x=0, start_z=0):
-    scene = prior_scene(start_x, start_z)
-    target_inst = {
-        'id': '743a91ad-fa2a-42a6-bf6b-2ac737ab7f8f',
-        'type': 'soccer_ball',
-        'mass': 1.0,
-        'salientMaterials': ['rubber'],
-        'debug': {
-            'dimensions': {'x': 0.22, 'y': 0.22, 'z': 0.22},
-            'positionY': 0.11,
-            'shape': ['ball'],
-            'offset': {'x': 0, 'y': 0.11, 'z': 0},
-            'materialCategory': [],
-            'color': ['black', 'white']
-        },
-        'moveable': True,
-        'pickupable': True,
-        'shows': [{
-            'rotation': {'x': 0, 'y': 45, 'z': 0},
-            'position': {'x': -1.03, 'y': 0.11, 'z': 4.08},
-            'boundingBox': ObjectBounds(box_xz=[
-                Vector3d(**{'x': -0.8744, 'y': 0, 'z': 4.08}),
-                Vector3d(**{'x': -1.03, 'y': 0, 'z': 3.9244}),
-                Vector3d(**{'x': -1.1856, 'y': 0, 'z': 4.08}),
-                Vector3d(**{'x': -1.03, 'y': 0, 'z': 4.2356})
-            ], max_y=0.22, min_y=0),
-            'stepBegin': 0,
-            'scale': {'x': 1, 'y': 1, 'z': 1}
-        }],
-        'materials': []
-    }
-
-    scene["objects"] = [target_inst]
-    goal = {
-        "metadata": {
-            "target": {
-                "id": "743a91ad-fa2a-42a6-bf6b-2ac737ab7f8f"
-            }
-        },
-        "last_step": 1000,
-        "category": "retrieval"
-    }
-    scene["goal"] = goal
-    target_defn = specific_objects.create_soccer_ball()
-    target_loc = target_inst['shows'][0]
-    t = InstanceDefinitionLocationTuple(target_inst, target_defn, target_loc)
-    ObjectRepository.get_instance().clear()
-    ObjectRepository.get_instance().add_to_labeled_objects(t, TARGET_LABEL)
-    return scene
+from .ile_helper import prior_scene, prior_scene_with_target
 
 
 @pytest.fixture(autouse=True)
@@ -105,7 +37,7 @@ def test_valid_path_no_obstacles():
     assert component.check_valid_path
     assert component.get_check_valid_path()
 
-    component.update_ile_scene(prior_scene_with_target())
+    component.update_ile_scene(prior_scene_with_target(add_to_repo=True))
     assert component.last_distance == pytest.approx(4.2, 0.1)
     # second path entry is location of target
     assert component.last_path == [(0, 0), (-1.03, 4.08)]
@@ -117,16 +49,27 @@ def test_valid_path_no_target():
     assert component.check_valid_path
     assert component.get_check_valid_path()
 
-    with pytest.raises(ILEConfigurationException):
-        component.update_ile_scene(prior_scene())
+    component.update_ile_scene(prior_scene())
+    assert component._delayed_target
+
+
+def test_valid_path_no_valid_performer_start():
+    component = ValidPathComponent({'check_valid_path': True})
+    scene = prior_scene_with_target()
+    scene.set_performer_start_position(x=10, y=0.5, z=10)
+    assert component.check_valid_path
+
+    assert component.get_check_valid_path()
+
+    component.update_ile_scene(scene)
+    assert component._delayed_performer_start
 
 
 def test_valid_path_blocked_by_holes():
     component = ValidPathComponent({'check_valid_path': True})
     scene = prior_scene_with_target()
-    scene['holes'] = scene.get('holes', [])
     # create blocked by holes
-    holes = scene.get('holes')
+    holes = scene.holes
     for i in range(11):
         holes.append({'x': i - 5, 'z': 2})
 
@@ -139,7 +82,7 @@ def test_valid_path_blocked_by_lava():
     scene = prior_scene_with_target()
 
     # create blocked by lava
-    scene['lava'] = [{'x': i - 5, 'z': 2} for i in range(11)]
+    scene.lava = [{'x': i - 5, 'z': 2} for i in range(11)]
 
     with pytest.raises(ILEException):
         component.update_ile_scene(scene)
@@ -148,54 +91,12 @@ def test_valid_path_blocked_by_lava():
 def test_valid_path_blocked_by_platforms():
     component = ValidPathComponent({'check_valid_path': True})
     scene = prior_scene_with_target()
-    scene['objects'] = scene.get('objects', [])
-    # create blocked by holes
-    objs = scene.get('objects')
-    [
-        {
-            "x": 4.9,
-            "y": 0.0,
-            "z": 2.4386
-        },
-        {
-            "x": 4.9,
-            "y": 0.0,
-            "z": 1.5614
-        },
-        {
-            "x": -4.9,
-            "y": 0.0,
-            "z": 1.5614
-        },
-        {
-            "x": -4.9,
-            "y": 0.0,
-            "z": 2.4386
-        },
-        {
-            "x": 4.9,
-            "y": 0.5,
-            "z": 2.4386
-        },
-        {
-            "x": 4.9,
-            "y": 0.5,
-            "z": 1.5614
-        },
-        {
-            "x": -4.9,
-            "y": 0.5,
-            "z": 1.5614
-        },
-        {
-            "x": -4.9,
-            "y": 0.5,
-            "z": 2.4386
-        }
-    ]
-
-    bb = ObjectBounds([Vector3d(4.9, 0, 2.4386), Vector3d(4.9, 0, -2.4386),
-                       Vector3d(-4.9, 0, -2.4386), Vector3d(-4.9, 0, 2.4386)],
+    # create blocked by platform
+    objs = scene.objects
+    bb = ObjectBounds([Vector3d(x=4.9, y=0, z=2.4386),
+                       Vector3d(x=4.9, y=0, z=-2.4386),
+                       Vector3d(x=-4.9, y=0, z=-2.4386),
+                       Vector3d(x=-4.9, y=0, z=2.4386)],
                       max_y=2.0, min_y=0.0)
 
     platform = {
@@ -215,7 +116,10 @@ def test_valid_path_blocked_by_platforms():
                 "y": 0.5,
                 "z": 0.8772
             },
-            "random_position": False
+            "random_position": False,
+            "labels": [
+                "platforms"
+            ]
         },
         "mass": 537,
         "materials": [
@@ -250,16 +154,370 @@ def test_valid_path_blocked_by_platforms():
         component.update_ile_scene(scene)
 
 
+def test_valid_path_blocked_by_ramp():
+    component = ValidPathComponent({'check_valid_path': True})
+    scene = prior_scene_with_target()
+    # create blocked by ramp
+    objs = scene.objects
+    bb = ObjectBounds([Vector3d(x=4.9, y=0, z=2.4386),
+                       Vector3d(x=4.9, y=0, z=-2.4386),
+                       Vector3d(x=-4.9, y=0, z=-2.4386),
+                       Vector3d(x=-4.9, y=0, z=2.4386)],
+                      max_y=2.0, min_y=0.0)
+
+    ramp = {
+        "id": "ramp_8c30bd12-0f0f-494f-a127-de362a54e79d",
+        "type": "triangle",
+        "debug": {
+            "color": [
+              "red"
+            ],
+            "info": [
+                "red",
+                "ramp",
+                "red ramp"
+            ],
+            "dimensions": {
+                "x": 9.8,
+                "y": 0.5,
+                "z": 0.8772
+            },
+            "random_position": False,
+            "labels": [
+                "ramps"
+            ]
+        },
+        "mass": 537,
+        "materials": [
+            "UnityAssetStore/Kindergarten_Interior/Models/Materials/color 1"],
+        "kinematic": True,
+        "structure": True,
+        "shows": [
+            {
+                "stepBegin": 0,
+                "position": {
+                    "x": 0,
+                    "y": 0.25,
+                    "z": 2
+                },
+                "rotation": {
+                    "x": 0,
+                    "y": 0,
+                    "z": 0
+                },
+                "scale": {
+                    "x": 9.8,
+                    "y": 0.5,
+                    "z": 0.8772
+                },
+                "boundingBox": bb
+            }
+        ]
+    }
+    objs.append(ramp)
+
+    with pytest.raises(ILEException):
+        component.update_ile_scene(scene)
+
+
+def test_valid_path_with_platform_and_ramp():
+    platform_bb = ObjectBounds([Vector3d(x=2.5, y=0, z=-1.5),
+                                Vector3d(x=2.5, y=0, z=-2.5),
+                                Vector3d(x=1.5, y=0, z=-2.5),
+                                Vector3d(x=1.5, y=0, z=-1.5)],
+                               max_y=0.5, min_y=0.0)
+
+    ramp_bb = ObjectBounds([Vector3d(x=2.5, y=0, z=-1.6343),
+                            Vector3d(x=3.0177, y=0, z=-1.6343),
+                            Vector3d(x=3.0177, y=0, z=-2.4928),
+                            Vector3d(x=2.5, y=0, z=-2.4928)],
+                           max_y=0.5, min_y=0.0)
+    component = ValidPathComponent({'check_valid_path': True})
+    scene = prior_scene_with_target()
+    scene.set_performer_start_position(x=1.9, y=0.5, z=-2.009)
+    scene.set_performer_start_rotation(y=225)
+
+    objs = scene.objects
+
+    platform = {
+        "id": "platform_34a5ce6b-8d0d-476f-a82f-74d18ca7e0c0",
+        "type": "cube",
+        "debug": {
+            "color": [
+              "red"
+            ],
+            "info": [
+                "red",
+                "platform",
+                "red platform"
+            ],
+            "dimensions": {
+                "x": 1,
+                "y": 0.5,
+                "z": 1
+            },
+            "random_position": False,
+            "labels": [
+                "platforms",
+                "start_structure",
+                "connected_to_ramp"
+            ],
+            "gaps": {
+                "right": [
+                    {
+                        "high": 0.8657,
+                        "low": 0.0072
+                    }
+                ]
+            }
+        },
+        "mass": 62,
+        "materials": ["AI2-THOR/Materials/Ceramics/RedBrick"],
+        "kinematic": True,
+        "structure": True,
+        "lips": {
+            "front": False,
+            "back": False,
+            "left": False,
+            "right": False
+        },
+        "shows": [
+            {
+                "stepBegin": 0,
+                "position": {
+                    "x": 2,
+                    "y": 0.25,
+                    "z": -2
+                },
+                "rotation": {
+                    "x": 0,
+                    "y": 0,
+                    "z": 0
+                },
+                "scale": {
+                    "x": 1,
+                    "y": 0.5,
+                    "z": 1
+                },
+                "boundingBox": platform_bb
+            }
+        ]
+    }
+    ramp = {
+        "id": "ramp_c72350a6-c113-4f51-b061-b041cfd7b1a3",
+        "type": "triangle",
+        "debug": {
+            "color": [
+              "red"
+            ],
+            "info": [
+                "red",
+                "ramp",
+                "ramp_44.00360316240082_degree",
+                "red ramp",
+                "red ramp_44.00360316240082_degree"
+            ],
+            "dimensions": {
+                "x": 0.8585,
+                "y": 0.5,
+                "z": 0.5177
+            },
+            "random_position": True,
+            "labels": [
+                "ramps",
+                "bidirectional"
+            ]
+        },
+        "mass": 28,
+        "materials": ["AI2-THOR/Materials/Ceramics/RedBrick"],
+        "kinematic": True,
+        "structure": True,
+        "shows": [
+            {
+                "stepBegin": 0,
+                "position": {
+                    "x": 2.7588,
+                    "y": 0.25,
+                    "z": -2.0635
+                },
+                "rotation": {
+                    "x": 0,
+                    "y": 270,
+                    "z": 0
+                },
+                "scale": {
+                    "x": 0.8585,
+                    "y": 0.5,
+                    "z": 0.5177
+                },
+                "boundingBox": ramp_bb
+            }
+        ]
+    }
+    objs.append(platform)
+    objs.append(ramp)
+
+    component.update_ile_scene(scene)
+    assert component.last_distance == pytest.approx(9.097656235484049)
+
+
+def test_valid_path_with_platform_and_ramp_delayed():
+    platform_bb = ObjectBounds([Vector3d(x=2.5, y=0, z=-1.5),
+                                Vector3d(x=2.5, y=0, z=-2.5),
+                                Vector3d(x=1.5, y=0, z=-2.5),
+                                Vector3d(x=1.5, y=0, z=-1.5)],
+                               max_y=0.5, min_y=0.0)
+
+    ramp_bb = ObjectBounds([Vector3d(x=2.5, y=0, z=-1.6343),
+                            Vector3d(x=3.0177, y=0, z=-1.6343),
+                            Vector3d(x=3.0177, y=0, z=-2.4928),
+                            Vector3d(x=2.5, y=0, z=-2.4928)],
+                           max_y=0.5, min_y=0.0)
+    component = ValidPathComponent({'check_valid_path': True})
+    scene = prior_scene_with_target()
+    # start with invalid performer position
+    scene.set_performer_start_position(x=10, y=0.5, z=10)
+    scene.set_performer_start_rotation(y=225)
+
+    objs = scene.objects
+
+    platform = {
+        "id": "platform_34a5ce6b-8d0d-476f-a82f-74d18ca7e0c0",
+        "type": "cube",
+        "debug": {
+            "color": [
+              "red"
+            ],
+            "info": [
+                "red",
+                "platform",
+                "red platform"
+            ],
+            "dimensions": {
+                "x": 1,
+                "y": 0.5,
+                "z": 1
+            },
+            "random_position": False,
+            "labels": [
+                "platforms",
+                "start_structure",
+                "connected_to_ramp"
+            ],
+            "gaps": {
+                "right": [
+                    {
+                        "high": 0.8657,
+                        "low": 0.0072
+                    }
+                ]
+            }
+        },
+        "mass": 62,
+        "materials": ["AI2-THOR/Materials/Ceramics/RedBrick"],
+        "kinematic": True,
+        "structure": True,
+        "lips": {
+            "front": False,
+            "back": False,
+            "left": False,
+            "right": False
+        },
+        "shows": [
+            {
+                "stepBegin": 0,
+                "position": {
+                    "x": 2,
+                    "y": 0.25,
+                    "z": -2
+                },
+                "rotation": {
+                    "x": 0,
+                    "y": 0,
+                    "z": 0
+                },
+                "scale": {
+                    "x": 1,
+                    "y": 0.5,
+                    "z": 1
+                },
+                "boundingBox": platform_bb
+            }
+        ]
+    }
+    ramp = {
+        "id": "ramp_c72350a6-c113-4f51-b061-b041cfd7b1a3",
+        "type": "triangle",
+        "debug": {
+            "color": [
+              "red"
+            ],
+            "info": [
+                "red",
+                "ramp",
+                "ramp_44.00360316240082_degree",
+                "red ramp",
+                "red ramp_44.00360316240082_degree"
+            ],
+            "dimensions": {
+                "x": 0.8585,
+                "y": 0.5,
+                "z": 0.5177
+            },
+            "random_position": True,
+            "labels": [
+                "ramps",
+                "bidirectional"
+            ]
+        },
+        "mass": 28,
+        "materials": ["AI2-THOR/Materials/Ceramics/RedBrick"],
+        "kinematic": True,
+        "structure": True,
+        "shows": [
+            {
+                "stepBegin": 0,
+                "position": {
+                    "x": 2.7588,
+                    "y": 0.25,
+                    "z": -2.0635
+                },
+                "rotation": {
+                    "x": 0,
+                    "y": 270,
+                    "z": 0
+                },
+                "scale": {
+                    "x": 0.8585,
+                    "y": 0.5,
+                    "z": 0.5177
+                },
+                "boundingBox": ramp_bb
+            }
+        ]
+    }
+    objs.append(platform)
+    objs.append(ramp)
+
+    component.update_ile_scene(scene)
+    assert component._delayed_performer_start
+    assert component.get_num_delayed_actions() == 1
+
+    scene.set_performer_start_position(x=1.9, y=0.5, z=-2.009)
+
+    scene = component.run_delayed_actions(scene)
+    assert component.last_distance == pytest.approx(9.097656235484049)
+
+
 def test_valid_path_with_lava_and_holes():
     component = ValidPathComponent({'check_valid_path': True})
-    scene = prior_scene_with_target(-3, -3)
-    scene['holes'] = scene.get('holes', [])
+    scene = prior_scene_with_target(start_x=-3, start_z=-3)
     # create blocked by holes
-    holes = scene.get('holes')
+    holes = scene.holes
     for i in range(8):
         holes.append({'x': i - 5, 'z': 3})
 
-    scene['lava'] = [{'x': i - 3, 'z': 0} for i in range(8)]
+    scene.lava = [{'x': i - 3, 'z': 0} for i in range(8)]
 
     component.update_ile_scene(scene)
     assert component.last_distance == pytest.approx(15, 0.1)

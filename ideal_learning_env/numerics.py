@@ -84,9 +84,9 @@ class VectorFloatConfig(ConverterClass):
     # Override
     def convert_value(self) -> Vector3d:
         return Vector3d(
-            choose_random(self.x, float),
-            choose_random(self.y, float),
-            choose_random(self.z, float)
+            x=choose_random(self.x, float),
+            y=choose_random(self.y, float),
+            z=choose_random(self.z, float)
         )
 
 
@@ -118,7 +118,12 @@ class VectorIntConfig(ConverterClass):
     # Override
     def convert_value(self) -> Vector3d:
         return Vector3d(
-            choose_random(self.x, int),
-            choose_random(self.y, int),
-            choose_random(self.z, int)
+            x=choose_random(self.x, int),
+            y=choose_random(self.y, int),
+            z=choose_random(self.z, int)
         )
+
+
+RandomizableVectorFloat3d = Union[VectorFloatConfig, List[VectorFloatConfig]]
+RandomizableInt = Union[int, MinMaxInt, List[Union[int, MinMaxInt]]]
+RandomizableFloat = Union[float, MinMaxFloat, List[Union[float, MinMaxFloat]]]

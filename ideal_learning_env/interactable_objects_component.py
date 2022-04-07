@@ -19,7 +19,12 @@ from generator import (
     materials,
     specific_objects,
 )
+from generator.scene import Scene
 from ideal_learning_env.defs import ILEDelayException
+from ideal_learning_env.feature_creation_service import (
+    FeatureCreationService,
+    FeatureTypes,
+)
 
 from .choosers import choose_counts, choose_random
 from .components import ILEComponent
@@ -31,8 +36,7 @@ from .defs import (
     find_bounds,
     return_list,
 )
-from .goal_services import get_target_object
-from .interactable_object_config import (
+from .interactable_object_service import (
     InteractableObjectConfig,
     KeywordLocationConfig,
 )
@@ -42,7 +46,6 @@ from .object_services import (
     KeywordLocation,
     MaterialRestrictions,
     ObjectRepository,
-    add_random_placement_tag,
 )
 from .validators import ValidateNumber, ValidateOptions
 
@@ -110,7 +113,8 @@ class SpecificInteractableObjectsComponent(ILEComponent):
     """
     _delayed_templates = []
 
-    @ile_config_setter(validator=ValidateNumber(props=['num'], min_value=1))
+    @ile_config_setter(validator=ValidateNumber(
+        props=['num'], min_value=1, null_ok=True))
     @ile_config_setter(validator=ValidateOptions(
         props=['material'],
         options=(materials.ALL_CONFIGURABLE_MATERIAL_LISTS_AND_STRINGS)
@@ -126,7 +130,6 @@ class SpecificInteractableObjectsComponent(ILEComponent):
     def update_ile_scene(self, scene: Dict[str, Any]) -> Dict[str, Any]:
         logger.info('Configuring specific interactable objects...')
 
-        scene['objects'] = scene.get('objects', [])
         bounds = find_bounds(scene)
         self._delayed_templates = []
         templates = return_list(self.specific_interactable_objects)
@@ -140,56 +143,73 @@ class SpecificInteractableObjectsComponent(ILEComponent):
         return scene
 
     def run_delayed_actions(self, scene: Dict[str, Any]) -> Dict[str, Any]:
-        scene['objects'] = scene.get('objects', [])
         bounds = find_bounds(scene)
         templates = self._delayed_templates
         self._delayed_templates = []
-        for template in templates:
+        for template, _ in templates:
             self._add_object_from_template(scene, bounds, template)
         return scene
 
     def get_num_delayed_actions(self) -> bool:
         return len(self._delayed_templates)
 
+    def get_delayed_action_error_strings(self) -> List[str]:
+        return [str(err) for _, err in self._delayed_templates]
+
     def _add_object_from_template(
         self,
-        scene: Dict[str, Any],
+        scene: Scene,
         bounds: List[ObjectBounds],
         object_config: InteractableObjectConfig
     ) -> None:
+        # Will automatically update the bounds list.
         try:
-            # Will automatically update the bounds list.
-
-            # If identical_to is used, pick that
-            # object's shape/scale/material
-            if(object_config.identical_to):
-                obj_label = object_config.identical_to
+            # If identical_to is used, pick that object's shape/scale/material.
+            # Otherwise, if identical_except_color is used, pick that object's
+            # shape/scale, but not its material.
+            cannot_have_same_material = False
+            if(
+                object_config.identical_to or
+                object_config.identical_except_color
+            ):
+                obj_label = (
+                    object_config.identical_to or
+                    object_config.identical_except_color
+                )
                 obj_repo = ObjectRepository.get_instance()
                 obj_to_use = obj_repo.get_one_from_labeled_objects(obj_label)
 
-                if(obj_to_use):
-                    object_config.shape = obj_to_use.definition.type
-                    object_config.scale = obj_to_use.definition.scale
+                if not obj_to_use:
+                    prop = (
+                        'identical_to' if object_config.identical_to else
+                        'identical_except_color'
+                    )
+                    raise ILEDelayException(
+                        f"Failed to find object with {prop} label: {obj_label}"
+                    )
+
+                object_config.shape = obj_to_use.definition.type
+                object_config.scale = obj_to_use.definition.scale
+                if object_config.identical_to:
                     object_config.material = obj_to_use.definition.materials
                 else:
-                    raise ILEException(
-                        f"Failed to find object with identical_to label "
-                        f"{object_config.identical_to}")
+                    cannot_have_same_material = True
 
-            new_obj = object_config.create_instance(
-                scene['roomDimensions'],
-                scene['performerStart'],
+            obj = FeatureCreationService.create_feature(
+                scene,
+                FeatureTypes.INTERACTABLE,
+                object_config,
                 bounds
-            )
-            if not new_obj:
-                raise ILEException(
-                    f'Failed to generate specific interactable object; please '
-                    f'try configuring fewer such objects:\n{object_config}'
-                )
-            add_random_placement_tag(new_obj, object_config)
-            scene['objects'].append(new_obj)
-        except ILEDelayException:
-            self._delayed_templates.append(object_config)
+            )[0]
+
+            if cannot_have_same_material:
+                if obj_to_use.definition.materials == obj['materials']:
+                    raise ILEException(
+                        'Random object accidentally matches in color'
+                    )
+
+        except ILEDelayException as e:
+            self._delayed_templates.append((object_config, e))
 
 
 class RandomInteractableObjectsComponent(ILEComponent):
@@ -226,24 +246,20 @@ class RandomInteractableObjectsComponent(ILEComponent):
     def update_ile_scene(self, scene: Dict[str, Any]) -> Dict[str, Any]:
         logger.info('Configuring random interactable objects...')
 
-        scene['objects'] = scene.get('objects', [])
         bounds = find_bounds(scene)
         num_objects = self.get_num_random_interactable_objects()
         logger.trace(
             f'Creating {num_objects} random interactable objects...'
         )
 
-        for n in range(num_objects):
+        for _ in range(num_objects):
             object_config = InteractableObjectConfig()
-            instance = object_config.create_instance(
-                scene['roomDimensions'],
-                scene['performerStart'],
-                bounds
-            )
+            instance = FeatureCreationService().create_feature(
+                scene, FeatureTypes.INTERACTABLE, object_config, bounds
+            )[0]
+
             debug = instance.get('debug', {})
             debug['random_position'] = True
-            scene['objects'].append(instance)
-            bounds.append(instance['shows'][0]['boundingBox'])
 
         return scene
 
@@ -267,6 +283,11 @@ class KeywordObjectsConfig():
     - `keyword` (string, or list of strings): The type of object, like
     confusor, container, obstacle, or occluder.
     If an array is given, one will be chosen for each creation of this group.
+        - `"asymmetric_containers"`: Asymmetric open-topped containers.
+        Subset of `"open_topped_containers"`. Used in interactive support
+        relations tasks.
+        - `"bins"`: Bin-like containers. Subset of `"open_topped_containers"`.
+        Used in interactive spatial reorientation tasks.
         - `"confusors"`: Objects that are similar to the target in two of the
         following: color, shape, size.
         - `"containers"`: Receptacles that can contain other objects and can
@@ -279,6 +300,10 @@ class KeywordObjectsConfig():
         other objects and can open and close, like chests.  These containers
         will not be large enough to contain the target.  If a goal target does
         not exist, generation will fail.
+        - `"context"`: Objects (also called "distractors") that are small,
+        pickupable, and serve to clutter the room to possibly distract the AI.
+        They are never the same shape as the target object, if the scene has a
+        goal with a target object.
         - `"obstacles"`: Objects that prevent movement through/under them but
         allow sight through them, like chairs or tables with four individual
         legs.
@@ -286,12 +311,11 @@ class KeywordObjectsConfig():
         AND sight through them, like sofas or bookcases with solid back panels.
         This is completely different from the occluders in passive
         intuitive physics scenes.
-        - `"context"`: Objects (also called "distractors") that are small,
-        pickupable, and serve to clutter the room to possibly distract the AI.
-        They are never the same shape as the target object, if the scene has a
-        goal with a target object.
         - `"open_topped_containers"`: Objects that can contain other objects
         but have no lid and open tops instead.
+        - `"symmetric_containers"`: Symmetric open-topped containers.
+        Subset of `"open_topped_containers"`. Used in interactive support
+        relations tasks.
     - `num` (int, or list of ints, or [MinMaxInt](#MinMaxInt) dict, or list of
     MinMaxInt dicts): The number of this object the user wants to create.
     - `keyword_location`: ([KeywordLocationConfig](#KeywordLocationConfig)):
@@ -333,16 +357,19 @@ class RandomKeywordObjectsComponent(ILEComponent):
     All objects created here will be given the following labels.  For more
     information see ([InteractableObjectConfig](#InteractableObjectConfig))
     for more information on labels.
+      - asymmetric_containers: keywords_asymmetric_containers
+      - bins: keywords_bins
       - confusors: keywords_confusors
       - containers: keywords_containers
       - containers_can_contain_target:
           keywords_containers, keywords_containers_can_contain_target
       - containers_cannot_contain_target:
           keywords_containers, keywords_containers_cannot_contain_target
+      - context: keywords_context
       - obstacles: keywords_obstacles
       - occluders: keywords_occluders
-      - context: keywords_context
       - open_topped_containers: keywords_open_topped_containers
+      - symmetric_containers: keywords_symmetric_containers
 
     Simple Example:
     ```
@@ -385,23 +412,29 @@ class RandomKeywordObjectsComponent(ILEComponent):
     Note: Creating too many random objects can increase the chance of failure.
     """
 
+    LABEL_KEYWORDS_ASYMMETRIC_CONTAINERS = "keywords_asymmetric_containers"
+    LABEL_KEYWORDS_BINS = "keywords_bins"
     LABEL_KEYWORDS_CONFUSORS = "keywords_confusors"
     LABEL_KEYWORDS_CONTAINERS = "keywords_containers"
     LABEL_KEYWORDS_CONTAINERS_CAN_CONTAIN_TARGET = "keywords_containers_can_contain_target"  # noqa
     LABEL_KEYWORDS_CONTAINERS_CANNOT_CONTAIN_TARGET = "keywords_containers_cannot_contain_target"  # noqa
+    LABEL_KEYWORDS_CONTEXT = "keywords_context"
     LABEL_KEYWORDS_OBSTACLES = "keywords_obstacles"
     LABEL_KEYWORDS_OCCLUDERS = "keywords_occluders"
-    LABEL_KEYWORDS_CONTEXT = "keywords_context"
     LABEL_KEYWORDS_OPEN_TOPPED_CONTAINERS = "keywords_open_topped_containers"
+    LABEL_KEYWORDS_SYMMETRIC_CONTAINERS = "keywords_symmetric_containers"
 
+    KEYWORDS_ASYMMETRIC_CONTAINERS = "asymmetric_containers"
+    KEYWORDS_BINS = "bins"
     KEYWORDS_CONFUSORS = "confusors"
     KEYWORDS_CONTAINERS = "containers"
+    KEYWORDS_CONTEXT = "context"
     KEYWORDS_CONTAINERS_CAN_CONTAIN_TARGET = "containers_can_contain_target"
     KEYWORDS_CONTAINERS_CANNOT_CONTAIN_TARGET = "containers_cannot_contain_target"  # noqa
     KEYWORDS_OBSTACLES = "obstacles"
     KEYWORDS_OCCLUDERS = "occluders"
-    KEYWORDS_CONTEXT = "context"
     KEYWORDS_OPEN_TOPPED_CONTAINERS = "open_topped_containers"
+    KEYWORDS_SYMMETRIC_CONTAINERS = "symmetric_containers"
 
     FULL_KEYWORD_LIST = []
 
@@ -415,26 +448,33 @@ class RandomKeywordObjectsComponent(ILEComponent):
 
     def __init__(self, data: Dict[str, Any]):
         self.FULL_KEYWORD_LIST = [
+            self.KEYWORDS_ASYMMETRIC_CONTAINERS,
+            self.KEYWORDS_BINS,
+            self.KEYWORDS_CONTEXT,
             self.KEYWORDS_CONFUSORS,
             self.KEYWORDS_CONTAINERS,
             self.KEYWORDS_CONTAINERS_CAN_CONTAIN_TARGET,
             self.KEYWORDS_CONTAINERS_CANNOT_CONTAIN_TARGET,
             self.KEYWORDS_OBSTACLES,
             self.KEYWORDS_OCCLUDERS,
-            self.KEYWORDS_CONTEXT,
-            self.KEYWORDS_OPEN_TOPPED_CONTAINERS]
+            self.KEYWORDS_OPEN_TOPPED_CONTAINERS,
+            self.KEYWORDS_SYMMETRIC_CONTAINERS
+        ]
         super().__init__(data)
 
     # Override
     def update_ile_scene(self, scene: Dict[str, Any]) -> Dict[str, Any]:
         logger.info('Configuring random keyword objects...')
 
-        scene['objects'] = scene.get('objects', [])
         bounds = find_bounds(scene)
         templates = return_list(self.keyword_objects, self.DEFAULT_VALUE)
         using_default = (templates == self.DEFAULT_VALUE)
 
         switcher = {
+            self.KEYWORDS_ASYMMETRIC_CONTAINERS:
+                self._add_asymmetric_container,
+            self.KEYWORDS_BINS: self._add_bin_container,
+            self.KEYWORDS_CONTEXT: self._add_context,
             self.KEYWORDS_CONFUSORS: self._add_confusor,
             self.KEYWORDS_CONTAINERS: self._add_container,
             self.KEYWORDS_CONTAINERS_CAN_CONTAIN_TARGET:
@@ -443,9 +483,9 @@ class RandomKeywordObjectsComponent(ILEComponent):
                 self._add_container_target_invalid,
             self.KEYWORDS_OBSTACLES: self._add_obstacle,
             self.KEYWORDS_OCCLUDERS: self._add_occluder,
-            self.KEYWORDS_CONTEXT: self._add_context,
             self.KEYWORDS_OPEN_TOPPED_CONTAINERS:
                 self._add_open_topped_container,
+            self.KEYWORDS_SYMMETRIC_CONTAINERS: self._add_symmetric_container
         }
         for template, num in choose_counts(templates):
             logger.trace(
@@ -473,14 +513,48 @@ class RandomKeywordObjectsComponent(ILEComponent):
                     scene, bounds, x, keyword_location=keyword_location)
                 debug = obj.get('debug', {})
                 debug['random_position'] = True
-                scene['objects'].append(obj)
+                scene.objects.append(obj)
                 bounds.append(obj['shows'][0]['boundingBox'])
 
         return scene
 
+    def _add_asymmetric_container(
+        self,
+        scene: Scene,
+        bounds: List[ObjectBounds],
+        index: int,
+        keyword_location: KeywordLocationConfig
+    ) -> Dict[str, Any]:
+        return self._add_special_container(
+            scene,
+            bounds,
+            index,
+            keyword_location,
+            'asymmetric container',
+            self.LABEL_KEYWORDS_ASYMMETRIC_CONTAINERS,
+            specific_objects.get_container_asymmetric_definition_dataset()
+        )
+
+    def _add_bin_container(
+        self,
+        scene: Scene,
+        bounds: List[ObjectBounds],
+        index: int,
+        keyword_location: KeywordLocationConfig
+    ) -> Dict[str, Any]:
+        return self._add_special_container(
+            scene,
+            bounds,
+            index,
+            keyword_location,
+            'bin container',
+            self.LABEL_KEYWORDS_BINS,
+            specific_objects.get_container_bin_definition_dataset()
+        )
+
     def _add_confusor(self, scene, bounds, index, keyword_location):
         # Requires target but ILE doesn't support that yet
-        target = get_target_object(scene)
+        target = scene.get_target_object()
         if target is not None:
             dataset = specific_objects.get_interactable_definition_dataset()
 
@@ -511,10 +585,10 @@ class RandomKeywordObjectsComponent(ILEComponent):
     def _add_container(self, scene, bounds, index,
                        contain_target=None, keyword_location=None):
         labels = [self.LABEL_KEYWORDS_CONTAINERS]
-        dataset = specific_objects.get_container_definition_dataset()
+        dataset = specific_objects.get_container_openable_definition_dataset()
 
         if contain_target is not None:
-            target = get_target_object(scene)
+            target = scene.get_target_object()
             if target is None:
                 raise ILEConfigurationException(
                     "ILE configured to add "
@@ -528,7 +602,7 @@ class RandomKeywordObjectsComponent(ILEComponent):
                 else self.LABEL_KEYWORDS_CONTAINERS_CANNOT_CONTAIN_TARGET)
             dim = target['debug']['dimensions']
             target_od = ObjectDefinition(
-                dimensions=Vector3d(dim['x'], dim['y'], dim['z']))
+                dimensions=Vector3d(x=dim['x'], y=dim['y'], z=dim['z']))
 
             def _callback(definition: ImmutableObjectDefinition) -> bool:
                 contain = (
@@ -560,7 +634,7 @@ class RandomKeywordObjectsComponent(ILEComponent):
         is_occluder: bool,
         keyword_location: KeywordLocationConfig
     ):
-        target = get_target_object(scene)
+        target = scene.get_target_object()
         chosen_rotation = None
 
         def _choose_definition_callback() -> ObjectDefinition:
@@ -610,7 +684,7 @@ class RandomKeywordObjectsComponent(ILEComponent):
             scene, bounds, dataset, index, True, keyword_location)
 
     def _add_context(self, scene, bounds, index, keyword_location):
-        target = get_target_object(scene)
+        target = scene.get_target_object()
         targets = []
         if target is not None:
             targets = [target['debug']['shape']]
@@ -628,20 +702,57 @@ class RandomKeywordObjectsComponent(ILEComponent):
             [self.LABEL_KEYWORDS_CONTEXT], keyword_location)
 
     def _add_open_topped_container(
-            self, scene, bounds, index, keyword_location):
+        self,
+        scene: Scene,
+        bounds: List[ObjectBounds],
+        index: int,
+        keyword_location: KeywordLocationConfig
+    ) -> Dict[str, Any]:
+        return self._add_special_container(
+            scene,
+            bounds,
+            index,
+            keyword_location,
+            'open topped container',
+            self.LABEL_KEYWORDS_OPEN_TOPPED_CONTAINERS,
+            specific_objects.get_container_open_topped_definition_dataset()
+        )
+
+    def _add_special_container(
+        self,
+        scene: Scene,
+        bounds: List[ObjectBounds],
+        index: int,
+        keyword_location: KeywordLocationConfig,
+        keyword: str,
+        label: str,
+        dataset: DefinitionDataset
+    ) -> Dict[str, Any]:
         def _choose_definition_callback() -> ObjectDefinition:
-            dataset = (specific_objects.
-                       get_container_open_topped_definition_dataset())
             return dataset.choose_random_definition()
 
-        log_keyword_location_object(
-            'open topped container',
-            keyword_location
-        )
+        log_keyword_location_object(keyword, keyword_location)
 
         return self._generate_instance_with_valid_location(
             scene, bounds, _choose_definition_callback, index,
-            [self.LABEL_KEYWORDS_OPEN_TOPPED_CONTAINERS], keyword_location)
+            [label], keyword_location)
+
+    def _add_symmetric_container(
+        self,
+        scene: Scene,
+        bounds: List[ObjectBounds],
+        index: int,
+        keyword_location: KeywordLocationConfig
+    ) -> Dict[str, Any]:
+        return self._add_special_container(
+            scene,
+            bounds,
+            index,
+            keyword_location,
+            'symmetric container',
+            self.LABEL_KEYWORDS_SYMMETRIC_CONTAINERS,
+            specific_objects.get_container_symmetric_definition_dataset()
+        )
 
     # If not null, each number must be an integer zero or greater.
     @ile_config_setter(validator=ValidateNumber(
@@ -653,7 +764,7 @@ class RandomKeywordObjectsComponent(ILEComponent):
 
     def _generate_instance_with_valid_location(
         self,
-        scene: Dict[str, Any],
+        scene: Scene,
         bounds: List[ObjectBounds],
         choose_definition_callback: Callable[[], ObjectDefinition],
         index: int,
@@ -670,27 +781,27 @@ class RandomKeywordObjectsComponent(ILEComponent):
         MaterialRestrictions.valid_defn_or_raise(defn)
         if keyword_location:
             idl = KeywordLocation.get_keyword_location_object_tuple(
-                keyword_location, defn, scene['performerStart'], bounds,
-                scene['roomDimensions'])
+                keyword_location, defn, scene.performer_start, bounds,
+                scene.room_dimensions)
 
             if labels and idl:
                 object_repo.add_to_labeled_objects(idl, labels)
             return idl.instance
         else:
             for _ in range(MAX_TRIES):
-                defn = shared_config.choose_definition_from_included_shapes(
-                    choose_definition_callback
-                )
-                MaterialRestrictions.valid_defn_or_raise(defn)
                 location = geometry.calc_obj_pos(
-                    scene['performerStart']['position'],
+                    vars(scene.performer_start.position),
                     bounds,
                     defn,
-                    room_dimensions=scene['roomDimensions'],
+                    room_dimensions=vars(scene.room_dimensions),
                     rotation_func=choose_rotation_callback
                 )
                 if location is not None:
                     break
+                defn = shared_config.choose_definition_from_included_shapes(
+                    choose_definition_callback
+                )
+                MaterialRestrictions.valid_defn_or_raise(defn)
             if location is None:
                 raise ILEException(
                     f"Failed to place object {index} after {MAX_TRIES} "

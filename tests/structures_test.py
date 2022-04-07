@@ -882,7 +882,7 @@ def test_create_guide_rail():
     show = rail['shows'][0]
     pos = show['position']
     scale = show['scale']
-    assert pos == {'x': 1, 'y': 0, 'z': 2}
+    assert pos == {'x': 1, 'y': 0.1, 'z': 2}
     assert show['rotation'] == {'x': 0, 'y': 90, 'z': 0}
     assert scale == {'x': 0.2, 'y': 0.2, 'z': 4}
     assert rail['materials'] == [mat[0]]
@@ -901,7 +901,7 @@ def test_create_guilde_rail_around():
     show = rail1['shows'][0]
     pos = show['position']
     scale = show['scale']
-    assert pos == {'x': 4.2, 'y': 0, 'z': 1}
+    assert pos == {'x': 4.2, 'y': 0.1, 'z': 1}
     assert show['rotation'] == {'x': 0, 'y': 180, 'z': 0}
     assert scale == {'x': 0.2, 'y': 0.2, 'z': 3}
 
@@ -912,7 +912,7 @@ def test_create_guilde_rail_around():
     show = rail2['shows'][0]
     pos = show['position']
     scale = show['scale']
-    assert pos == {'x': 1.8, 'y': 0, 'z': 1}
+    assert pos == {'x': 1.8, 'y': 0.1, 'z': 1}
     assert show['rotation'] == {'x': 0, 'y': 180, 'z': 0}
     assert scale == {'x': 0.2, 'y': 0.2, 'z': 3}
     assert rail1['materials'] == rail2['materials'] == [mat[0]]

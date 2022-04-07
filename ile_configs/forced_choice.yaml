@@ -13,7 +13,8 @@ excluded_shapes: soccer_ball
 # Generate a platform bisecting the room.
 shortcut_bisecting_platform: True
 
-# Override default behavior to avoid randomly generating any other structures
-# beside the platform.
+# Override the default to avoid randomly generating other structural objects
+# besides the bisecting platform. Remove these lines if you want additional
+# randomly generated objects.
 random_structural_objects:
     - num: 0

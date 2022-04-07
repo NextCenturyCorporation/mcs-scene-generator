@@ -1,0 +1,80 @@
+# Add a Retrieval goal with a soccer ball as the target object.
+goal:
+    category: retrieval
+    target:
+        shape: soccer_ball
+        scale:
+            min: 1.0
+            max: 3.0
+        # Give the target a semi-random X position near the middle of the room.
+        position:
+            x:
+                min: -1.5
+                max: 1.5
+        position_relative:
+            # Give the target a Z position either in line with the thrower and
+            # rolled object, and will therefore collide with it (50%), or off
+            # by 1.5 or more, and will therefore NOT collide with it (50%).
+            # Change "add_z" to 0 if you want to always generate collisions.
+            - label: rolled_object
+              use_z: true
+              add_z:
+                  - 0
+                  - 0
+                  - min: -2.5
+                    max: -1.5
+                  - min: 1.5
+                    max: 2.5
+
+# Only the target can be a soccer ball.
+excluded_shapes: soccer_ball
+
+# Generate a room that's usually long and thin.
+room_dimensions:
+    x:
+        min: 4
+        max: 10
+    y: 3
+    z: 12
+
+# Start at a semi-random position in the middle of the back of the room, facing
+# directly forward. These settings ensure you always see the target (soccer
+# ball) from your starting position, based on the target's position config.
+performer_start_position:
+    x:
+        min: -0.5
+        max: 0.5
+    y: 0
+    z: -5.5
+performer_start_rotation:
+    x: 0
+    y: 0
+
+# One thrower at a semi-random location (near the middle of the room) rolling a
+# ball of a semi-random size with a semi-random amount of force.
+structural_throwers:
+    - num: 1
+      wall: ['left', 'right']
+      position_wall:
+          min: 0.5
+          max: 2.5
+      height: 0
+      rotation_y: 0
+      rotation_z: 0
+      projectile_labels: rolled_object
+      projectile_shape: ball
+      projectile_scale:
+          min: 0.25
+          max: 0.75
+      throw_force:
+          min: 1000
+          max: 1500
+      throw_step: 1
+
+# Override the default to avoid randomly generating any other objects besides
+# the thrower, the rolled object (ball), and the target (soccer ball).
+# Remove these lines if you want additional randomly generated objects.
+keyword_objects:
+    - num: 0
+random_structural_objects:
+    - num: 0

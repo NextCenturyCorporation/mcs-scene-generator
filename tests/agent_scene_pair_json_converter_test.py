@@ -36,7 +36,8 @@ UNIT_SIZE = [0.025, 0.025]
 
 def create_bounds(x1, x2, z1, z2):
     return ObjectBounds(box_xz=[
-        Vector3d(x, 0, z) for x, z in [(x1, z1), (x1, z2), (x2, z2), (x2, z1)]
+        Vector3d(x=x, y=0, z=z) for x, z in [(x1, z1), (x1, z2),
+                                             (x2, z2), (x2, z1)]
     ], max_y=0, min_y=0)
 
 
@@ -767,8 +768,8 @@ def test_create_goal_object_list_single_object():
 
     # We're not testing this right now, so just use a silly value.
     mock_agent_start_bounds = ObjectBounds(box_xz=[
-        Vector3d(10, 0, 10), Vector3d(10, 0, 12),
-        Vector3d(12, 0, 12), Vector3d(12, 0, 10)
+        Vector3d(x=10, y=0, z=10), Vector3d(x=10, y=0, z=12),
+        Vector3d(x=12, y=0, z=12), Vector3d(x=12, y=0, z=10)
     ], max_y=0, min_y=0)
 
     goal_object_list = _create_goal_object_list(
@@ -836,8 +837,8 @@ def test_create_goal_object_list_multiple_object():
 
     # We're not testing this right now, so just use a silly value.
     mock_agent_start_bounds = ObjectBounds(box_xz=[
-        Vector3d(10, 0, 10), Vector3d(10, 0, 12),
-        Vector3d(12, 0, 12), Vector3d(12, 0, 10)
+        Vector3d(x=10, y=0, z=10), Vector3d(x=10, y=0, z=12),
+        Vector3d(x=12, y=0, z=12), Vector3d(x=12, y=0, z=10)
     ], max_y=0, min_y=0)
 
     goal_object_list = _create_goal_object_list(
@@ -924,8 +925,8 @@ def test_create_goal_object_list_multiple_object_swap_icon():
 
     # We're not testing this right now, so just use a silly value.
     mock_agent_start_bounds = ObjectBounds(box_xz=[
-        Vector3d(10, 0, 10), Vector3d(10, 0, 12),
-        Vector3d(12, 0, 12), Vector3d(12, 0, 10)
+        Vector3d(x=10, y=0, z=10), Vector3d(x=10, y=0, z=12),
+        Vector3d(x=12, y=0, z=12), Vector3d(x=12, y=0, z=10)
     ], max_y=0, min_y=0)
 
     goal_object_list = _create_goal_object_list(
@@ -1009,8 +1010,8 @@ def test_create_goal_object_list_single_object_on_home():
     ]
 
     agent_start_bounds = ObjectBounds(box_xz=[
-        Vector3d(-0.25, 0, -0.25), Vector3d(-0.25, 0, 0.25),
-        Vector3d(0.25, 0, 0.25), Vector3d(0.25, 0, -0.25)
+        Vector3d(x=-0.25, y=0, z=-0.25), Vector3d(x=-0.25, y=0, z=0.25),
+        Vector3d(x=0.25, y=0, z=0.25), Vector3d(x=0.25, y=0, z=-0.25)
     ], max_y=0, min_y=0)
 
     with pytest.raises(exceptions.SceneException):
@@ -1043,8 +1044,8 @@ def test_create_goal_object_list_multiple_object_on_home():
     ]
 
     agent_start_bounds = ObjectBounds(box_xz=[
-        Vector3d(-0.25, 0, -0.25), Vector3d(-0.25, 0, 0.25),
-        Vector3d(0.25, 0, 0.25), Vector3d(0.25, 0, -0.25)
+        Vector3d(x=-0.25, y=0, z=-0.25), Vector3d(x=-0.25, y=0, z=0.25),
+        Vector3d(x=0.25, y=0, z=0.25), Vector3d(x=0.25, y=0, z=-0.25)
     ], max_y=0, min_y=0)
 
     with pytest.raises(exceptions.SceneException):
