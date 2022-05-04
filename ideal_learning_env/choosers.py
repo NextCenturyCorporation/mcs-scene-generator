@@ -50,6 +50,7 @@ def choose_position(
     object_x: float = None,
     object_z: float = None,
     room_x: float = None,
+    room_y: float = None,
     room_z: float = None
 ) -> Vector3d:
     """Choose and return a random position for the given position config or,
@@ -57,20 +58,142 @@ def choose_position(
     if position is None:
         position = VectorFloatConfig()
     position = position if isinstance(position, list) else [position]
+    constrained_positions = []
     for pos in position:
-        if pos.x is None:
-            pos.x = MinMaxFloat(
-                -(room_x / 2.0) + (object_x / 2.0),
-                (room_x / 2.0) - (object_x / 2.0)
+        constrained_x = pos.x
+        constrained_y = pos.y if pos.y is not None else 0
+        constrained_z = pos.z
+        if room_x is not None:
+            constrained_x = _constrain_position_x_z(pos.x, object_x, room_x)
+        if room_y is not None:
+            constrained_y = _constrain_position_y(pos.y, room_y)
+        if room_z is not None:
+            constrained_z = _constrain_position_x_z(pos.z, object_z, room_z)
+        constrained_position = VectorFloatConfig(
+            constrained_x, constrained_y, constrained_z)
+        constrained_positions.append(constrained_position)
+    return choose_random(constrained_positions)
+
+
+def _get_min_max_room_dimensions(room_dim, object_dim):
+    width = object_dim / 2.0
+    min = -(room_dim / 2.0) + width
+    max = (room_dim / 2.0) - width
+    return min, max
+
+
+def _constrain_position_x_z(
+        position: Union[float, MinMaxFloat, List[float]] = None,
+        object_dim: float = None,
+        room_dim: float = None):
+    constrained_position = position
+    if position is None:
+        min, max = _get_min_max_room_dimensions(room_dim, object_dim)
+        constrained_position = MinMaxFloat(min, max)
+    elif isinstance(position, float) or isinstance(position, int):
+        minimum = -(room_dim / 2.0) + (object_dim / 2.0)
+        maximum = (room_dim / 2.0) - (object_dim / 2.0)
+        if position < minimum or position > maximum:
+            raise ILEException(
+                f'Failed to find a valid position {position} '
+                f'with room dimension: {room_dim}'
             )
-        if pos.y is None:
-            pos.y = 0
-        if pos.z is None:
-            pos.z = MinMaxFloat(
-                -(room_z / 2.0) + (object_z / 2.0),
-                (room_z / 2.0) - (object_z / 2.0)
+        constrained_position = position
+    elif isinstance(position, MinMaxFloat):
+        constrained_position = \
+            _constrain_min_max_pos_to_room_dimensions_x_z(
+                position,
+                object_dim,
+                room_dim
             )
-    return choose_random(position)
+    elif isinstance(position, List):
+        original_list = position
+        constrained_position = []
+        for pos in position:
+            is_valid = \
+                _constrain_float_list_to_room_dimension_x_z(
+                    pos, object_dim, room_dim)
+            if is_valid:
+                constrained_position.append(pos)
+        if len(constrained_position) == 0:
+            raise ILEException(
+                f'Failed to find a valid position in list: '
+                f'{original_list} with room dimension: {room_dim}'
+            )
+    return constrained_position
+
+
+def _constrain_position_y(
+        position: Union[float, MinMaxFloat, List[float]] = None,
+        room_dim: float = None):
+    max_y = room_dim - geometry.PERFORMER_HEIGHT
+    constrained_y = position
+    if position is None:
+        constrained_y = 0
+    elif isinstance(position, float) or isinstance(position, int):
+        if not 0 <= position <= max_y:
+            raise ILEException(
+                f'Failed to find a valid position y with: '
+                f'{position} with room dimension: {room_dim}'
+            )
+    elif isinstance(position, MinMaxFloat):
+        constrained_y = _constrain_min_max_y_to_room_height(position, max_y)
+    elif isinstance(position, List):
+        original_list = position
+        constrained_y = []
+        for y in position:
+            is_valid = \
+                _constrain_float_list_y_to_room_height(y, max_y)
+            if is_valid:
+                constrained_y.append(y)
+        if len(constrained_y) == 0:
+            raise ILEException(
+                f'Failed to find a valid position in list: '
+                f'{original_list} with room dimension: {room_dim}'
+            )
+    return constrained_y
+
+
+def _constrain_min_max_y_to_room_height(
+    pos: MinMaxFloat = None,
+    max_y: float = None
+) -> MinMaxFloat:
+    constrained_min = max_y if pos.min > max_y \
+        else 0 if pos.min < 0 else pos.min
+    constrained_max = max_y if pos.max > max_y \
+        else 0 if pos.max < 0 else pos.max
+    return MinMaxFloat(constrained_min, constrained_max)
+
+
+def _constrain_float_list_y_to_room_height(
+    pos: float = None,
+    max_y: float = None,
+) -> float:
+    constrained_pos = max_y if pos > max_y else 0 if pos < 0 else pos
+    return constrained_pos
+
+
+def _constrain_float_list_to_room_dimension_x_z(
+    pos: float = None,
+    object_dim: float = None,
+    room_dim: float = None
+) -> float:
+    min, max = _get_min_max_room_dimensions(room_dim, object_dim)
+    is_valid_pos = min < pos < max
+    return is_valid_pos
+
+
+def _constrain_min_max_pos_to_room_dimensions_x_z(
+    pos: MinMaxFloat = None,
+    object_dim: float = None,
+    room_dim: float = None
+) -> MinMaxFloat:
+    min, max = _get_min_max_room_dimensions(room_dim, object_dim)
+    constrained_max = max if pos.max > max \
+        else min if pos.max < min else pos.max
+    constrained_min = max if pos.min > max \
+        else min if pos.min < min else pos.min
+    return MinMaxFloat(constrained_min, constrained_max)
 
 
 def choose_rotation(

@@ -15,8 +15,14 @@ from ideal_learning_env import (
     VectorFloatConfig,
     VectorIntConfig,
 )
+from ideal_learning_env.numerics import MinMaxFloat, MinMaxInt
 from ideal_learning_env.object_services import ObjectRepository
-from tests.ile_helper import prior_scene, prior_scene_custom_start
+from tests.ile_helper import (
+    add_object_with_position_to_repo,
+    prior_scene,
+    prior_scene_custom_start,
+    prior_scene_with_target,
+)
 
 
 @pytest.fixture(autouse=True)
@@ -101,6 +107,82 @@ def test_global_settings_partial_start_position():
     assert -ext_z <= position.z <= ext_z
 
 
+def test_global_settings_start_position_restrictions():
+    scene = prior_scene()
+    component = GlobalSettingsComponent({
+        "performer_start_position": {
+            "x": MinMaxFloat(-4.75, 4.75),
+            "y": 5.75,
+            "z": [-4.75, -2, 0, 2, 4.75]
+        },
+        "room_dimensions": {
+            "x": MinMaxInt(5, 10),
+            "y": 7,
+            "z": [5, 10]
+        }
+    })
+    scene = component.update_ile_scene(scene)
+    position = scene.performer_start.position
+    assert -4.75 <= position.x <= 4.75
+    assert position.y == 5.75
+    assert position.z in [-2, 0, 2]
+
+    component = GlobalSettingsComponent({
+        "performer_start_position": {
+            "x": MinMaxFloat(-5, 0)
+        },
+        "room_dimensions": {
+            "x": MinMaxInt(5, 10)
+        }
+    })
+    with pytest.raises(ILEException):
+        scene = component.update_ile_scene(scene)
+
+    component = GlobalSettingsComponent({
+        "performer_start_position": {
+            "x": MinMaxFloat(0, 5)
+        },
+        "room_dimensions": {
+            "x": MinMaxInt(5, 10)
+        }
+    })
+    with pytest.raises(ILEException):
+        scene = component.update_ile_scene(scene)
+
+    component = GlobalSettingsComponent({
+        "performer_start_position": {
+            "y": 7
+        },
+        "room_dimensions": {
+            "y": 7
+        }
+    })
+    with pytest.raises(ILEException):
+        scene = component.update_ile_scene(scene)
+
+    component = GlobalSettingsComponent({
+        "performer_start_position": {
+            "z": [-5, 0, 2.5]
+        },
+        "room_dimensions": {
+            "z": [5, 10]
+        }
+    })
+    with pytest.raises(ILEException):
+        scene = component.update_ile_scene(scene)
+
+    component = GlobalSettingsComponent({
+        "performer_start_position": {
+            "z": [0, 2.5, 5]
+        },
+        "room_dimensions": {
+            "z": [5, 10]
+        }
+    })
+    with pytest.raises(ILEException):
+        scene = component.update_ile_scene(scene)
+
+
 def test_global_settings_configured():
     component = GlobalSettingsComponent({
         'ceiling_material': 'Custom/Materials/GreyDrywallMCS',
@@ -169,6 +251,25 @@ def test_global_settings_configured():
 
     # Cleanup
     ILESharedConfiguration.get_instance().set_excluded_shapes([])
+
+
+def test_auto_last_step():
+    component = GlobalSettingsComponent({
+        'auto_last_step': True,
+        'room_dimensions': {'x': 5, 'y': 3, 'z': 10},
+    })
+    scene: Scene = component.update_ile_scene(prior_scene())
+    assert scene.goal['last_step'] == 2000
+
+
+def test_last_step_both_methods():
+    component = GlobalSettingsComponent({
+        'auto_last_step': True,
+        'last_step': 987,
+        'room_dimensions': {'x': 5, 'y': 3, 'z': 10},
+    })
+    scene: Scene = component.update_ile_scene(prior_scene())
+    assert scene.goal['last_step'] == 987
 
 
 def test_global_settings_fail_ceiling_material():
@@ -421,6 +522,109 @@ def test_global_settings_performer_start_rotation_x_and_z_are_none():
     })
     scene = component.update_ile_scene(prior_scene())
     assert scene.performer_start.rotation == Vector3d(x=0, y=-90, z=0)
+
+
+def test_global_settings_performer_look_at_target():
+    component = GlobalSettingsComponent({
+        'performer_start_position': {
+            'x': 4,
+            'z': -4
+        },
+        'performer_start_rotation': {
+            'x': 0,
+            'y': 0
+        },
+        'performer_look_at': 'target',
+        'room_dimensions': {
+            'x': 10,
+            'y': 10,
+            'z': 10
+        }
+    })
+    scene = component.update_ile_scene(
+        prior_scene_with_target(add_to_repo=True))
+    assert scene.performer_start.rotation.x == pytest.approx(3.9188, abs=1e-2)
+    assert scene.performer_start.rotation.y == pytest.approx(
+        -31.9032, abs=1e-2)
+    assert scene.performer_start.rotation.z == 0
+
+
+def test_global_settings_performer_look_at_target_around_the_world():
+    component = GlobalSettingsComponent({
+        'performer_start_position': {
+            'x': 1,
+            'z': -1
+        },
+        'performer_start_rotation': {
+            'x': 0,
+            'y': 0
+        },
+        'performer_look_at': 'test_obj'
+    })
+
+    ObjectRepository.get_instance().clear()
+    add_object_with_position_to_repo("test_obj", 1, 0.5, 1)
+    scene = component.update_ile_scene(prior_scene())
+    assert scene.performer_start.rotation.y == pytest.approx(
+        0, abs=1e-2)
+    assert scene.performer_start.rotation.z == 0
+
+    ObjectRepository.get_instance().clear()
+    add_object_with_position_to_repo("test_obj", 3, 0.5, 1)
+    scene = component.update_ile_scene(prior_scene())
+    assert scene.performer_start.rotation.y == pytest.approx(
+        45, abs=1e-2)
+    assert scene.performer_start.rotation.z == 0
+
+    ObjectRepository.get_instance().clear()
+    add_object_with_position_to_repo("test_obj", 3, 0.5, -1)
+    scene = component.update_ile_scene(prior_scene())
+    assert scene.performer_start.rotation.y == pytest.approx(
+        90, abs=1e-2)
+    assert scene.performer_start.rotation.z == 0
+
+    ObjectRepository.get_instance().clear()
+    add_object_with_position_to_repo("test_obj", 3, 0.5, -3)
+    scene = component.update_ile_scene(prior_scene())
+    assert scene.performer_start.rotation.y == pytest.approx(
+        135, abs=1e-2)
+    assert scene.performer_start.rotation.z == 0
+
+    ObjectRepository.get_instance().clear()
+    add_object_with_position_to_repo("test_obj", 1, 0.5, -3)
+    scene = component.update_ile_scene(prior_scene())
+    assert scene.performer_start.rotation.y == pytest.approx(
+        -180, abs=1e-2)
+    assert scene.performer_start.rotation.z == 0
+
+    ObjectRepository.get_instance().clear()
+    add_object_with_position_to_repo("test_obj", -1, 0.5, -3)
+    scene = component.update_ile_scene(prior_scene())
+    assert scene.performer_start.rotation.y == pytest.approx(
+        -135, abs=1e-2)
+    assert scene.performer_start.rotation.z == 0
+
+    ObjectRepository.get_instance().clear()
+    add_object_with_position_to_repo("test_obj", -1, 0.5, -1)
+    scene = component.update_ile_scene(prior_scene())
+    assert scene.performer_start.rotation.y == pytest.approx(
+        -90, abs=1e-2)
+    assert scene.performer_start.rotation.z == 0
+
+    ObjectRepository.get_instance().clear()
+    add_object_with_position_to_repo("test_obj", -1, 0.5, 1)
+    scene = component.update_ile_scene(prior_scene())
+    assert scene.performer_start.rotation.y == pytest.approx(
+        -45, abs=1e-2)
+    assert scene.performer_start.rotation.z == 0
+
+    ObjectRepository.get_instance().clear()
+    add_object_with_position_to_repo("test_obj", 4, 0.5, -4)
+    scene = component.update_ile_scene(prior_scene())
+    assert scene.performer_start.rotation.x == pytest.approx(3.533, abs=1e-2)
+    assert scene.performer_start.rotation.y == pytest.approx(
+        135, abs=1e-2)
+    assert scene.performer_start.rotation.z == 0
 
 
 def test_global_settings_room_shape_rectangle():

@@ -413,11 +413,10 @@ def verify_object_fall_down(instance, name):
     verify_object_fall_down_position(instance, name)
 
     # Verify object X and Z rotation.
-    expected_rotation_x = 90 if instance['type'] in CYLINDRICAL_SHAPES else 0
     rotation = instance['shows'][0]['rotation']
-    if rotation['x'] != expected_rotation_x:
-        print(f'[ERROR] {name} X ROTATION SHOULD BE {expected_rotation_x} BUT '
-              f'WAS {rotation["x"]}\n{name}={instance}')
+    if rotation['x'] != 0:
+        print(f'[ERROR] {name} X ROTATION SHOULD BE ZERO BUT WAS '
+              f'{rotation["x"]}\n{name}={instance}')
         return False
     if rotation['z'] != 0:
         print(f'[ERROR] {name} Z ROTATION SHOULD BE ZERO BUT WAS '

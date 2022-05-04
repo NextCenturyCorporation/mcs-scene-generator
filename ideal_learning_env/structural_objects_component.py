@@ -172,6 +172,7 @@ class SpecificStructuralObjectsComponent(ILEComponent):
           z:
             min: 0.3
             max: 1.3
+        auto_adjust_platforms: True
     ```
     """
 
@@ -942,13 +943,15 @@ class RandomStructuralObjectsComponent(ILEComponent):
 
     ALL_STRUCTURAL_TYPES = [
         item.name.lower() for item in FeatureTypes if item not in [
-            FeatureTypes.AGENT, FeatureTypes.INTERACTABLE]]
+            FeatureTypes.AGENT, FeatureTypes.INTERACTABLE,
+            FeatureTypes.PARTITION_FLOOR]]
     ALL_STRUCTURAL_TYPES_NO_TARGET = [
         item.name.lower() for item in FeatureTypes
         # The following FeatureTypes need a target object:
         if item not in [FeatureTypes.OCCLUDING_WALLS,
                         FeatureTypes.INTERACTABLE,
-                        FeatureTypes.AGENT]
+                        FeatureTypes.AGENT,
+                        FeatureTypes.PARTITION_FLOOR]
     ]
     # TODO MCS-1206 Include tools here for now, but move them to the default
     #      keyword_objects setting in the future since they're not structures.

@@ -1972,6 +1972,46 @@ def test_generate_location_on_object_centered():
     assert location['position']['y'] == 1
 
 
+def test_generate_location_on_object_thats_too_tall():
+    # Set the performer start in the back of the room facing inward.
+    performer_start = {
+        'position': {'x': -4.5, 'y': 0, 'z': -4.5},
+        'rotation': {'y': 0}
+    }
+    obj = {
+        'debug': {
+            'dimensions': {'x': 0.2, 'y': 0.2, 'z': 0.2},
+            'offset': {'x': 0, 'y': 0, 'z': 0},
+            'positionY': 0,
+            'rotation': {'x': 0, 'y': 0, 'z': 0}
+        }
+    }
+
+    loc = {
+        'position': {'x': 3, 'y': 0, 'z': 4},
+        'rotation': {'x': 0, 'y': 0, 'z': 0}
+    }
+    static_inst = {
+        'debug': {
+            'dimensions': {'x': 1, 'y': 3.5, 'z': 1},
+            'offset': {'x': 0, 'y': 0, 'z': 0},
+            'positionY': 0
+        },
+        'shows': [loc]
+    }
+    static_inst = geometry.move_to_location(static_inst, loc)
+
+    bounds_list = []
+    with pytest.raises(Exception):
+        geometry.generate_location_on_object(
+            obj,
+            static_inst,
+            performer_start,
+            bounds_list,
+            geometry.DEFAULT_ROOM_DIMENSIONS,
+            False)
+
+
 def test_generate_location_in_line_with_object_unreachable_diagonal():
     # Set the performer start in the back of the room facing inward.
     performer_start = {
@@ -2133,7 +2173,7 @@ def test_find_performer_bounds():
     assert vars(actual1.box_xz[1]) == expected1[1]
     assert vars(actual1.box_xz[2]) == expected1[2]
     assert vars(actual1.box_xz[3]) == expected1[3]
-    assert actual1.max_y == 1.08
+    assert actual1.max_y == 1.25
     assert actual1.min_y == 0
 
     expected2 = [
@@ -2145,7 +2185,7 @@ def test_find_performer_bounds():
     assert vars(actual2.box_xz[1]) == expected2[1]
     assert vars(actual2.box_xz[2]) == expected2[2]
     assert vars(actual2.box_xz[3]) == expected2[3]
-    assert actual2.max_y == 2.08
+    assert actual2.max_y == 2.25
     assert actual2.min_y == 1
 
 
@@ -3032,19 +3072,20 @@ def test_move_to_location():
 
 
 def test_generate_floor_area_bounds():
+    buffer = geometry.FLOOR_FEATURE_BOUNDS_BUFFER
     bounds_1 = ObjectBounds(box_xz=[
-        Vector3d(x=0.5, y=0, z=0.5),
-        Vector3d(x=1.5, y=0, z=0.5),
-        Vector3d(x=1.5, y=0, z=1.5),
-        Vector3d(x=0.5, y=0, z=1.5)
+        Vector3d(x=0.5 + buffer, y=0, z=0.5 + buffer),
+        Vector3d(x=1.5 - buffer, y=0, z=0.5 + buffer),
+        Vector3d(x=1.5 - buffer, y=0, z=1.5 - buffer),
+        Vector3d(x=0.5 + buffer, y=0, z=1.5 - buffer)
     ], max_y=100, min_y=0)
     assert geometry.generate_floor_area_bounds(1, 1) == bounds_1
 
     bounds_2 = ObjectBounds(box_xz=[
-        Vector3d(x=-3.5, y=0, z=-3.5),
-        Vector3d(x=-2.5, y=0, z=-3.5),
-        Vector3d(x=-2.5, y=0, z=-2.5),
-        Vector3d(x=-3.5, y=0, z=-2.5)
+        Vector3d(x=-3.5 + buffer, y=0, z=-3.5 + buffer),
+        Vector3d(x=-2.5 - buffer, y=0, z=-3.5 + buffer),
+        Vector3d(x=-2.5 - buffer, y=0, z=-2.5 - buffer),
+        Vector3d(x=-3.5 + buffer, y=0, z=-2.5 - buffer)
     ], max_y=100, min_y=0)
     assert geometry.generate_floor_area_bounds(-3, -3) == bounds_2
 

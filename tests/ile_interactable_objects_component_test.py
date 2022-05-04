@@ -69,6 +69,38 @@ def test_specific_objects_single():
     assert scene.objects[0]['debug']['random_position']
 
 
+def test_specific_objects_on_lava_fail():
+    component = SpecificInteractableObjectsComponent({
+        "specific_interactable_objects": {
+            "position": {
+                "x": 2,
+                "y": 0,
+                "z": 2
+            }
+        }
+    })
+    scene = prior_scene()
+    scene.lava = [{'x': 2, 'z': 2}]
+    with pytest.raises(ILEException):
+        component.update_ile_scene(scene)
+
+
+def test_specific_objects_on_holes_fail():
+    component = SpecificInteractableObjectsComponent({
+        "specific_interactable_objects": {
+            "position": {
+                "x": 1,
+                "y": 0,
+                "z": -3
+            }
+        }
+    })
+    scene = prior_scene()
+    scene.holes = [{'x': 1, 'z': -3}]
+    with pytest.raises(ILEException):
+        component.update_ile_scene(scene)
+
+
 def test_specific_objects_array_single():
     component = SpecificInteractableObjectsComponent({
         "specific_interactable_objects": [{}]
@@ -99,7 +131,7 @@ def test_specific_objects_array_single():
             obj['materials'][0] in materials.ALL_CONFIGURABLE_MATERIAL_STRINGS
         )
     show = obj['shows'][0]
-    # The soccer_ball has scale restrictions.
+    # The soccer_ball has scale restrictions so test them specifically.
     if obj['type'] == 'soccer_ball':
         assert 1 <= show['scale']['x'] == show['scale']['z'] <= 3
     else:
@@ -148,7 +180,11 @@ def test_specific_objects_array_single_num_range():
                 materials.ALL_CONFIGURABLE_MATERIAL_STRINGS
             )
         show = obj['shows'][0]
-        assert show['scale']['x'] == show['scale']['z'] == 1
+        # The soccer_ball has scale restrictions so test them specifically.
+        if obj['type'] == 'soccer_ball':
+            assert 1 <= show['scale']['x'] == show['scale']['z'] <= 3
+        else:
+            assert show['scale']['x'] == show['scale']['z'] == 1
         assert 0 <= show['rotation']['y'] < 450
         assert -25 <= show['position']['x'] < 25
         assert -25 <= show['position']['z'] < 25
@@ -712,7 +748,11 @@ def test_specific_objects_array_multiple():
         for mat in obj['materials']:
             assert mat in materials.ALL_CONFIGURABLE_MATERIAL_STRINGS
         show = obj['shows'][0]
-        assert show['scale']['x'] == show['scale']['z'] == 1
+        # The soccer_ball has scale restrictions so test them specifically.
+        if obj['type'] == 'soccer_ball':
+            assert 1 <= show['scale']['x'] == show['scale']['z'] <= 3
+        else:
+            assert show['scale']['x'] == show['scale']['z'] == 1
         assert 0 <= show['rotation']['y'] <= 450
         assert -10 <= show['position']['x'] < 10
         assert -10 <= show['position']['z'] < 10
@@ -1333,6 +1373,47 @@ def test_random_interactable_objects_types_context_in_containers():
     assert 1 == len(ObjectRepository.get_instance()
                     .get_all_from_labeled_objects(
         RandomKeywordObjectsComponent.LABEL_KEYWORDS_CONTEXT))
+
+
+def test_specific_objects_dimensions():
+    component = SpecificInteractableObjectsComponent({
+        "specific_interactable_objects": [{
+            "num": 1,
+            "shape": "chest_1",
+            "dimensions": 1.0,
+        }]})
+    scene = component.update_ile_scene(prior_scene())
+    obj = scene.objects[0]
+    scale = obj['shows'][0]['scale']
+    # The scale is the inverse of the dimenions listed in base_objects.py when
+    # dimensions is 1.0
+    assert scale['x'] == 1 / 0.83
+    assert scale['y'] == 1 / 0.42
+    assert scale['z'] == 1 / 0.55
+
+
+def test_specific_objects_dimensions_and_scale():
+    component = SpecificInteractableObjectsComponent({
+        "specific_interactable_objects": [{
+            "num": 1,
+            "shape": "soccer_ball",
+            "scale": {
+                "x": 1,
+                "y": 3,
+                "z": 0.5
+            },
+            "dimensions": {
+                "x": 0.33,
+                "y": 0.44,
+                "z": 0.55
+            }
+        }]})
+    scene = component.update_ile_scene(prior_scene())
+    obj = scene.objects[0]
+    scale = obj['shows'][0]['scale']
+    assert scale['x'] == pytest.approx(1.5)
+    assert scale['y'] == pytest.approx(2)
+    assert scale['z'] == pytest.approx(2.5)
 
 
 def test_interactable_objects_with_identical_to_label():

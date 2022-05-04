@@ -145,11 +145,52 @@ def test_choose_position():
 
 
 def test_choose_position_random():
-    result = choose_position(None, 1, 2, 4, 8)
+    result = choose_position(None, 1, 2, 4, 6, 8)
     assert isinstance(result, Vector3d)
     assert -1.5 <= result.x <= 1.5
     assert result.y == 0
     assert -3 <= result.z <= 3
+
+
+def test_choose_position_within_bounds():
+    position = VectorFloatConfig(
+        [-4, -2.5, 0, 2.5, 4],
+        7,
+        MinMaxFloat(-5, 5))
+    room_dimensions = VectorFloatConfig(5, 10, 5)
+    bounds = 0.5
+    result = choose_position(
+        position=position,
+        object_x=bounds,
+        object_z=bounds,
+        room_x=room_dimensions.x,
+        room_y=room_dimensions.y,
+        room_z=room_dimensions.z
+    )
+
+    assert isinstance(result, Vector3d)
+    assert result.x in [-2.5, 0, 2.5]
+    assert result.y == 7
+    assert -2.75 <= result.z <= 2.75
+
+    room_dimensions = VectorFloatConfig(3, 4, 5)
+    position = VectorFloatConfig(
+        1,
+        MinMaxFloat(0, 5),
+        [-5, -2, 0, 2, 5])
+    result = choose_position(
+        position=position,
+        object_x=bounds,
+        object_z=bounds,
+        room_x=room_dimensions.x,
+        room_y=room_dimensions.y,
+        room_z=room_dimensions.z
+    )
+
+    assert isinstance(result, Vector3d)
+    assert result.x == 1
+    assert 0 <= result.y <= 3.75
+    assert result.z in [-2, 0, 2]
 
 
 def test_choose_random():
@@ -427,11 +468,11 @@ def test_choose_shape_material_neither_none_restricted():
 
 def test_choose_shape_material_neither_none_non_restricted():
     shape_input = "sphere"
-    mat_input = "AI2-THOR/Materials/Fabrics/BedroomCarpet"
+    mat_input = "AI2-THOR/Materials/Fabrics/Carpet2"
     shape, mat = choose_shape_material(shape_input, mat_input)
     assert shape == "sphere"
-    assert mat[0] == "AI2-THOR/Materials/Fabrics/BedroomCarpet"
-    assert mat[1] == ['blue']
+    assert mat[0] == "AI2-THOR/Materials/Fabrics/Carpet2"
+    assert mat[1] == ['brown']
 
 
 def test_choose_shape_material_neither_none_invalid():

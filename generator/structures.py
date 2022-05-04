@@ -9,7 +9,10 @@ from .base_objects import (
     ALL_LARGE_BLOCK_TOOLS,
     LARGE_BLOCK_TOOLS_TO_DIMENSIONS,
 )
-from .geometry import ObjectBounds, create_bounds
+from .geometry import (
+    PERFORMER_HEIGHT,
+    ObjectBounds,
+    create_bounds)
 from .materials import MaterialTuple
 
 ANGLE_BRACE_TEMPLATE = {
@@ -494,14 +497,29 @@ def create_platform(
     scale_x: float,
     scale_y: float,
     scale_z: float,
+    room_dimension_y: int,
     material_tuple: MaterialTuple,
     lips: dict = None,
     position_y_modifier: float = 0,
-    bounds: ObjectBounds = None
+    bounds: ObjectBounds = None,
+    auto_adjust_platform: bool = False
 ) -> Dict[str, Any]:
     """Create and return an instance of a platform."""
     platform = copy.deepcopy(PLATFORM_TEMPLATE)
 
+    buffer = PERFORMER_HEIGHT
+    if auto_adjust_platform:
+        if position_y_modifier > 0:
+            top_of_platform = position_y_modifier + scale_y
+            if top_of_platform > room_dimension_y - buffer:
+                top_of_platform = room_dimension_y - buffer
+                bottom_of_platform = position_y_modifier
+                fixed_y = (top_of_platform + bottom_of_platform) / 2
+                fixed_scale = (top_of_platform - fixed_y) * 2
+                position_y_modifier = fixed_y - fixed_scale / 2
+                scale_y = fixed_scale
+        elif scale_y > room_dimension_y - buffer:
+            scale_y = room_dimension_y - buffer
     lips = platform['lips'] if lips is None else lips if isinstance(
         lips, dict) else lips.__dict__
     platform['lips'] = {

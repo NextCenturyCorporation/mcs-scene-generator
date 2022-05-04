@@ -38,17 +38,15 @@ room_dimensions:
     z: 12
 
 # Start at a semi-random position in the middle of the back of the room, facing
-# directly forward. These settings ensure you always see the target (soccer
+# the target object. These settings ensure you always see the target (soccer
 # ball) from your starting position, based on the target's position config.
 performer_start_position:
     x:
-        min: -0.5
-        max: 0.5
+        min: -4.5
+        max: 4.5
     y: 0
     z: -5.5
-performer_start_rotation:
-    x: 0
-    y: 0
+performer_look_at: target
 
 # One thrower at a semi-random location (near the middle of the room) rolling a
 # ball of a semi-random size with a semi-random amount of force.
@@ -67,8 +65,8 @@ structural_throwers:
           min: 0.25
           max: 0.75
       throw_force:
-          min: 1000
-          max: 1500
+          min: 10
+          max: 15
       throw_step: 1
 
 # Override the default to avoid randomly generating any other objects besides

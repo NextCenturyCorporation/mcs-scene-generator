@@ -241,3 +241,90 @@ def test_random_agent_component_num():
     assert agent['shows'][0]['scale']['x'] == 1
     assert agent['shows'][0]['scale']['y'] == 1
     assert agent['shows'][0]['scale']['z'] == 1
+
+
+def test_random_agent_component_doc_example():
+    scene = Scene()
+    cmp = SpecificAgentComponent({
+        "specific_agents": {
+            "num": 1,
+            "type": "agent_female_02",
+            "agent_settings": {
+                "chest": 2,
+                "eyes": 1
+            },
+            "position": {
+                "x": [1, 0, -1, 0.5, -0.5],
+                "y": 0,
+                "z": [1, 0, -1]
+            },
+            "rotation_y": [0, 10, 350],
+            "actions": [{
+                "step_begin": [1, 2],
+                "step_end": 7,
+                "is_loop_animation": False,
+                "id": ["TPM_clap", "TPM_cry"]
+            }, {
+                "step_begin": [13, 14],
+                "step_end": 17,
+                "is_loop_animation": True,
+                "id": ["TPM_clap", "TPM_cry"]
+            }
+            ],
+            "movement": {
+                "animation": "TPE_walk",
+                "step_begin": [2, 4],
+                "bounds": [{
+                    "x": 2,
+                    "z": 0
+                }, {
+                    "x": 0,
+                    "z": 2
+                }, {
+                    "x": -2,
+                    "z": 0
+                }, {
+                    "x": 0,
+                    "z": -2
+                }
+                ],
+                "num_points": 5,
+                "repeat": True
+            }
+        }})
+    assert cmp.specific_agents
+    assert cmp.get_specific_agents()
+    scene: Scene = cmp.update_ile_scene(scene)
+    assert len(scene.objects) == 1
+    agent = scene.objects[0]
+    assert agent['id'].startswith('agent')
+    assert 'agent_' in agent['type']
+    assert agent['type'] == "agent_female_02"
+    assert agent['shows'][0]['position']['x'] in [1, 0, -1, 0.5, -0.5]
+    assert agent['shows'][0]['position']['y'] == 0
+    assert agent['shows'][0]['position']['z'] in [1, 0, -1]
+    assert agent['shows'][0]['rotation']['x'] == 0
+    assert agent['shows'][0]['rotation']['y'] in [0, 10, 350]
+    assert agent['shows'][0]['rotation']['z'] == 0
+    assert agent['shows'][0]['scale']['x'] == 1
+    assert agent['shows'][0]['scale']['y'] == 1
+    assert agent['shows'][0]['scale']['z'] == 1
+    actions = agent['actions']
+    assert len(actions) == 2
+    actions[0]['stepBegin'] in [1, 2]
+    actions[0]['stepEnd'] == 7
+    actions[0]['isLoopAnimation'] is False
+    actions[0]['id'] in ["TPM_clap", "TPM_cry"]
+    actions[1]['stepBegin'] in [13, 14]
+    actions[1]['stepEnd'] == 17
+    actions[1]['isLoopAnimation'] is True
+    actions[1]['id'] in ["TPM_clap", "TPM_cry"]
+    move = agent['agentMovement']
+    assert move['stepBegin'] in [2, 4]
+    assert move['repeat'] is True
+    seq = move['sequence']
+    assert len(seq) == 5
+    for item in seq:
+        assert item['animation'] == 'TPE_walk'
+        assert -2 <= item['endPoint']['x'] <= 2
+        assert -2 <= item['endPoint']['z'] <= 2

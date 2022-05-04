@@ -14,7 +14,6 @@ from machine_common_sense.config_manager import Vector3d
 from generator import (
     ALL_LARGE_BLOCK_TOOLS,
     MAX_TRIES,
-    DefinitionDataset,
     MaterialTuple,
     ObjectBounds,
     geometry,
@@ -28,7 +27,7 @@ from generator import (
     structures,
 )
 from generator.base_objects import LARGE_BLOCK_TOOLS_TO_DIMENSIONS
-from generator.scene import Scene
+from generator.scene import PartitionFloor, Scene
 from ideal_learning_env.global_settings_component import (
     ROOM_MIN_XZ,
     ROOM_MIN_Y,
@@ -58,7 +57,7 @@ from .choosers import (
     choose_rotation,
     choose_shape_material,
 )
-from .defs import ILEException
+from .defs import ILEException, find_bounds
 from .feature_creation_service import (
     BaseFeatureConfig,
     BaseObjectCreationService,
@@ -147,59 +146,54 @@ LABEL_CONNECTED_TO_RAMP = "connected_to_ramp"
 
 
 def _retrieve_scaled_shapes_from_datasets(
-    datasets: List[DefinitionDataset]
+    shapes_to_scales: Dict[str, List[Vector3d]]
 ) -> Dict[str, List[Union[MinMaxFloat, VectorFloatConfig]]]:
-    """Return a dict mapping each shape in the given datasets to each scale
+    """Return a dict mapping each shape in the given data to each scale
     option, maintaining its aspect ratio, to use as possible default scales."""
     output = {}
-    for dataset in datasets:
-        for definition in dataset.definitions():
-            if definition.type not in output:
-                output[definition.type] = []
-            output[definition.type].append(VectorFloatConfig(
-                x=definition.scale.x,
-                y=definition.scale.y,
-                z=definition.scale.z
-            ))
+    for shape, scales in shapes_to_scales.items():
+        if shape not in output:
+            output[shape] = []
+        output[shape].extend([
+            VectorFloatConfig(x=scale.x, y=scale.y, z=scale.z)
+            for scale in scales
+        ])
     # Override soccer ball scales with specific ILE limitations.
     if 'soccer_ball' in output:
         # Use a single MinMaxFloat to ensure the ball has equal X/Y/Z scales.
-        output[definition.type] = [MinMaxFloat(
+        output['soccer_ball'] = [MinMaxFloat(
             min=SOCCER_BALL_SCALE_MIN,
             max=SOCCER_BALL_SCALE_MAX
         )]
     # Remove duplicate scales from the output.
-    for object_type in output.keys():
+    for shape in output.keys():
         unique_output = []
-        for vector in output[object_type]:
-            if vector not in unique_output:
-                unique_output.append(vector)
-        output[object_type] = unique_output
+        for scale in output[shape]:
+            if scale not in unique_output:
+                unique_output.append(scale)
+        output[shape] = unique_output
     return output
 
 
-DROPPER_SHAPES_TO_SCALES = _retrieve_scaled_shapes_from_datasets(
-    [specific_objects.get_rollable_definition_dataset(True)] +
-    [intuitive_physics_objects.get_fall_down_definition_dataset(True)] +
-    [gravity_support_objects.get_symmetric_target_definition_dataset(True)] +
-    [gravity_support_objects.get_asymmetric_target_definition_dataset(True)]
-)
+DROPPER_SHAPES_TO_SCALES = _retrieve_scaled_shapes_from_datasets({
+    **specific_objects.ROLLABLE_TYPES_TO_SIZES,
+    **intuitive_physics_objects.FALL_DOWN_TYPES_TO_SIZES,
+    **gravity_support_objects.TYPES_TO_SIZES
+})
 DROPPER_SHAPES = sorted(list(DROPPER_SHAPES_TO_SCALES.keys()))
 
-PLACER_SHAPES_TO_SCALES = _retrieve_scaled_shapes_from_datasets(
-    [specific_objects.get_rollable_definition_dataset(True)] +
-    [specific_objects.get_container_symmetric_definition_dataset(True)] +
-    [specific_objects.get_container_asymmetric_definition_dataset(True)] +
-    [intuitive_physics_objects.get_fall_down_definition_dataset(True)] +
-    [gravity_support_objects.get_symmetric_target_definition_dataset(True)] +
-    [gravity_support_objects.get_asymmetric_target_definition_dataset(True)]
-)
+PLACER_SHAPES_TO_SCALES = _retrieve_scaled_shapes_from_datasets({
+    **specific_objects.ROLLABLE_TYPES_TO_SIZES,
+    **specific_objects.CONTAINER_TYPES_TO_SIZES,
+    **intuitive_physics_objects.FALL_DOWN_TYPES_TO_SIZES,
+    **gravity_support_objects.TYPES_TO_SIZES
+})
 PLACER_SHAPES = sorted(list(PLACER_SHAPES_TO_SCALES.keys()))
 
-THROWER_SHAPES_TO_SCALES = _retrieve_scaled_shapes_from_datasets(
-    [specific_objects.get_rollable_definition_dataset(True)] +
-    [intuitive_physics_objects.get_move_across_definition_dataset(True)]
-)
+THROWER_SHAPES_TO_SCALES = _retrieve_scaled_shapes_from_datasets({
+    **specific_objects.ROLLABLE_TYPES_TO_SIZES,
+    **intuitive_physics_objects.MOVE_ACROSS_TYPES_TO_SIZES
+})
 THROWER_SHAPES = sorted(list(THROWER_SHAPES_TO_SCALES.keys()))
 
 
@@ -314,7 +308,9 @@ class StructuralPlatformCreationService(
             'lips': reconciled.lips,
             'scale_x': x,
             'scale_y': y,
-            'scale_z': z
+            'scale_z': z,
+            'room_dimension_y': scene.room_dimensions.y,
+            'auto_adjust_platform': reconciled.auto_adjust_platforms
         }
 
         logger.trace(f'Creating platform:\nINPUT = {args}')
@@ -674,6 +670,8 @@ class StructuralThrowerCreationService(
         altered_scene: Scene = copy.deepcopy(scene)
         altered_scene.room_dimensions.x += 2
         altered_scene.room_dimensions.z += 2
+        # Throwers should ignore the holes and lava directly underneath them.
+        bounds = find_bounds(scene, ignore_ground=True)
         return super().is_valid(
             altered_scene, new_obj, bounds, try_num, retries)
 
@@ -684,12 +682,23 @@ class StructuralThrowerCreationService(
     def _do_post_add(self, scene, reconciled):
         thrower = self.thrower
         force = reconciled.throw_force
+        if reconciled.throw_force_multiplier:
+            force = reconciled.throw_force_multiplier
+            room_size = scene.room_dimensions
+            on_side_wall = reconciled.wall in [WallSide.LEFT, WallSide.RIGHT]
+            force *= room_size.x if on_side_wall else room_size.z
+        elif force is None:
+            force = choose_random(
+                DEFAULT_THROW_FORCE_IMPULSE if reconciled.impulse else
+                DEFAULT_THROW_FORCE_NON_IMPULSE
+            )
         force *= self.target.definition.mass
         args = {
             'instance': self.target.instance,
             'throwing_device': thrower,
             'throwing_force': force,
-            'throwing_step': reconciled.throw_step
+            'throwing_step': reconciled.throw_step,
+            'impulse': reconciled.impulse
         }
         logger.trace(f'Positioning thrower object:\nINPUT = {args}')
         self.target.instance['debug']['positionedBy'] = 'mechanism'
@@ -780,7 +789,7 @@ class StructuralMovingOccluderCreationService(
             reconciled.occluder_height, room_dim.y)
         reconciled.wall_material = _reconcile_material(
             reconciled.wall_material,
-            materials.CEILING_AND_WALL_GROUPINGS
+            materials.ROOM_WALL_MATERIALS
         )
         reconciled.pole_material = _reconcile_material(
             reconciled.pole_material,
@@ -796,6 +805,41 @@ class StructuralMovingOccluderCreationService(
             new_obj[1]['id'],
             reconciled_template.labels
         )
+
+
+class StructuralPartitionFloorCreationService(BaseObjectCreationService):
+    def __init__(self):
+        self._default_template = DEFAULT_TEMPLATE_PARTITION_FLOOR
+        self._type = FeatureTypes.PARTITION_FLOOR
+
+    def create_feature_from_specific_values(
+            self, scene: Scene, reconciled: PartitionFloorConfig,
+            source_template: PartitionFloorConfig):
+        return PartitionFloor(reconciled.leftHalf,
+                              reconciled.rightHalf)
+
+    def is_valid(self, scene: Scene, partitions: List,
+                 bounds, try_num, retries):
+        if partitions:
+            part_bounds = geometry.find_partition_floor_bounds(
+                scene.room_dimensions, partitions[0])
+            for bb in part_bounds:
+                if not geometry.validate_location_rect(
+                    bb,
+                    vars(scene.performer_start.position),
+                    bounds,
+                    vars(scene.room_dimensions)
+                ):
+                    return False
+        return True
+
+    def _on_valid_instances(
+            self, scene: Scene, reconciled_template, partitions):
+        if partitions:
+            scene.partition_floor = partitions[0]
+            log_feature_template(
+                'partition_floor', 'partition_floor',
+                partitions[0], [reconciled_template])
 
 
 class StructuralLavaCreationService(
@@ -988,7 +1032,7 @@ class StructuralOccludingWallsCreationService(
 
         reconciled.material = _reconcile_material(
             reconciled.material,
-            materials.CEILING_AND_WALL_GROUPINGS
+            materials.ROOM_WALL_MATERIALS
         )
 
         if (
@@ -1190,6 +1234,7 @@ class StructuralPlacersCreationService(
             defn.dimensions.x,
             defn.dimensions.z,
             room_dim.x,
+            room_dim.y,
             room_dim.z
         )
 
@@ -1438,7 +1483,9 @@ class StructuralPlatformLipsConfig():
 @dataclass
 class StructuralPlatformConfig(PositionableStructuralObjectsConfig):
     """
-    Defines details of a structural platform.
+    Defines details of a structural platform. The top of a platform should
+    never exceed room_dimension_y - 1.25 if a target or performer are to be
+    placed on top of the platform to ensure the performer can reach the target.
 
     - `num` (int, or list of ints, or [MinMaxInt](#MinMaxInt) dict, or list of
     MinMaxInt dicts): Number of structures to be created with these parameters
@@ -1467,6 +1514,12 @@ class StructuralPlatformConfig(PositionableStructuralObjectsConfig):
     dict, or list of MinMaxFloat dicts): The structure's rotation in the scene
     - `scale` (float, or list of floats, or [MinMaxFloat](#MinMaxFloat) dict,
     or list of MinMaxFloat dicts): Scale of the platform
+    - `auto_adjust_platforms` (bool or list of bools): If true, makes sure all
+    platform heights do not exceed 1.25 units below the y room dimension
+    allowing the performer to always stand on top of a platform. For example,
+    a room with a room_dimension_y = 4 and
+    auto_adjusted_platforms = True will ensure that all platform heights
+    do not exceed 2.75.  Default: False
     """
     lips: Union[StructuralPlatformLipsConfig,
                 List[StructuralPlatformLipsConfig]] = None
@@ -1475,6 +1528,7 @@ class StructuralPlatformConfig(PositionableStructuralObjectsConfig):
     attached_ramps: Union[int, MinMaxInt, List[Union[int, MinMaxInt]]] = None
     platform_underneath: Union[bool, List[bool]] = None
     platform_underneath_attached_ramps: Union[int, MinMaxInt, List[Union[int, MinMaxInt]]] = None  # noqa
+    auto_adjust_platforms: Union[bool, List[bool]] = False
 
 
 @dataclass
@@ -1632,6 +1686,10 @@ class StructuralThrowerConfig(BaseFeatureConfig):
     - `height` (float, or list of floats, or
     [MinMaxFloat](#MinMaxFloat) dict, or list of MinMaxFloat dicts): The
     height on the wall that the thrower will be placed.
+    - `impulse` (bool, or list of bools): Whether to use "impulse" force mode.
+    We recommend using impulse force mode moving forward. Please note that the
+    default `throw_force` is different for impulse and non-impulse force modes.
+    Default: true
     - `labels` (string, or list of strings): A label or labels to be assigned
     to this object. Always automatically assigned "throwers"
     - `position_relative` ([RelativePositionConfig](#RelativePositionConfig)
@@ -1671,7 +1729,13 @@ class StructuralThrowerConfig(BaseFeatureConfig):
     - `throw_force` (float, or list of floats, or
     [MinMaxFloat](#MinMaxFloat) dict, or list of MinMaxFloat dicts): Force of
     the throw put on the projectile.  This value will be multiplied by the
-    mass of the projectile.  Values between 500 and 1500 are typical.
+    mass of the projectile.  Default: between 5 and 20 for impulse force mode,
+    or between 500 and 2000 for non-impulse force mode
+    - `throw_force_multiplier` (float, or list of floats, or
+    [MinMaxFloat](#MinMaxFloat) dict, or list of MinMaxFloat dicts): Force of
+    the throw put on the projectile, that will be multiplied by the appropriate
+    room dimension for the thrower's wall position (X for left/right, Z for
+    front/back). If set, overrides the `throw_force`.
     - `throw_step` (int, or list of ints, or [MinMaxInt](#MinMaxInt) dict, or
     list of MinMaxInt dicts): The step of the simulation in which the
     projectile should be thrown.
@@ -1700,6 +1764,10 @@ class StructuralThrowerConfig(BaseFeatureConfig):
     position_relative: Union[
         RelativePositionConfig,
         List[RelativePositionConfig]
+    ] = None
+    impulse: Union[bool, List[bool]] = True
+    throw_force_multiplier: Union[
+        float, MinMaxFloat, List[Union[float, MinMaxFloat]]
     ] = None
 
 
@@ -1776,6 +1844,12 @@ class StructuralMovingOccluderConfig(BaseFeatureConfig):
     reverse_direction: Union[bool, List[bool]] = None
     rotation_y: Union[int, MinMaxInt, List[Union[int, MinMaxInt]]] = None
     move_up_before_last_step: Union[bool, List[bool]] = None
+
+
+@dataclass
+class PartitionFloorConfig():
+    leftHalf: Optional[float] = None
+    rightHalf: Optional[float] = None
 
 
 @dataclass
@@ -2020,12 +2094,21 @@ DEFAULT_TEMPLATE_THROWER = StructuralThrowerConfig(
         WallSide.BACK.value,
         WallSide.LEFT.value,
         WallSide.RIGHT.value],
+    impulse=True,
     throw_step=MinMaxInt(0, 10),
-    throw_force=MinMaxInt(500, 1000),
+    throw_force=None,
+    throw_force_multiplier=None,
     rotation_y=[0, MinMaxInt(-45, 45)],
     rotation_z=[0, MinMaxInt(0, 15)],
     projectile_shape=THROWER_SHAPES,
     position_relative=None
+)
+DEFAULT_THROW_FORCE_IMPULSE = MinMaxInt(5, 20)
+DEFAULT_THROW_FORCE_NON_IMPULSE = MinMaxInt(500, 2000)
+
+DEFAULT_TEMPLATE_PARTITION_FLOOR = PartitionFloorConfig(
+    leftHalf=0,
+    rightHalf=0
 )
 
 DEFAULT_TEMPLATE_MOVING_OCCLUDER = StructuralMovingOccluderConfig(
@@ -2056,7 +2139,8 @@ DEFAULT_TEMPLATE_PLATFORM = StructuralPlatformConfig(
     position=VectorFloatConfig(None, None, None),
     scale=MinMaxFloat(PLATFORM_SCALE_MIN, PLATFORM_SCALE_MAX),
     attached_ramps=0, platform_underneath=False,
-    platform_underneath_attached_ramps=0)
+    platform_underneath_attached_ramps=0,
+    auto_adjust_platforms=False)
 
 DEFAULT_TEMPLATE_WALL = StructuralWallConfig(
     num=0, position=VectorFloatConfig(None, None, None),
@@ -2172,7 +2256,7 @@ def _handle_position_material_defaults(
                     if template.rotation_y is None
                     else template.rotation_y)
     template.material = _reconcile_material(
-        template.material, materials.CEILING_AND_WALL_GROUPINGS
+        template.material, materials.ROOM_WALL_MATERIALS
     )
 
     plat_under = getattr(template, 'platform_underneath', None)
@@ -2194,7 +2278,7 @@ def _handle_position_material_defaults(
 
 
 def _is_valid_floor(
-        scene, floor_pos, key, restrict_under_user,
+        scene: Scene, floor_pos, key, restrict_under_user,
         bounds, try_num, retries, type_str):
     room_dim = scene.room_dimensions
     x = floor_pos['x']
@@ -2204,14 +2288,26 @@ def _is_valid_floor(
     xmax = math.floor(room_dim.x / 2)
     zmax = math.floor(room_dim.z / 2)
     valid = not (x < -xmax or x > xmax or z < -zmax or z > zmax)
+    bb = geometry.generate_floor_area_bounds(
+        floor_pos['x'],
+        floor_pos['z']
+    )
+    # It is expected that some holes/lava will extend beyond the walls, so we
+    # extend the room bounds.
+    room_dim_extended = Vector3d(
+        x=scene.room_dimensions.x + 1,
+        y=scene.room_dimensions.y,
+        z=scene.room_dimensions.z + 1)
+    valid = valid and geometry.validate_location_rect(
+        bb,
+        vars(scene.performer_start.position),
+        bounds,
+        vars(room_dim_extended))
     valid = valid and floor_pos not in getattr(scene, key, '')
     restricted = restrict_under_user and x == perf_x and z == perf_z
     valid = valid and not restricted
     if valid:
-        bounds.append(geometry.generate_floor_area_bounds(
-            floor_pos['x'],
-            floor_pos['z']
-        ))
+        bounds.append(bb)
         return valid
     else:
         # Checks if enabled for TRACE logging.
@@ -2948,6 +3044,7 @@ for feature_type, creation_service in [
     (FeatureTypes.HOLES, StructuralHolesCreationService),
     (FeatureTypes.L_OCCLUDERS, StructuralLOccluderCreationService),
     (FeatureTypes.LAVA, StructuralLavaCreationService),
+    (FeatureTypes.PARTITION_FLOOR, StructuralPartitionFloorCreationService),
     (FeatureTypes.MOVING_OCCLUDERS, StructuralMovingOccluderCreationService),
     (FeatureTypes.OCCLUDING_WALLS, StructuralOccludingWallsCreationService),
     (FeatureTypes.PLACERS, StructuralPlacersCreationService),

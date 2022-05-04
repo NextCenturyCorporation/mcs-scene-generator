@@ -6,8 +6,8 @@ from typing import Any, Dict, List, Union
 from machine_common_sense.config_manager import Vector3d
 
 from generator import MaterialTuple, geometry, materials
-from generator.scene import Scene
-from ideal_learning_env.numerics import MinMaxInt
+from generator.scene import Scene, get_step_limit_from_dimensions
+from ideal_learning_env.numerics import MinMaxFloat, MinMaxInt
 
 from .choosers import (
     choose_material_tuple_from_material,
@@ -23,10 +23,13 @@ from .defs import (
     ROOM_MIN_XZ,
     ROOM_MIN_Y,
     ILEDelayException,
+    ILEException,
     ILESharedConfiguration,
+    RandomizableBool,
 )
 from .goal_services import GoalConfig, GoalServices
 from .numerics import VectorFloatConfig, VectorIntConfig
+from .object_services import ObjectRepository
 from .validators import ValidateNoNullProp, ValidateNumber, ValidateOptions
 
 logger = logging.getLogger(__name__)
@@ -34,11 +37,31 @@ logger = logging.getLogger(__name__)
 # Limit the possible random room dimensions to more typical choices.
 ROOM_RANDOM_XZ = MinMaxInt(5, 30)
 ROOM_RANDOM_Y = MinMaxInt(3, 8)
+ADJUSTED_PERFORMER_WIDTH = geometry.PERFORMER_HALF_WIDTH - 0.02
 
 
 class GlobalSettingsComponent(ILEComponent):
     """Manages the global settings of an ILE scene (the config properties that
     affect the whole scene)."""
+
+    auto_last_step: RandomizableBool = None
+    """
+    (bool, or list of bools): Determines if the last step should automatically
+    be determined by room size.  The last step is calculated such that the
+    performer can walk in a circle along the walls of the room approximately 5
+    times.  If 'last_step' is set, that field takes
+    precedence.  Default: False
+
+    Simple Example:
+    ```
+    auto_last_step: False
+    ```
+
+    Advanced Example:
+    ```
+    auto_last_step: True
+    ```
+    """
 
     ceiling_material: Union[str, List[str]] = None
     """
@@ -119,7 +142,8 @@ class GlobalSettingsComponent(ILEComponent):
     last_step: Union[int, List[int]] = None
     """
     (int, or list of ints): The last possible action step, or list of last
-    steps, from which one is chosen at random for each scene. Default: none
+    steps, from which one is chosen at random for each scene. This field will
+    overwrite 'auto_last_step' if set.  Default: none
     (unlimited)
 
     Simple Example:
@@ -133,6 +157,24 @@ class GlobalSettingsComponent(ILEComponent):
     ```
     """
 
+    performer_look_at: Union[str, List[str]] = None
+    """
+    (string or list of strings): If set, configures the performer to start
+    looking at an object found by the label matching the string given.
+    Overrides `performer_start_rotation`.
+    Default: Use `performer_start_rotation`
+
+    Simple Example:
+    ```
+    performer_look_at: null
+    ```
+
+    Advanced Example:
+    ```
+    performer_look_at: [target, agent]
+    ```
+    """
+
     performer_start_position: Union[
         VectorFloatConfig,
         List[VectorFloatConfig]
@@ -142,7 +184,19 @@ class GlobalSettingsComponent(ILEComponent):
     dicts): The starting position of the performer agent, or a list of
     positions, from which one is chosen at random for each scene. The
     (optional) `y` is used to position on top of structural objects like
-    platforms. Default: random within the room
+    platforms. Valid parameters are constrained by room dimensions.
+    `x` and `z` positions must be positioned within half of the room
+    dimension bounds minus an additional 0.25 to account for the performer
+    width. For example: in a room where 'dimension x = 5', valid
+    `x` parameters would be '4.75, MinMaxFloat(-4.75, 4.75) and
+    [-4.75, 0, 4.75].' In the case of variable room dimensions that use a
+    MinMaxInt or list, valid parameters are bound by the maximum room
+    dimension. For example: with 'dimension `x` = MinMax(5, 7) or [5, 6, 7]
+    valid x parameters would be '3.25, MinMaxFloat(-3.25, 3.25), and
+    [-3.25, 0, 3.25].' For `y` start and room dimensions, the min y position
+    must always be greater than 0 and the max must always be less than or equal
+    to room dimension y - 1.25.' This ensures the performer does not clip
+    into the ceiling. Default: random within the room
 
     Simple Example:
     ```
@@ -336,11 +390,15 @@ class GlobalSettingsComponent(ILEComponent):
 
         scene.room_dimensions = self.get_room_dimensions()
         logger.trace(f'Setting room dimensions = {scene.room_dimensions}')
+
         scene.set_performer_start(
             self.get_performer_start_position(
                 scene.room_dimensions),
             self.get_performer_start_rotation())
         logger.trace(f'Setting performer start = {scene.performer_start}')
+
+        self._delayed_rotation_label = self.get_performer_look_at()
+        self._set_rotation_by_look_at(scene)
 
         ceiling_material_tuple = self.get_ceiling_material()
         scene.ceiling_material = ceiling_material_tuple.material
@@ -364,11 +422,41 @@ class GlobalSettingsComponent(ILEComponent):
         )
 
         last_step = self.get_last_step()
+        if not last_step and self.get_auto_last_step():
+            last_step = get_step_limit_from_dimensions(
+                room_x=scene.room_dimensions.x,
+                room_z=scene.room_dimensions.z)
         if last_step:
             scene.goal['last_step'] = last_step
             logger.trace(f'Setting last step = {last_step}')
         self._attempt_goal(scene)
+
         return scene
+
+    def _set_rotation_by_look_at(self, scene: Scene):
+        if not self._delayed_rotation_label:
+            return
+        if idl := (ObjectRepository.get_instance().
+                   get_one_from_labeled_objects(
+                self._delayed_rotation_label)):
+            self._delayed_rotation_reason = None
+            # determine rotation
+            perf_pos = scene.performer_start.position
+            tar_pos = idl.instance['shows'][0]['position']
+            tbb = idl.instance['shows'][0]['boundingBox']
+            target_y = (tbb.min_y + tbb.max_y) / 2.0
+            dx = -(perf_pos.x - tar_pos['x'])
+            dy = perf_pos.y + geometry.PERFORMER_CAMERA_Y - target_y
+            dz = -(perf_pos.z - tar_pos['z'])
+            self._delayed_rotation_label = None
+            rot = math.degrees(math.atan2(float(dx), dz))
+            scene.performer_start.rotation.y = rot
+            tilt = math.degrees(math.atan2(dy, math.sqrt(dx * dx + dz * dz)))
+            scene.performer_start.rotation.x = tilt
+        else:
+            self._delayed_rotation_reason = ILEDelayException(
+                f"Performer unable to set rotation due to missing object "
+                f"with label '{self._delayed_rotation_label}'")
 
     def _attempt_goal(self, scene):
         try:
@@ -386,7 +474,7 @@ class GlobalSettingsComponent(ILEComponent):
         return (
             choose_random(self.ceiling_material, MaterialTuple)
             if self.ceiling_material else
-            random.choice(random.choice(materials.CEILING_AND_WALL_GROUPINGS))
+            random.choice(materials.CEILING_MATERIALS)
         )
 
     @ile_config_setter(validator=ValidateOptions(
@@ -442,8 +530,16 @@ class GlobalSettingsComponent(ILEComponent):
             geometry.PERFORMER_WIDTH,
             geometry.PERFORMER_WIDTH,
             room_dimensions.x,
+            room_dimensions.y,
             room_dimensions.z
         )
+
+    def get_performer_look_at(self) -> str:
+        return choose_random(self.performer_look_at)
+
+    @ile_config_setter()
+    def set_performer_look_at(self, data: Any) -> None:
+        self.performer_look_at = data
 
     # allow partial setting of start position.  I.E.  only setting X
     @ile_config_setter(validator=ValidateNumber(
@@ -491,6 +587,9 @@ class GlobalSettingsComponent(ILEComponent):
         if not has_none and not has_random:
             return Vector3d(x=template.x, y=template.y, z=template.z)
 
+        # check if all configs are valid
+        self._valid_performer_start(template)
+
         good = False
         while not good:
             dims = choose_random(template)
@@ -503,6 +602,84 @@ class GlobalSettingsComponent(ILEComponent):
             if self.room_shape == 'rectangle' and x == z:
                 good = False
         return Vector3d(x=x, y=dims.y, z=z)
+
+    def _valid_performer_start(self, template):
+        room_x = template.x
+        room_y = template.y
+        room_z = template.z
+        perf_x = None
+        perf_y = None
+        perf_z = None
+        start = self.performer_start_position
+        if start is not None:
+            perf_x = start.x
+            perf_y = start.y
+            perf_z = start.z
+
+        if perf_x is not None:
+            self._valid_position(room_x, perf_x)
+        if perf_y is not None:
+            self._valid_position(room_y, perf_y, True)
+        if perf_z is not None:
+            self._valid_position(room_z, perf_z)
+
+    def _valid_position(self, room_dim, pos, is_y=False):
+        if isinstance(room_dim, int):
+            # if any positions are outside the one room dimension
+            minimum, maximum = (0, room_dim - geometry.PERFORMER_HEIGHT) \
+                if is_y else self._get_min_max_room_dimensions(room_dim)
+            self._valid_pos_checks(minimum, maximum, pos)
+        elif isinstance(room_dim, MinMaxInt):
+            # if any positions are outside the max throw an exception
+            max_min, max_max = (0, room_dim.max - geometry.PERFORMER_HEIGHT) \
+                if is_y else self._get_min_max_room_dimensions(room_dim.max)
+            self._valid_pos_checks(max_min, max_max, pos)
+        elif isinstance(room_dim, list):
+            # if any positions are outside the max throw an exception
+            max_room_dim = max(room_dim)
+            minimum, maximum = (0, room_dim - geometry.PERFORMER_HEIGHT) \
+                if is_y else self._get_min_max_room_dimensions(max_room_dim)
+            self._valid_pos_checks(minimum, maximum, pos)
+
+    def _valid_pos_checks(self, min, max, pos):
+        if isinstance(pos, float) or isinstance(pos, int):
+            self._valid_position_int_or_float(min, max, pos)
+        elif isinstance(pos, MinMaxFloat):
+            self._valid_position_min_max_float(min, max, pos)
+        elif isinstance(pos, List):
+            self._valid_position_list(min, max, pos)
+
+    def _valid_position_int_or_float(self, min, max, pos):
+        self._position_is_inside_room(min, max, pos)
+
+    def _valid_position_min_max_float(self, min, max, pos):
+        max_pos_is_valid = self._position_is_inside_room(min, max, pos.max)
+        min_pos_is_valid = self._position_is_inside_room(min, max, pos.min)
+        return max_pos_is_valid and min_pos_is_valid
+
+    def _valid_position_list(self, min, max, pos):
+        for p in pos:
+            self._position_is_inside_room(min, max, p)
+
+    def _position_is_inside_room(self, min, max, pos):
+        valid = min <= pos <= max
+        room_dim = self._get_constrained_room_dimension(
+            max) if min != 0 else int(max + geometry.PERFORMER_HEIGHT)
+        if not valid:
+            raise ILEException(
+                f'Performer start position: {pos} '
+                f'is not valid with room dimension: {room_dim} '
+                f'where the MAX position = {max} and MIN position = {min}'
+                f'Please remove this position from the performer start '
+                f'config options')
+
+    def _get_min_max_room_dimensions(self, room_dim):
+        min = -(room_dim / 2.0) + ADJUSTED_PERFORMER_WIDTH
+        max = (room_dim / 2.0) - ADJUSTED_PERFORMER_WIDTH
+        return min, max
+
+    def _get_constrained_room_dimension(self, room_dim):
+        return int((room_dim + ADJUSTED_PERFORMER_WIDTH) * 2)
 
     @ile_config_setter()
     def set_restrict_open_doors(self, data: Any) -> None:
@@ -563,9 +740,7 @@ class GlobalSettingsComponent(ILEComponent):
 
     def get_wall_material_data(self) -> Dict[str, MaterialTuple]:
         # All walls should use the same default material, so choose it now.
-        material_choice = random.choice(random.choice(
-            materials.CEILING_AND_WALL_GROUPINGS
-        ))
+        material_choice = random.choice(materials.ROOM_WALL_MATERIALS)
         back = material_choice
         if self.wall_back_material:
             back = choose_material_tuple_from_material(self.wall_back_material)
@@ -587,15 +762,28 @@ class GlobalSettingsComponent(ILEComponent):
             'right': choose_random(right, MaterialTuple)
         }
 
+    def get_auto_last_step(self) -> bool:
+        return choose_random(self.auto_last_step)
+
+    @ile_config_setter()
+    def set_auto_last_step(self, data: Any) -> None:
+        self.auto_last_step = data
+
     def get_num_delayed_actions(self) -> int:
-        return 1 if self._delayed_goal else 0
+        return ((1 if self._delayed_goal else 0) +
+                (1 if self._delayed_rotation_label else 0))
 
     def run_delayed_actions(self, scene: Dict[str, Any]) -> Dict[str, Any]:
         if self._delayed_goal:
             self._attempt_goal(scene)
+        if self._delayed_rotation_label:
+            self._set_rotation_by_look_at(scene)
         return scene
 
     def get_delayed_action_error_strings(self):
-        return ([
-            str(self._delayed_goal_reason)] if self._delayed_goal and
-            self._delayed_goal_reason else [])
+        reasons = []
+        if self._delayed_goal and self._delayed_goal_reason:
+            reasons.append(str(self._delayed_goal_reason))
+        if self._delayed_rotation_label and self._delayed_rotation_reason:
+            reasons.append(str(self._delayed_rotation_reason))
+        return reasons

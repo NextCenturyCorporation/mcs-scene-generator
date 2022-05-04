@@ -87,8 +87,8 @@ structural_throwers:
           - tube_wide
           - turtle_on_wheels
       throw_force:
-          min: 2000
-          max: 2500
+          min: 20
+          max: 25
       throw_step:
           min: 41
           max: 60

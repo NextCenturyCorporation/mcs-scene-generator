@@ -1,6 +1,6 @@
 from machine_common_sense.config_manager import Vector3d
 
-from generator.scene import Scene
+from generator.scene import Scene, get_step_limit_from_dimensions
 
 from .ile_helper import prior_scene_with_target
 
@@ -162,3 +162,18 @@ def test_to_dict():
             "x": 4,
             "y": 5,
             "z": 6}}
+
+
+def test_get_last_step():
+    assert get_step_limit_from_dimensions(2, 2) == 900
+    assert get_step_limit_from_dimensions(2, 20) == 2700
+    assert get_step_limit_from_dimensions(20, 2) == 2700
+    assert get_step_limit_from_dimensions(20, 20) == 4500
+    assert get_step_limit_from_dimensions(10, 10) == 2500
+    assert get_step_limit_from_dimensions(50, 50) == 10500
+    assert get_step_limit_from_dimensions(10, 100) == 11500
+    assert get_step_limit_from_dimensions(100, 100) == 20500
+
+    assert get_step_limit_from_dimensions(None, None) == 2500
+    assert get_step_limit_from_dimensions(None, 10) == 2500
+    assert get_step_limit_from_dimensions(10, None) == 2500

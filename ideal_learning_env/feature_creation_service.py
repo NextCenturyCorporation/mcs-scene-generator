@@ -40,6 +40,7 @@ class FeatureTypes(Enum):
     LAVA = auto()
     MOVING_OCCLUDERS = auto()
     OCCLUDING_WALLS = auto()
+    PARTITION_FLOOR = auto()
     PLACERS = auto()
     PLATFORMS = auto()
     RAMPS = auto()

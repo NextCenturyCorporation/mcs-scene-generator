@@ -29,7 +29,7 @@ def test_CollisionsHypercube_default_objects_move_across():
         {'target': None, 'non target': None}
     )
     assert hypercube.is_move_across()
-    wall_material_tuple = random.choice(materials.CEILING_AND_WALL_GROUPINGS)
+    wall_material_tuple = random.choice(materials.ROOM_WALL_MATERIALS)
     object_dict = hypercube._create_default_objects(
         wall_material_tuple[0],
         wall_material_tuple[1]
@@ -197,7 +197,7 @@ def test_ObjectPermanenceHypercube_default_objects_fall_down():
         is_fall_down=True
     )
     assert hypercube.is_fall_down()
-    wall_material_tuple = random.choice(materials.CEILING_AND_WALL_GROUPINGS)
+    wall_material_tuple = random.choice(materials.ROOM_WALL_MATERIALS)
     object_dict = hypercube._create_default_objects(
         wall_material_tuple[0],
         wall_material_tuple[1]
@@ -241,7 +241,7 @@ def test_ShapeConstancyHypercube_default_objects_fall_down():
         is_fall_down=True
     )
     assert hypercube.is_fall_down()
-    wall_material_tuple = random.choice(materials.CEILING_AND_WALL_GROUPINGS)
+    wall_material_tuple = random.choice(materials.ROOM_WALL_MATERIALS)
     object_dict = hypercube._create_default_objects(
         wall_material_tuple[0],
         wall_material_tuple[1]
@@ -285,7 +285,7 @@ def test_SpatioTemporalContinuityHypercube_default_objects_move_across():
         is_move_across=True
     )
     assert hypercube.is_move_across()
-    wall_material_tuple = random.choice(materials.CEILING_AND_WALL_GROUPINGS)
+    wall_material_tuple = random.choice(materials.ROOM_WALL_MATERIALS)
     object_dict = hypercube._create_default_objects(
         wall_material_tuple[0],
         wall_material_tuple[1]
@@ -333,7 +333,7 @@ def test_GravitySupportHypercube_default_objects_fall_down():
         is_fall_down=True
     )
     assert hypercube.is_fall_down()
-    wall_material_tuple = random.choice(materials.CEILING_AND_WALL_GROUPINGS)
+    wall_material_tuple = random.choice(materials.ROOM_WALL_MATERIALS)
     object_dict = hypercube._create_default_objects(
         wall_material_tuple[0],
         wall_material_tuple[1]
@@ -1213,7 +1213,7 @@ def test_ObjectPermanenceHypercubeEval4_default_objects_move_across():
         is_move_across=True
     )
     assert hypercube.is_move_across()
-    wall_material_tuple = random.choice(materials.CEILING_AND_WALL_GROUPINGS)
+    wall_material_tuple = random.choice(materials.ROOM_WALL_MATERIALS)
     object_dict = hypercube._create_default_objects(
         wall_material_tuple[0],
         wall_material_tuple[1]
@@ -1337,7 +1337,7 @@ def test_SpatioTemporalContinuityHypercubeEval4_default_objects_move_across():
         is_move_across=True
     )
     assert hypercube.is_move_across()
-    wall_material_tuple = random.choice(materials.CEILING_AND_WALL_GROUPINGS)
+    wall_material_tuple = random.choice(materials.ROOM_WALL_MATERIALS)
     object_dict = hypercube._create_default_objects(
         wall_material_tuple[0],
         wall_material_tuple[1]

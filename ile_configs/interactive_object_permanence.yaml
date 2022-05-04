@@ -75,11 +75,11 @@ structural_throwers:
       throw_force:
           # Use either a small throw force so the target is thrown on the same
           # side as the thrower (50%)...
-          - 300
+          - 3
           # ...or a large throw force so the target is thrown to the opposite
           # side (50%), which may or may not be behind the L-occluder.
-          - min: 700
-            max: 1250
+          - min: 7
+            max: 12.5
       throw_step: 1
       # Position the thrower relative to one of the L-occluders.
       position_relative:

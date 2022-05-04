@@ -291,18 +291,31 @@ class KeywordLocation():
                 instance, location, keyword)
         if keyword in [KeywordLocation.ON_OBJECT,
                        KeywordLocation.ON_OBJECT_CENTERED]:
-            try:
-                location = geometry.generate_location_on_object(
-                    instance,
-                    relative_instance, performer_start,
-                    bounds, room_dimensions=room_dimensions,
-                    center=(keyword == KeywordLocation.ON_OBJECT_CENTERED))
-            except Exception:
-                # If the object is too big to be on top of the relative object,
-                # retry generating the scene, in case the object(s) are random.
-                raise ILEException(
-                    'Object on top too big for object underneath. Retrying...'
-                )
+            all_idls = obj_repo.get_all_from_labeled_objects(obj_tag)
+            random.shuffle(all_idls)
+            attempts = 0
+            for idl in all_idls:
+                try:
+                    location = geometry.generate_location_on_object(
+                        instance,
+                        relative_instance, performer_start,
+                        bounds, room_dimensions=room_dimensions,
+                        center=(keyword == KeywordLocation.ON_OBJECT_CENTERED))
+                    relative_instance = idl.instance
+                    relative_defn = idl.definition
+                    rel_object_location = idl.location
+                    relative_instance['debug'][DEBUG_FINAL_POSITION_KEY] = True
+                except Exception:
+                    attempts += 1
+                    if attempts == len(all_idls):
+                        # If the object is too big to be on top of all
+                        # relative objects, retry generating the scene
+                        raise ILEException(
+                            'Object on top too big for object underneath.'
+                            'Retrying...')
+                    # If the object is too big to be on top of the relative
+                    # object, retry with another realtive object in the scene
+                    continue
             return KeywordLocation._move_instance_or_raise_error(
                 instance, location, keyword)
 
@@ -324,6 +337,32 @@ class KeywordLocation():
                 idx = indexes[0]
                 containers.put_object_in_container(
                     instance, con_inst, idx, rotation=indexes[1][0])
+
+                # Make sure containers positioned by placers apply
+                # their rules to any objects inside of them.
+                #
+                # Note: 'moves' and 'positionedBy' should be enough for
+                # now to differentiate this case, but this could change
+                # in the future.
+                positioned_by = con_inst['debug'].get('positionedBy', None)
+
+                if(positioned_by == 'mechanism' and
+                   con_inst.get('moves') is not None):
+                    ctr_moves = con_inst.get('moves')
+                    moves = instance.get('moves', [])
+                    for ctr_move in ctr_moves:
+                        moves.append(copy.deepcopy(ctr_move))
+
+                    instance['moves'] = moves
+                    instance['kinematic'] = con_inst['kinematic']
+                    if(con_inst.get('togglePhysics') is not None):
+                        ctr_tog_list = con_inst.get('togglePhysics')
+                        tog_list = instance.get('togglePhysics', [])
+                        for ctr_tog in ctr_tog_list:
+                            tog_list.append(copy.deepcopy(ctr_tog))
+
+                        instance['togglePhysics'] = tog_list
+
                 # Location will be None here because its dependent on the
                 # parent and shouldn't be used to locate other objects
                 return None

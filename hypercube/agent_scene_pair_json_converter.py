@@ -377,6 +377,7 @@ def _create_agent_object_list(
             unit_size
         )
         agent_object['hides'] = []
+        agent_object['kinematic'] = True
         agent_object['debug'][
             tags.SCENE.UNTRAINED_SHAPE
         ] = config_with_material.untrained
@@ -533,6 +534,7 @@ def _create_goal_object_list(
             json_size,
             unit_size
         )
+        goal_object['kinematic'] = True
         goal_object['debug'][
             tags.SCENE.UNTRAINED_SHAPE
         ] = config_with_material.untrained
@@ -681,10 +683,10 @@ def _create_key_object(
         'z': KEY_OBJECT_SIZE[1]
     }
 
-    # The key probably shouldn't be a structural object, but keep it this way
-    # for Eval 4 so it's consistent with our released training data.
+    # In Eval 4, the key object had structure=True, but that was a bug, and has
+    # been fixed for Eval 5 and beyond.
     key_object['kinematic'] = True
-    key_object['structure'] = True
+
     key_object['hides'] = []
 
     return key_object

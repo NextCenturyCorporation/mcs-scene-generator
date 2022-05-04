@@ -85,6 +85,26 @@ def test_action_teleports_multiple_out_of_order():
     assert action == ['EndHabituation,xPosition=-2,zPosition=1,yRotation=180']
 
 
+def test_action_circles_empty_array():
+    goal = {}
+    ActionService.add_circles(goal, [])
+    assert goal['action_list'] == []
+
+
+def test_action_circles_single():
+    goal = {}
+    ActionService.add_circles(goal, [1])
+    circle = ['RotateRight']
+    assert goal['action_list'] == [circle] * 36
+
+
+def test_action_circles_multiple():
+    goal = {}
+    ActionService.add_circles(goal, [1, 101])
+    circle = ['RotateRight']
+    assert goal['action_list'] == [circle] * 36 + [[]] * 64 + [circle] * 36
+
+
 def test_action_swivels_empty_array():
     goal = {}
     ActionService.add_swivels(goal, [])

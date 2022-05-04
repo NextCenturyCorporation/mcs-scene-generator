@@ -71,6 +71,26 @@ python ile.py -c ile_config.yaml -n 10 -p scene
 
 ### Latest Release Notes
 
+#### Release 1.3
+
+Changelog:
+- Changed throwers to use "impulse" force mode by default; this is our recommended configuration moving forward. Please update your old thrower configurations (in your YAML files) to either use the `impulse: false` setting or adjust the `throw_force` setting (a good rule-of-thumb is to divide all of your non-impulse forces by 100). All of the example configs in this repository (the YAML files in `ile_configs/`) have been updated appropriately. For more information on force modes, please see `ForceMode.Force` and `ForceMode.Impulse` in [this documentation](https://docs.unity3d.com/ScriptReference/Rigidbody.AddForce.html).
+- Created new example YAML configs for the [agent identification](./ile_configs/interactive_agent_identification.yaml) and [moving target prediction](./ile_configs/interactive_moving_target_prediction.yaml) tasks.
+- Added `movement` config option under `specific_agents` to set a specific or random movement (either walking or running) path for an simulation-controlled agent.
+- Added `auto_last_step` config option to set `last_step` relative to each scene's room dimensions.
+- Added `circles` config option to force the performer agent to rotate in a complete clockwise circle (by using only RotateRight actions) at specific action steps.
+- Added `performer_look_at` config option to make the performer agent start in a scene looking at a specific object.
+- Added `dimensions` config option for all interactable objects that can be used instead of `scale` to set an object's size.
+- Added `throw_force_multiplier` config option under `structural_throwers` to set throw forces relative to each scene's room dimensions.
+- Added `has_blocking_wall` config option under `shortcut_bisecting_platform`.
+- Added `auto_adjust_platforms` config option under `structural_platforms`.
+- Fixed a bug where objects on top of containers held by placers (like the soccer ball in scenes generated with the interactive_support_relations.yaml config file) would fall and bounce rather than descending smoothly.
+- Fixed a bug where holes and lava would be randomly positioned underneath other objects.
+- Fixed a bug where scenes with manually-configured room dimensions and a random performer start position may cause the performer agent to start outside the room.
+- Improved ILE startup time.
+- Updated `shortcut_lava_room` config option to make use of the `partitionFloor` property recently introduced in MCS version 0.5.4.
+- Updated `ile_configs/collisions.yaml` so the performer agent always faces the target.
+
 #### Release 1.2
 
 Changelog:
@@ -134,10 +154,12 @@ List of example ILE configuration files for basic use cases:
 - [door_occluder.yaml](./ile_configs/door_occluder.yaml) Generates scenes with an occluding wall containing three doors, a tall platform bisecting the room, and a randomly positioned soccer ball retrieval target.
 - [empty_room.yaml](./ile_configs/empty_room.yaml) Generates scenes with no objects by overriding the default random generation behavior.
 - [forced_choice.yaml](./ile_configs/forced_choice.yaml) Generates scenes with the performer agent positioned on top of a tall platform bisecting the room and a randomly positioned soccer ball retrieval target.
+- [last_step.yaml](./ile_configs/last_step.yaml) Generates scenes with an action/step limit ("last step") scaled relative to the room's random dimensions.
 - [specific_object.yaml](./ile_configs/specific_object.yaml) Generates scenes with a consistently sized and colored blue toy car object.
 - [starts_frozen.yaml](./ile_configs/starts_frozen.yaml) Generates scenes in which the performer agent begins frozen for the first 5 to 100 steps.
 - [starts_look_rotate_only.yaml](./ile_configs/starts_look_rotate_only.yaml) Generates scenes in which the performer agent begins able to only use the Look and Rotate actions for the first 5 to 100 steps.
 - [target_soccer_ball.yaml](./ile_configs/target_soccer_ball.yaml) Generates scenes with a soccer ball retrieval target.
+- [two_kidnappings.yaml](./ile_configs/two_kidnappings.yaml) Generates scenes in which the performer agent is kidnapped on steps 501 and 550.
 
 #### Learning Core Common Sense Concepts
 
@@ -197,8 +219,8 @@ Eval 5 Tasks:
 
 | Eval 5 Task | MCS Core Domains | Example Config Files |
 | --- | --- | --- |
-| Agent Identification (Interactive) | A5 | TODO |
-| Moving Target Prediction (Interactive) | O8 | TODO |
+| Agent Identification (Interactive) | A5 | [interactive_agent_identification.yaml](./ile_configs/interactive_agent_identification.yaml) |
+| Moving Target Prediction (Interactive) | O8 | [interactive_moving_target_prediction.yaml](./ile_configs/interactive_moving_target_prediction.yaml) |
 | Navigation: Holes (Interactive) | P7 | [holes.yaml](./ile_configs/holes.yaml) |
 | Navigation: Lava (Interactive) | P7 | [lava.yaml](./ile_configs/lava.yaml) |
 | Navigation: Ramps (Interactive) | P6 | [ramps.yaml](./ile_configs/ramps.yaml) |
@@ -210,6 +232,8 @@ Eval 5 Tasks:
 List of example ILE configuration files for generating scenes similar to specific evaluation tasks:
 
 - [holes.yaml](./ile_configs/holes.yaml) Generates scenes with many holes and a randomly positioned soccer ball retrieval target.
+- [interactive_agent_identification.yaml](./ile_configs/interactive_agent_identification.yaml) Generates scenes similar to the interactive agent indentification eval tasks: start on a platform bisecting the room; an agent on one side of the platform; must walk up to the agent and request for it to produce the target.
+- [interactive_moving_target_prediction.yaml](./ile_configs/interactive_moving_target_prediction.yaml) Generates scenes similar to the interactive moving target prediction eval tasks: start on a platform; lava extending across both sides of the room; must first rotate in a 360 degree circle; then a thrower rolls a soccer ball from one end of the room toward the other; must predict the speed and trajectory of the soccer ball in order to intercept it efficiently.
 - [interactive_object_permanence.yaml](./ile_configs/interactive_object_permanence.yaml) Generates scenes similar to the interactive object permanence eval tasks: start on a platform bisecting the room; an L-occluder on each side; and a thrower that tosses the soccer ball into the room.
 - [interactive_solidity.yaml](./ile_configs/interactive_solidity.yaml) Generates scenes similar to the interactive solidity eval tasks: start on a platform bisecting the room; a placer holding the soccer ball descends from the ceiling; a door occluder descends from the ceiling; the placer releases the soccer ball so it falls somewhere behind the door occluder.
 - [interactive_spatial_elimination.yaml](./ile_configs/interactive_spatial_elimination.yaml) Generates scenes similar to the interactive spatial elimination eval tasks: start on a platform bisecting the room; an occlusing wall on each side; and a soccer ball either in front of or behind an occluding wall.
@@ -221,7 +245,6 @@ List of example ILE configuration files for generating scenes similar to specifi
 - [passive_physics_move_across.yaml](./ile_configs/passive_physics_move_across.yaml) Generates scenes similar to passive physics eval tasks with objects moving across: same view; similarly sized and positioned moving-and-rotating occluders; multiple objects moving across the scene; only able to use Pass actions.
 - [ramps.yaml](./ile_configs/ramps.yaml) Generates scenes with ramps leading up to platforms and a soccer ball retrieval target either on top of the platform or on the floor adjacent to the platform.
 - [tools.yaml](./ile_configs/tools.yaml) Generates scenes with a large moveable block tool and a soccer ball retrieval target completely surrounded by lava.
-- [two_kidnappings.yaml](./ile_configs/two_kidnappings.yaml) Generates scenes in which the performer agent is kidnapped on steps 501 and 550.
 
 ## Scene Validation
 

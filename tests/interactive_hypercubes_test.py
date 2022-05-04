@@ -603,6 +603,7 @@ def verify_scene(hypercube, scene, index, ignore_parent=False,
 
     # Floor should not have distracting patterns.
     assert len(scene['debug']['floorColors']) == 1
+    assert scene['goal']['last_step'] == 2500
 
     # Floor should not have the same color as critical (non-context) objects.
     for role in [
@@ -862,6 +863,7 @@ def test_container_hypercube():
     for index, scene in enumerate(hypercube.get_scenes()):
         scene_id = scene['goal']['sceneInfo']['id'][0].lower()
         scene_dict[scene_id] = (scene, index)
+        assert scene['goal']['last_step'] == 2500
 
     save_scene_debug_files(scene_dict, 'container')
 
@@ -1287,6 +1289,7 @@ def test_obstacle_hypercube():
     for index, scene in enumerate(hypercube.get_scenes()):
         scene_id = scene['goal']['sceneInfo']['id'][0].lower()
         scene_dict[scene_id] = (scene, index)
+        assert scene['goal']['last_step'] == 2500
 
     save_scene_debug_files(scene_dict, 'obstacle')
 
@@ -1438,6 +1441,7 @@ def test_occluder_hypercube():
     for index, scene in enumerate(hypercube.get_scenes()):
         scene_id = scene['goal']['sceneInfo']['id'][0].lower()
         scene_dict[scene_id] = (scene, index)
+        assert scene['goal']['last_step'] == 2500
 
     save_scene_debug_files(scene_dict, 'occluder')
 

@@ -343,6 +343,7 @@ def test_create_platform():
         scale_x=4,
         scale_y=5,
         scale_z=6,
+        room_dimension_y=8,
         material_tuple=MaterialTuple('test_material', ['black', 'white'])
     )
 
@@ -385,6 +386,200 @@ def test_create_platform():
     assert platform['lips']['right'] is False
 
 
+def test_create_platform_thats_too_tall_no_auto_adjust():
+    platform = structures.create_platform(
+        position_x=1,
+        position_z=2,
+        rotation_y=0,
+        scale_x=4,
+        scale_y=3.9,
+        scale_z=6,
+        room_dimension_y=4,
+        material_tuple=MaterialTuple('test_material', ['black', 'white']),
+        auto_adjust_platform=False
+    )
+
+    assert isinstance(platform['id'], str)
+    assert platform['kinematic'] is True
+    assert platform['structure'] is True
+    assert platform['type'] == 'cube'
+    # Expected mass from _calculate_mass function
+    assert platform['mass'] == 11700
+    assert platform['materials'] == ['test_material']
+    assert platform['debug']['color'] == ['black', 'white']
+    assert platform['debug']['info'] == [
+        'black', 'white', 'platform', 'black platform', 'white platform',
+        'black white platform'
+    ]
+
+    assert len(platform['shows']) == 1
+    assert platform['shows'][0]['stepBegin'] == 0
+    assert platform['shows'][0]['position'] == {'x': 1, 'y': 1.95, 'z': 2}
+    assert platform['shows'][0]['rotation'] == {'x': 0, 'y': 0, 'z': 0}
+    assert platform['shows'][0]['scale'] == {'x': 4, 'y': 3.9, 'z': 6}
+    platform_bounds = platform['shows'][0]['boundingBox']
+    assert vars(platform_bounds.box_xz[0]) == pytest.approx(
+        {'x': 3, 'y': 0, 'z': 5}
+    )
+    assert vars(platform_bounds.box_xz[1]) == pytest.approx(
+        {'x': 3, 'y': 0, 'z': -1}
+    )
+    assert vars(platform_bounds.box_xz[2]) == pytest.approx(
+        {'x': -1, 'y': 0, 'z': -1}
+    )
+    assert vars(platform_bounds.box_xz[3]) == pytest.approx(
+        {'x': -1, 'y': 0, 'z': 5}
+    )
+    assert platform_bounds.max_y == 3.9
+    assert platform_bounds.min_y == 0
+
+
+def test_create_platform_thats_too_tall_no_auto_adjust_pos_y_modifier():
+    platform = structures.create_platform(
+        position_x=1,
+        position_z=2,
+        position_y_modifier=1,
+        rotation_y=0,
+        scale_x=4,
+        scale_y=2.9,
+        scale_z=6,
+        room_dimension_y=4,
+        material_tuple=MaterialTuple('test_material', ['black', 'white']),
+        auto_adjust_platform=False
+    )
+
+    assert isinstance(platform['id'], str)
+    assert platform['kinematic'] is True
+    assert platform['structure'] is True
+    assert platform['type'] == 'cube'
+    # Expected mass from _calculate_mass function
+    assert platform['mass'] == 8700
+    assert platform['materials'] == ['test_material']
+    assert platform['debug']['color'] == ['black', 'white']
+    assert platform['debug']['info'] == [
+        'black', 'white', 'platform', 'black platform', 'white platform',
+        'black white platform'
+    ]
+
+    assert len(platform['shows']) == 1
+    assert platform['shows'][0]['stepBegin'] == 0
+    assert platform['shows'][0]['position'] == {'x': 1, 'y': 2.45, 'z': 2}
+    assert platform['shows'][0]['rotation'] == {'x': 0, 'y': 0, 'z': 0}
+    assert platform['shows'][0]['scale'] == {'x': 4, 'y': 2.9, 'z': 6}
+    platform_bounds = platform['shows'][0]['boundingBox']
+    assert vars(platform_bounds.box_xz[0]) == pytest.approx(
+        {'x': 3, 'y': 0, 'z': 5}
+    )
+    assert vars(platform_bounds.box_xz[1]) == pytest.approx(
+        {'x': 3, 'y': 0, 'z': -1}
+    )
+    assert vars(platform_bounds.box_xz[2]) == pytest.approx(
+        {'x': -1, 'y': 0, 'z': -1}
+    )
+    assert vars(platform_bounds.box_xz[3]) == pytest.approx(
+        {'x': -1, 'y': 0, 'z': 5}
+    )
+    assert round(platform_bounds.max_y, 3) == 3.9
+    assert round(platform_bounds.min_y, 3) == 1
+
+
+def test_create_platform_thats_too_tall_auto_adjust():
+    platform = structures.create_platform(
+        position_x=1,
+        position_z=2,
+        rotation_y=0,
+        scale_x=4,
+        scale_y=100,
+        scale_z=6,
+        room_dimension_y=8,
+        material_tuple=MaterialTuple('test_material', ['black', 'white']),
+        auto_adjust_platform=True
+    )
+
+    assert isinstance(platform['id'], str)
+    assert platform['kinematic'] is True
+    assert platform['structure'] is True
+    assert platform['type'] == 'cube'
+    # Expected mass from _calculate_mass function
+    assert platform['mass'] == 20250
+    assert platform['materials'] == ['test_material']
+    assert platform['debug']['color'] == ['black', 'white']
+    assert platform['debug']['info'] == [
+        'black', 'white', 'platform', 'black platform', 'white platform',
+        'black white platform'
+    ]
+
+    assert len(platform['shows']) == 1
+    assert platform['shows'][0]['stepBegin'] == 0
+    assert platform['shows'][0]['position'] == {'x': 1, 'y': 3.375, 'z': 2}
+    assert platform['shows'][0]['rotation'] == {'x': 0, 'y': 0, 'z': 0}
+    assert platform['shows'][0]['scale'] == {'x': 4, 'y': 6.75, 'z': 6}
+    platform_bounds = platform['shows'][0]['boundingBox']
+    assert vars(platform_bounds.box_xz[0]) == pytest.approx(
+        {'x': 3, 'y': 0, 'z': 5}
+    )
+    assert vars(platform_bounds.box_xz[1]) == pytest.approx(
+        {'x': 3, 'y': 0, 'z': -1}
+    )
+    assert vars(platform_bounds.box_xz[2]) == pytest.approx(
+        {'x': -1, 'y': 0, 'z': -1}
+    )
+    assert vars(platform_bounds.box_xz[3]) == pytest.approx(
+        {'x': -1, 'y': 0, 'z': 5}
+    )
+    assert platform_bounds.max_y == 6.75
+    assert platform_bounds.min_y == 0
+
+
+def test_create_platform_thats_too_tall_with_y_modifier_auto_adjust():
+    platform = structures.create_platform(
+        position_x=1,
+        position_z=2,
+        rotation_y=0,
+        scale_x=4,
+        scale_y=2,
+        scale_z=6,
+        room_dimension_y=5,
+        position_y_modifier=3,
+        material_tuple=MaterialTuple('test_material', ['black', 'white']),
+        auto_adjust_platform=True
+    )
+
+    assert isinstance(platform['id'], str)
+    assert platform['kinematic'] is True
+    assert platform['structure'] is True
+    assert platform['type'] == 'cube'
+    # Expected mass from _calculate_mass function
+    assert platform['mass'] == 2250
+    assert platform['materials'] == ['test_material']
+    assert platform['debug']['color'] == ['black', 'white']
+    assert platform['debug']['info'] == [
+        'black', 'white', 'platform', 'black platform', 'white platform',
+        'black white platform'
+    ]
+
+    assert len(platform['shows']) == 1
+    assert platform['shows'][0]['stepBegin'] == 0
+    assert platform['shows'][0]['position'] == {'x': 1, 'y': 3.375, 'z': 2}
+    assert platform['shows'][0]['rotation'] == {'x': 0, 'y': 0, 'z': 0}
+    assert platform['shows'][0]['scale'] == {'x': 4, 'y': 0.75, 'z': 6}
+    platform_bounds = platform['shows'][0]['boundingBox']
+    assert vars(platform_bounds.box_xz[0]) == pytest.approx(
+        {'x': 3, 'y': 0, 'z': 5}
+    )
+    assert vars(platform_bounds.box_xz[1]) == pytest.approx(
+        {'x': 3, 'y': 0, 'z': -1}
+    )
+    assert vars(platform_bounds.box_xz[2]) == pytest.approx(
+        {'x': -1, 'y': 0, 'z': -1}
+    )
+    assert vars(platform_bounds.box_xz[3]) == pytest.approx(
+        {'x': -1, 'y': 0, 'z': 5}
+    )
+    assert platform_bounds.max_y == 3.75
+    assert platform_bounds.min_y == 3
+
+
 def test_create_platform_with_lips():
     platform = structures.create_platform(
         position_x=1,
@@ -393,6 +588,7 @@ def test_create_platform_with_lips():
         scale_x=4,
         scale_y=5,
         scale_z=6,
+        room_dimension_y=8,
         lips={
             'front': True,
             'back': True,
@@ -442,6 +638,64 @@ def test_create_platform_with_lips():
     assert platform['lips']['right'] is False
 
 
+def test_create_platform_thats_too_tall_with_lips_auto_adjust():
+    platform = structures.create_platform(
+        position_x=1,
+        position_z=2,
+        rotation_y=0,
+        scale_x=4,
+        scale_y=100,
+        scale_z=6,
+        room_dimension_y=7,
+        lips={
+            'front': True,
+            'back': True,
+            'left': False,
+            'right': False
+        },
+        material_tuple=MaterialTuple('test_material', ['black', 'white']),
+        auto_adjust_platform=True
+    )
+
+    assert isinstance(platform['id'], str)
+    assert platform['kinematic'] is True
+    assert platform['structure'] is True
+    assert platform['type'] == 'cube'
+    # Expected mass from _calculate_mass function
+    assert platform['mass'] == 17250
+    assert platform['materials'] == ['test_material']
+    assert platform['debug']['color'] == ['black', 'white']
+    assert platform['debug']['info'] == [
+        'black', 'white', 'platform', 'black platform', 'white platform',
+        'black white platform'
+    ]
+
+    assert len(platform['shows']) == 1
+    assert platform['shows'][0]['stepBegin'] == 0
+    assert platform['shows'][0]['position'] == {'x': 1, 'y': 2.875, 'z': 2}
+    assert platform['shows'][0]['rotation'] == {'x': 0, 'y': 0, 'z': 0}
+    assert platform['shows'][0]['scale'] == {'x': 4, 'y': 5.75, 'z': 6}
+    platform_bounds = platform['shows'][0]['boundingBox']
+    assert vars(platform_bounds.box_xz[0]) == pytest.approx(
+        {'x': 3, 'y': 0, 'z': 5}
+    )
+    assert vars(platform_bounds.box_xz[1]) == pytest.approx(
+        {'x': 3, 'y': 0, 'z': -1}
+    )
+    assert vars(platform_bounds.box_xz[2]) == pytest.approx(
+        {'x': -1, 'y': 0, 'z': -1}
+    )
+    assert vars(platform_bounds.box_xz[3]) == pytest.approx(
+        {'x': -1, 'y': 0, 'z': 5}
+    )
+    assert platform_bounds.max_y == 5.75
+    assert platform_bounds.min_y == 0
+    assert platform['lips']['front'] is True
+    assert platform['lips']['back'] is True
+    assert platform['lips']['left'] is False
+    assert platform['lips']['right'] is False
+
+
 def test_create_platform_optional_parameters():
     bounds = ObjectBounds(box_xz=[
         Vector3d(**{'x': 0.11, 'y': 0.12, 'z': 0.13}),
@@ -456,6 +710,7 @@ def test_create_platform_optional_parameters():
         scale_x=4,
         scale_y=5,
         scale_z=6,
+        room_dimension_y=20,
         material_tuple=MaterialTuple('test_material', ['black', 'white']),
         position_y_modifier=10,
         bounds=bounds

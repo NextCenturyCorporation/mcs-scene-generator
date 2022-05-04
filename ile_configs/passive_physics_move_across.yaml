@@ -90,8 +90,8 @@ structural_throwers:
       # Same chance to throw straight across (50%) or at an angle (50%).
       rotation_z: [0, 0, 0, 5, 10, 15]
       throw_force:
-          min: 1500
-          max: 2000
+          min: 15
+          max: 20
       throw_step:
           min: 41
           max: 60

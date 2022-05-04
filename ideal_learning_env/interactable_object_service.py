@@ -43,7 +43,12 @@ from .choosers import (
     choose_scale,
     choose_shape_material,
 )
-from .numerics import MinMaxFloat, VectorFloatConfig, VectorIntConfig
+from .numerics import (
+    MinMaxFloat,
+    RandomizableVectorFloat3dOrFloat,
+    VectorFloatConfig,
+    VectorIntConfig,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -120,6 +125,10 @@ class InteractableObjectConfig(BaseFeatureConfig):
     of objects with this template to generate in each scene. For a list or a
     MinMaxInt, a new number will be randomly chosen for each scene.
     Default: `1`
+    - `dimensions` ([VectorFloatConfig](#VectorFloatConfig) dict, int,
+    [MinMaxInt](#MinMaxInt), or a list of any of those types): Sets the overal
+    dimensions of the object in meters.  This field will override scale.
+    Default: Use scale.
     - `identical_to` (str): Used to match to another object with
     the specified label, so that this definition can share that object's
     exact shape, scale, and material. Overrides `identical_except_color`
@@ -159,7 +168,7 @@ class InteractableObjectConfig(BaseFeatureConfig):
     dict, or list of VectorFloatConfig dicts): The scale of this object in each
     scene. A single float will be used as the scale for all object dimensions
     (X/Y/Z). For a list or a MinMaxFloat, a new scale will be randomly chosen
-    for each scene. Default: `1`
+    for each scene. This field can be overriden by 'dimensions'. Default: `1`
     - `shape` (string, or list of strings): The shape (object type) of this
     object in each scene. For a list, a new shape will be randomly chosen for
     each scene. Default: random
@@ -212,6 +221,7 @@ class InteractableObjectConfig(BaseFeatureConfig):
     ```
     """
 
+    dimensions: RandomizableVectorFloat3dOrFloat = None
     material: Union[str, List[str]] = None
     scale: Union[float, MinMaxFloat, VectorFloatConfig,
                  List[Union[float, MinMaxFloat, VectorFloatConfig]]] = None
@@ -249,7 +259,9 @@ class InteractableObjectCreationService(BaseObjectCreationService):
             self, scene: Scene, reconciled: InteractableObjectConfig,
             source_template: InteractableObjectConfig
     ) -> InteractableObjectConfig:
-
+        if isinstance(reconciled.dimensions, (int, float)):
+            val = reconciled.dimensions
+            reconciled.dimensions = Vector3d(x=val, y=val, z=val)
         (reconciled.shape, mat) = choose_shape_material(
             reconciled.shape, reconciled.material)
         reconciled.material = mat[0] if isinstance(mat, MaterialTuple) else mat
@@ -257,6 +269,9 @@ class InteractableObjectCreationService(BaseObjectCreationService):
             source_template.scale,
             reconciled.shape
         )
+        if isinstance(reconciled.scale, (int, float)):
+            val = reconciled.scale
+            reconciled.scale = Vector3d(x=val, y=val, z=val)
         defn = self._create_definition(reconciled)
         self.defn = defn
         reconciled.scale = defn.scale
@@ -270,6 +285,7 @@ class InteractableObjectCreationService(BaseObjectCreationService):
                 defn.dimensions.x,
                 defn.dimensions.z,
                 scene.room_dimensions.x,
+                scene.room_dimensions.y,
                 scene.room_dimensions.z
             )
             reconciled.rotation = choose_rotation(reconciled.rotation)
@@ -420,13 +436,29 @@ class InteractableObjectCreationService(BaseObjectCreationService):
             colors = [mat[0]]
             mat = mat[1]
 
-        return base_objects.create_specific_definition_from_base(
+        defn = base_objects.create_specific_definition_from_base(
             shape,
             mat,
             colors,
             salient_materials,
             template.scale
         )
+        if template.dimensions:
+            # We need the original defn to get the dimensions at a given scale.
+            # We then adjust that scale relative to ratio of given dimensions
+            # and desired dimensions to give a scale that will achieve the
+            # desired dimensions.
+            template.scale.x *= template.dimensions.x / defn.dimensions.x
+            template.scale.y *= template.dimensions.y / defn.dimensions.y
+            template.scale.z *= template.dimensions.z / defn.dimensions.z
+            defn = base_objects.create_specific_definition_from_base(
+                shape,
+                mat,
+                colors,
+                salient_materials,
+                template.scale
+            )
+        return defn
 
 
 FeatureCreationService.register_creation_service(

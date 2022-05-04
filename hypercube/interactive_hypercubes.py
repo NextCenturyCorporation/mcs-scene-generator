@@ -19,6 +19,7 @@ from generator import (
     specific_objects,
     tags,
 )
+from generator.scene import get_step_limit_from_dimensions
 
 from .hypercubes import (
     Hypercube,
@@ -50,7 +51,6 @@ ROOM_X_MAX = (ROOM_DIMENSIONS['x'] / 2.0) - geometry.PERFORMER_WIDTH
 ROOM_Z_MAX = (ROOM_DIMENSIONS['x'] / 2.0) - geometry.PERFORMER_WIDTH
 
 
-LAST_STEP = 2500
 SMALL_CONTEXT_OBJECT_CHOICES = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
 SMALL_CONTEXT_OBJECT_WEIGHTS = [5, 5, 10, 10, 12.5, 15, 12.5, 10, 10, 5, 5]
 
@@ -1718,7 +1718,11 @@ class InteractiveHypercube(Hypercube):
             scene['goal'],
             [self._target_data.instance_list[scene_index]]
         )
-        scene['goal']['last_step'] = LAST_STEP
+
+        scene['goal']['last_step'] = get_step_limit_from_dimensions(
+            scene.get('roomDimensions', {}).get('x'),
+            scene.get('roomDimensions', {}).get('z')
+        )
 
         role_to_object_list = {}
         role_to_object_list[tags.ROLES.TARGET] = [

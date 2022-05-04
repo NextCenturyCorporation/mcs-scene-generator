@@ -47,6 +47,9 @@ Default: `1`
 ([AgentActionConfig](#AgentActionConfig)): The config for agent actions
 or animations.  Enties in a list are NOT choices.  Each entry will be kept
 and any randomness will be reconciled inside the entry.
+- `movement` ([AgentMovementConfig](#AgentMovementConfig)) or list of
+([AgentMovementConfig](#AgentMovementConfig)): The config for agent
+movement.
 - `agent_settings` ([AgentSettings](#AgentSettings) or list of
 [AgentSettings](#AgentSettings)): The settings that describe how an agent
 will look. Default: random
@@ -83,6 +86,31 @@ actions:
   is_loop_animation: [True, False]
 ```
 
+#### AgentMovementConfig
+
+Represents what movements the agent is to perform.  If the
+'points' field is set, the 'bounds' and 'num_points' fields will
+be ignored.
+- `animation` (str or list of str): Determines animation that
+should occur while movement is happening.
+Default: 'TPM_walk' or 'TPM_run'
+- `step_begin` (int, or list of ints, or [MinMaxInt](#MinMaxInt) dict):
+The step at which this movement should start.
+- `points` (list of [VectorFloatConfig](#VectorFloatConfig)): List of
+points the agent should move to.  If this value is set, it will take
+precedence over 'bounds' and 'num_points'.  Default: Use bounds
+- `bounds` (list of [VectorFloatConfig](#VectorFloatConfig)): A set of
+points that create a polygon in which points will be generated inside.
+If there are less than 3 points, the entire room will be used.  This
+option will be ignored if 'points' is set.
+Default: Entire room
+- `num_points` (int, or list of ints, or [MinMaxInt](#MinMaxInt) dict):
+The number of points to generate inside the bounds.  Only valid if points
+is not used.  Default: random between 2 and 10 inclusive.
+- `repeat` (bool or list of bool): Determines whether the
+set of movements should loop or end when finished.
+Default: Random
+
 #### AgentSettings
 
 Describes the appearance of the agent.  Detailed information can be
@@ -97,6 +125,20 @@ position can be specified.
 - `agent_position` ([VectorFloatConfig](#VectorFloatConfig) or list of
 [VectorFloatConfig](#VectorFloatConfig)): Determines the position of the
 agent.  Default: Random
+- `movement_bounds` (list of [VectorFloatConfig](#VectorFloatConfig))
+points to generate a polygon that bounds the agents random movement.
+If the polygon has an area of 0, no movement will occur.  Polygons with
+only 1 or 2 points will have an area of 0 and therefore will have no
+movement.  Default: entire room
+
+#### BisectingPlatformConfig
+
+Defines details of the shortcut_bisecting_platform shortcut.  This shortcut
+creates a platform that bisects the room, where the performer will start.
+On default, a blocking wall is on that platform, forcing the performer
+to choose a side to drop off of the platform, but this can be disabled.
+- `has_blocking_wall` (bool): Enables the blocking wall so that the
+performer has to stop and choose a side of the room. Default: True
 
 #### FloorAreaConfig
 
@@ -157,6 +199,10 @@ following optional properties:
 of objects with this template to generate in each scene. For a list or a
 MinMaxInt, a new number will be randomly chosen for each scene.
 Default: `1`
+- `dimensions` ([VectorFloatConfig](#VectorFloatConfig) dict, int,
+[MinMaxInt](#MinMaxInt), or a list of any of those types): Sets the overal
+dimensions of the object in meters.  This field will override scale.
+Default: Use scale.
 - `identical_to` (str): Used to match to another object with
 the specified label, so that this definition can share that object's
 exact shape, scale, and material. Overrides `identical_except_color`
@@ -196,7 +242,7 @@ or list of MinMaxFloat dicts, or [VectorFloatConfig](#VectorFloatConfig)
 dict, or list of VectorFloatConfig dicts): The scale of this object in each
 scene. A single float will be used as the scale for all object dimensions
 (X/Y/Z). For a list or a MinMaxFloat, a new scale will be randomly chosen
-for each scene. Default: `1`
+for each scene. This field can be overriden by 'dimensions'. Default: `1`
 - `shape` (string, or list of strings): The shape (object type) of this
 object in each scene. For a list, a new shape will be randomly chosen for
 each scene. Default: random
@@ -728,7 +774,9 @@ later options overriding earlier options if necessary. Default: not used
 
 #### StructuralPlatformConfig
 
-Defines details of a structural platform.
+Defines details of a structural platform. The top of a platform should
+never exceed room_dimension_y - 1.25 if a target or performer are to be
+placed on top of the platform to ensure the performer can reach the target.
 
 - `num` (int, or list of ints, or [MinMaxInt](#MinMaxInt) dict, or list of
 MinMaxInt dicts): Number of structures to be created with these parameters
@@ -757,6 +805,12 @@ VectorFloatConfig dicts): The structure's position in the scene
 dict, or list of MinMaxFloat dicts): The structure's rotation in the scene
 - `scale` (float, or list of floats, or [MinMaxFloat](#MinMaxFloat) dict,
 or list of MinMaxFloat dicts): Scale of the platform
+- `auto_adjust_platforms` (bool or list of bools): If true, makes sure all
+platform heights do not exceed 1.25 units below the y room dimension
+allowing the performer to always stand on top of a platform. For example,
+a room with a room_dimension_y = 4 and
+auto_adjusted_platforms = True will ensure that all platform heights
+do not exceed 2.75.  Default: False
 
 #### StructuralPlatformLipsConfig
 
@@ -807,6 +861,10 @@ MinMaxInt dicts): Number of structures to be created with these parameters
 - `height` (float, or list of floats, or
 [MinMaxFloat](#MinMaxFloat) dict, or list of MinMaxFloat dicts): The
 height on the wall that the thrower will be placed.
+- `impulse` (bool, or list of bools): Whether to use "impulse" force mode.
+We recommend using impulse force mode moving forward. Please note that the
+default `throw_force` is different for impulse and non-impulse force modes.
+Default: true
 - `labels` (string, or list of strings): A label or labels to be assigned
 to this object. Always automatically assigned "throwers"
 - `position_relative` ([RelativePositionConfig](#RelativePositionConfig)
@@ -846,7 +904,13 @@ be between 0 and 15. Default: random value between 0 and 15.
 - `throw_force` (float, or list of floats, or
 [MinMaxFloat](#MinMaxFloat) dict, or list of MinMaxFloat dicts): Force of
 the throw put on the projectile.  This value will be multiplied by the
-mass of the projectile.  Values between 500 and 1500 are typical.
+mass of the projectile.  Default: between 5 and 20 for impulse force mode,
+or between 500 and 2000 for non-impulse force mode
+- `throw_force_multiplier` (float, or list of floats, or
+[MinMaxFloat](#MinMaxFloat) dict, or list of MinMaxFloat dicts): Force of
+the throw put on the projectile, that will be multiplied by the appropriate
+room dimension for the thrower's wall position (X for left/right, Z for
+front/back). If set, overrides the `throw_force`.
 - `throw_step` (int, or list of ints, or [MinMaxInt](#MinMaxInt) dict, or
 list of MinMaxInt dicts): The step of the simulation in which the
 projectile should be thrown.
@@ -1013,6 +1077,24 @@ z:
 
 You may set the following options in your ILE (YAML) config file:
 
+#### auto_last_step
+
+(bool, or list of bools): Determines if the last step should automatically
+be determined by room size.  The last step is calculated such that the
+performer can walk in a circle along the walls of the room approximately 5
+times.  If 'last_step' is set, that field takes
+precedence.  Default: False
+
+Simple Example:
+```
+auto_last_step: False
+```
+
+Advanced Example:
+```
+auto_last_step: True
+```
+
 #### ceiling_material
 
 (string, or list of strings): A single material for the ceiling, or a
@@ -1049,6 +1131,26 @@ check_valid_path: false
 Advanced Example:
 ```
 check_valid_path: true
+```
+
+#### circles
+
+(list of either ints, or lists of ints, or [MinMaxInt](#MinMaxInt) dicts,
+or lists of MinMaxInt dicts): When the AI should be forced to rotate in a
+complete circle counterclockwise (by only allowing RotateRight actions for
+36 consecutive actions).
+This field must be blank or an empty array if `passive_scene` is `true`.
+
+Simple Example:
+```
+circles: null
+```
+
+Advanced Example:
+```
+circles:
+  - 7
+  - [107, 207]
 ```
 
 #### doors
@@ -1327,7 +1429,8 @@ Note: Creating too many random objects can increase the chance of failure.
 #### last_step
 
 (int, or list of ints): The last possible action step, or list of last
-steps, from which one is chosen at random for each scene. Default: none
+steps, from which one is chosen at random for each scene. This field will
+overwrite 'auto_last_step' if set.  Default: none
 (unlimited)
 
 Simple Example:
@@ -1409,7 +1512,24 @@ num_random_interactable_objects:
 (bool): Determine if scene should be considered passive and the
 performer agent should be restricted to only use the `"Pass"` action.
 If true, ILE will raise an exception if last_step is not set or either
-`freezes`, `swivels` or `teleports` has any entries.
+`circles`, `freezes`, `swivels` or `teleports` has any entries.
+
+#### performer_look_at
+
+(string or list of strings): If set, configures the performer to start
+looking at an object found by the label matching the string given.
+Overrides `performer_start_rotation`.
+Default: Use `performer_start_rotation`
+
+Simple Example:
+```
+performer_look_at: null
+```
+
+Advanced Example:
+```
+performer_look_at: [target, agent]
+```
 
 #### performer_start_position
 
@@ -1417,7 +1537,19 @@ If true, ILE will raise an exception if last_step is not set or either
 dicts): The starting position of the performer agent, or a list of
 positions, from which one is chosen at random for each scene. The
 (optional) `y` is used to position on top of structural objects like
-platforms. Default: random within the room
+platforms. Valid parameters are constrained by room dimensions.
+`x` and `z` positions must be positioned within half of the room
+dimension bounds minus an additional 0.25 to account for the performer
+width. For example: in a room where 'dimension x = 5', valid
+`x` parameters would be '4.75, MinMaxFloat(-4.75, 4.75) and
+[-4.75, 0, 4.75].' In the case of variable room dimensions that use a
+MinMaxInt or list, valid parameters are bound by the maximum room
+dimension. For example: with 'dimension `x` = MinMax(5, 7) or [5, 6, 7]
+valid x parameters would be '3.25, MinMaxFloat(-3.25, 3.25), and
+[-3.25, 0, 3.25].' For `y` start and room dimensions, the min y position
+must always be greater than 0 and the max must always be less than or equal
+to room dimension y - 1.25.' This ensures the performer does not clip
+into the ceiling. Default: random within the room
 
 Simple Example:
 ```
@@ -1643,15 +1775,27 @@ shortcut_agent_with_target:
       max: 3
     y: 0
     z: [2, 3]
+  movement_bounds:
+    - x: 0
+      z: 2
+    - x: 2
+      z: 0
+    - x: 0
+      z: -2
+    - x: -2
+      z: 0
 ```
 
 #### shortcut_bisecting_platform
 
-(bool): Creates a platform bisecting the room.  The performer starts on one
-end with a wall in front of them such that the performer is forced to make
-a choice on which side they want to drop off and they cannot get back to
-the other side. This overrides the `performer_start_position` and
-`performer_start_rotation`, if configured. Default: False
+(bool or [BisectingPlatformConfig](#BisectingPlatformConfig)):
+Creates a platform bisecting the room.  If True, the default behavior will
+be that the performer starts on one end with a blocking wall in front of
+them such that the performer is forced to make a choice on which side they
+want to drop off and they cannot get back to the other side. This overrides
+the `performer_start_position` and `performer_start_rotation`, if
+configured. Note that the blocking wall can be disabled if needed.
+Default: False
 
 Simple Example:
 ```
@@ -1660,7 +1804,8 @@ shortcut_bisecting_platform: False
 
 Advanced Example:
 ```
-shortcut_bisecting_platform: True
+shortcut_bisecting_platform:
+    has_blocking_wall: False
 ```
 
 #### shortcut_lava_room
@@ -1767,18 +1912,13 @@ specific_agents:
   agent_settings:
     chest: 2
     eyes: 1
-    glasses:
-        min: 0
-        max: 2
-    showBeard: True
-    showGlasses: True
   position:
     x: [1, 0, -1, 0.5, -0.5]
     y: 0
     z: [1, 0, -1]
   rotation_y: [0, 10, 350]
   actions:
-    - step_begin: [3, 4]
+    - step_begin: [1, 2]
       step_end: 7
       is_loop_animation: False
       id: ['TPM_clap', 'TPM_cry']
@@ -1786,7 +1926,20 @@ specific_agents:
       step_end: 17
       is_loop_animation: True
       id: ['TPM_clap', 'TPM_cry']
-
+  movement:
+    animation: TPF_walk
+    step_begin: [2, 4]
+    bounds:
+      - x: 2
+        z: 0
+      - x: 0
+        z: 2
+      - x: -2
+        z: 0
+      - x: 0
+        z: -2
+    num_points: 5
+    repeat: True
 ```
 
 #### specific_interactable_objects
@@ -2006,6 +2159,7 @@ structural_platforms:
       z:
         min: 0.3
         max: 1.3
+    auto_adjust_platforms: True
 ```
 
 #### structural_ramps

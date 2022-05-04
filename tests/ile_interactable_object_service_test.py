@@ -553,6 +553,112 @@ def test_interactable_object_service_create_keyword_location_in():
     assert chest['debug'][DEBUG_FINAL_POSITION_KEY]
 
 
+def test_interactable_object_service_create_keyword_location_in_placer_ctr():
+    container_config = InteractableObjectConfig(
+        material='AI2-THOR/Materials/Wood/WhiteWood',
+        position=VectorFloatConfig(-2, 0, -2),
+        scale=1,
+        shape='container_asymmetric_01',
+        labels="container_label"
+    )
+
+    srv = InteractableObjectCreationService()
+    scene = prior_scene()
+    container, _ = srv.add_to_scene(scene, container_config, [])
+    container = container[0]
+    klc = KeywordLocationConfig(
+        KeywordLocation.IN_CONTAINER,
+        container_label="container_label")
+    config = InteractableObjectConfig(
+        material='Custom/Materials/Black',
+        keyword_location=klc,
+        scale=1,
+        shape='crayon_blue'
+    )
+    srv = InteractableObjectCreationService()
+    reconciled = srv.reconcile(scene, config)
+
+    container['moves'] = [{
+        "stepBegin": 1,
+        "stepEnd": 16,
+        "vector": {
+            "x": 0,
+            "y": -0.25,
+            "z": 0
+        }
+    }]
+    container['kinematic'] = True
+    container['togglePhysics'] = [{"stepBegin": 60}]
+    container['debug']['positionedBy'] = "mechanism"
+
+    instance = srv.create_feature_from_specific_values(
+        scene=scene, reconciled=reconciled, source_template=config)
+
+    assert instance['type'] == 'crayon_blue'
+    assert instance['debug'][DEBUG_FINAL_POSITION_KEY]
+    assert instance['shows'][0]['position']['x'] == 0
+    assert instance['shows'][0]['position']['z'] == 0
+    assert instance['locationParent'] == container['id']
+
+    assert instance['shows'][0]['scale'] == {'x': 1, 'y': 1, 'z': 1}
+
+    # make sure object inside container match container physics
+    assert instance['moves'] == container['moves']
+    assert instance['togglePhysics'] == container['togglePhysics']
+    assert instance['kinematic'] == container['kinematic']
+
+    assert container['debug'][DEBUG_FINAL_POSITION_KEY]
+
+
+def test_interactable_object_service_create_keyword_location_in_dropper_ctr():
+    container_config = InteractableObjectConfig(
+        material='AI2-THOR/Materials/Wood/WhiteWood',
+        position=VectorFloatConfig(-2, 0, -2),
+        scale=1,
+        shape='container_asymmetric_01',
+        labels="container_label"
+    )
+
+    srv = InteractableObjectCreationService()
+    scene = prior_scene()
+    container, _ = srv.add_to_scene(scene, container_config, [])
+    container = container[0]
+    klc = KeywordLocationConfig(
+        KeywordLocation.IN_CONTAINER,
+        container_label="container_label")
+    config = InteractableObjectConfig(
+        material='Custom/Materials/Black',
+        keyword_location=klc,
+        scale=1,
+        shape='crayon_blue'
+    )
+    srv = InteractableObjectCreationService()
+    reconciled = srv.reconcile(scene, config)
+
+    container['kinematic'] = True
+    container['togglePhysics'] = [{"stepBegin": 60}]
+    container['debug']['positionedBy'] = "mechanism"
+
+    instance = srv.create_feature_from_specific_values(
+        scene=scene, reconciled=reconciled, source_template=config)
+
+    assert instance['type'] == 'crayon_blue'
+    assert instance['debug'][DEBUG_FINAL_POSITION_KEY]
+    assert instance['shows'][0]['position']['x'] == 0
+    assert instance['shows'][0]['position']['z'] == 0
+    assert instance['locationParent'] == container['id']
+
+    assert instance['shows'][0]['scale'] == {'x': 1, 'y': 1, 'z': 1}
+
+    # don't update physics for cases for objects within containers that
+    # are held by non-placers
+    assert instance.get('togglePhysics') is None
+    assert instance.get('kinematic') is None
+    assert instance.get('moves') is None
+
+    assert container['debug'][DEBUG_FINAL_POSITION_KEY]
+
+
 def test_interactable_object_service_create_keyword_location_in_with():
     rel_config = InteractableObjectConfig(
         scale=1,
@@ -698,7 +804,7 @@ def test_interactable_object_service_create_keyword_location_on_center():
     instance = srv.create_feature_from_specific_values(
         scene=scene, reconciled=reconciled, source_template=config)
     assert instance['type'] == 'crayon_blue'
-    assert instance['shows'][0]['position']['x'] == -2
+    assert instance['shows'][0]['position']['x'] == pytest.approx(-2)
     assert instance['shows'][0]['position']['z'] == -2
     assert instance['shows'][0]['position']['y'] == 0.265
     assert instance['shows'][0]['scale'] == {'x': 1, 'y': 1, 'z': 1}

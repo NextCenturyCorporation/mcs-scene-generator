@@ -1,5 +1,5 @@
 from dataclasses import asdict, dataclass, field
-from typing import List
+from typing import List, Optional
 
 from machine_common_sense.config_manager import (
     FloorTexturesConfig,
@@ -20,6 +20,7 @@ scene_aliases = {
     "floor_properties": "floorProperties",
     "floor_textures": "floorTextures",
     "intuitive_physics": "intuitivePhysics",
+    "partition_floor": "partitionFloor",
     "performer_start": "performerStart",
     "restrict_open_doors": "restrictOpenDoors",
     "room_dimensions": "roomDimensions",
@@ -27,6 +28,12 @@ scene_aliases = {
     "wall_material": "wallMaterial",
     "wall_properties": "wallProperties"
 }
+
+
+@dataclass
+class PartitionFloor:
+    leftHalf: Optional[float] = 0
+    rightHalf: Optional[float] = 0
 
 
 @dataclass
@@ -51,6 +58,7 @@ class Scene:
     name: str = ""
     # objects: List[SceneObject] = field(default_factory=list)
     objects: List = field(default_factory=list)
+    partition_floor: PartitionFloor = None
     performer_start: PerformerStart = None
     restrict_open_doors: bool = None
     room_dimensions: Vector3d = None
@@ -123,3 +131,11 @@ class Scene:
         data['performerStart'] = data['performerStart'].dict()
         data['roomDimensions'] = data['roomDimensions'].dict()
         return data
+
+
+def get_step_limit_from_dimensions(room_x: int, room_z: int) -> int:
+    room_x = room_x or DEFAULT_ROOM_DIMENSIONS['x']
+    room_z = room_z or DEFAULT_ROOM_DIMENSIONS['z']
+    steps_moving_around_the_room = ((room_x * 10) + (room_z * 10)) * 2
+    steps_for_rotation = 100
+    return int((steps_moving_around_the_room + steps_for_rotation) * 5)

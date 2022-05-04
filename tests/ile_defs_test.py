@@ -7,7 +7,7 @@ from machine_common_sense.config_manager import (
     Vector3d,
 )
 
-from generator import ObjectBounds, ObjectDefinition
+from generator import ObjectBounds, ObjectDefinition, geometry
 from generator.scene import Scene
 from ideal_learning_env.defs import (
     ILEException,
@@ -121,18 +121,18 @@ def test_find_bounds():
         {'shows': [{'boundingBox': bounds_2}]}
     ])
     assert find_bounds(scene) == [bounds_1, bounds_2]
-
+    buffer = geometry.FLOOR_FEATURE_BOUNDS_BUFFER
     bounds_3 = ObjectBounds(box_xz=[
-        Vector3d(x=2.5, y=0, z=2.5),
-        Vector3d(x=3.5, y=0, z=2.5),
-        Vector3d(x=3.5, y=0, z=3.5),
-        Vector3d(x=2.5, y=0, z=3.5)
+        Vector3d(x=2.5 + buffer, y=0, z=2.5 + buffer),
+        Vector3d(x=3.5 - buffer, y=0, z=2.5 + buffer),
+        Vector3d(x=3.5 - buffer, y=0, z=3.5 - buffer),
+        Vector3d(x=2.5 + buffer, y=0, z=3.5 - buffer)
     ], max_y=100, min_y=0)
     bounds_4 = ObjectBounds(box_xz=[
-        Vector3d(x=-3.5, y=0, z=-3.5),
-        Vector3d(x=-2.5, y=0, z=-3.5),
-        Vector3d(x=-2.5, y=0, z=-2.5),
-        Vector3d(x=-3.5, y=0, z=-2.5)
+        Vector3d(x=-3.5 + buffer, y=0, z=-3.5 + buffer),
+        Vector3d(x=-2.5 - buffer, y=0, z=-3.5 + buffer),
+        Vector3d(x=-2.5 - buffer, y=0, z=-2.5 - buffer),
+        Vector3d(x=-3.5 + buffer, y=0, z=-2.5 - buffer)
     ], max_y=100, min_y=0)
 
     # Case 4: 1 hole

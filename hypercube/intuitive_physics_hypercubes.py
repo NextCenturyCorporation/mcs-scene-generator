@@ -353,9 +353,8 @@ class TargetVariations(ObjectVariations):
             }
         # If the object's a cylinder, rotate it a little to be at an angle.
         if self._is_fall_down and definition.type in [
-            'cylinder', 'decagon_cylinder', 'double_cone', 'dumbbell_1',
-            'dumbbell_2', 'hex_cylinder', 'hex_tube_narrow', 'hex_tube_wide',
-            'tie_fighter', 'tube_narrow', 'tube_wide'
+            'cylinder', 'decagon_cylinder', 'hex_cylinder', 'hex_tube_narrow',
+            'hex_tube_wide', 'tube_narrow', 'tube_wide'
         ]:
             location_copy['rotation']['y'] = random.choice([45, -45])
         return location_copy

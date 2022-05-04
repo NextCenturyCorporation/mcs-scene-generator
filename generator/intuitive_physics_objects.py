@@ -121,8 +121,10 @@ _CYLINDER_NOVEL_SIZE = create_variable_definition_from_base(
 )
 _CYLINDER_NOVEL_SIZE.untrainedSize = True
 # Rotate the object onto its curved side so it can roll sideways.
-_CYLINDER.rotation = Vector3d(x=90, y=0, z=0)
-_CYLINDER_NOVEL_SIZE.rotation = Vector3d(x=90, y=0, z=0)
+_CYLINDER_SIDEWAYS = copy.deepcopy(_CYLINDER)
+_CYLINDER_SIDEWAYS.rotation = Vector3d(x=90, y=0, z=0)
+_CYLINDER_SIDEWAYS_NOVEL_SIZE = copy.deepcopy(_CYLINDER_NOVEL_SIZE)
+_CYLINDER_SIDEWAYS_NOVEL_SIZE.rotation = Vector3d(x=90, y=0, z=0)
 
 
 _PYRAMID = create_variable_definition_from_base(
@@ -198,8 +200,10 @@ _TUBE_NARROW_NOVEL_SIZE = create_variable_definition_from_base(
 )
 _TUBE_NARROW_NOVEL_SIZE.untrainedSize = True
 # Rotate the object onto its curved side so it can roll sideways.
-_TUBE_NARROW.rotation = Vector3d(x=90, y=0, z=0)
-_TUBE_NARROW_NOVEL_SIZE.rotation = Vector3d(x=90, y=0, z=0)
+_TUBE_NARROW_SIDEWAYS = copy.deepcopy(_TUBE_NARROW)
+_TUBE_NARROW_SIDEWAYS.rotation = Vector3d(x=90, y=0, z=0)
+_TUBE_NARROW_SIDEWAYS_NOVEL_SIZE = copy.deepcopy(_TUBE_NARROW_NOVEL_SIZE)
+_TUBE_NARROW_SIDEWAYS_NOVEL_SIZE.rotation = Vector3d(x=90, y=0, z=0)
 
 
 _TUBE_WIDE = create_variable_definition_from_base(
@@ -214,8 +218,10 @@ _TUBE_WIDE_NOVEL_SIZE = create_variable_definition_from_base(
 )
 _TUBE_WIDE_NOVEL_SIZE.untrainedSize = True
 # Rotate the object onto its curved side so it can roll sideways.
-_TUBE_WIDE.rotation = Vector3d(x=90, y=0, z=0)
-_TUBE_WIDE_NOVEL_SIZE.rotation = Vector3d(x=90, y=0, z=0)
+_TUBE_WIDE_SIDEWAYS = copy.deepcopy(_TUBE_WIDE)
+_TUBE_WIDE_SIDEWAYS.rotation = Vector3d(x=90, y=0, z=0)
+_TUBE_WIDE_SIDEWAYS_NOVEL_SIZE = copy.deepcopy(_TUBE_WIDE_NOVEL_SIZE)
+_TUBE_WIDE_SIDEWAYS_NOVEL_SIZE.rotation = Vector3d(x=90, y=0, z=0)
 
 
 _DUCK = create_variable_definition_from_base(
@@ -313,8 +319,10 @@ _DOUBLE_CONE_NOVEL_SIZE = create_variable_definition_from_base(
 )
 _DOUBLE_CONE_NOVEL_SIZE.untrainedSize = True
 # Rotate the object onto its curved side so it can roll sideways.
-_DOUBLE_CONE.rotation = Vector3d(x=90, y=0, z=0)
-_DOUBLE_CONE_NOVEL_SIZE.rotation = Vector3d(x=90, y=0, z=0)
+_DOUBLE_CONE_SIDEWAYS = copy.deepcopy(_DOUBLE_CONE)
+_DOUBLE_CONE_SIDEWAYS.rotation = Vector3d(x=90, y=0, z=0)
+_DOUBLE_CONE_SIDEWAYS_NOVEL_SIZE = copy.deepcopy(_DOUBLE_CONE_NOVEL_SIZE)
+_DOUBLE_CONE_SIDEWAYS_NOVEL_SIZE.rotation = Vector3d(x=90, y=0, z=0)
 
 
 _DUMBBELL_1 = create_variable_definition_from_base(
@@ -330,8 +338,10 @@ _DUMBBELL_1_NOVEL_SIZE = create_variable_definition_from_base(
 )
 _DUMBBELL_1_NOVEL_SIZE.untrainedSize = True
 # Rotate the object onto its curved side so it can roll sideways.
-_DUMBBELL_1.rotation = Vector3d(x=90, y=0, z=0)
-_DUMBBELL_1_NOVEL_SIZE.rotation = Vector3d(x=90, y=0, z=0)
+_DUMBBELL_1_SIDEWAYS = copy.deepcopy(_DUMBBELL_1)
+_DUMBBELL_1_SIDEWAYS.rotation = Vector3d(x=90, y=0, z=0)
+_DUMBBELL_1_SIDEWAYS_NOVEL_SIZE = copy.deepcopy(_DUMBBELL_1_NOVEL_SIZE)
+_DUMBBELL_1_SIDEWAYS_NOVEL_SIZE.rotation = Vector3d(x=90, y=0, z=0)
 
 
 _DUMBBELL_2 = create_variable_definition_from_base(
@@ -347,8 +357,10 @@ _DUMBBELL_2_NOVEL_SIZE = create_variable_definition_from_base(
 )
 _DUMBBELL_2_NOVEL_SIZE.untrainedSize = True
 # Rotate the object onto its curved side so it can roll sideways.
-_DUMBBELL_2.rotation = Vector3d(x=90, y=0, z=0)
-_DUMBBELL_2_NOVEL_SIZE.rotation = Vector3d(x=90, y=0, z=0)
+_DUMBBELL_2_SIDEWAYS = copy.deepcopy(_DUMBBELL_2)
+_DUMBBELL_2_SIDEWAYS.rotation = Vector3d(x=90, y=0, z=0)
+_DUMBBELL_2_SIDEWAYS_NOVEL_SIZE = copy.deepcopy(_DUMBBELL_2_NOVEL_SIZE)
+_DUMBBELL_2_SIDEWAYS_NOVEL_SIZE.rotation = Vector3d(x=90, y=0, z=0)
 
 
 _TIE_FIGHTER = create_variable_definition_from_base(
@@ -364,8 +376,10 @@ _TIE_FIGHTER_NOVEL_SIZE = create_variable_definition_from_base(
 )
 _TIE_FIGHTER_NOVEL_SIZE.untrainedSize = True
 # Rotate the object onto its curved side so it can roll sideways.
-_TIE_FIGHTER.rotation = Vector3d(x=90, y=0, z=0)
-_TIE_FIGHTER_NOVEL_SIZE.rotation = Vector3d(x=90, y=0, z=0)
+_TIE_FIGHTER_SIDEWAYS = copy.deepcopy(_TIE_FIGHTER)
+_TIE_FIGHTER_SIDEWAYS.rotation = Vector3d(x=90, y=0, z=0)
+_TIE_FIGHTER_SIDEWAYS_NOVEL_SIZE = copy.deepcopy(_TIE_FIGHTER_NOVEL_SIZE)
+_TIE_FIGHTER_SIDEWAYS_NOVEL_SIZE.rotation = Vector3d(x=90, y=0, z=0)
 
 
 _BUS_1 = create_variable_definition_from_base(
@@ -454,6 +468,27 @@ _TRUCK_2_NOVEL_SIZE.untrainedSize = True
 
 # Only use rollable objects in move-across setups.
 _MOVE_ACROSS_BASIC = [
+    _CYLINDER_SIDEWAYS,
+    _SPHERE,
+    _TUBE_NARROW_SIDEWAYS,
+    _TUBE_WIDE_SIDEWAYS,
+    _CYLINDER_SIDEWAYS_NOVEL_SIZE,
+    _SPHERE_NOVEL_SIZE,
+    _TUBE_NARROW_SIDEWAYS_NOVEL_SIZE,
+    _TUBE_WIDE_SIDEWAYS_NOVEL_SIZE,
+    # Eval 4 novel objects
+    _DOUBLE_CONE_SIDEWAYS,
+    _DOUBLE_CONE_SIDEWAYS_NOVEL_SIZE,
+    _DUMBBELL_1_SIDEWAYS,
+    _DUMBBELL_1_SIDEWAYS_NOVEL_SIZE,
+    _DUMBBELL_2_SIDEWAYS,
+    _DUMBBELL_2_SIDEWAYS_NOVEL_SIZE,
+    _TIE_FIGHTER_SIDEWAYS,
+    _TIE_FIGHTER_SIDEWAYS_NOVEL_SIZE,
+]
+
+_FALL_DOWN_BASIC = [
+    # Objects copied from _MOVE_ACROSS_BASIC (not the sideways versions)
     _CYLINDER,
     _SPHERE,
     _TUBE_NARROW,
@@ -462,7 +497,6 @@ _MOVE_ACROSS_BASIC = [
     _SPHERE_NOVEL_SIZE,
     _TUBE_NARROW_NOVEL_SIZE,
     _TUBE_WIDE_NOVEL_SIZE,
-    # Eval 4 novel objects
     _DOUBLE_CONE,
     _DOUBLE_CONE_NOVEL_SIZE,
     _DUMBBELL_1,
@@ -471,9 +505,7 @@ _MOVE_ACROSS_BASIC = [
     _DUMBBELL_2_NOVEL_SIZE,
     _TIE_FIGHTER,
     _TIE_FIGHTER_NOVEL_SIZE,
-]
-
-_FALL_DOWN_BASIC = _MOVE_ACROSS_BASIC + [
+    # Objects specific to _FALL_DOWN_BASIC
     _CIRCLE_FRUSTUM,
     _CONE,
     _CUBE,
@@ -523,13 +555,34 @@ _MOVE_ACROSS_ALL = _MOVE_ACROSS_BASIC + _MOVE_ACROSS_COMPLEX
 _FALL_DOWN_ALL = _FALL_DOWN_BASIC + _FALL_DOWN_COMPLEX
 
 
+# Map each intuitive physics object type (shape) to each size (scale) option.
+FALL_DOWN_TYPES_TO_SIZES = {}
+MOVE_ACROSS_TYPES_TO_SIZES = {}
+for definition in _FALL_DOWN_ALL:
+    if definition.type not in FALL_DOWN_TYPES_TO_SIZES:
+        FALL_DOWN_TYPES_TO_SIZES[definition.type] = []
+    if definition.scale:
+        FALL_DOWN_TYPES_TO_SIZES[definition.type].append(definition.scale)
+    FALL_DOWN_TYPES_TO_SIZES[definition.type].extend([
+        option.scale for option in definition.chooseSizeList
+    ])
+for definition in _MOVE_ACROSS_ALL:
+    if definition.type not in MOVE_ACROSS_TYPES_TO_SIZES:
+        MOVE_ACROSS_TYPES_TO_SIZES[definition.type] = []
+    if definition.scale:
+        MOVE_ACROSS_TYPES_TO_SIZES[definition.type].append(definition.scale)
+    MOVE_ACROSS_TYPES_TO_SIZES[definition.type].extend([
+        option.scale for option in definition.chooseSizeList
+    ])
+
+
 def _get(prop: str) -> Union[ObjectDefinition, List[ObjectDefinition]]:
     """Returns a deep copy of the global property with the given name
     (normally either an object definition or an object definition list)."""
     return copy.deepcopy(globals()['_' + prop])
 
 
-def _adjust_definition_list_to_opposite_colors(
+def _create_opposite_colors_definition_list(
     definition_list: List[ObjectDefinition]
 ) -> List[ObjectDefinition]:
     # Override each object definition so its colors/materials can only be
@@ -541,12 +594,8 @@ def _adjust_definition_list_to_opposite_colors(
     return definition_list
 
 
-_MOVE_ACROSS_OPPOSITE_COLORS = _adjust_definition_list_to_opposite_colors(
-    _get('MOVE_ACROSS_ALL')
-)
-_FALL_DOWN_OPPOSITE_COLORS = _adjust_definition_list_to_opposite_colors(
-    _get('FALL_DOWN_ALL')
-)
+_MOVE_ACROSS_OPPOSITE_COLORS = None
+_FALL_DOWN_OPPOSITE_COLORS = None
 
 
 def get_fall_down_definition_dataset(
@@ -594,6 +643,11 @@ def get_fall_down_opposite_colors_definition_dataset(
 ) -> DefinitionDataset:
     """Returns an immutable dataset of the corresponding intuitive physics
     object definition list."""
+    global _FALL_DOWN_OPPOSITE_COLORS
+    if not _FALL_DOWN_OPPOSITE_COLORS:
+        _FALL_DOWN_OPPOSITE_COLORS = (
+            _create_opposite_colors_definition_list(_get('FALL_DOWN_ALL'))
+        )
     return get_dataset(
         [_get('FALL_DOWN_OPPOSITE_COLORS')],
         'FALL_DOWN_OPPOSITE_COLORS',
@@ -646,6 +700,11 @@ def get_move_across_opposite_colors_definition_dataset(
 ) -> DefinitionDataset:
     """Returns an immutable dataset of the corresponding intuitive physics
     object definition list."""
+    global _MOVE_ACROSS_OPPOSITE_COLORS
+    if not _MOVE_ACROSS_OPPOSITE_COLORS:
+        _MOVE_ACROSS_OPPOSITE_COLORS = (
+            _create_opposite_colors_definition_list(_get('MOVE_ACROSS_ALL'))
+        )
     return get_dataset(
         [_get('MOVE_ACROSS_OPPOSITE_COLORS')],
         'MOVE_ACROSS_OPPOSITE_COLORS',

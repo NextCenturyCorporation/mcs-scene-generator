@@ -463,7 +463,8 @@ def throw_object(
     position_y_modifier: float = 0,
     position_z_modifier: float = 0,
     rotation_y: int = 0,
-    rotation_z: int = 0
+    rotation_z: int = 0,
+    impulse: bool = True
 ) -> Dict[str, Any]:
     """Modify and return the given object instance that will be thrown by the
     given device with the given force at the given step. The rotation_y should
@@ -500,6 +501,7 @@ def throw_object(
     swap_axes = (original_rotation.get('y', 0) % 180 == 90)
     # Add the force to the object.
     instance['forces'] = [{
+        'impulse': impulse,
         'relative': True,
         'stepBegin': throwing_step,
         'stepEnd': throwing_step,
@@ -509,5 +511,4 @@ def throw_object(
             'z': throwing_force if swap_axes else 0
         }
     }]
-    instance['maxAngularVelocity'] = 25
     return instance

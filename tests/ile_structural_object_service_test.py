@@ -70,14 +70,6 @@ from tests.ile_helper import (
 )
 
 
-def ceiling_and_wall_group():
-    # is this computed elsewhere?
-    all = []
-    for group in materials.CEILING_AND_WALL_GROUPINGS:
-        all += group
-    return all
-
-
 def material_tuple_group_to_string_list(group, existing_list=None):
     if existing_list is None:
         existing_list = []
@@ -838,7 +830,7 @@ def test_platform_creation_reconcile():
     assert r1.num == 1
     assert r1.lips == StructuralPlatformLipsConfig(False, False, False, False)
     assert r1.material in material_tuple_group_to_string_list(
-        ceiling_and_wall_group())
+        materials.ROOM_WALL_MATERIALS)
     assert -rd.x / 2.0 < r1.position.x < rd.x / 2.0
     assert r1.position.y == 0
     assert -rd.z / 2.0 < r1.position.z < rd.z / 2.0
@@ -905,7 +897,7 @@ def test_ramp_creation_reconcile():
     r1: StructuralRampConfig = srv.reconcile(scene, tmp)
     assert r1.num == 1
     assert r1.material in material_tuple_group_to_string_list(
-        ceiling_and_wall_group())
+        materials.ROOM_WALL_MATERIALS)
     assert -rd.x / 2.0 < r1.position.x < rd.x / 2.0
     assert r1.position.y == 0
     assert -rd.z / 2.0 < r1.position.z < rd.z / 2.0
@@ -965,13 +957,14 @@ def test_thrower_creation_reconcile():
     tmp = StructuralThrowerConfig(1)
     r1: StructuralThrowerConfig = srv.reconcile(scene, tmp)
     assert r1.num == 1
+    assert r1.impulse
     assert r1.wall in [
         WallSide.FRONT.value,
         WallSide.BACK.value,
         WallSide.LEFT.value,
         WallSide.RIGHT.value]
     assert 0 <= r1.throw_step <= 10
-    assert 500 <= r1.throw_force <= 1000
+    assert r1.throw_force is None
     assert -45 <= r1.rotation_y <= 45
     assert 0 <= r1.rotation_z <= 15
     assert r1.projectile_shape in THROWER_SHAPES
@@ -982,7 +975,7 @@ def test_thrower_creation_reconcile():
 
     tmp2 = StructuralThrowerConfig(
         [2, 3], None, wall=WallSide.FRONT.value, throw_step=[50, 60],
-        throw_force=MinMaxFloat(555, 557), rotation_y=2, rotation_z=22,
+        throw_force=MinMaxInt(14, 16), rotation_y=2, rotation_z=22,
         position_wall=-2,
         height=1.2, projectile_shape="ball", projectile_scale=1,
         projectile_material="AI2-THOR/Materials/Walls/DrywallOrange")
@@ -991,7 +984,7 @@ def test_thrower_creation_reconcile():
 
     assert r2.wall == WallSide.FRONT.value
     assert r2.throw_step in [50, 60]
-    assert 555 <= r2.throw_force <= 557
+    assert 14 <= r2.throw_force <= 16
     assert r2.rotation_y == 2
     assert r2.rotation_z == 22
     assert r2.position_wall == -2
@@ -1072,7 +1065,7 @@ def test_wall_creation_reconcile():
 
     assert r1.num == 1
     assert r1.material in material_tuple_group_to_string_list(
-        ceiling_and_wall_group())
+        materials.ROOM_WALL_MATERIALS)
     assert -rd.x / 2.0 < r1.position.x < rd.x / 2.0
     assert r1.position.y == 0
     assert -rd.z / 2.0 < r1.position.z < rd.z / 2.0
@@ -1607,6 +1600,8 @@ def test_placer_create_container_asymmetric_with_rotation():
 
 
 def test_platform_create():
+    scene = prior_scene()
+    scene.room_dimensions.y = 10
     temp = StructuralPlatformConfig(
         position=VectorFloatConfig(1.1, 1.2, 1.3),
         rotation_y=34,
@@ -1615,7 +1610,7 @@ def test_platform_create():
         scale=0.6, attached_ramps=0, platform_underneath=False,
         platform_underneath_attached_ramps=0)
     platforms = StructuralPlatformCreationService(
-    ).create_feature_from_specific_values(prior_scene(), temp, None)
+    ).create_feature_from_specific_values(scene, temp, None)
 
     plat = platforms[0]
     assert plat
@@ -1639,7 +1634,81 @@ def test_platform_create():
     assert scale == {'x': 0.6, 'y': 0.6, 'z': 0.6}
 
 
+def test_platform_create_too_tall_auto_adjust():
+    scene = prior_scene()
+    scene.room_dimensions.y = 5
+    temp = StructuralPlatformConfig(
+        position=VectorFloatConfig(1.1, 3, 1.3),
+        rotation_y=34,
+        material="AI2-THOR/Materials/Ceramics/BrownMarbleFake 1",
+        lips=StructuralPlatformLipsConfig(False, True, False, True),
+        scale=2, attached_ramps=0, platform_underneath=False,
+        platform_underneath_attached_ramps=0, auto_adjust_platforms=True)
+    platforms = StructuralPlatformCreationService(
+    ).create_feature_from_specific_values(scene, temp, None)
+
+    plat = platforms[0]
+    assert plat
+    assert plat['id'].startswith('platform_')
+    assert plat['type'] == 'cube'
+    assert plat['kinematic']
+    assert plat['structure']
+    assert plat['materials'] == [
+        "AI2-THOR/Materials/Ceramics/BrownMarbleFake 1"]
+    assert plat['lips'] == {
+        'front': False,
+        'back': True,
+        'left': False,
+        'right': True}
+    show = plat['shows'][0]
+    pos = show['position']
+    rot = show['rotation']
+    scale = show['scale']
+    assert pos == {'x': 1.1, 'y': 3.375, 'z': 1.3}
+    assert rot == {'x': 0, 'y': 34, 'z': 0}
+    assert scale == {'x': 2, 'y': 0.75, 'z': 2}
+
+
+def test_platform_create_too_tall_no_auto_adjust():
+    scene = prior_scene()
+    scene.room_dimensions.x = 10
+    scene.room_dimensions.y = 5
+    scene.room_dimensions.z = 10
+    temp = StructuralPlatformConfig(
+        position=VectorFloatConfig(1.1, 0, 1.3),
+        rotation_y=34,
+        material="AI2-THOR/Materials/Ceramics/BrownMarbleFake 1",
+        lips=StructuralPlatformLipsConfig(False, True, False, True),
+        scale=4.9, attached_ramps=0, platform_underneath=False,
+        platform_underneath_attached_ramps=0)
+    platforms = StructuralPlatformCreationService(
+    ).create_feature_from_specific_values(scene, temp, None)
+
+    plat = platforms[0]
+    assert plat
+    assert plat['id'].startswith('platform_')
+    assert plat['type'] == 'cube'
+    assert plat['kinematic']
+    assert plat['structure']
+    assert plat['materials'] == [
+        "AI2-THOR/Materials/Ceramics/BrownMarbleFake 1"]
+    assert plat['lips'] == {
+        'front': False,
+        'back': True,
+        'left': False,
+        'right': True}
+    show = plat['shows'][0]
+    pos = show['position']
+    rot = show['rotation']
+    scale = show['scale']
+    assert pos == {'x': 1.1, 'y': 2.45, 'z': 1.3}
+    assert rot == {'x': 0, 'y': 34, 'z': 0}
+    assert scale == {'x': 4.9, 'y': 4.9, 'z': 4.9}
+
+
 def test_platform_create_under():
+    scene = prior_scene()
+    scene.room_dimensions.y = 10
     temp = StructuralPlatformConfig(
         position=VectorFloatConfig(1.1, 1.2, 1.3),
         rotation_y=34, material="AI2-THOR/Materials/Metals/WhiteMetal",
@@ -1647,7 +1716,7 @@ def test_platform_create_under():
         scale=0.6, attached_ramps=1, platform_underneath=True,
         platform_underneath_attached_ramps=2)
     platforms = StructuralPlatformCreationService(
-    ).create_feature_from_specific_values(prior_scene(), temp, None)
+    ).create_feature_from_specific_values(scene, temp, None)
 
     plat = platforms[0]
     assert plat
@@ -1768,7 +1837,7 @@ def test_thrower_create():
     temp = StructuralThrowerConfig(
         height=1.3, wall='front', position_wall=0.1, rotation_y=0,
         rotation_z=2, throw_step=3,
-        throw_force=256, projectile_shape='ball',
+        throw_force=5, projectile_shape='ball',
         projectile_material="AI2-THOR/Materials/Plastics/BlueRubber",
         projectile_scale=0.3)
     scene = prior_scene_custom_start(4, 4)

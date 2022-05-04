@@ -45,22 +45,38 @@ OUTPUT_TEMPLATE = json.loads(OUTPUT_TEMPLATE_JSON)
 
 
 class SceneGenerator():
+    excluded_materials = []
+
     def __init__(self, hypercube_list) -> None:
         self.hypercube_list = hypercube_list
 
     def generate_body_template(self) -> Dict[str, Any]:
         global OUTPUT_TEMPLATE
         body = copy.deepcopy(OUTPUT_TEMPLATE)
-        ceiling_and_wall_material_choice = random.choice(
-            random.choice(materials.CEILING_AND_WALL_GROUPINGS)
-        )
-        body['ceilingMaterial'] = ceiling_and_wall_material_choice[0]
-        body['wallMaterial'] = ceiling_and_wall_material_choice[0]
-        body['debug']['wallColors'] = ceiling_and_wall_material_choice[1]
-        floor_material_choice = random.choice(materials.FLOOR_MATERIALS)
+        excluded = self.excluded_materials
+        ceiling_material_choice = self._get_material(
+            materials.CEILING_MATERIALS)
+        excluded += ceiling_material_choice[0]
+        wall_material_choice = self._get_material(
+            materials.ROOM_WALL_MATERIALS, excluded)
+        excluded += wall_material_choice[0]
+        body['ceilingMaterial'] = ceiling_material_choice[0]
+        body['wallMaterial'] = wall_material_choice[0]
+        body['debug']['wallColors'] = wall_material_choice[1]
+        floor_material_choice = self._get_material(
+            materials.FLOOR_MATERIALS, excluded)
         body['floorMaterial'] = floor_material_choice[0]
         body['debug']['floorColors'] = floor_material_choice[1]
         return body
+
+    def _get_material(self, materials, excluded_materials=None):
+        if excluded_materials is None:
+            excluded_materials = []
+        filtered_materials = [
+            material_tuple for material_tuple in materials
+            if material_tuple.material not in excluded_materials
+        ]
+        return random.choice(filtered_materials)
 
     def generate_scenes(
         self,

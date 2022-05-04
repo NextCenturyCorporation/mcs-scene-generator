@@ -16,9 +16,11 @@ MAX_TRIES = 50
 MAX_REACH_DISTANCE = 1.0
 MOVE_DISTANCE = 0.1
 
+FLOOR_FEATURE_BOUNDS_BUFFER = 0.001
+
 PERFORMER_CAMERA_Y = 0.762
 PERFORMER_HALF_WIDTH = 0.27
-PERFORMER_HEIGHT = PERFORMER_HALF_WIDTH * 4
+PERFORMER_HEIGHT = 1.25
 PERFORMER_MASS = 2
 PERFORMER_WIDTH = PERFORMER_HALF_WIDTH * 2.0
 
@@ -503,6 +505,10 @@ def generate_location_on_object(
 
         # set y position
         y = static_bounds.max_y + position_y
+        if static_bounds.max_y > room_dimensions['y'] - PERFORMER_HEIGHT:
+            raise Exception(
+                f"Object positioned at y={y} is too high for "
+                f"room with height={room_dimensions['y']}")
         obj_position = {'x': x, 'y': y, 'z': z}
 
         # determine new bounds for object
@@ -953,17 +959,47 @@ def move_to_location(
     return object_instance
 
 
-def generate_floor_area_bounds(area_x: float, area_z: float) -> ObjectBounds:
+def generate_floor_area_bounds(
+        area_x: float, area_z: float) -> ObjectBounds:
     """Generate and return an ObjectBounds for a floor area (a hole or lava)
     with the given coordinates."""
+    # Keeping the buffer at 0.5 caused adjacent holes/lava to 'collide'
+    buffer = 0.5 - FLOOR_FEATURE_BOUNDS_BUFFER
     points = [
-        Vector3d(x=area_x - 0.5, y=0, z=area_z - 0.5),
-        Vector3d(x=area_x + 0.5, y=0, z=area_z - 0.5),
-        Vector3d(x=area_x + 0.5, y=0, z=area_z + 0.5),
-        Vector3d(x=area_x - 0.5, y=0, z=area_z + 0.5)
+        Vector3d(x=area_x - buffer, y=0, z=area_z - buffer),
+        Vector3d(x=area_x + buffer, y=0, z=area_z - buffer),
+        Vector3d(x=area_x + buffer, y=0, z=area_z + buffer),
+        Vector3d(x=area_x - buffer, y=0, z=area_z + buffer)
     ]
     # Just use an arbitrarily high number for the max_y.
     return ObjectBounds(box_xz=points, max_y=100, min_y=0)
+
+
+def find_partition_floor_bounds(room_dim, partition):
+    bounds = []
+    z_half = room_dim.z / 2.0
+    x_half = room_dim.x / 2.0
+    if partition.leftHalf:
+        x_left_scale = x_half * partition.leftHalf
+        left_edge = -x_half + x_left_scale
+        points = [
+            Vector3d(x=-x_half, y=0, z=-z_half),
+            Vector3d(x=left_edge, y=0, z=-z_half),
+            Vector3d(x=left_edge, y=0, z=z_half),
+            Vector3d(x=-x_half, y=0, z=z_half)
+        ]
+        bounds.append(ObjectBounds(box_xz=points, max_y=100, min_y=0))
+    if partition.rightHalf:
+        x_right_scale = x_half * partition.rightHalf
+        right_edge = x_half - x_right_scale
+        points = [
+            Vector3d(x=right_edge, y=0, z=-z_half),
+            Vector3d(x=x_half, y=0, z=-z_half),
+            Vector3d(x=x_half, y=0, z=z_half),
+            Vector3d(x=right_edge, y=0, z=z_half)
+        ]
+        bounds.append(ObjectBounds(box_xz=points, max_y=100, min_y=0))
+    return bounds
 
 
 def object_x_to_occluder_x(

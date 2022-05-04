@@ -1016,12 +1016,13 @@ def test_throw_object():
     )
     assert target['type'] == BALL_DEFINITION.type
     assert target['forces'] == [{
+        'impulse': True,
         'relative': True,
         'stepBegin': 25,
         'stepEnd': 25,
         'vector': {'x': 345, 'y': 0, 'z': 0}
     }]
-    assert target['maxAngularVelocity'] == 25
+    assert target.get('maxAngularVelocity') is None
 
     assert len(target['shows']) == 1
     assert target['shows'][0]['position'] == {'x': 1, 'y': 2, 'z': 3}
@@ -1055,12 +1056,13 @@ def test_throw_object_cylinder():
     )
     assert target['type'] == CYLINDER_DEFINITION.type
     assert target['forces'] == [{
+        'impulse': True,
         'relative': True,
         'stepBegin': 25,
         'stepEnd': 25,
         'vector': {'x': 345, 'y': 0, 'z': 0}
     }]
-    assert target['maxAngularVelocity'] == 25
+    assert target.get('maxAngularVelocity') is None
 
     assert len(target['shows']) == 1
     assert target['shows'][0]['position'] == {'x': 1, 'y': 2, 'z': 3}
@@ -1099,12 +1101,13 @@ def test_throw_object_downward():
     )
     assert target['type'] == BALL_DEFINITION.type
     assert target['forces'] == [{
+        'impulse': True,
         'relative': True,
         'stepBegin': 25,
         'stepEnd': 25,
         'vector': {'x': 345, 'y': 0, 'z': 0}
     }]
-    assert target['maxAngularVelocity'] == 25
+    assert target.get('maxAngularVelocity') is None
 
     assert len(target['shows']) == 1
     assert target['shows'][0]['position'] == {'x': 1, 'y': 2, 'z': 3}
@@ -1139,12 +1142,13 @@ def test_throw_object_downward_from_device_with_upward_z_rotation():
     )
     assert target['type'] == BALL_DEFINITION.type
     assert target['forces'] == [{
+        'impulse': True,
         'relative': True,
         'stepBegin': 25,
         'stepEnd': 25,
         'vector': {'x': 345, 'y': 0, 'z': 0}
     }]
-    assert target['maxAngularVelocity'] == 25
+    assert target.get('maxAngularVelocity') is None
 
     assert len(target['shows']) == 1
     assert target['shows'][0]['position'] == {'x': 1, 'y': 2, 'z': 3}
@@ -1179,12 +1183,13 @@ def test_throw_object_weird_shape():
     )
     assert target['type'] == DUCK_DEFINITION.type
     assert target['forces'] == [{
+        'impulse': True,
         'relative': True,
         'stepBegin': 25,
         'stepEnd': 25,
         'vector': {'x': 345, 'y': 0, 'z': 0}
     }]
-    assert target['maxAngularVelocity'] == 25
+    assert target.get('maxAngularVelocity') is None
 
     assert len(target['shows']) == 1
     assert target['shows'][0]['position'] == {'x': 1, 'y': 1.84, 'z': 3}
@@ -1218,12 +1223,13 @@ def test_throw_object_with_y_rotation():
     )
     assert target['type'] == BALL_DEFINITION.type
     assert target['forces'] == [{
+        'impulse': True,
         'relative': True,
         'stepBegin': 25,
         'stepEnd': 25,
         'vector': {'x': 345, 'y': 0, 'z': 0}
     }]
-    assert target['maxAngularVelocity'] == 25
+    assert target.get('maxAngularVelocity') is None
 
     assert len(target['shows']) == 1
     assert target['shows'][0]['position'] == {'x': 1, 'y': 2, 'z': 3}
@@ -1257,12 +1263,13 @@ def test_throw_object_from_device_with_upward_z_rotation():
     )
     assert target['type'] == BALL_DEFINITION.type
     assert target['forces'] == [{
+        'impulse': True,
         'relative': True,
         'stepBegin': 25,
         'stepEnd': 25,
         'vector': {'x': 345, 'y': 0, 'z': 0}
     }]
-    assert target['maxAngularVelocity'] == 25
+    assert target.get('maxAngularVelocity') is None
 
     assert len(target['shows']) == 1
     assert target['shows'][0]['position'] == {'x': 1, 'y': 2, 'z': 3}

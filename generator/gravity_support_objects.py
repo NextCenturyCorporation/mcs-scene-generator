@@ -310,6 +310,18 @@ _SYMMETRIC_TARGET_LIST = [
 ]
 
 
+# Map each gravity support object type (shape) to each size (scale) option.
+TYPES_TO_SIZES = {}
+for definition in (_SYMMETRIC_TARGET_LIST + _ASYMMETRIC_TARGET_LIST):
+    if definition.type not in TYPES_TO_SIZES:
+        TYPES_TO_SIZES[definition.type] = []
+    if definition.scale:
+        TYPES_TO_SIZES[definition.type].append(definition.scale)
+    TYPES_TO_SIZES[definition.type].extend([
+        option.scale for option in definition.chooseSizeList
+    ])
+
+
 def _get(prop: str) -> Union[ObjectDefinition, List[ObjectDefinition]]:
     """Returns a deep copy of the global property with the given name
     (normally either an object definition or an object definition list)."""

@@ -127,3 +127,10 @@ class VectorIntConfig(ConverterClass):
 RandomizableVectorFloat3d = Union[VectorFloatConfig, List[VectorFloatConfig]]
 RandomizableInt = Union[int, MinMaxInt, List[Union[int, MinMaxInt]]]
 RandomizableFloat = Union[float, MinMaxFloat, List[Union[float, MinMaxFloat]]]
+
+RandomizableVectorInt3dOrInt = Union[
+    int, MinMaxInt, VectorIntConfig,
+    List[Union[VectorIntConfig, int, MinMaxInt]]]
+RandomizableVectorFloat3dOrFloat = Union[
+    float, MinMaxFloat, VectorFloatConfig,
+    List[Union[VectorFloatConfig, float, MinMaxFloat]]]

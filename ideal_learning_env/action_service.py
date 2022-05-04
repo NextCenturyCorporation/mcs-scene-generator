@@ -63,6 +63,44 @@ class TeleportConfig():
 
 class ActionService():
     @staticmethod
+    def add_circles(goal: dict, circles: List):
+        """Adds restrictions to the steps in the goal portion of a scene such
+        that the performer can only rotate clockwise for 36 consecutive steps.
+        The intervals provided by 'circles' should not overlap."""
+        circle_action_list = ['RotateRight']
+        circle_length = 36
+        goal['action_list'] = goal.get('action_list', [])
+        action_list = goal['action_list']
+
+        for circle in circles:
+            no_actions = len(action_list) == 0
+
+            if no_actions or circle > len(action_list):
+                circle_skip = (
+                    circle if no_actions else (circle - len(action_list))
+                ) - 1
+                action_list += ([[]] * (circle_skip))
+                action_list += ([circle_action_list] * (circle_length))
+
+            else:
+                step = circle
+                while step <= circle_length:
+                    if len(action_list) >= step:
+                        if (
+                            action_list[step - 1] != [] and
+                            action_list[step - 1] != circle_action_list
+                        ):
+                            raise ILEException(
+                                f"Circles {circle} overlaps with existing "
+                                f"action restriction in action_list: "
+                                f"{action_list[step-1]}"
+                            )
+                        action_list[step - 1] = circle_action_list
+                    else:
+                        action_list += circle_action_list
+                    step = step + 1
+
+    @staticmethod
     def add_freezes(goal: dict, freezes: List[StepBeginEnd]):
         """Adds freezes to the goal portion of the scene. The freezes occur
         over ranges provided by `freezes` and should not overlap.  All random

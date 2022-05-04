@@ -9,6 +9,7 @@ from .ile_helper import prior_scene
 def test_action_restrictions_defaults():
     component = ActionRestrictionsComponent({})
     assert component.passive_scene is None
+    assert component.circles is None
     assert component.freezes is None
     assert component.swivels is None
     assert component.teleports is None
@@ -297,6 +298,91 @@ def test_action_restrictions_freeze_empty_list():
     goal = scene.goal
     assert isinstance(goal, dict)
     assert not hasattr(goal, 'action_list')
+
+
+def test_action_restrictions_circles():
+    component = ActionRestrictionsComponent({
+        'circles': [1]
+    })
+    config = component.get_circles()
+    assert config == [1]
+
+    scene = component.update_ile_scene(prior_scene(100))
+    goal = scene.goal
+    assert isinstance(goal, dict)
+    action_list = goal['action_list']
+    assert isinstance(action_list, list)
+    assert len(action_list) == 36
+    for i, actions_per_step in enumerate(action_list):
+        assert isinstance(actions_per_step, list)
+        if 0 <= i < 36:
+            assert actions_per_step == ['RotateRight']
+        else:
+            assert actions_per_step == []
+
+
+def test_action_restrictions_circles_late():
+    component = ActionRestrictionsComponent({
+        'circles': [11]
+    })
+    config = component.get_circles()
+    assert config == [11]
+
+    scene = component.update_ile_scene(prior_scene(100))
+    goal = scene.goal
+    assert isinstance(goal, dict)
+    action_list = goal['action_list']
+    assert isinstance(action_list, list)
+    assert len(action_list) == 46
+    for i, actions_per_step in enumerate(action_list):
+        assert isinstance(actions_per_step, list)
+        if 10 <= i < 46:
+            assert actions_per_step == ['RotateRight']
+        else:
+            assert actions_per_step == []
+
+
+def test_action_restrictions_circles_multiple():
+    component = ActionRestrictionsComponent({
+        'circles': [1, 101]
+    })
+    config = component.get_circles()
+    assert config == [1, 101]
+
+    scene = component.update_ile_scene(prior_scene(100))
+    goal = scene.goal
+    assert isinstance(goal, dict)
+    action_list = goal['action_list']
+    assert isinstance(action_list, list)
+    assert len(action_list) == 136
+    for i, actions_per_step in enumerate(action_list):
+        assert isinstance(actions_per_step, list)
+        if 0 <= i < 36 or 100 <= i < 136:
+            assert actions_per_step == ['RotateRight']
+        else:
+            assert actions_per_step == []
+
+
+def test_action_restrictions_circles_option():
+    component = ActionRestrictionsComponent({
+        'circles': [[1, 101]]
+    })
+    config = component.get_circles()
+    assert config == [1] or config == [101]
+
+    scene = component.update_ile_scene(prior_scene(100))
+    goal = scene.goal
+    assert isinstance(goal, dict)
+    action_list = goal['action_list']
+    assert isinstance(action_list, list)
+    assert len(action_list) in [36, 136]
+    choice_1 = (len(action_list) == 36)
+    for i, actions_per_step in enumerate(action_list):
+        assert isinstance(actions_per_step, list)
+        if (choice_1 and 0 <= i < 36) or (not choice_1 and 100 <= i < 136):
+            assert actions_per_step == ['RotateRight']
+        else:
+            assert actions_per_step == []
 
 
 def test_action_restrictions_swivel_start():

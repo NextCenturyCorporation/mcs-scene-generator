@@ -7,10 +7,8 @@ from dataclasses import dataclass
 from typing import Any, Dict, List, Union
 
 from machine_common_sense.config_manager import Vector3d
-from shapely.geometry import Point, Polygon
 
 from generator import MAX_TRIES, ObjectBounds, Scene, geometry, materials
-from generator.agents import AGENT_MOVEMENT_ANIMATIONS, add_agent_movement
 from generator.base_objects import LARGE_BLOCK_TOOLS_TO_DIMENSIONS
 from generator.structures import (
     BASE_DOOR_HEIGHT,
@@ -19,7 +17,11 @@ from generator.structures import (
 )
 from ideal_learning_env.action_service import ActionService
 from ideal_learning_env.actions_component import StepBeginEnd
-from ideal_learning_env.agent_service import AgentConfig
+from ideal_learning_env.agent_service import (
+    DEFAULT_TEMPLATE_AGENT_MOVEMENT,
+    AgentConfig,
+    AgentCreationService,
+)
 from ideal_learning_env.goal_services import GoalConfig, GoalServices
 from ideal_learning_env.interactable_object_service import (
     InteractableObjectConfig,
@@ -50,7 +52,7 @@ from .structural_object_service import (
     FeatureCreationService,
     FeatureTypes,
     FloorAreaConfig,
-    FloorMaterialConfig,
+    PartitionFloorConfig,
     StructuralDoorConfig,
     StructuralPlatformConfig,
     ToolConfig,
@@ -183,17 +185,28 @@ class AgentTargetConfig():
     - `agent_position` ([VectorFloatConfig](#VectorFloatConfig) or list of
     [VectorFloatConfig](#VectorFloatConfig)): Determines the position of the
     agent.  Default: Random
+    - `movement_bounds` (list of [VectorFloatConfig](#VectorFloatConfig))
+    points to generate a polygon that bounds the agents random movement.
+    If the polygon has an area of 0, no movement will occur.  Polygons with
+    only 1 or 2 points will have an area of 0 and therefore will have no
+    movement.  Default: entire room
     """
-    # - `movement_bounds` (list of [VectorFloatConfig](#VectorFloatConfig))
-    # points to generate a polygon that bounds the agents random movement.
-    # If the polygon has an area of 0, no movement will occur.  Polygons with
-    # only 1 or 2 points will have an area of 0 and therefore will have no
-    # movement.  Default: entire room
-    # """
 
     agent_position: RandomizableVectorFloat3d = None
-    # restore after 1.2 release
-    # movement_bounds: List[RandomizableVectorFloat3d] = None
+    movement_bounds: List[RandomizableVectorFloat3d] = None
+
+
+@dataclass
+class BisectingPlatformConfig():
+    """
+    Defines details of the shortcut_bisecting_platform shortcut.  This shortcut
+    creates a platform that bisects the room, where the performer will start.
+    On default, a blocking wall is on that platform, forcing the performer
+    to choose a side to drop off of the platform, but this can be disabled.
+    - `has_blocking_wall` (bool): Enables the blocking wall so that the
+    performer has to stop and choose a side of the room. Default: True
+    """
+    has_blocking_wall: bool = True
 
 
 class ShortcutComponent(ILEComponent):
@@ -208,13 +221,16 @@ class ShortcutComponent(ILEComponent):
     RAMP_TO_PLATFORM_MIN_DIST_TO_CEILING = 1
     LABEL_START_PLATFORM = "start_structure"
 
-    shortcut_bisecting_platform: bool = False
+    shortcut_bisecting_platform: Union[bool, BisectingPlatformConfig] = False
     """
-    (bool): Creates a platform bisecting the room.  The performer starts on one
-    end with a wall in front of them such that the performer is forced to make
-    a choice on which side they want to drop off and they cannot get back to
-    the other side. This overrides the `performer_start_position` and
-    `performer_start_rotation`, if configured. Default: False
+    (bool or [BisectingPlatformConfig](#BisectingPlatformConfig)):
+    Creates a platform bisecting the room.  If True, the default behavior will
+    be that the performer starts on one end with a blocking wall in front of
+    them such that the performer is forced to make a choice on which side they
+    want to drop off and they cannot get back to the other side. This overrides
+    the `performer_start_position` and `performer_start_rotation`, if
+    configured. Note that the blocking wall can be disabled if needed.
+    Default: False
 
     Simple Example:
     ```
@@ -223,7 +239,8 @@ class ShortcutComponent(ILEComponent):
 
     Advanced Example:
     ```
-    shortcut_bisecting_platform: True
+    shortcut_bisecting_platform:
+        has_blocking_wall: False
     ```
     """
 
@@ -316,7 +333,10 @@ class ShortcutComponent(ILEComponent):
     ```
     """
 
-    shortcut_agent_with_target: Union[bool, AgentTargetConfig] = False
+    shortcut_agent_with_target: Union[bool,
+                                      AgentTargetConfig,
+                                      List[Union[bool,
+                                                 AgentTargetConfig]]] = False
     """
     (bool or [AgentTargetConfig](#AgentTargetConfig)):
     Creates a room with an agent holding a target soccer ball.  The agent's
@@ -336,33 +356,36 @@ class ShortcutComponent(ILEComponent):
           max: 3
         y: 0
         z: [2, 3]
+      movement_bounds:
+        - x: 0
+          z: 2
+        - x: 2
+          z: 0
+        - x: 0
+          z: -2
+        - x: -2
+          z: 0
     ```
     """
-
-    #  movement_bounds:
-    #    - x: 0
-    #      z: 2
-    #    - x: 2
-    #      z: 0
-    #    - x: 0
-    #      z: -2
-    #    - x: -2
-    #      z: 0
-    # ```
-    # """
-    # TODO add bounds to doc
 
     def __init__(self, data: Dict[str, Any]):
         super().__init__(data)
         self._delayed_perf_pos = False
         self._delayed_perf_pos_reason = None
 
+    @ile_config_setter()
     def set_shortcut_bisecting_platform(self, data: Any) -> None:
         self.shortcut_bisecting_platform = data
 
     def get_shortcut_bisecting_platform(
-            self) -> bool:
-        return self.shortcut_bisecting_platform
+            self) -> Union[bool, BisectingPlatformConfig]:
+        if self.shortcut_bisecting_platform is False:
+            return False
+        config = self.shortcut_bisecting_platform
+        if self.shortcut_bisecting_platform is True:
+            config = BisectingPlatformConfig()
+        config = choose_random(config)
+        return config
 
     @ile_config_setter(validator=ValidateOptions(
         props=['door_material'],
@@ -443,16 +466,17 @@ class ShortcutComponent(ILEComponent):
         if not self.shortcut_agent_with_target:
             return False
         template = copy.deepcopy(self.shortcut_agent_with_target)
-        if self.shortcut_agent_with_target is True:
+        if isinstance(self.shortcut_agent_with_target, List):
+            template = random.choice(template)
+        if template is True:
             template = AgentTargetConfig()
-        # Restore movement bounds after 1.2 release
-        # bounds = template.movement_bounds or []
-        # template.movement_bounds = None
+        bounds = template.movement_bounds or []
+        template.movement_bounds = None
         # choose random fails with an empty array and we want to process the
         # array manually anyway, so we've saved the value.
         config = choose_random(template)
-        # config.movement_bounds = [
-        #     choose_random(point) for point in bounds]
+        config.movement_bounds = [
+            choose_random(point) for point in bounds]
         return config
 
     # Override
@@ -470,9 +494,13 @@ class ShortcutComponent(ILEComponent):
         return scene
 
     def _add_bisecting_platform(self, scene: Scene, room_dim: Vector3d):
-        if self.get_shortcut_bisecting_platform():
-            logger.trace("Adding bisecting platform shortcut")
-            self._do_add_bisecting_platform(scene, room_dim, True)
+        if not self.get_shortcut_bisecting_platform():
+            return scene
+
+        logger.trace("Adding bisecting platform shortcut")
+        config = self.get_shortcut_bisecting_platform()
+        self._do_add_bisecting_platform(scene, room_dim,
+                                        config.has_blocking_wall)
 
         return scene
 
@@ -699,9 +727,6 @@ class ShortcutComponent(ILEComponent):
         if self.get_shortcut_lava_room():
             logger.trace("Adding lava shortcut")
             bounds = find_bounds(scene)
-
-            struct_type = FeatureTypes.LAVA
-
             # position performer in the center non-lava part,
             # in the back of the room, facing forward.
             scene.set_performer_start_position(
@@ -709,33 +734,10 @@ class ShortcutComponent(ILEComponent):
                 -1 * (room_dim.z / 2.0) + 0.5)
             scene.set_performer_start_rotation(random.randint(-90, 90))
 
-            step = 1
-
-            # find the width along the x axis of
-            # each lava section, and the min/max values
-            # along the x axis
-            x_lava_width = math.floor(room_dim.x / 3.0)
-            x_max = room_dim.x / 2.0
-            x_min = math.ceil(x_max - x_lava_width)
-            x_values = range(x_min, math.floor(x_max) + step)
-
-            # need to create lava all along the z axis
-            z_max = int(room_dim.z / 2.0)
-            z_min = -1 * z_max
-            z_values = range(z_min, z_max + step)
-
-            for z in z_values:
-                for x in x_values:
-                    lava_neg_x = FloorMaterialConfig(
-                        num=1, position_x=-x, position_z=z)
-                    lava_pos_x = FloorMaterialConfig(
-                        num=1, position_x=x, position_z=z)
-
-                    FeatureCreationService.create_feature(
-                        scene, struct_type, lava_neg_x, bounds)
-
-                    FeatureCreationService.create_feature(
-                        scene, struct_type, lava_pos_x, bounds)
+            FeatureCreationService.create_feature(
+                scene, FeatureTypes.PARTITION_FLOOR,
+                PartitionFloorConfig(
+                    2.0 / 3.0, 2.0 / 3.0), bounds)
 
         return scene
 
@@ -758,69 +760,85 @@ class ShortcutComponent(ILEComponent):
 
         bounds = find_bounds(scene)
 
-        struct = obj_repo.get_one_from_labeled_objects(
+        structs = obj_repo.get_all_from_labeled_objects(
             self.LABEL_START_PLATFORM
         )
-
-        if struct is None:
+        if structs is None:
             raise ILEException(
                 f"Attempt to position performer on chosen "
                 f"platform failed due to missing platform with "
                 f"'{self.LABEL_START_PLATFORM}' label.")
 
-        struct_pos = struct.instance['shows'][0]['position']
-        struct_scale = struct.instance['shows'][0]['scale']
-
-        # If platform found, choose random position on platform
-        # Note: the 0.1 with padding is accounting for platform lips/
-        # not being placed too close to the edge
-        padding = 0.1 + geometry.PERFORMER_HALF_WIDTH
-        min_x = struct_pos['x'] - ((struct_scale['x'] / 2.0) - padding)
-        max_x = struct_pos['x'] + ((struct_scale['x'] / 2.0) - padding)
-        min_z = struct_pos['z'] - ((struct_scale['z'] / 2.0) - padding)
-        max_z = struct_pos['z'] + ((struct_scale['z'] / 2.0) - padding)
-
+        attempts = 0
         valid = False
-        perf_pos = {}
+        for struct in structs:
+            if attempts == len(structs):
+                raise ILEException(
+                    f"Attempt to position performer on chosen "
+                    f"platform failed. Unable to place performer "
+                    f"on platform with '{self.LABEL_START_PLATFORM}' "
+                    f"label.")
+            struct_pos = struct.instance['shows'][0]['position']
+            struct_scale = struct.instance['shows'][0]['scale']
 
-        for _ in range(MAX_TRIES):
-            perf_pos = Vector3d(
-                x=round(random.uniform(min_x, max_x), 3),
-                y=struct_scale['y'],
-                z=round(random.uniform(min_z, max_z), 3)
-            )
+            # If platform found, choose random position on platform
+            # Note: the 0.1 with padding is accounting for platform lips/
+            # not being placed too close to the edge
+            padding = 0.1 + geometry.PERFORMER_HALF_WIDTH
+            min_x = struct_pos['x'] - ((struct_scale['x'] / 2.0) - padding)
+            max_x = struct_pos['x'] + ((struct_scale['x'] / 2.0) - padding)
+            min_z = struct_pos['z'] - ((struct_scale['z'] / 2.0) - padding)
+            max_z = struct_pos['z'] + ((struct_scale['z'] / 2.0) - padding)
 
-            new_perf_bounds = geometry.create_bounds(
-                dimensions={
-                    "x": geometry.PERFORMER_WIDTH,
-                    "y": geometry.PERFORMER_HEIGHT,
-                    "z": geometry.PERFORMER_WIDTH
-                },
-                offset=None,
-                position=vars(perf_pos),
-                rotation=vars(scene.performer_start.rotation),
-                standing_y=0
-            )
+            perf_pos = {}
+            for _ in range(MAX_TRIES):
 
-            valid = geometry.validate_location_rect(
-                location_bounds=new_perf_bounds,
-                performer_start_position=vars(scene.performer_start.position),
-                bounds_list=bounds,
-                room_dimensions=vars(scene.room_dimensions)
-            )
+                perf_pos = Vector3d(
+                    x=round(random.uniform(min_x, max_x), 3),
+                    y=struct_scale['y'],
+                    z=round(random.uniform(min_z, max_z), 3)
+                )
 
+                max_y = scene.room_dimensions.y - \
+                    geometry.PERFORMER_HEIGHT
+
+                if perf_pos.y > max_y:
+                    # platform is too tall
+                    break
+
+                new_perf_bounds = geometry.create_bounds(
+                    dimensions={
+                        "x": geometry.PERFORMER_WIDTH,
+                        "y": geometry.PERFORMER_HEIGHT,
+                        "z": geometry.PERFORMER_WIDTH
+                    },
+                    offset=None,
+                    position=vars(perf_pos),
+                    rotation=vars(scene.performer_start.rotation),
+                    standing_y=0
+                )
+
+                valid = geometry.validate_location_rect(
+                    location_bounds=new_perf_bounds,
+                    performer_start_position=vars(
+                        scene.performer_start.position),
+                    bounds_list=bounds,
+                    room_dimensions=vars(scene.room_dimensions)
+                )
+
+                if valid:
+                    break
+
+            attempts += 1
             if valid:
-                break
-
-        if valid:
-            scene.performer_start.position = perf_pos
-            self._delayed_perf_pos = False
-            self._delayed_perf_pos_reason = None
-        else:
+                scene.performer_start.position = perf_pos
+                self._delayed_perf_pos = False
+                self._delayed_perf_pos_reason = None
+        if not valid:
             raise ILEException(
                 f"Attempt to position performer on chosen "
-                f"platform failed due unabled to place performer "
-                f" on platform with '{self.LABEL_START_PLATFORM}' label.")
+                f"platform failed. Unable to place performer "
+                f"on platform with '{self.LABEL_START_PLATFORM}' label.")
 
     LavaSizes = namedtuple('LavaIslandSizes', (
         'island_size',
@@ -1016,9 +1034,7 @@ class ShortcutComponent(ILEComponent):
             invalid_mats.add(mat)
         valid = False
         while (not valid):
-            mat = random.choice(
-                random.choice(materials.CEILING_AND_WALL_GROUPINGS)
-            )
+            mat = random.choice(materials.ROOM_WALL_MATERIALS)
             valid = mat[0] not in invalid_mats
         return mat
 
@@ -1279,55 +1295,11 @@ class ShortcutComponent(ILEComponent):
                     scale=VectorFloatConfig(1, 1, 1),
                     rotation=rot))
             GoalServices.attempt_to_add_goal(scene, goal_template)
-        # restore after 1.2 release
-        # self._add_random_agent_movement(scene, agent, config.movement_bounds)
+        movement_template = choose_random(DEFAULT_TEMPLATE_AGENT_MOVEMENT)
+        movement_template.bounds = config.movement_bounds
+        AgentCreationService.add_random_agent_movement(
+            scene, agent, movement_template)
         return scene
-
-    def _add_random_agent_movement(
-            self, scene: Scene, agent: dict, bounds: List[Vector3d]):
-        x_limit = scene.room_dimensions.x / 2.0
-        z_limit = scene.room_dimensions.z / 2.0
-
-        if not bounds:
-            bounds = [Vector3d(x=-x_limit, y=0, z=-z_limit),
-                      Vector3d(x=x_limit, y=0, z=-z_limit),
-                      Vector3d(x=x_limit, y=0, z=z_limit),
-                      Vector3d(x=-x_limit, y=0, z=z_limit)]
-        if len(bounds) in {1, 2}:
-            return
-
-        x_min = x_limit
-        x_max = -x_limit
-        z_min = z_limit
-        z_max = -z_limit
-        for point in bounds:
-            x_min = min(point.x, x_min)
-            x_max = max(point.x, x_max)
-            z_min = min(point.z, z_min)
-            z_max = max(point.z, z_max)
-
-        poly = Polygon([[p.x, p.z] for p in bounds])
-        repeat = random.choice([True, True, True, False])
-        num_points = random.randint(3, 20)
-        step_begin = random.randint(0, 20)
-
-        waypoints = []
-        animation = random.choice(AGENT_MOVEMENT_ANIMATIONS)
-        for _ in range(num_points):
-            # maybe we only want walk?
-            waypoint = False
-            for _ in range(MAX_TRIES):
-                x = random.uniform(x_min, x_max)
-                z = random.uniform(z_min, z_max)
-                if Point(x, z).within(poly):
-                    waypoints.append((x, z))
-                    waypoint = True
-                    break
-            if not waypoint:
-                raise ILEException(
-                    "Failed to generate path inside bounds for "
-                    "agent.  Try increasing bounds.")
-        add_agent_movement(agent, step_begin, waypoints, animation, repeat)
 
     def get_num_delayed_actions(self) -> int:
         return 1 if self._delayed_perf_pos else 0
@@ -1341,4 +1313,5 @@ class ShortcutComponent(ILEComponent):
         return scene
 
     def get_delayed_action_error_strings(self) -> List[str]:
-        return [str(self._delayed_perf_pos_reason)]
+        return [str(self._delayed_perf_pos_reason)
+                ] if self._delayed_perf_pos_reason else []

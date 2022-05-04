@@ -1199,7 +1199,7 @@ _CHEST_9_TRAPEZOID_LID = create_variable_definition_from_base(
         # Too little to fit a soccer ball inside
         0.4, 0.6,
         # Big enough to fit a soccer ball inside
-        1, 1.2, 1.4
+        1.2, 1.4, 1.6
     ],
     chosen_material_list=[
         ChosenMaterial.METAL,
@@ -1616,6 +1616,30 @@ _STACK_TARGETS = list(filter(lambda filtered_list: len(filtered_list) > 0, [
 
 
 _ALL_NON_CONTAINERS = _PICKUPABLES + _NOT_PICKUPABLES
+
+
+# Map each rollable object type (shape) to each size (scale) option.
+ROLLABLE_TYPES_TO_SIZES = {}
+for definition_list in _ROLLABLES:
+    for definition in definition_list:
+        if definition.type not in ROLLABLE_TYPES_TO_SIZES:
+            ROLLABLE_TYPES_TO_SIZES[definition.type] = []
+        if definition.scale:
+            ROLLABLE_TYPES_TO_SIZES[definition.type].append(definition.scale)
+        ROLLABLE_TYPES_TO_SIZES[definition.type].extend([
+            option.scale for option in definition.chooseSizeList
+        ])
+# Map each symmetric/asymmetric container object type to each size option.
+CONTAINER_TYPES_TO_SIZES = {}
+for definition_list in [_CONTAINERS_SYMMETRIC] + [_CONTAINERS_ASYMMETRIC]:
+    for definition in definition_list:
+        if definition.type not in CONTAINER_TYPES_TO_SIZES:
+            CONTAINER_TYPES_TO_SIZES[definition.type] = []
+        if definition.scale:
+            CONTAINER_TYPES_TO_SIZES[definition.type].append(definition.scale)
+        CONTAINER_TYPES_TO_SIZES[definition.type].extend([
+            option.scale for option in definition.chooseSizeList
+        ])
 
 
 def _get(prop: str) -> Union[

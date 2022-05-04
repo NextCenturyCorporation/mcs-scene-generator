@@ -256,14 +256,11 @@ CERAMIC_MATERIALS = [
     MaterialTuple("AI2-THOR/Materials/Ceramics/GREYGRANITE", ["grey"]),
     MaterialTuple(
         "AI2-THOR/Materials/Ceramics/PinkConcrete_Bedroom1", ["red"]),
-    MaterialTuple("AI2-THOR/Materials/Ceramics/RedBrick", ["red"]),
-    MaterialTuple("AI2-THOR/Materials/Ceramics/TexturesCom_BrickRound0044_1_seamless_S",
-                  ["grey"]),
     MaterialTuple("AI2-THOR/Materials/Ceramics/WhiteCountertop", ["grey"])
+    # Don't use the brick or cobblestone textures.
 ]
 
 FABRIC_MATERIALS = [
-    MaterialTuple("AI2-THOR/Materials/Fabrics/BedroomCarpet", ["blue"]),
     MaterialTuple("AI2-THOR/Materials/Fabrics/Carpet2", ["brown"]),
     MaterialTuple("AI2-THOR/Materials/Fabrics/Carpet3", ["brown"]),
     MaterialTuple("AI2-THOR/Materials/Fabrics/Carpet4", ["blue"]),
@@ -273,18 +270,8 @@ FABRIC_MATERIALS = [
     MaterialTuple("AI2-THOR/Materials/Fabrics/CarpetDarkGreen", ["green"]),
     MaterialTuple("AI2-THOR/Materials/Fabrics/CarpetGreen", ["green"]),
     MaterialTuple("AI2-THOR/Materials/Fabrics/CarpetWhite", ["white"]),
-    MaterialTuple("AI2-THOR/Materials/Fabrics/CarpetWhite 3", ["white"]),
-    MaterialTuple("AI2-THOR/Materials/Fabrics/HotelCarpet", ["red"]),
-    MaterialTuple("AI2-THOR/Materials/Fabrics/HotelCarpet3", ["red", "black"]),
-    MaterialTuple("AI2-THOR/Materials/Fabrics/RUG2", ["red", "blue"]),
-    MaterialTuple("AI2-THOR/Materials/Fabrics/Rug3", ["blue", "red"]),
-    MaterialTuple("AI2-THOR/Materials/Fabrics/RUG4", ["red", "yellow"]),
-    MaterialTuple("AI2-THOR/Materials/Fabrics/Rug5", ["white"]),
-    MaterialTuple("AI2-THOR/Materials/Fabrics/Rug6",
-                  ["green", "purple", "red"]),
-    MaterialTuple("AI2-THOR/Materials/Fabrics/RUG7", ["red", "blue"]),
-    MaterialTuple("AI2-THOR/Materials/Fabrics/RugPattern224",
-                  ["green", "brown", "white"])
+    MaterialTuple("AI2-THOR/Materials/Fabrics/CarpetWhite 3", ["white"])
+    # Don't use highly patterned multicolor carpet textures.
 ] + _CUSTOM_CARPET_MATERIALS
 
 METAL_MATERIALS = [
@@ -322,10 +309,15 @@ RUBBER_MATERIALS = [
     MaterialTuple("AI2-THOR/Materials/Plastics/LightBlueRubber", ["blue"])
 ]
 
+CEILING_MATERIALS = [
+    MaterialTuple("AI2-THOR/Materials/Walls/Drywall4Tiled", ["white"]),
+    MaterialTuple("AI2-THOR/Materials/Walls/DrywallBeige", ["white"]),
+    MaterialTuple("AI2-THOR/Materials/Walls/Drywall", ["white"])]
+
 WALL_MATERIALS = [
     MaterialTuple("AI2-THOR/Materials/Walls/BrownDrywall", ["brown"]),
     MaterialTuple("AI2-THOR/Materials/Walls/Drywall", ["white"]),
-    MaterialTuple("AI2-THOR/Materials/Walls/DrywallBeige", ["brown"]),
+    MaterialTuple("AI2-THOR/Materials/Walls/DrywallBeige", ["white"]),
     MaterialTuple("AI2-THOR/Materials/Walls/DrywallGreen", ["green"]),
     MaterialTuple("AI2-THOR/Materials/Walls/DrywallOrange", ["orange"]),
     MaterialTuple("AI2-THOR/Materials/Walls/Drywall4Tiled", ["white"]),
@@ -497,12 +489,8 @@ INTUITIVE_PHYSICS_WALL_GROUPINGS = [WALL_MATERIALS + [
                   ["yellow"]),
 ]]
 
-CEILING_AND_WALL_GROUPINGS = [
-    CERAMIC_MATERIALS,
-    METAL_MATERIALS,
-    WALL_MATERIALS,
+ROOM_WALL_MATERIALS = CERAMIC_MATERIALS + METAL_MATERIALS + WALL_MATERIALS + \
     WOOD_MATERIALS
-]
 
 FLAT_MATERIALS = [
     AZURE,

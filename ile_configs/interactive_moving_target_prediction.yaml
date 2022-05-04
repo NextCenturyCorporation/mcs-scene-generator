@@ -1,0 +1,83 @@
+# Add a Retrieval goal with a soccer ball as the target object.
+goal:
+    category: retrieval
+    target:
+        shape: soccer_ball
+        scale:
+            min: 1.0
+            max: 3.0
+
+# Only the target can be a soccer ball.
+excluded_shapes: soccer_ball
+
+# Generate a room with lava on both sides.
+shortcut_lava_room: True
+
+# Use a wide room size for this task.
+room_dimensions:
+    x:
+        min: 12
+        max: 36
+    y: 4
+    z: 12
+
+# Start on top of a platform, looking directly at the target object.
+performer_start_position:
+    x: 0
+    y: 1.762
+    z: -5.5
+performer_look_at: target
+structural_platforms:
+    num: 1
+    position:
+        x: 0
+        y: 0
+        z: -5.5
+    rotation_y: 0
+    scale:
+        x: 1
+        y: 1
+        z: 1
+
+# Must rotate in a complete circle at the start of each scene.
+circles: [1]
+
+# Generate one throwing device that begins holding the target object (soccer
+# ball) positioned on either the left or right wall at ground level with a
+# semi-random depth, rotation, and throw force, then releases the ball after
+# the forced rotation at the start of the scene is finished.
+structural_throwers:
+    - num: 1
+      wall: [left, right]
+      height: 0
+      projectile_labels: target
+      rotation_z: 0
+      throw_step: 37
+      # Modify these numbers to adjust the thrower's depth. This is necessary
+      # if you want your throwers to have a non-zero "rotation" and prevent the
+      # ball from hitting and bouncing off the front or back walls.
+      position_wall:
+          min: -4
+          max: 4
+      # Modify these numbers to adjust the thrower's rotation. Note that using
+      # a non-zero "rotation" may cause the ball to hit and bounce off the
+      # front or back wall, which will not happen in the evaluation data.
+      rotation_y:
+          - 0
+          - 10
+          - -10
+      # Modify these numbers to adjust the throw force. These numbers are not
+      # perfect for all possible room widths, so we encourage you to experiment
+      # with them. Ideally, the ball should end its movement in the lava on the
+      # opposite side of the room from its starting position in the thrower.
+      throw_force_multiplier:
+          min: 0.45
+          max: 0.55
+
+# Override the defaults to avoid randomly generating any other objects besides
+# the lava, platform, thrower, and target. Remove these lines if you want
+# additional randomly generated objects.
+keyword_objects:
+    - num: 0
+random_structural_objects:
+    - num: 0

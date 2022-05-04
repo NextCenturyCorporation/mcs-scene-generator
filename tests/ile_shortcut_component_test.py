@@ -4,6 +4,7 @@ import pytest
 from machine_common_sense.config_manager import Vector3d
 
 from generator.geometry import PERFORMER_HALF_WIDTH
+from generator.scene import PartitionFloor, Scene
 from ideal_learning_env import (
     ObjectRepository,
     ShortcutComponent,
@@ -51,6 +52,7 @@ def test_shortcut_bisecting_platform_off():
 
 
 def test_shortcut_bisecting_platform_on():
+    # Note that this would have a blocking wall on default
     component = ShortcutComponent({
         'shortcut_bisecting_platform': True
     })
@@ -81,6 +83,72 @@ def test_shortcut_bisecting_platform_on():
     assert show['position'] == {'x': 0, 'y': .625, 'z': -sizez / 2.0 + 1.5}
     assert show['rotation'] == {'x': 0, 'y': 0, 'z': 0}
     assert show['scale'] == {'x': 0.99, 'y': 1.25, 'z': 0.1}
+
+    perf_pos = scene.performer_start.position
+    assert perf_pos == Vector3d(x=0, y=1, z=-sizez / 2.0 + 0.5)
+
+
+def test_shortcut_bisecting_platform_on_with_blocking_wall_prop():
+    component = ShortcutComponent({
+        'shortcut_bisecting_platform': {
+            'has_blocking_wall': True
+        }
+    })
+    assert component.shortcut_bisecting_platform
+    assert component.get_shortcut_bisecting_platform()
+    scene = component.update_ile_scene(prior_scene())
+    assert scene != prior_scene()
+    objs = scene.objects
+    sizez = scene.room_dimensions.z
+    assert isinstance(objs, List)
+    assert len(objs) == 2
+    obj = objs[0]
+    assert obj['id'].startswith('platform')
+    assert obj['type'] == 'cube'
+    assert obj['kinematic']
+    assert obj['structure']
+    show = obj['shows'][0]
+    assert show['position'] == {'x': 0, 'y': 0.5, 'z': 0}
+    assert show['rotation'] == {'x': 0, 'y': 0, 'z': 0}
+    assert show['scale'] == {'x': 1, 'y': 1, 'z': sizez}
+
+    obj = objs[1]
+    assert obj['id'].startswith('platform')
+    assert obj['type'] == 'cube'
+    assert obj['kinematic']
+    assert obj['structure']
+    show = obj['shows'][0]
+    assert show['position'] == {'x': 0, 'y': .625, 'z': -sizez / 2.0 + 1.5}
+    assert show['rotation'] == {'x': 0, 'y': 0, 'z': 0}
+    assert show['scale'] == {'x': 0.99, 'y': 1.25, 'z': 0.1}
+
+    perf_pos = scene.performer_start.position
+    assert perf_pos == Vector3d(x=0, y=1, z=-sizez / 2.0 + 0.5)
+
+
+def test_shortcut_bisecting_platform_on_no_blocking_wall():
+    component = ShortcutComponent({
+        'shortcut_bisecting_platform': {
+            'has_blocking_wall': False
+        }
+    })
+    assert component.shortcut_bisecting_platform
+    assert component.get_shortcut_bisecting_platform()
+    scene = component.update_ile_scene(prior_scene())
+    assert scene != prior_scene()
+    objs = scene.objects
+    sizez = scene.room_dimensions.z
+    assert isinstance(objs, List)
+    assert len(objs) == 1
+    obj = objs[0]
+    assert obj['id'].startswith('platform')
+    assert obj['type'] == 'cube'
+    assert obj['kinematic']
+    assert obj['structure']
+    show = obj['shows'][0]
+    assert show['position'] == {'x': 0, 'y': 0.5, 'z': 0}
+    assert show['rotation'] == {'x': 0, 'y': 0, 'z': 0}
+    assert show['scale'] == {'x': 1, 'y': 1, 'z': sizez}
 
     perf_pos = scene.performer_start.position
     assert perf_pos == Vector3d(x=0, y=1, z=-sizez / 2.0 + 0.5)
@@ -668,6 +736,7 @@ def test_shortcut_start_on_platform_on():
 def test_start_position_delayed():
     label = "start_structure"
     scene = prior_scene()
+    scene.room_dimensions.y = 10
 
     data = {
         "structural_platforms": {
@@ -726,19 +795,132 @@ def test_start_position_delayed():
     assert min_z <= perf_pos.z <= max_z
 
 
+def test_start_on_platform_no_auto_adjust():
+    ObjectRepository.get_instance().clear()
+    label = "start_structure"
+    scene = prior_scene_custom_size(10, 10)
+    scene.room_dimensions.y = 4
+
+    data = {
+        "structural_platforms": {
+            "num": 1,
+            "labels": label,
+            "scale": 3.5
+        },
+        "shortcut_start_on_platform": True
+    }
+
+    component = ShortcutComponent(data)
+
+    scene = component.update_ile_scene(scene)
+    objects = scene.objects
+    assert isinstance(objects, list)
+    assert len(objects) == 0
+    assert component._delayed_perf_pos
+    assert component.get_num_delayed_actions() == 1
+
+    struct_obj_comp = SpecificStructuralObjectsComponent(data)
+    scene = struct_obj_comp.update_ile_scene(scene)
+    assert len(objects) == 1
+
+    assert component._delayed_perf_pos_reason is None
+    scene = component.run_delayed_actions(scene)
+    error = ILEException(message="Attempt to position performer on chosen " +
+                         "platform failed. Unable to place performer on " +
+                         "platform with '" + label + "' label.")
+    assert isinstance(component._delayed_perf_pos_reason, ILEException)
+    assert str(component._delayed_perf_pos_reason) == str(error)
+
+
+def test_start_on_platform_auto_adjust():
+    ObjectRepository.get_instance().clear()
+    label = "start_structure"
+    scene = prior_scene_custom_size(10, 10)
+    scene.room_dimensions.y = 5
+
+    data = {
+        "structural_platforms": {
+            "num": 1,
+            "labels": label,
+            "position": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+            },
+            "scale": {
+                "x": 4.9,
+                "y": 4.9,
+                "z": 4.9
+            },
+            "auto_adjust_platforms": True
+        },
+        "shortcut_start_on_platform": True
+    }
+
+    component = ShortcutComponent(data)
+
+    scene = component.update_ile_scene(scene)
+    objects = scene.objects
+    assert isinstance(objects, list)
+    assert len(objects) == 0
+    assert component._delayed_perf_pos
+    assert component.get_num_delayed_actions() == 1
+
+    struct_obj_comp = SpecificStructuralObjectsComponent(data)
+    scene = struct_obj_comp.update_ile_scene(scene)
+    assert len(objects) == 1
+
+    scene = component.run_delayed_actions(scene)
+    objects = scene.objects
+    assert isinstance(objects, list)
+    assert len(objects) == 1
+    component.get_num_delayed_actions() == 0
+    assert not component._delayed_perf_pos
+    assert objects[0]['type'] == "cube"
+    assert ObjectRepository.get_instance().has_label(label)
+
+    perf_pos = scene.performer_start.position
+    platform_pos = objects[0]['shows'][0]['position']
+    platform_scale = objects[0]['shows'][0]['scale']
+
+    padding = 0.1 + PERFORMER_HALF_WIDTH
+    min_x = platform_pos['x'] - (
+        (platform_scale['x'] / 2) +
+        (padding)
+    )
+    max_x = platform_pos['x'] + (
+        (platform_scale['x'] / 2) +
+        (padding)
+    )
+    min_z = platform_pos['z'] - (
+        (platform_scale['z'] / 2) +
+        (padding)
+    )
+    max_z = platform_pos['z'] + (
+        (platform_scale['z'] / 2) +
+        (padding)
+    )
+
+    assert min_x <= perf_pos.x <= max_x
+    assert perf_pos.y == 3.75
+    assert min_z <= perf_pos.z <= max_z
+
+
 def test_shortcut_lava_room_off():
     component = ShortcutComponent({
         'shortcut_lava_room': False
     })
     assert not component.shortcut_lava_room
     assert not component.get_shortcut_lava_room()
-    scene = component.update_ile_scene(prior_scene())
+    scene: Scene = component.update_ile_scene(prior_scene())
     assert scene.floor_textures == []
+    assert not scene.lava
+    assert not scene.partition_floor
 
     assert scene == prior_scene()
 
 
-def test_shortcut_lava_room_on_3x3_room():
+def test_shortcut_lava_room_on_room():
     x_size = 3
     z_size = 3
     component = ShortcutComponent({
@@ -750,128 +932,10 @@ def test_shortcut_lava_room_on_3x3_room():
                                                                z_size))
     assert scene != prior_scene_custom_size(x_size, z_size)
 
-    lava = scene.lava
-    assert len(lava) == 6
-    assert lava[0]['x'] == -1
-    assert lava[0]['z'] == -1
-    assert lava[1]['x'] == 1
-    assert lava[1]['z'] == -1
-    assert lava[2]['x'] == -1
-    assert lava[2]['z'] == 0
-    assert lava[3]['x'] == 1
-    assert lava[3]['z'] == 0
-    assert lava[4]['x'] == -1
-    assert lava[4]['z'] == 1
-    assert lava[5]['x'] == 1
-    assert lava[5]['z'] == 1
-
-    perf_pos = scene.performer_start.position
-    perf_rot_y = scene.performer_start.rotation.y
-    assert perf_pos == Vector3d(x=0, y=0, z=-1 * (z_size / 2.0) + 0.5)
-    assert perf_rot_y >= -90
-    assert perf_rot_y <= 90
-
-
-def test_shortcut_lava_room_on_4x2_room():
-    x_size = 4
-    z_size = 2
-    component = ShortcutComponent({
-        'shortcut_lava_room': True
-    })
-    assert component.shortcut_lava_room
-    assert component.get_shortcut_lava_room()
-    scene = component.update_ile_scene(prior_scene_custom_size(x_size,
-                                                               z_size))
-    assert scene != prior_scene_custom_size(x_size, z_size)
-
-    lava = scene.lava
-    assert len(lava) == 12
-    assert lava == [
-        {'x': -1, 'z': -1},
-        {'x': 1, 'z': -1},
-        {'x': -2, 'z': -1},
-        {'x': 2, 'z': -1},
-        {'x': -1, 'z': 0},
-        {'x': 1, 'z': 0},
-        {'x': -2, 'z': 0},
-        {'x': 2, 'z': 0},
-        {'x': -1, 'z': 1},
-        {'x': 1, 'z': 1},
-        {'x': -2, 'z': 1},
-        {'x': 2, 'z': 1}
-    ]
-
-    perf_pos = scene.performer_start.position
-    perf_rot_y = scene.performer_start.rotation.y
-    assert perf_pos == Vector3d(x=0, y=0, z=-1 * (z_size / 2.0) + 0.5)
-    assert perf_rot_y >= -90
-    assert perf_rot_y <= 90
-
-
-def test_shortcut_lava_room_on_7x1_room():
-    x_size = 7
-    z_size = 1
-    component = ShortcutComponent({
-        'shortcut_lava_room': True
-    })
-    assert component.shortcut_lava_room
-    assert component.get_shortcut_lava_room()
-    scene = component.update_ile_scene(prior_scene_custom_size(x_size,
-                                                               z_size))
-    assert scene != prior_scene_custom_size(x_size, z_size)
-
-    lava = scene.lava
-    assert len(lava) == 4
-    assert lava[0]['x'] == -2
-    assert lava[0]['z'] == 0
-    assert lava[1]['x'] == 2
-    assert lava[1]['z'] == 0
-    assert lava[2]['x'] == -3
-    assert lava[2]['z'] == 0
-    assert lava[3]['x'] == 3
-    assert lava[3]['z'] == 0
-
-    perf_pos = scene.performer_start.position
-    perf_rot_y = scene.performer_start.rotation.y
-    assert perf_pos == Vector3d(x=0, y=0, z=-1 * (z_size / 2.0) + 0.5)
-    assert perf_rot_y >= -90
-    assert perf_rot_y <= 90
-
-
-def test_shortcut_lava_room_on_9x4_room():
-    x_size = 9
-    z_size = 4
-    component = ShortcutComponent({
-        'shortcut_lava_room': True
-    })
-    assert component.shortcut_lava_room
-    assert component.get_shortcut_lava_room()
-    scene = component.update_ile_scene(prior_scene_custom_size(x_size,
-                                                               z_size))
-    assert scene != prior_scene_custom_size(x_size, z_size)
-
-    lava = scene.lava
-    assert len(lava) == 30
-
-    perf_pos = scene.performer_start.position
-    perf_rot_y = scene.performer_start.rotation.y
-    assert perf_pos == Vector3d(x=0, y=0, z=-1 * (z_size / 2.0) + 0.5)
-    assert perf_rot_y >= -90
-    assert perf_rot_y <= 90
-
-
-def test_shortcut_lava_room_on_10x10_room():
-    z_size = 10
-    component = ShortcutComponent({
-        'shortcut_lava_room': True
-    })
-    assert component.shortcut_lava_room
-    assert component.get_shortcut_lava_room()
-    scene = component.update_ile_scene(prior_scene())
-    assert scene != prior_scene()
-
-    lava = scene.lava
-    assert len(lava) == 88
+    assert not scene.lava
+    assert scene.partition_floor
+    assert scene.partition_floor == PartitionFloor(
+        leftHalf=2 / 3, rightHalf=2 / 3)
 
     perf_pos = scene.performer_start.position
     perf_rot_y = scene.performer_start.rotation.y
@@ -1349,9 +1413,11 @@ def test_shortcut_agent_with_target_with_position():
             'agent_position': {'x': 1, 'y': 2, 'z': 3}
         }
     })
+    scene = prior_scene_with_target()
+    scene.room_dimensions.y = 10
     assert component.shortcut_agent_with_target
     assert component.get_shortcut_agent_with_target()
-    scene = component.update_ile_scene(prior_scene_with_target())
+    scene = component.update_ile_scene(scene)
     assert len(scene.objects) == 2
     target = scene.objects[0]
     agent = scene.objects[1]
@@ -1369,7 +1435,6 @@ def test_shortcut_agent_with_target_with_position():
     assert agent['shows'][0]['position'] == {'x': 1, 'y': 2, 'z': 3}
 
 
-@pytest.mark.skip(reason="Restore 3 tests after 1.2 release")
 def test_shortcut_agent_with_target_with_no_bounds():
     component = ShortcutComponent({
         'shortcut_agent_with_target': {
@@ -1403,7 +1468,6 @@ def test_shortcut_agent_with_target_with_no_bounds():
         assert -3 < point['z'] < 3
 
 
-@pytest.mark.skip(reason="Restore 3 tests after 1.2 release")
 def test_shortcut_agent_with_target_with_line_bounds_means_no_bounds():
     component = ShortcutComponent({
         'shortcut_agent_with_target': {
@@ -1432,10 +1496,9 @@ def test_shortcut_agent_with_target_with_line_bounds_means_no_bounds():
     assert target['pickupable']
     assert agent['id'].startswith("agent")
     assert agent['agentSettings']
-    assert agent['agentMovement'] == []
+    assert not hasattr(agent, 'agentMovement')
 
 
-@pytest.mark.skip(reason="Restore 3 tests after 1.2 release")
 def test_shortcut_agent_with_target_with_bounds():
     component = ShortcutComponent({
         'shortcut_agent_with_target': {
@@ -1471,3 +1534,82 @@ def test_shortcut_agent_with_target_with_bounds():
         point = movement_item['endPoint']
         assert 2 < point['x'] < 4
         assert 1 < point['z'] < 2
+
+
+def test_shortcut_agent_with_target_with_bounds_location_choice():
+    component = ShortcutComponent({
+        "shortcut_agent_with_target": [{
+            "agent_position": {
+                "x": 1.5,
+                "z": 1.5
+            },
+            "movement_bounds": [{
+                "x": 1,
+                "z": 2
+            }, {
+                "x": 2,
+                "z": 2
+            }, {
+                "x": 2,
+                "z": 1
+            }, {
+                "x": 1,
+                "z": 1
+            }]
+        },
+            {
+            "agent_position": {
+                "x": -1.5,
+                "z": -1.5
+            },
+            "movement_bounds": [{
+                "x": -1,
+                "z": -2
+            }, {
+                "x": -2,
+                "z": -2
+            }, {
+                "x": -2,
+                "z": -1
+            }, {
+                "x": -1,
+                "z": -1
+            }]
+        }]
+    })
+    assert component.shortcut_agent_with_target
+    assert isinstance(component.shortcut_agent_with_target, List)
+    assert component.get_shortcut_agent_with_target()
+    assert not isinstance(component.get_shortcut_agent_with_target(), List)
+    scene = component.update_ile_scene(prior_scene_with_target())
+    assert len(scene.objects) == 2
+    target = scene.objects[0]
+    agent = scene.objects[1]
+    assert target['id']
+    assert target['type'] == 'soccer_ball'
+    assert target['associatedWithAgent'] == agent['id']
+    assert target['shows'][0]['boundingBox'].max_y == 0
+    assert target['shows'][0]['boundingBox'].min_y == 0
+    assert target['shows'][0]['scale'] == {'x': 1, 'y': 1, 'z': 1}
+    assert target['shows'][0]['position']
+    assert target['moveable']
+    assert target['pickupable']
+    assert agent['id'].startswith("agent")
+    assert agent['agentSettings']
+    pos = agent['shows'][0]['position']
+    assert agent['agentMovement']
+    seq = agent['agentMovement']['sequence']
+    if pos['x'] > 0:
+        assert pos['x'] == 1.5
+        assert pos['z'] == 1.5
+    else:
+        assert pos['x'] == -1.5
+        assert pos['z'] == -1.5
+    for movement_item in seq:
+        point = movement_item['endPoint']
+        if pos['x'] > 0:
+            assert 1 < point['x'] < 2
+            assert 1 < point['z'] < 2
+        else:
+            assert -2 < point['x'] < -1
+            assert -2 < point['z'] < -1

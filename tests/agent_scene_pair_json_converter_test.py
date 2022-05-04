@@ -57,6 +57,8 @@ def verify_key_properties(key_object):
     assert key_object['id'].startswith('key_')
     assert key_object['type'] == 'triangle'
     assert key_object['materials'] == ['Custom/Materials/Maroon']
+    assert key_object['kinematic']
+    assert not key_object.get('structure')
     assert key_object['debug']['info'] == [
         'maroon', 'triangle', 'maroon triangle'
     ]
@@ -82,13 +84,13 @@ def verify_lock_properties(lock_object):
     assert lock_object['id'].startswith('lock_')
     assert lock_object['type'] == 'lock_wall'
     assert lock_object['materials'] == ['Custom/Materials/Lime']
+    assert lock_object['kinematic']
+    assert lock_object['structure']
     assert lock_object['debug']['info'] == [
         'lime', 'lock_wall', 'lime lock_wall'
     ]
     assert lock_object['debug']['configHeight'] == [0.06, 0.12]
     assert lock_object['debug']['configSize'] == [0.5, 0.5]
-    assert lock_object['kinematic']
-    assert lock_object['structure']
 
     assert len(lock_object['shows']) == 1
     assert lock_object['shows'][0]['rotation']['x'] == 0
@@ -150,6 +152,8 @@ def verify_fuse_wall_list_trial_1(wall_object_list):
         assert wall_object['id'].startswith('fuse_wall_')
         assert wall_object['type'] == 'cube'
         assert wall_object['materials'] == ['Custom/Materials/Lime']
+        assert wall_object['kinematic']
+        assert wall_object['structure']
         assert wall_object['debug']['info'] == ['lime', 'cube', 'lime cube']
         assert wall_object['debug']['configHeight'] == [0.06, 0.12]
         assert wall_object['debug']['configSize'] == [0.5, 0.5]
@@ -204,6 +208,8 @@ def verify_static_wall_list_properties(wall_object_list, hidden_step=-1):
         assert wall_object['id'].startswith('wall_')
         assert wall_object['type'] == 'cube'
         assert wall_object['materials'] == ['Custom/Materials/Black']
+        assert wall_object['kinematic']
+        assert wall_object['structure']
         assert wall_object['debug']['info'] == ['black', 'cube', 'black cube']
         assert wall_object['debug']['configHeight'] == [0.0625, 0.125]
         assert wall_object['debug']['configSize'] == [0.5, 0.5]
@@ -666,6 +672,8 @@ def test_create_agent_object_list():
     assert agent_object['id'].startswith('agent_')
     assert agent_object['type'] == 'test_type'
     assert agent_object['materials'] == ['test_material']
+    assert agent_object['kinematic']
+    assert not agent_object.get('structure')
     assert agent_object['debug']['info'] == [
         'test_color_a', 'test_color_b', 'test_type',
         'test_color_a test_color_b test_type'
@@ -786,6 +794,8 @@ def test_create_goal_object_list_single_object():
     assert goal_object_1['id'].startswith('object_')
     assert goal_object_1['type'] == 'test_type'
     assert goal_object_1['materials'] == ['test_material']
+    assert goal_object_1['kinematic']
+    assert not goal_object_1.get('structure')
     assert goal_object_1['debug']['info'] == [
         'test_color_a', 'test_color_b', 'test_type',
         'test_color_a test_color_b test_type'
@@ -856,6 +866,8 @@ def test_create_goal_object_list_multiple_object():
     assert goal_object_1['id'].startswith('object_')
     assert goal_object_1['type'] == 'test_type_1'
     assert goal_object_1['materials'] == ['test_material_1']
+    assert goal_object_1['kinematic']
+    assert not goal_object_1.get('structure')
     assert goal_object_1['debug']['info'] == [
         'test_color_a', 'test_color_b', 'test_type_1',
         'test_color_a test_color_b test_type_1'
@@ -879,6 +891,8 @@ def test_create_goal_object_list_multiple_object():
     assert goal_object_2['id'].startswith('object_')
     assert goal_object_2['type'] == 'test_type_2'
     assert goal_object_2['materials'] == ['test_material_2']
+    assert goal_object_2['kinematic']
+    assert not goal_object_2.get('structure')
     assert goal_object_2['debug']['info'] == [
         'test_color_c', 'test_type_2', 'test_color_c test_type_2'
     ]
@@ -944,6 +958,8 @@ def test_create_goal_object_list_multiple_object_swap_icon():
     assert goal_object_1['id'].startswith('object_')
     assert goal_object_1['type'] == 'test_type_1'
     assert goal_object_1['materials'] == ['test_material_1']
+    assert goal_object_1['kinematic']
+    assert not goal_object_1.get('structure')
     assert goal_object_1['debug']['info'] == [
         'test_color_a', 'test_color_b', 'test_type_1',
         'test_color_a test_color_b test_type_1'
@@ -967,6 +983,8 @@ def test_create_goal_object_list_multiple_object_swap_icon():
     assert goal_object_2['id'].startswith('object_')
     assert goal_object_2['type'] == 'test_type_2'
     assert goal_object_2['materials'] == ['test_material_2']
+    assert goal_object_2['kinematic']
+    assert not goal_object_2.get('structure')
     assert goal_object_2['debug']['info'] == [
         'test_color_c', 'test_type_2', 'test_color_c test_type_2'
     ]
@@ -1068,6 +1086,8 @@ def test_create_home_object():
     assert home_object['id'].startswith('home_')
     assert home_object['type'] == 'cube'
     assert home_object['materials'] == ['Custom/Materials/Magenta']
+    assert home_object['kinematic']
+    assert home_object['structure']
     assert home_object['debug']['info'] == ['magenta', 'cube', 'magenta cube']
     assert home_object['debug']['configHeight'] == [0.000625, 0.00125]
     assert home_object['debug']['configSize'] == [0.5, 0.5]
@@ -1093,6 +1113,8 @@ def test_create_home_object_uses_first_frame_of_first_trial():
     assert home_object['id'].startswith('home_')
     assert home_object['type'] == 'cube'
     assert home_object['materials'] == ['Custom/Materials/Magenta']
+    assert home_object['kinematic']
+    assert home_object['structure']
     assert home_object['debug']['info'] == ['magenta', 'cube', 'magenta cube']
     assert home_object['debug']['configHeight'] == [0.000625, 0.00125]
     assert home_object['debug']['configSize'] == [0.5, 0.5]

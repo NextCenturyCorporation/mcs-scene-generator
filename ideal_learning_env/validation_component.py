@@ -419,12 +419,13 @@ class ValidPathComponent(ILEComponent):
         return scene
 
     def get_delayed_action_error_strings(self) -> List[str]:
-        return [str(self._delayed_error_reason)]
+        return [str(self._delayed_error_reason)
+                ] if self._delayed_error_reason else []
 
     def get_check_valid_path(
             self) -> bool:
         return self.check_valid_path or False
 
-    @ ile_config_setter()
+    @ile_config_setter()
     def set_check_valid_path(self, data: Any) -> None:
         self.check_valid_path = data

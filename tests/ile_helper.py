@@ -1,3 +1,5 @@
+from os import getuid
+
 from machine_common_sense.config_manager import Vector3d
 
 from generator import ObjectBounds, base_objects
@@ -71,7 +73,7 @@ def prior_scene_with_target(
                       Vector3d(**{'x': -1.03, 'y': 0, 'z': 3.9244}),
                       Vector3d(**{'x': -1.1856, 'y': 0, 'z': 4.08}),
                       Vector3d(**{'x': -1.03, 'y': 0, 'z': 4.2356})
-                  ], max_y=0, min_y=0),
+                  ], max_y=0.22, min_y=0),
                   'stepBegin': 0, 'scale': {'x': 1, 'y': 1, 'z': 1}}],
         'materials': []}
 
@@ -127,3 +129,23 @@ def prior_scene_with_wall(
     idl = InstanceDefinitionLocationTuple(instance, None, instance['shows'][0])
     ObjectRepository.get_instance().add_to_labeled_objects(idl, 'test_wall')
     return scene
+
+
+def add_object_with_position_to_repo(label, x, y, z):
+    """This function adds an object to the repo, but with very limited
+    features.  We can add more features as needed"""
+    obj_repo = ObjectRepository.get_instance()
+    idl = InstanceDefinitionLocationTuple({
+        'id': getuid(),
+        'shows': [{
+            'position': {
+                'x': x,
+                'y': y,
+                'z': z
+            },
+            'boundingBox': ObjectBounds(
+                box_xz=[], max_y=y + 0.5, min_y=y - 0.5)
+
+        }]
+    }, None, None)
+    obj_repo.add_to_labeled_objects(idl, label)
