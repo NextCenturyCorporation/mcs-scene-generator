@@ -65,6 +65,10 @@ Default: random
 agent to use.  Options are: agent_female_01, agent_female_02,
 agent_female_04, agent_male_02, agent_male_03, agent_male_04.
 Default: random
+- `keyword_location`: ([KeywordLocationConfig](#KeywordLocationConfig)):
+One of the keyword locations for this agent or set of agents. Any choices
+in `keyword_location` are made for each object inside the group, not the
+group as a whole.
 
 Example:
 ```
@@ -223,6 +227,8 @@ object is not lockable, this field has no affect.
 - `material` (string, or list of strings): The material (color/texture) to
 use on this object in each scene. For a list, a new material will be
 randomly chosen for each scene. Default: random
+- `not_material` (string): The material (color/texture)
+to NOT use on this object in each scene. Default: none
 - `position` ([VectorFloatConfig](#VectorFloatConfig) dict, or list of
 VectorFloatConfig dicts): The position of this object in each scene. For a
 list, a new position will be randomly chosen for each scene.
@@ -246,6 +252,12 @@ for each scene. This field can be overriden by 'dimensions'. Default: `1`
 - `shape` (string, or list of strings): The shape (object type) of this
 object in each scene. For a list, a new shape will be randomly chosen for
 each scene. Default: random
+- `rotate_cylinders` (bool): Whether or not to rotate cylindrical shapes
+along their x axis so that they are placed on their round sides (needed
+for collision scenes). This would only apply to these shapes: 'cylinder',
+'double_cone', 'dumbbell_1', 'dumbbell_2', 'tie_fighter', 'tube_narrow',
+'tube_wide'. Note that this will override any x rotation previously
+specified by 'rotation'. Default: False
 
 Example:
 ```
@@ -341,6 +353,16 @@ be one of the following:
     (I.E. two bowls), use 'on_center'.  The object must be referenced by
     the 'relative_object_label' field.  If multiple objects have this
     label, one will be randomly chosen.
+    - `opposite_x` - The object will be placed in the exact same location
+    as the object referenced by `relative_object_label` except that its x
+    location will be on the opposite side of the room.  There is no
+    adjustments to find a valid location if another object already exists
+    in location specified by this keyword.
+    - `opposite_z` - The object will be placed in the exact same location
+    as the object referenced by `relative_object_label` except that its z
+    location will be on the opposite side of the room.  There is no
+    adjustments to find a valid location if another object already exists
+    in location specified by this keyword.
     - `random` - The object will be positioned in a random location, as if
     it did not have a keyword location.
     - `associated_with_agent` - This object will be held by an agent
@@ -913,7 +935,9 @@ room dimension for the thrower's wall position (X for left/right, Z for
 front/back). If set, overrides the `throw_force`.
 - `throw_step` (int, or list of ints, or [MinMaxInt](#MinMaxInt) dict, or
 list of MinMaxInt dicts): The step of the simulation in which the
-projectile should be thrown.
+projectile should be thrown. Please note that using a value of less than 5
+may cause unexpected behavior, so we recommend using values of 5 or more in
+your custom config files.
 - `wall` (string, or list of strings): Which wall the thrower should be
 placed on.  Options are: left, right, front, back.
 
@@ -1505,6 +1529,21 @@ Advanced Example:
 num_random_interactable_objects:
     min: 1
     max: 10
+```
+
+#### passive_physics_floor
+
+(bool): Lowers the friction of the floor (making it more "slippery").
+Used in passive physics evaluation scenes. Default: False
+
+Simple Example:
+```
+passive_physics_floor: False
+```
+
+Advanced Example:
+```
+passive_physics_floor: True
 ```
 
 #### passive_scene

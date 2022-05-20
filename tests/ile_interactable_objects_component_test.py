@@ -136,7 +136,8 @@ def test_specific_objects_array_single():
         assert 1 <= show['scale']['x'] == show['scale']['z'] <= 3
     else:
         assert show['scale']['x'] == show['scale']['z'] == 1
-    assert 0 <= show['rotation']['y'] <= 450
+    original_rotation = obj['debug']['originalRotation']['y']
+    assert 0 <= (show['rotation']['y'] - original_rotation) <= 360
     assert -10 <= show['position']['x'] < 10
     assert -10 <= show['position']['z'] < 10
     assert len(scene.objects) == 1
@@ -185,7 +186,8 @@ def test_specific_objects_array_single_num_range():
             assert 1 <= show['scale']['x'] == show['scale']['z'] <= 3
         else:
             assert show['scale']['x'] == show['scale']['z'] == 1
-        assert 0 <= show['rotation']['y'] < 450
+        original_rotation = obj['debug']['originalRotation']['y']
+        assert 0 <= (show['rotation']['y'] - original_rotation) <= 360
         assert -25 <= show['position']['x'] < 25
         assert -25 <= show['position']['z'] < 25
         assert obj['debug']['random_position']
@@ -753,7 +755,8 @@ def test_specific_objects_array_multiple():
             assert 1 <= show['scale']['x'] == show['scale']['z'] <= 3
         else:
             assert show['scale']['x'] == show['scale']['z'] == 1
-        assert 0 <= show['rotation']['y'] <= 450
+        original_rotation = obj['debug']['originalRotation']['y']
+        assert 0 <= (show['rotation']['y'] - original_rotation) <= 360
         assert -10 <= show['position']['x'] < 10
         assert -10 <= show['position']['z'] < 10
         assert obj['debug']['random_position']

@@ -24,7 +24,9 @@ ROLE_DICT = {
     'OCCLUDER': 'occluder',
     'STRUCTURAL': 'structural',
     'TARGET': 'target',
-    'WALL': 'wall'
+    'TOOL': 'tool',
+    'WALL': 'wall',
+    'GUIDERAILS': 'guiderail'
 }
 
 SCENE_BOOL_TAGS_DICT = {
@@ -35,10 +37,15 @@ SCENE_BOOL_TAGS_DICT = {
 SCENE_OPTIONAL_TAGS_DICT = {
     'AMBIGUOUS': 'ambiguous',
     'CORNER': 'corner',
+    'CORRECT_DOOR': 'correctDoor',
     'DIRECTION': 'direction',
+    'EXTENSION_SIDE': 'extensionSide',
     'FALL_DOWN': 'fallDown',
     'MOVE_ACROSS': 'moveAcross',
+    'NUM_FLOOR_FEATURES': 'numFloorFeatures',
+    'PATH_RATIO': 'pathRatio',
     'SETUP': 'sceneSetup',
+    'TARGET_SIDE': 'targetSide',
     'WALL': 'wall'
 }
 
@@ -100,8 +107,17 @@ SCENE = SimpleNamespace(
 
     INTERACTIVE_OBJECT_PERMANENCE='interactive object permanence',
     REORIENTATION='reorientation',
+    TOOL_USE='tool use',
+    SPATIAL_ELIMINATION='spatial elimination',
 
     AGENTS='agents',
+
+    LAVA='lava',
+    HOLES='holes',
+    RAMP='ramp',
+    SUPPORT_RELATIONS='support relations',
+
+    SOLIDITY='solidity',
 
     **SCENE_BOOL_TAGS_DICT,
     **SCENE_OPTIONAL_TAGS_DICT,
@@ -324,6 +340,10 @@ CELLS = SimpleNamespace(
         YES='yes',
         NO='no'
     ),
+    TARGET_SIDE=SimpleNamespace(
+        LEFT='left',
+        RIGHT='right'
+    )
 )
 
 # MCS core domains
@@ -355,7 +375,16 @@ ABBREV = SimpleNamespace(
     INTERACTIVE_OCCLUDER='intocc',
 
     INTERACTIVE_OBJECT_PERMANENCE='intobjp',
-    REORIENTATION='reor'
+    REORIENTATION='reor',
+    TOOL_USE='tool',
+
+    RAMP='ramp',
+
+    SOLIDITY='solidity',
+    LAVA='lava',
+    HOLES='holes',
+    SPATIAL_ELIMINATION='spateli',
+    SUPPORT_RELATIONS='suprel',
 )
 
 

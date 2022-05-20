@@ -4,7 +4,15 @@ import random
 import uuid
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
-from generator import ObjectBounds, SceneException, geometry, materials, tags
+from generator import (
+    MaterialTuple,
+    ObjectBounds,
+    SceneException,
+    geometry,
+    materials,
+    structures,
+    tags,
+)
 from generator.separating_axis_theorem import sat_entry
 
 from .hypercubes import update_scene_objects
@@ -14,24 +22,57 @@ class ObjectConfig():
     def __init__(
         self,
         object_type: str,
-        center_y: float,
-        scale_x: float,
+        scale_xz: float,
         scale_y: float,
-        scale_z: float,
-        untrained: bool = False,
         rotation_x: float = 0,
         rotation_y: float = 0,
-        rotation_z: float = 0
+        rotation_z: float = 0,
+        untrained: bool = False,
     ) -> None:
         self.object_type = object_type
-        self.center_y = center_y
-        self.scale_x = scale_x
+        self.scale_xz = scale_xz
         self.scale_y = scale_y
-        self.scale_z = scale_z
         self.rotation_x = rotation_x
         self.rotation_y = rotation_y
         self.rotation_z = rotation_z
         self.untrained = untrained
+
+
+class AgentConfig(ObjectConfig):
+    def __init__(
+        self,
+        object_type: str,
+        scale: float,
+        rotation_x: float = 0,
+        rotation_y: float = 0,
+        rotation_z: float = 0,
+        untrained: bool = False
+    ) -> None:
+        super().__init__(
+            object_type,
+            scale,
+            scale,
+            rotation_x,
+            rotation_y,
+            rotation_z,
+            untrained
+        )
+
+
+class ObjectDimensions():
+    def __init__(
+        self,
+        object_type: str,
+        x: float,
+        y: float,
+        z: float,
+        center_y: float = None
+    ) -> None:
+        self.object_type = object_type
+        self.x = x
+        self.y = y
+        self.z = z
+        self.center_y = (y / 2.0) if center_y is None else center_y
 
 
 class ObjectConfigWithMaterial(ObjectConfig):
@@ -42,10 +83,8 @@ class ObjectConfigWithMaterial(ObjectConfig):
     ) -> None:
         super().__init__(
             config.object_type,
-            config.center_y,
-            config.scale_x,
+            config.scale_xz,
             config.scale_y,
-            config.scale_z,
             config.untrained
         )
         self.material = material
@@ -75,15 +114,47 @@ PAUSED_STEP_WAIT_TIME = 2
 DEFUSE_STEP_SKIP_TIME = 5
 POST_DEFUSE_WAIT_TIME = 5
 
+OBJECT_DIMENSIONS = {
+    'blob_01': ObjectDimensions('blob_01', 0.26, 0.8, 0.36),
+    'blob_02': ObjectDimensions('blob_02', 0.33, 0.78, 0.33),
+    'blob_03': ObjectDimensions('blob_03', 0.25, 0.69, 0.25),
+    'blob_04': ObjectDimensions('blob_04', 0.3, 0.53, 0.3, 0.225),
+    'blob_05': ObjectDimensions('blob_05', 0.38, 0.56, 0.38, 0.24),
+    'blob_06': ObjectDimensions('blob_06', 0.52, 0.5, 0.54),
+    'blob_07': ObjectDimensions('blob_07', 0.25, 0.55, 0.25, 0.245),
+    'blob_08': ObjectDimensions('blob_08', 0.27, 0.62, 0.15),
+    'blob_09': ObjectDimensions('blob_09', 0.33, 0.78, 0.44),
+    'blob_10': ObjectDimensions('blob_10', 0.24, 0.5, 0.24),
+    'circle_frustum': ObjectDimensions('circle_frustum', 1, 1, 1),
+    'cone': ObjectDimensions('cone', 1, 1, 1),
+    'cube': ObjectDimensions('cube', 1, 1, 1),
+    'cube_hollow_narrow': ObjectDimensions('cube_hollow_narrow', 1, 1, 1, 0),
+    'cube_hollow_wide': ObjectDimensions('cube_hollow_wide', 1, 1, 1, 0),
+    'cylinder': ObjectDimensions('cylinder', 1, 2, 1),
+    'hash': ObjectDimensions('hash', 1, 1, 1, 0),
+    'letter_x': ObjectDimensions('letter_x', 1, 1, 1, 0),
+    'lock_wall': ObjectDimensions('lock_wall', 1, 1, 1),
+    'pyramid': ObjectDimensions('pyramid', 1, 1, 1),
+    'semi_sphere': ObjectDimensions('semi_sphere', 1, 1, 1, 0.25),
+    'sphere': ObjectDimensions('sphere', 1, 1, 1),
+    'square_frustum': ObjectDimensions('square_frustum', 1, 1, 1),
+    'triangle': ObjectDimensions('triangle', 1, 1, 1),
+    'tube_narrow': ObjectDimensions('tube_narrow', 1, 1, 1),
+    'tube_wide': ObjectDimensions('tube_wide', 1, 1, 1),
+}
+
 AGENT_OBJECT_CONFIG_LIST = [
-    ObjectConfig('cone', 0.25, 0.225, 0.5, 0.225, False),
-    ObjectConfig('cube', 0.25, 0.125, 0.5, 0.125, False),
-    ObjectConfig('cylinder', 0.25, 0.225, 0.25, 0.225, False),
-    ObjectConfig('square_frustum', 0.25, 0.225, 0.5, 0.225, False),
-    ObjectConfig('circle_frustum', 0.25, 0.225, 0.5, 0.225, False),
-    ObjectConfig('pyramid', 0.25, 0.225, 0.5, 0.225, False),
-    ObjectConfig('tube_narrow', 0.25, 0.225, 0.5, 0.225, False),
-    ObjectConfig('tube_wide', 0.25, 0.225, 0.5, 0.225, False)
+    # Scaled to ensure that each agent's max X/Z dimension is 1
+    AgentConfig('blob_01', 2.77),
+    AgentConfig('blob_02', 3.03),
+    AgentConfig('blob_03', 4),
+    AgentConfig('blob_04', 3.33),
+    AgentConfig('blob_05', 2.63),
+    AgentConfig('blob_06', 1.85),
+    AgentConfig('blob_07', 4),
+    AgentConfig('blob_08', 3.7),
+    AgentConfig('blob_09', 2.27),
+    AgentConfig('blob_10', 4.16),
 ]
 AGENT_OBJECT_MATERIAL_LIST = [
     materials.BLUE,
@@ -92,26 +163,32 @@ AGENT_OBJECT_MATERIAL_LIST = [
     materials.PURPLE
     # Don't use red here because it looks too much like the maroon key.
 ]
-# The height of each possible agent object type should be the same.
-AGENT_OBJECT_HEIGHT = 0.5
-
-FLOOR_OBJECT_MATERIAL = ('Custom/Materials/White', ['white'])
 
 GOAL_OBJECT_CONFIG_LIST = [
-    ObjectConfig('cube', 0.125, 0.225, 0.25, 0.225, False),
-    ObjectConfig('cube', 0.0625, 0.225, 0.125, 0.225, False),
-    ObjectConfig('cylinder', 0.0625, 0.225, 0.0625, 0.225, False),
-    ObjectConfig('semi_sphere', 0.0625, 0.225, 0.25, 0.225, False),
-    ObjectConfig('sphere', 0.125, 0.225, 0.25, 0.225, False),
-    ObjectConfig('square_frustum', 0.0625, 0.225, 0.125, 0.225, False),
-    ObjectConfig('cube_hollow_narrow', 0, 0.225, 0.25, 0.225, False),
-    ObjectConfig('cube_hollow_wide', 0, 0.225, 0.25, 0.225, False),
-    ObjectConfig('letter_x', 0, 0.225, 0.125, 0.225, False),
-    ObjectConfig('hash', 0, 0.225, 0.125, 0.225, False),
-    ObjectConfig('tube_narrow', 0.125, 0.225, 0.25, 0.225, False),
-    ObjectConfig('tube_wide', 0.125, 0.225, 0.25, 0.225, False)
+    # Scaled to ensure that each object's max X/Z dimension is 1
+    ObjectConfig('circle_frustum', 1, 1),
+    ObjectConfig('circle_frustum', 1, 0.5),
+    ObjectConfig('cube', 1, 1),
+    ObjectConfig('cube', 1, 0.5),
+    ObjectConfig('cube_hollow_narrow', 1, 0.5),
+    ObjectConfig('cube_hollow_wide', 1, 0.5),
+    ObjectConfig('cylinder', 1, 0.5),
+    ObjectConfig('cylinder', 1, 0.25),
+    ObjectConfig('letter_x', 1, 0.5),
+    ObjectConfig('hash', 1, 0.5),
+    ObjectConfig('pyramid', 1, 1),
+    ObjectConfig('pyramid', 1, 0.5),
+    ObjectConfig('semi_sphere', 1, 0.5),
+    ObjectConfig('sphere', 1, 1),
+    ObjectConfig('square_frustum', 1, 1),
+    ObjectConfig('square_frustum', 1, 0.5),
+    ObjectConfig('tube_narrow', 1, 1),
+    ObjectConfig('tube_narrow', 1, 0.5),
+    ObjectConfig('tube_wide', 1, 1),
+    ObjectConfig('tube_wide', 1, 0.5),
 ]
 GOAL_OBJECT_MATERIAL_LIST = [
+    materials.AZURE,
     materials.BROWN,
     materials.CYAN,
     materials.GREY,
@@ -119,25 +196,27 @@ GOAL_OBJECT_MATERIAL_LIST = [
     materials.NAVY,
     materials.OLIVE,
     materials.ORANGE,
+    materials.ROSE,
     materials.TEAL,
     materials.VIOLET,
     materials.YELLOW
 ]
 
-HOME_OBJECT_HEIGHT = [0.000625, 0.00125]
-HOME_OBJECT_MATERIAL = ('Custom/Materials/Magenta', ['magenta'])
+# Make the home object as short as possible, without it looking weird in Unity.
+HOME_OBJECT_HEIGHT = [0.01, 0.02]
+HOME_OBJECT_MATERIAL = MaterialTuple('Custom/Materials/Magenta', ['magenta'])
 HOME_OBJECT_SIZE = [0.5, 0.5]
 
 WALL_OBJECT_HEIGHT = [0.0625, 0.125]
-WALL_OBJECT_MATERIAL = ('Custom/Materials/Black', ['black'])
+WALL_OBJECT_MATERIAL = MaterialTuple('Custom/Materials/Black', ['black'])
 WALL_OBJECT_SIZE = [0.5, 0.5]
 
 FUSE_WALL_OBJECT_HEIGHT = [0.06, 0.12]
-FUSE_WALL_OBJECT_MATERIAL = ('Custom/Materials/Lime', ['lime'])
+FUSE_WALL_OBJECT_MATERIAL = MaterialTuple('Custom/Materials/Lime', ['lime'])
 FUSE_WALL_OBJECT_SIZE = [0.5, 0.5]
 
 KEY_OBJECT_HEIGHT = [FUSE_WALL_OBJECT_HEIGHT[0], 0.35]
-KEY_OBJECT_MATERIAL = ('Custom/Materials/Maroon', ['maroon'])
+KEY_OBJECT_MATERIAL = MaterialTuple('Custom/Materials/Maroon', ['maroon'])
 KEY_OBJECT_SIZE = [FUSE_WALL_OBJECT_HEIGHT[1], 0.35]
 KEY_OBJECT_TYPE = 'triangle'
 KEY_OBJECT_ROTATION_X = 0
@@ -173,6 +252,41 @@ KEY_OBJECT_ROTATION_Y = {
 }
 KEY_OBJECT_ROTATION_Z = 90
 
+# The floor and room walls should have bland colors and simple textures.
+CEILING_MATERIAL = MaterialTuple("AI2-THOR/Materials/Walls/Drywall", ["white"])
+FLOOR_OR_WALL_MATERIALS = [
+    MaterialTuple("AI2-THOR/Materials/Ceramics/BrownMarbleFake 1", ["brown"]),
+    MaterialTuple("AI2-THOR/Materials/Ceramics/ConcreteBoards1", ["grey"]),
+    MaterialTuple("AI2-THOR/Materials/Ceramics/ConcreteFloor", ["grey"]),
+    MaterialTuple("AI2-THOR/Materials/Ceramics/GREYGRANITE", ["grey"]),
+    MaterialTuple("AI2-THOR/Materials/Ceramics/PinkConcrete_Bedroom1",
+                  ["red"]),
+    MaterialTuple("AI2-THOR/Materials/Ceramics/WhiteCountertop", ["grey"]),
+    MaterialTuple("AI2-THOR/Materials/Wood/BedroomFloor1", ["brown"]),
+    MaterialTuple("AI2-THOR/Materials/Wood/LightWoodCounters 1", ["brown"]),
+    MaterialTuple("AI2-THOR/Materials/Wood/LightWoodCounters3", ["brown"]),
+    MaterialTuple("AI2-THOR/Materials/Wood/LightWoodCounters4", ["brown"]),
+    MaterialTuple(
+        "AI2-THOR/Materials/Wood/TexturesCom_WoodFine0050_1_seamless_S",
+        ["brown"]),
+    MaterialTuple("AI2-THOR/Materials/Wood/WhiteWood", ["white"]),
+    MaterialTuple("AI2-THOR/Materials/Wood/WoodFloorsCross", ["brown"]),
+    MaterialTuple("AI2-THOR/Materials/Wood/WoodGrain_Brown", ["brown"]),
+    MaterialTuple("AI2-THOR/Materials/Wood/WoodGrain_Tan", ["brown"])
+]
+FLOOR_MATERIALS = FLOOR_OR_WALL_MATERIALS + [
+    MaterialTuple("AI2-THOR/Materials/Fabrics/Carpet2", ["brown"]),
+    MaterialTuple("AI2-THOR/Materials/Fabrics/CarpetWhite", ["white"]),
+    MaterialTuple("AI2-THOR/Materials/Fabrics/CarpetWhite 3", ["white"])
+]
+WALL_MATERIALS = FLOOR_OR_WALL_MATERIALS + [
+    MaterialTuple("AI2-THOR/Materials/Walls/Drywall", ["white"]),
+    MaterialTuple("AI2-THOR/Materials/Walls/DrywallBeige", ["white"]),
+    MaterialTuple("AI2-THOR/Materials/Walls/Drywall4Tiled", ["white"]),
+    MaterialTuple("AI2-THOR/Materials/Walls/WallDrywallGrey", ["grey"]),
+    MaterialTuple("AI2-THOR/Materials/Walls/YellowDrywall", ["yellow"])
+]
+
 
 def _append_each_show_to_object(
     mcs_object: Dict[str, Any],
@@ -200,6 +314,7 @@ def _append_each_show_to_object(
             # Move the object to its new position for the step.
             mcs_show = _create_show(
                 step,
+                mcs_object['type'],
                 mcs_object['debug']['configHeight'],
                 mcs_object['debug']['configSize'],
                 json_coords,
@@ -366,12 +481,18 @@ def _create_agent_object_list(
 
         # Create the MCS agent object.
         config_with_material = agent_object_config_list[index]
+        dimensions = OBJECT_DIMENSIONS[config_with_material.object_type]
+        # Multiply the agent's scale based on its JSON radius and unit size.
+        factor = json_radius * 2 * min(unit_size[0], unit_size[1])
+        scale_xz = config_with_material.scale_xz * factor
+        scale_y = config_with_material.scale_y * factor
+        center_y = dimensions.center_y * config_with_material.scale_y * factor
         agent_object = _create_object(
             'agent_',
             config_with_material.object_type,
             config_with_material.material,
-            [config_with_material.center_y, config_with_material.scale_y],
-            [config_with_material.scale_x, config_with_material.scale_z],
+            [center_y, scale_y],
+            [scale_xz, scale_xz],
             json_coords,
             json_size,
             unit_size
@@ -524,12 +645,18 @@ def _create_goal_object_list(
 
         # Create the MCS goal object.
         config_with_material = goal_object_config_list[index]
+        dimensions = OBJECT_DIMENSIONS[config_with_material.object_type]
+        # Multiply the object's scale based on its JSON radius and unit size.
+        factor = json_radius * 2 * min(unit_size[0], unit_size[1])
+        scale_xz = config_with_material.scale_xz * factor
+        scale_y = config_with_material.scale_y * factor
+        center_y = dimensions.center_y * config_with_material.scale_y * factor
         goal_object = _create_object(
             'object_',
             config_with_material.object_type,
             config_with_material.material,
-            [config_with_material.center_y, config_with_material.scale_y],
-            [config_with_material.scale_x, config_with_material.scale_z],
+            [center_y, scale_y],
+            [scale_xz, scale_xz],
             json_coords,
             json_size,
             unit_size
@@ -565,6 +692,7 @@ def _create_goal_object_list(
             # Move the object to its new position for the trial.
             goal_object['shows'].append(_create_show(
                 step,
+                goal_object['type'],
                 goal_object['debug']['configHeight'],
                 goal_object['debug']['configSize'],
                 json_coords,
@@ -631,7 +759,8 @@ def _create_home_object(
 
 def _create_key_object(
     trial_list: List[List[Dict[str, Any]]],
-    unit_size: Tuple[float, float]
+    unit_size: Tuple[float, float],
+    agent_height: float
 ) -> Optional[Dict[str, Any]]:
     """Create and return the MCS scene's key object using the given trial
     list from the JSON file data."""
@@ -663,6 +792,7 @@ def _create_key_object(
     # Remove the object's first appearance (we will override it later).
     key_object['shows'] = []
     key_object['debug']['boundsAtStep'] = []
+    key_object['debug']['agentHeight'] = agent_height
 
     # Move the key on each step as needed.
     for trial_index, trial in enumerate(trial_list):
@@ -812,8 +942,9 @@ def _create_object(
     mcs_object = {
         'id': id_prefix + str(uuid.uuid4()),
         'type': object_type,
-        'materials': [object_material[0]],
+        'materials': [object_material.material],
         'debug': {
+            'color': object_material.color,
             'info': object_material[1] + [object_type],
             # Save the object's height and size data for future use.
             'configHeight': object_height,
@@ -821,12 +952,20 @@ def _create_object(
         },
         'shows': [_create_show(
             0,
+            object_type,
             object_height,
             object_size,
             json_coords,
             json_size,
             unit_size
         )]
+    }
+    dimensions = OBJECT_DIMENSIONS[object_type]
+    scale = mcs_object['shows'][0]['scale']
+    mcs_object['debug']['dimensions'] = {
+        'x': dimensions.x * scale['x'],
+        'y': dimensions.x * scale['y'],
+        'z': dimensions.x * scale['z']
     }
     mcs_object['debug']['info'].append(' '.join(mcs_object['debug']['info']))
     mcs_object['debug']['boundsAtStep'] = [
@@ -848,10 +987,8 @@ def _create_scene(
     list, and expectedness answer from the JSON file data."""
 
     scene = copy.deepcopy(body_template)
+    scene['version'] = 3
     scene['isometric'] = True
-    scene['ceilingMaterial'] = None
-    scene['floorMaterial'] = FLOOR_OBJECT_MATERIAL[0]
-    scene['wallMaterial'] = WALL_OBJECT_MATERIAL[0]
 
     scene['goal'] = copy.deepcopy(goal_template)
     scene['goal']['action_list'] = _create_action_list(trial_list)
@@ -868,8 +1005,10 @@ def _create_scene(
         agent_object_config_list,
         unit_size
     )
-    # Assume only one agent, and the agent will always start on the same spot.
-    agent_start_bounds = agent_object_list[0]['shows'][0]['boundingBox']
+    # Identify the primary agent.
+    agent_object = agent_object_list[0]
+    # Assume the primary agent is the only one moving around.
+    agent_start_bounds = agent_object['shows'][0]['boundingBox']
     goal_object_list = _create_goal_object_list(
         trial_list,
         goal_object_config_list,
@@ -878,7 +1017,9 @@ def _create_scene(
         unit_size
     )
     home_object = _create_home_object(trial_list, unit_size)
-    key_object = _create_key_object(trial_list, unit_size)
+    # Assume the primary agent is the only one that can hold the key.
+    agent_height = agent_start_bounds.max_y
+    key_object = _create_key_object(trial_list, unit_size, agent_height)
     lock_wall_list = _create_lock_wall_object_list(
         trial_list,
         key_object,
@@ -899,13 +1040,10 @@ def _create_scene(
     )
     _move_agent_past_lock_location(agent_object_list, lock_wall_list)
 
-    # Assume only one agent in instrumental action scenes.
-    agent_object = agent_object_list[0]
-
     # If the agent is carrying the key on this step, move the key to be
     # centered directly above the agent.
     for key_show in (key_object['shows'] if key_object else []):
-        if key_show['position']['y'] >= AGENT_OBJECT_HEIGHT:
+        if key_show['position']['y'] >= agent_height:
             position_x = KEY_OBJECT_ROTATION_Y[
                 key_show['rotationProperty']
             ]['position_x']
@@ -934,11 +1072,46 @@ def _create_scene(
             for a in ['x', 'y', 'z']:
                 mcs_show['position'][a] = round(mcs_show['position'][a], 4)
 
+    platform_material = random.choice(materials.WALL_MATERIALS)
+
+    platform = structures.create_platform(
+        position_x=4,
+        position_z=-4,
+        rotation_y=0,
+        scale_x=0.75,
+        scale_y=3,
+        scale_z=0.75,
+        room_dimension_y=10,
+        material_tuple=platform_material
+    )
+
+    # Set distinct random materials for the floor and room walls.
+    # Ensure they don't match the color of any important objects.
+    excluded_colors = [
+        color for mcs_object in (agent_object_list + goal_object_list)
+        for color in mcs_object['debug']['color']
+    ]
+    scene['ceilingMaterial'] = CEILING_MATERIAL.material
+    floor_choices = [material_tuple for material_tuple in FLOOR_MATERIALS if (
+        material_tuple.color[0] not in excluded_colors
+    )]
+    floor_choice = random.choice(floor_choices)
+    scene['floorMaterial'] = floor_choice.material
+    scene['debug']['floorColors'] = floor_choice.color
+    wall_choices = [material_tuple for material_tuple in WALL_MATERIALS if (
+        material_tuple.color[0] not in excluded_colors and
+        material_tuple.material != floor_choice.material
+    )]
+    wall_choice = random.choice(wall_choices)
+    scene['wallMaterial'] = wall_choice.material
+    scene['debug']['wallColors'] = wall_choice.color
+
     role_to_object_list = {}
     role_to_object_list[tags.ROLES.AGENT] = agent_object_list
     role_to_object_list[tags.ROLES.HOME] = [home_object]
     role_to_object_list[tags.ROLES.KEY] = [key_object] if key_object else []
     role_to_object_list[tags.ROLES.NON_TARGET] = non_target_list
+    role_to_object_list[tags.ROLES.STRUCTURAL] = [platform]
     role_to_object_list[tags.ROLES.TARGET] = [target]
     role_to_object_list[tags.ROLES.WALL] = wall_object_list + lock_wall_list
 
@@ -948,6 +1121,7 @@ def _create_scene(
 
 def _create_show(
     begin_frame: int,
+    object_type: str,
     object_height: Tuple[float, float],
     object_size: Tuple[float, float],
     json_coords: Tuple[int, int],
@@ -974,12 +1148,17 @@ def _create_show(
             'z': object_size[1]
         }
     }
+    dimensions = OBJECT_DIMENSIONS[object_type]
     mcs_show['boundingBox'] = geometry.create_bounds(
-        dimensions=mcs_show['scale'],
+        dimensions={
+            'x': mcs_show['scale']['x'] * dimensions.x,
+            'y': mcs_show['scale']['y'] * dimensions.y,
+            'z': mcs_show['scale']['z'] * dimensions.z
+        },
         offset={'x': 0, 'y': 0, 'z': 0},
         position=mcs_show['position'],
         rotation=mcs_show['rotation'],
-        standing_y=(mcs_show['scale']['y'] / 2.0)
+        standing_y=(mcs_show['scale']['y'] * dimensions.y / 2.0)
     )
     return mcs_show
 
@@ -1138,6 +1317,51 @@ def _create_wall_object_list(
     trial list from the JSON file data."""
     fuse_wall_list = _create_fuse_wall_object_list(trial_list, unit_size)
     static_wall_list = _create_static_wall_object_list(trial_list, unit_size)
+    for name, position, size in [
+        ('wall_front', (0, 2.25), (5, WALL_OBJECT_SIZE[1])),
+        ('wall_back', (0, -2.25), (5, WALL_OBJECT_SIZE[1])),
+        ('wall_left', (-2.25, 0), (WALL_OBJECT_SIZE[0], 4)),
+        ('wall_right', (2.25, 0), (WALL_OBJECT_SIZE[0], 4))
+    ]:
+        wall_object = {
+            'id': name,
+            'type': 'cube',
+            'materials': [WALL_OBJECT_MATERIAL[0]],
+            'shows': [{
+                'stepBegin': 0,
+                'position': {
+                    'x': position[0],
+                    'y': WALL_OBJECT_HEIGHT[0],
+                    'z': position[1]
+                },
+                'rotation': {
+                    'x': 0,
+                    'y': 0,
+                    'z': 0
+                },
+                'scale': {
+                    'x': size[0],
+                    'y': WALL_OBJECT_HEIGHT[1],
+                    'z': size[1]
+                }
+            }],
+            'kinematic': True,
+            'structure': True,
+            'debug': {
+                'info': WALL_OBJECT_MATERIAL[1] + ['cube'],
+            }
+        }
+        wall_object['debug']['info'].append(
+            ' '.join(wall_object['debug']['info'])
+        )
+        wall_object['shows'][0]['boundingBox'] = geometry.create_bounds(
+            dimensions=wall_object['shows'][0]['scale'],
+            offset={'x': 0, 'y': 0, 'z': 0},
+            position=wall_object['shows'][0]['position'],
+            rotation=wall_object['shows'][0]['rotation'],
+            standing_y=(wall_object['shows'][0]['scale']['y'] / 2.0)
+        )
+        static_wall_list.append(wall_object)
     return static_wall_list + fuse_wall_list
 
 
@@ -1208,7 +1432,7 @@ def _fix_key_location(
             previous_show['stepBegin'] < trial_start_step and
             this_show['stepBegin'] >= trial_start_step
         ):
-            this_show['position']['y'] += AGENT_OBJECT_HEIGHT
+            this_show['position']['y'] += key_object['debug']['agentHeight']
     return key_object
 
 
@@ -1349,12 +1573,10 @@ def _remove_intersecting_agent_steps(
             agent_object['debug']['boundsAtStep']
         ):
             for other_object in other_object_list:
-                other_object_bounds = (
-                    other_object['debug']['boundsAtStep'][step]
-                )
-                if (
-                    other_object_bounds and
-                    sat_entry(agent_bounds.box_xz, other_object_bounds.box_xz)
+                object_bounds = other_object['debug']['boundsAtStep'][step]
+                if object_bounds and sat_entry(
+                    agent_bounds.box_xz,
+                    object_bounds.box_xz
                 ):
                     remove_step_list.append(step)
         agent_object['shows'] = [

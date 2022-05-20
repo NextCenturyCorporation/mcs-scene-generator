@@ -1,3 +1,4 @@
+import copy
 import logging
 import random
 from dataclasses import dataclass
@@ -167,7 +168,6 @@ class SpecificInteractableObjectsComponent(ILEComponent):
             # If identical_to is used, pick that object's shape/scale/material.
             # Otherwise, if identical_except_color is used, pick that object's
             # shape/scale, but not its material.
-            cannot_have_same_material = False
             if(
                 object_config.identical_to or
                 object_config.identical_except_color
@@ -189,11 +189,24 @@ class SpecificInteractableObjectsComponent(ILEComponent):
                     )
 
                 object_config.shape = obj_to_use.definition.type
-                object_config.scale = obj_to_use.definition.scale
+                object_config.scale = copy.deepcopy(
+                    obj_to_use.definition.scale
+                )
+
+                # Because a cylinder's height is auto downscaled when its
+                # ObjectDefinition is created, upscale it here to compensate.
+                if object_config.shape in ['cylinder']:
+                    if getattr(object_config.scale, 'y'):
+                        object_config.scale.y *= 2
+
                 if object_config.identical_to:
-                    object_config.material = obj_to_use.definition.materials
+                    object_config.material = copy.deepcopy(
+                        obj_to_use.definition.materials
+                    )
                 else:
-                    cannot_have_same_material = True
+                    object_config.not_material = (
+                        obj_to_use.definition.materials[0]
+                    )
 
             obj = FeatureCreationService.create_feature(
                 scene,
@@ -202,7 +215,7 @@ class SpecificInteractableObjectsComponent(ILEComponent):
                 bounds
             )[0]
 
-            if cannot_have_same_material:
+            if object_config.not_material:
                 if obj_to_use.definition.materials == obj['materials']:
                     raise ILEException(
                         'Random object accidentally matches in color'

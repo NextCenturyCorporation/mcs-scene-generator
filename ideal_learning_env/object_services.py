@@ -142,6 +142,8 @@ class KeywordLocation():
     ON_OBJECT_CENTERED = "on_center"
     RANDOM = "random"
     ASSOCIATED_WITH_AGENT = "associated_with_agent"
+    OPPOSITE_X = "opposite_x"
+    OPPOSITE_Z = "opposite_z"
 
     @staticmethod
     def get_keyword_location_object_tuple(
@@ -287,6 +289,20 @@ class KeywordLocation():
                 adjacent=True,
                 room_dimensions=room_dimensions
             )
+            return KeywordLocation._move_instance_or_raise_error(
+                instance, location, keyword)
+        if keyword == KeywordLocation.OPPOSITE_X:
+            location = copy.deepcopy(rel_object_location)
+            location['position']['x'] *= -1
+            location['position']['y'] -= (
+                relative_instance['debug']['positionY'])
+            return KeywordLocation._move_instance_or_raise_error(
+                instance, location, keyword)
+        if keyword == KeywordLocation.OPPOSITE_Z:
+            location = copy.deepcopy(rel_object_location)
+            location['position']['z'] *= -1
+            location['position']['y'] -= (
+                relative_instance['debug']['positionY'])
             return KeywordLocation._move_instance_or_raise_error(
                 instance, location, keyword)
         if keyword in [KeywordLocation.ON_OBJECT,

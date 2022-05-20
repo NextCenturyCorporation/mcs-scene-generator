@@ -3,16 +3,14 @@ import math
 import uuid
 from typing import Any, Dict, List
 
+from machine_common_sense.config_manager import Vector3d
 from shapely import affinity
 
 from .base_objects import (
     ALL_LARGE_BLOCK_TOOLS,
     LARGE_BLOCK_TOOLS_TO_DIMENSIONS,
 )
-from .geometry import (
-    PERFORMER_HEIGHT,
-    ObjectBounds,
-    create_bounds)
+from .geometry import PERFORMER_HEIGHT, ObjectBounds, create_bounds
 from .materials import MaterialTuple
 
 ANGLE_BRACE_TEMPLATE = {
@@ -526,8 +524,10 @@ def create_platform(
         'front': lips['front'],
         'back': lips['back'],
         'left': lips['left'],
-        'right': lips['right']
+        'right': lips['right'],
     }
+    if lips.get('gaps'):
+        platform['lips']['gaps'] = lips['gaps']
     platform['shows'][0]['position'] = {
         'x': position_x,
         'y': position_y_modifier + (scale_y / 2.0),
@@ -693,6 +693,55 @@ def create_door(
             bounds
         )
     return objs + walls
+
+
+def create_door_occluder(room_dimensions: Vector3d,
+                         door_start_drop_step: int,
+                         door_mat: MaterialTuple,
+                         wall_mat: MaterialTuple,
+                         middle_height: float,
+                         middle_width: float,
+                         position_z: float = 0):
+    door_gap = room_dimensions.y - middle_height - 2.25
+    side_wall_x = (room_dimensions.x - middle_width) / 2
+    side_pos_x = room_dimensions.x / 2 - side_wall_x / 2
+    add_y = room_dimensions.y
+    doors_objs = []
+    door_x = [0, -side_pos_x, side_pos_x]
+    door_y = [middle_height, 0, 0]
+    wall_scale_x = [middle_width, side_wall_x, side_wall_x]
+    wall_scale_y = [
+        room_dimensions.y -
+        middle_height - door_gap,
+        room_dimensions.y - door_gap,
+        room_dimensions.y - door_gap]
+    door_end_drop_step = door_start_drop_step + add_y * 4 - 1
+    for i in range(3):
+        new_objs = create_door(
+            position_x=door_x[i],
+            position_y=door_y[i] + add_y,
+            position_z=position_z,
+            rotation_y=0,
+            material_tuple=door_mat,
+            wall_scale_x=wall_scale_x[i],
+            wall_scale_y=wall_scale_y[i],
+            wall_material_tuple=wall_mat)
+        for new_obj in new_objs:
+            new_obj['moves'] = [{
+                "stepBegin": door_start_drop_step,
+                "stepEnd": door_end_drop_step,
+                "vector": {
+                    "x": 0,
+                    "y": -0.25,
+                    "z": 0
+                }
+            }]
+        doors_objs += new_objs
+    center_door = doors_objs[0]
+    left_door = doors_objs[4]
+    right_door = doors_objs[8]
+    return (doors_objs, int(door_end_drop_step),
+            center_door, left_door, right_door)
 
 
 def _get_door_wall_objects(

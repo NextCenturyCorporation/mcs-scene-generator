@@ -4,11 +4,12 @@ passive_scene: true
 # Max of 240 action steps in each passive "move across" scene.
 last_step: 240
 
-# Large room with a high ceiling.
+# Large room with a high ceiling and a slippery floor.
 room_dimensions:
-    x: 16
+    x: 20
     y: 8
-    z: 10
+    z: 20
+passive_physics_floor: true
 
 # Specific starting position and rotation used in passive physics tasks.
 performer_start_position:
@@ -90,11 +91,11 @@ structural_throwers:
       # Same chance to throw straight across (50%) or at an angle (50%).
       rotation_z: [0, 0, 0, 5, 10, 15]
       throw_force:
-          min: 15
-          max: 20
+          min: 8
+          max: 12
       throw_step:
           min: 41
-          max: 60
+          max: 80
 
 # Override the defaults to avoid randomly generating any other objects.
 keyword_objects:

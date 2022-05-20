@@ -963,7 +963,7 @@ def test_thrower_creation_reconcile():
         WallSide.BACK.value,
         WallSide.LEFT.value,
         WallSide.RIGHT.value]
-    assert 0 <= r1.throw_step <= 10
+    assert 5 <= r1.throw_step <= 10
     assert r1.throw_force is None
     assert -45 <= r1.rotation_y <= 45
     assert 0 <= r1.rotation_z <= 15
@@ -1836,7 +1836,7 @@ def test_ramp_create():
 def test_thrower_create():
     temp = StructuralThrowerConfig(
         height=1.3, wall='front', position_wall=0.1, rotation_y=0,
-        rotation_z=2, throw_step=3,
+        rotation_z=2, throw_step=5,
         throw_force=5, projectile_shape='ball',
         projectile_material="AI2-THOR/Materials/Plastics/BlueRubber",
         projectile_scale=0.3)
@@ -1851,7 +1851,9 @@ def test_thrower_create():
     assert thrower['kinematic']
     assert thrower['structure']
     assert thrower['materials'] == ['Custom/Materials/Grey']
-    assert thrower['states'] == [['held'], ['held'], ['released']]
+    assert thrower['states'] == [
+        ['held'], ['held'], ['held'], ['held'], ['released']
+    ]
     show = thrower['shows'][0]
     pos = show['position']
     rot = show['rotation']

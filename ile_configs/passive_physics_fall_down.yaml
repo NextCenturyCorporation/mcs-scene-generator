@@ -4,11 +4,12 @@ passive_scene: true
 # Max of 160 action steps in each "fall down" scene.
 last_step: 160
 
-# Large room with a high ceiling.
+# Large room with a high ceiling and a slippery floor.
 room_dimensions:
-    x: 16
+    x: 20
     y: 8
-    z: 10
+    z: 20
+passive_physics_floor: true
 
 # Specific starting position and rotation used in passive physics tasks.
 performer_start_position:

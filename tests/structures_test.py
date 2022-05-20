@@ -1127,6 +1127,46 @@ def test_create_door():
     assert right_wall['shows'][0]['scale']['z'] == 0.1
 
 
+def test_create_door_occluder():
+    door_mat = MaterialTuple("test_material", ["brown", "blue"])
+    wall_mat = MaterialTuple("wall_material", ["green", "red"])
+    (doors_objs, door_end_drop_step,
+     center_door, left_door, right_door) = structures.create_door_occluder(
+        Vector3d(
+            x=15,
+            y=15,
+            z=15),
+        door_start_drop_step=3,
+        door_mat=door_mat,
+        wall_mat=wall_mat,
+        middle_height=1.3,
+        middle_width=1.6,
+        position_z=0.4)
+
+    assert len(doors_objs) == 12
+    doors = 0
+    walls = 0
+    for obj in doors_objs:
+        move = obj['moves'][0]
+        assert move['stepBegin'] == 3
+        assert obj['shows'][0]['position']['z'] == 0.4
+
+        if obj['id'].startswith('door_'):
+            doors += 1
+            assert obj['openable']
+        else:
+            walls += 1
+            assert obj.get('openable') is None
+            assert obj['structure']
+
+    assert doors == 3
+    assert walls == 9
+    assert door_end_drop_step == 62
+    assert center_door['id'].startswith('door_')
+    assert left_door['id'].startswith('door_')
+    assert right_door['id'].startswith('door_')
+
+
 def test_create_guide_rail():
     mat = MaterialTuple("AI2-THOR/Materials/Wood/BedroomFloor1", ["brown"])
     rail = structures.create_guide_rail(1, 2, 90, 4, mat)

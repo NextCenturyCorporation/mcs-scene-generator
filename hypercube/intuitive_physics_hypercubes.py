@@ -65,6 +65,7 @@ PERFORMER_START = {
 
 MIN_TARGET_Z = 1.6
 MAX_TARGET_Z = 4.4
+MAX_TARGET_Z_EXTENDED = 9.4
 STEP_Z = 0.05
 SEPARATION_Z = 1.1
 
@@ -379,6 +380,7 @@ class IntuitivePhysicsHypercube(Hypercube, ABC):
         last_step=None
     ) -> None:
         self._role_to_type = role_to_type
+        body_template['version'] = 3
 
         # Choose fall-down or move-across if needed.
         if not is_fall_down and not is_move_across:
@@ -461,6 +463,14 @@ class IntuitivePhysicsHypercube(Hypercube, ABC):
         # Always generate three occluders for all move-across scenes in Eval 3.
         # We may remove one or more of them later for specific scenes.
         return 3
+
+    def _get_object_max_z(self) -> int:
+        """Return the maximum Z position for an object."""
+        return MAX_TARGET_Z
+
+    def _get_object_min_z(self) -> int:
+        """Return the minimum Z position for an object."""
+        return MIN_TARGET_Z
 
     def _choose_all_movements(
         self,
@@ -1189,7 +1199,10 @@ class IntuitivePhysicsHypercube(Hypercube, ABC):
                     occluder_default_max_x
                 )
 
-                z_position = choose_position_z()
+                z_position = choose_position_z(
+                    self._get_object_min_z(),
+                    self._get_object_max_z()
+                )
 
                 # Each object must have an occluder so ensure that they're each
                 # positioned far enough away from one another.
@@ -1410,7 +1423,9 @@ class IntuitivePhysicsHypercube(Hypercube, ABC):
                 # Choose the object's position and define its location.
                 object_position = choose_move_across_object_position(
                     left_side,
-                    object_list
+                    object_list,
+                    min_z=self._get_object_min_z(),
+                    max_z=self._get_object_max_z()
                 )
                 if object_position is None:
                     continue
@@ -1788,6 +1803,8 @@ class CollisionsHypercube(IntuitivePhysicsHypercube):
         training=False,
         last_step=None
     ):
+        # If the target object is near the camera (50% of hypercubes).
+        self._is_target_near = random.choice([True, False])
         super().__init__(
             tags.ABBREV.COLLISIONS.upper(),
             body_template,
@@ -1923,6 +1940,22 @@ class CollisionsHypercube(IntuitivePhysicsHypercube):
         return 1
 
     # Override
+    def _get_object_max_z(self) -> int:
+        """Return the maximum Z position for an object."""
+        if self._is_target_near:
+            # The target should not be positioned past the first quarter.
+            return MIN_TARGET_Z + (MAX_TARGET_Z_EXTENDED / 4.0)
+        return MAX_TARGET_Z_EXTENDED
+
+    # Override
+    def _get_object_min_z(self) -> int:
+        """Return the minimum Z position for an object."""
+        if self._is_target_near:
+            return MIN_TARGET_Z
+        # The target should not be positioned in front of the final quarter.
+        return MAX_TARGET_Z_EXTENDED - (MAX_TARGET_Z_EXTENDED / 4.0)
+
+    # Override
     def _identify_targets_and_non_targets(
         self,
         target_object_list: List[Dict[str, Any]]
@@ -1942,15 +1975,14 @@ class CollisionsHypercube(IntuitivePhysicsHypercube):
         non_target_trained['forces'] = []
         non_target_trained['shows'][0]['stepBegin'] = 0
 
-        # Move the non-target to a far-off Z position.
+        # Move the non-target to a Z position opposite from the target: if
+        # _is_target_near, then the non-target should be far, and visa-versa.
         # (We may move it again in specific scenes later.)
-        half_difference_z = ((MAX_TARGET_Z - MIN_TARGET_Z) / 2.0)
-        midway_position_z = MIN_TARGET_Z + half_difference_z
-        target_z = target_trained['shows'][0]['position']['z']
-        is_near = target_z <= midway_position_z
         non_target_trained['shows'][0]['position']['z'] = choose_position_z(
-            (target_z + half_difference_z) if is_near else MIN_TARGET_Z,
-            MAX_TARGET_Z if is_near else (target_z - half_difference_z)
+            (MAX_TARGET_Z_EXTENDED - (MAX_TARGET_Z_EXTENDED / 4.0))
+            if self._is_target_near else MIN_TARGET_Z,
+            MAX_TARGET_Z_EXTENDED if self._is_target_near else
+            (MIN_TARGET_Z + (MAX_TARGET_Z_EXTENDED / 4.0))
         )
 
         # Move the non-target to an X position directly behind the occluder.
@@ -2001,6 +2033,30 @@ class CollisionsHypercube(IntuitivePhysicsHypercube):
         non_target_instances[VARIATIONS.UNTRAINED_SHAPE] = non_target_untrained
         self._variations_list.append(ObjectVariations(non_target_instances))
         return target_object_list, [non_target_trained]
+
+    # Override
+    def _init_each_object_definition_list(self, is_fall_down: bool) -> None:
+        """Set each object definition list needed by this hypercube, used in
+        _choose_object_variations."""
+
+        super()._init_each_object_definition_list(is_fall_down)
+
+        # Don't use balls/spheres in Eval 4 Collision/OP/STC hypercubes.
+        # They don't completely stop upon collision, so they roll out into view
+        # from behind the occluder.
+        self._trained_dataset = self._trained_dataset.filter_on_type(
+            cannot_be=['ball', 'sphere']
+        )
+        self._untrained_shape_dataset = (
+            self._untrained_shape_dataset.filter_on_type(
+                cannot_be=['ball', 'sphere']
+            )
+        )
+        self._untrained_size_dataset = (
+            self._untrained_size_dataset.filter_on_type(
+                cannot_be=['ball', 'sphere']
+            )
+        )
 
     # Override
     def _retrieve_definition_data(
@@ -3827,7 +3883,8 @@ class SpatioTemporalContinuityHypercubeEval4(
 
         super()._init_each_object_definition_list(is_fall_down)
 
-        # Don't use balls/spheres in Eval 4 OP/STC hypercubes.
+        # Don't use balls/spheres in Eval 4 Collision/OP/STC hypercubes.
+        # They don't roll at the same pace as other objects.
         self._trained_dataset = self._trained_dataset.filter_on_type(
             cannot_be=['ball', 'sphere']
         )

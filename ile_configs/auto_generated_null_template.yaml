@@ -18,6 +18,7 @@ lava:
     - num: 0
 num_random_agents: 0
 num_random_interactable_objects: null
+passive_physics_floor: False
 performer_look_at: null
 performer_start_position: null
 performer_start_rotation: null

@@ -157,6 +157,22 @@ class GlobalSettingsComponent(ILEComponent):
     ```
     """
 
+    passive_physics_floor: bool = None
+    """
+    (bool): Lowers the friction of the floor (making it more "slippery").
+    Used in passive physics evaluation scenes. Default: False
+
+    Simple Example:
+    ```
+    passive_physics_floor: False
+    ```
+
+    Advanced Example:
+    ```
+    passive_physics_floor: True
+    ```
+    """
+
     performer_look_at: Union[str, List[str]] = None
     """
     (string or list of strings): If set, configures the performer to start
@@ -421,6 +437,17 @@ class GlobalSettingsComponent(ILEComponent):
             f'\nFLOOR={scene.floor_material}\nWALL={scene.room_materials}'
         )
 
+        if self.get_passive_physics_floor():
+            # Lower the friction values, but use defaults for the others.
+            scene.floor_properties = {
+                'enable': True,
+                'angularDrag': 0.5,
+                'bounciness': 0,
+                'drag': 0,
+                'dynamicFriction': 0.1,
+                'staticFriction': 0.1
+            }
+
         last_step = self.get_last_step()
         if not last_step and self.get_auto_last_step():
             last_step = get_step_limit_from_dimensions(
@@ -520,6 +547,13 @@ class GlobalSettingsComponent(ILEComponent):
     @ile_config_setter(validator=ValidateNumber(min_value=1))
     def set_last_step(self, data: Any) -> None:
         self.last_step = data
+
+    @ile_config_setter()
+    def set_passive_physics_floor(self, data: Any) -> None:
+        self.passive_physics_floor = data
+
+    def get_passive_physics_floor(self) -> bool:
+        return self.passive_physics_floor or False
 
     def get_performer_start_position(
         self,

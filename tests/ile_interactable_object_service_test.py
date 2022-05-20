@@ -105,6 +105,63 @@ def test_interactable_object_service_create_instance_random_rotation():
     assert instance['shows'][0]['rotation']['z'] == 0
 
 
+def test_interactable_object_service_create_instance_rotate_x_cylinder():
+    config = InteractableObjectConfig(
+        position=VectorFloatConfig(1, 0, 2),
+        scale=3,
+        shape='cylinder',
+        rotate_cylinders=True
+    )
+    srv = InteractableObjectCreationService()
+
+    scene = prior_scene()
+    reconciled = srv.reconcile(scene, config)
+    assert reconciled.material
+    instance = srv.create_feature_from_specific_values(
+        scene=scene, reconciled=reconciled, source_template=config)
+    assert instance['type'] == 'cylinder'
+    assert instance['shows'][0]['position'] == {'x': 1, 'y': 1.5, 'z': 2}
+    assert instance['shows'][0]['rotation']['x'] == 90
+    assert instance['shows'][0]['rotation']['y'] in [
+        0, 45, 90, 135, 180, 225, 270, 315
+    ]
+    assert instance['shows'][0]['rotation']['z'] == 0
+    assert instance['shows'][0]['scale'] == {'x': 3, 'y': 1.5, 'z': 3}
+
+    assert len(instance['materials']) > 0
+    assert (
+        instance['materials'][0] in materials.ALL_UNRESTRICTED_MATERIAL_STRINGS
+    )
+    assert instance['materials'][0] == reconciled.material
+
+
+def test_interactable_object_service_create_instance_rotate_x_cylinder_override():  # noqa: E501
+    config = InteractableObjectConfig(
+        position=VectorFloatConfig(1, 0, 2),
+        rotation=VectorFloatConfig(0, 90, 0),
+        scale=3,
+        shape='cylinder',
+        rotate_cylinders=True
+    )
+    srv = InteractableObjectCreationService()
+
+    scene = prior_scene()
+    reconciled = srv.reconcile(scene, config)
+    assert reconciled.material
+    instance = srv.create_feature_from_specific_values(
+        scene=scene, reconciled=reconciled, source_template=config)
+    assert instance['type'] == 'cylinder'
+    assert instance['shows'][0]['position'] == {'x': 1, 'y': 1.5, 'z': 2}
+    assert instance['shows'][0]['rotation'] == {'x': 90, 'y': 90, 'z': 0}
+    assert instance['shows'][0]['scale'] == {'x': 3, 'y': 1.5, 'z': 3}
+
+    assert len(instance['materials']) > 0
+    assert (
+        instance['materials'][0] in materials.ALL_UNRESTRICTED_MATERIAL_STRINGS
+    )
+    assert instance['materials'][0] == reconciled.material
+
+
 def test_interactable_object_service_create_instance_random_scale():
     config = InteractableObjectConfig(
         material='AI2-THOR/Materials/Wood/DarkWoodSmooth2',
@@ -807,4 +864,66 @@ def test_interactable_object_service_create_keyword_location_on_center():
     assert instance['shows'][0]['position']['x'] == pytest.approx(-2)
     assert instance['shows'][0]['position']['z'] == -2
     assert instance['shows'][0]['position']['y'] == 0.265
+    assert instance['shows'][0]['scale'] == {'x': 1, 'y': 1, 'z': 1}
+
+
+def test_interactable_object_service_create_keyword_location_opposite_x():
+    rel_config = InteractableObjectConfig(
+        material='AI2-THOR/Materials/Plastics/OrangePlastic',
+        position=VectorFloatConfig(4, 0, 2),
+        scale=1,
+        shape='ball',
+        labels="rel_label"
+    )
+    srv = InteractableObjectCreationService()
+    scene = prior_scene()
+    srv.add_to_scene(scene, rel_config, [])
+    klc = KeywordLocationConfig(
+        KeywordLocation.OPPOSITE_X,
+        relative_object_label="rel_label")
+    config = InteractableObjectConfig(
+        material='Custom/Materials/Black',
+        keyword_location=klc,
+        scale=1,
+        shape='crayon_blue'
+    )
+    srv = InteractableObjectCreationService()
+    reconciled = srv.reconcile(scene, config)
+    instance = srv.create_feature_from_specific_values(
+        scene=scene, reconciled=reconciled, source_template=config)
+    assert instance['type'] == 'crayon_blue'
+    assert instance['shows'][0]['position']['x'] == -4
+    assert instance['shows'][0]['position']['y'] == 0
+    assert instance['shows'][0]['position']['z'] == 2
+    assert instance['shows'][0]['scale'] == {'x': 1, 'y': 1, 'z': 1}
+
+
+def test_interactable_object_service_create_keyword_location_opposite_z():
+    rel_config = InteractableObjectConfig(
+        material='AI2-THOR/Materials/Plastics/OrangePlastic',
+        position=VectorFloatConfig(4, 0, 2),
+        scale=1,
+        shape='ball',
+        labels="rel_label"
+    )
+    srv = InteractableObjectCreationService()
+    scene = prior_scene()
+    srv.add_to_scene(scene, rel_config, [])
+    klc = KeywordLocationConfig(
+        KeywordLocation.OPPOSITE_Z,
+        relative_object_label="rel_label")
+    config = InteractableObjectConfig(
+        material='Custom/Materials/Black',
+        keyword_location=klc,
+        scale=1,
+        shape='crayon_blue'
+    )
+    srv = InteractableObjectCreationService()
+    reconciled = srv.reconcile(scene, config)
+    instance = srv.create_feature_from_specific_values(
+        scene=scene, reconciled=reconciled, source_template=config)
+    assert instance['type'] == 'crayon_blue'
+    assert instance['shows'][0]['position']['x'] == 4
+    assert instance['shows'][0]['position']['y'] == 0
+    assert instance['shows'][0]['position']['z'] == -2
     assert instance['shows'][0]['scale'] == {'x': 1, 'y': 1, 'z': 1}

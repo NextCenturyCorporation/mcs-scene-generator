@@ -172,6 +172,11 @@ def _retrieve_scaled_shapes_from_datasets(
             if scale not in unique_output:
                 unique_output.append(scale)
         output[shape] = unique_output
+    # Due to the way the inputs were made, the height for each cylinder shape
+    # must be upscaled here, because it will be downscaled again when its
+    # ObjectDefinition is created.
+    for scale in output.get('cylinder', []):
+        scale.y *= 2
     return output
 
 
@@ -1211,10 +1216,7 @@ class StructuralPlacersCreationService(
                 num=1,
                 scale=scale,
                 shape=shape,
-                material=(
-                    material[0] if isinstance(material, MaterialTuple) else
-                    material
-                ),
+                material=(material.material if material else None),
                 labels=self.labels)
 
             srv: InteractableObjectCreationService = (
@@ -1738,7 +1740,9 @@ class StructuralThrowerConfig(BaseFeatureConfig):
     front/back). If set, overrides the `throw_force`.
     - `throw_step` (int, or list of ints, or [MinMaxInt](#MinMaxInt) dict, or
     list of MinMaxInt dicts): The step of the simulation in which the
-    projectile should be thrown.
+    projectile should be thrown. Please note that using a value of less than 5
+    may cause unexpected behavior, so we recommend using values of 5 or more in
+    your custom config files.
     - `wall` (string, or list of strings): Which wall the thrower should be
     placed on.  Options are: left, right, front, back.
     """
@@ -2095,7 +2099,7 @@ DEFAULT_TEMPLATE_THROWER = StructuralThrowerConfig(
         WallSide.LEFT.value,
         WallSide.RIGHT.value],
     impulse=True,
-    throw_step=MinMaxInt(0, 10),
+    throw_step=MinMaxInt(5, 10),
     throw_force=None,
     throw_force_multiplier=None,
     rotation_y=[0, MinMaxInt(-45, 45)],
@@ -2841,7 +2845,7 @@ def _reconcile_material(material_choice, default_material_lists):
         while(isinstance(material, list)):
             material = random.choice(material)
 
-    if isinstance(material, materials.MaterialTuple):
+    if isinstance(material, MaterialTuple):
         return material[0]
     else:
         return material
@@ -2978,10 +2982,7 @@ def _get_projectile_idl(
                 [label for label in labels if label != TARGET_LABEL]
                 if isinstance(labels, list) else labels
             ),
-            material=(
-                material[0] if isinstance(material, MaterialTuple) else
-                material
-            ),
+            material=(material.material if material else None),
             shape=shape,
             scale=scale
         )

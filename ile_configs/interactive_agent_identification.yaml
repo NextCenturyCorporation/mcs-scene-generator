@@ -52,29 +52,16 @@ shortcut_agent_with_target:
 # Only the target can be a soccer ball.
 excluded_shapes: soccer_ball
 
-# Generate random non-agent object(s) on each side of the bisecting platform.
+# Generate a random static (non-agent) object on the other side of the
+# bisecting platform from the agent.
 specific_interactable_objects:
-    - num: [0, 1, 2]
-      position:
-          x:
-              min: -3.5
-              max: -1
-          y: 0
-          z:
-              min: -5.5
-              max: 5.5
-    - num: [0, 1, 2]
-      position:
-          x:
-              min: 1
-              max: 3.5
-          y: 0
-          z:
-              min: -5.5
-              max: 5.5
+    - num: 1
+      keyword_location:
+          keyword: opposite_x
+          relative_object_label: agent
 
 # Override the defaults to avoid randomly generating any other objects besides
-# the agent, platform, target, and the other objects. Remove these lines if you
+# the agent, platform, target, and the other object. Remove these lines if you
 # want additional randomly generated objects.
 keyword_objects:
     - num: 0

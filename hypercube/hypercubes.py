@@ -7,6 +7,8 @@ from typing import Any, Callable, Dict, List
 
 from generator import SceneException, materials, tags
 
+logger = logging.getLogger(__name__)
+
 
 def initialize_goal(goal: Dict[str, Any]) -> Dict[str, Any]:
     """Initialize and return the properties in the given goal template."""
@@ -217,6 +219,31 @@ def update_scene_objects_tag_lists(
     return scene
 
 
+def get_skewed_bell_curve_for_room_size(minimum=10, maximum=50):
+    val = random.uniform(0, 100)
+    if minimum > 19:
+        raise Exception(
+            f'Minimum room size {minimum} must be less than or equal to 10'
+        )
+    if maximum < 40:
+        raise Exception(
+            f'Maximum room size {maximum} must be greater than or equal to 40'
+        )
+    if val <= 80:
+        # most scenes should be medium sized 20 - 39
+        low = 20
+        high = 39
+    elif val <= 90:
+        # size small 10 medium 19
+        low = minimum
+        high = 19
+    elif val <= 100:
+        # size large 40 to 50
+        low = 40
+        high = maximum
+    return low, high
+
+
 class Hypercube(ABC):
     """Creates a unique hypercube of one or more scenes that each have the same
     goals, objects, and variables, except for specific differences."""
@@ -273,11 +300,11 @@ class Hypercube(ABC):
         """Return this hypercube's list of scenes."""
         if self._training:
             scenes = self._get_training_scenes()
-            print(f'{self.get_name()} hypercube made '
-                  f'{len(scenes)} training scenes')
+            logger.info(f'{self.get_name()} hypercube made '
+                        f'{len(scenes)} training scenes')
             return scenes
-        print(f'{self.get_name()} hypercube made '
-              f'{len(self._scenes)} non-training scenes')
+        logger.info(f'{self.get_name()} hypercube made '
+                    f'{len(self._scenes)} non-training scenes')
         return self._scenes
 
 
@@ -308,7 +335,7 @@ class HypercubeFactory(ABC):
         """Create and return a new list of scenes built by this factory."""
         hypercubes = []
         for count in range(1, total + 1):
-            print(f'Generating hypercube {count} / {total}')
+            logger.info(f'Generating hypercube {count} / {total}')
             tries = 0
             while tries < 100:
                 tries += 1

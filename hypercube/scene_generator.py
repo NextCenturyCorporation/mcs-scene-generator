@@ -9,6 +9,8 @@ import os.path
 import random
 from typing import Any, Dict
 
+from machine_common_sense.logging_config import LoggingConfig
+
 from generator import materials, tags
 from generator.scene_saver import find_next_filename, save_scene_files
 
@@ -247,8 +249,14 @@ class SceneGenerator():
         args = parser.parse_args(argv[1:])
         random.seed(args.seed)
 
-        if args.loglevel:
-            logging.getLogger().setLevel(args.loglevel)
+        cfg = LoggingConfig.get_configurable_logging_config(
+            log_level=args.loglevel or 'INFO',
+            logger_names=['hypercube', 'generator', 'secret'],
+            console=True, debug_file=False, info_file=False,
+            log_file_name="hypercube", file_format='precise',
+            console_format='precise'
+        )
+        LoggingConfig.init_logging(log_config=cfg)
 
         role_to_type = {}
         role_to_type[tags.ROLES.AGENT] = args.agent

@@ -215,7 +215,8 @@ def choose_rotation(
 
 
 def choose_material_tuple_from_material(
-    material_or_color: Union[str, List[str]]
+    material_or_color: Union[str, List[str]],
+    prohibited_material: str = None
 ) -> MaterialTuple:
     """Return a MaterialTuple chosen randomly from the given materials that can
     either be specific materials or names of lists in materials.py."""
@@ -223,9 +224,16 @@ def choose_material_tuple_from_material(
         material_or_color if isinstance(material_or_color, List) else
         [material_or_color]
     )
+    material_or_color = [
+        material for material in material_or_color
+        if material != prohibited_material
+    ]
     mat = choose_random(material_or_color)
     if hasattr(materials, str(mat)):
-        return random.choice(getattr(materials, mat))
+        return random.choice([
+            material_tuple for material_tuple in getattr(materials, mat)
+            if material_tuple.material != prohibited_material
+        ])
     colors = materials.find_colors(mat, [])
     return MaterialTuple(mat, colors)
 
@@ -281,7 +289,8 @@ def choose_scale(
 
 def choose_shape_material(
     shape_list: Union[str, List[str]] = None,
-    material_or_color: Union[str, List[str]] = None
+    material_or_color: Union[str, List[str]] = None,
+    prohibited_material: str = None
 ) -> Optional[Tuple[str, MaterialTuple]]:
     """Takes choices for shape and material_or_color and returns a valid
     combination or throws and exception.  Throwing an exception will mean
@@ -310,16 +319,19 @@ def choose_shape_material(
                     f'Failed to find a valid shape with excluded shapes: '
                     f'{excluded_shapes}'
                 )
-        material_restriction = base_objects.get_material_restriction_tuples(
+        material_restriction = base_objects.get_material_restriction_strings(
             shape)
-        material_or_color = (
-            choose_random(material_restriction) if material_restriction else
-            None
-        )
-        return (shape, material_or_color)
+        mat = choose_material_tuple_from_material(
+            material_restriction,
+            prohibited_material
+        ) if material_restriction else None
+        return (shape, mat)
     elif shape_list is None:
         # Case 2 above
-        mat = choose_material_tuple_from_material(material_or_color)
+        mat = choose_material_tuple_from_material(
+            material_or_color,
+            prohibited_material
+        )
         for _ in range(MAX_TRIES):
             shape = base_objects.get_type_from_material(mat[0])
             if shape not in excluded_shapes:
@@ -342,12 +354,18 @@ def choose_shape_material(
             # Can we find a way to figure this out without guess and check?
             # The color option somewhat creates an issue
             for _ in range(MAX_TRIES):
-                mat = choose_material_tuple_from_material(material_or_color)
+                mat = choose_material_tuple_from_material(
+                    material_or_color,
+                    prohibited_material
+                )
                 if mat[0] in material_restriction:
                     return (shape, mat)
             raise ILEException(
                 f'Failed to find a valid shape and material combination for '
                 f'shape {shape} and {len(material_restriction)} materials'
             )
-        mat = choose_material_tuple_from_material(material_or_color)
+        mat = choose_material_tuple_from_material(
+            material_or_color,
+            prohibited_material
+        )
         return (shape, mat)

@@ -1,6 +1,6 @@
 import copy
 import logging
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from typing import Any, Dict, List, Union
 
 from machine_common_sense.config_manager import PerformerStart, Vector3d
@@ -14,6 +14,7 @@ from generator import (
     specific_objects,
 )
 from generator.materials import MaterialTuple
+from generator.mechanisms import CYLINDRICAL_SHAPES
 from generator.scene import Scene
 from ideal_learning_env.defs import (
     ILEDelayException,
@@ -100,6 +101,16 @@ class KeywordLocationConfig():
         (I.E. two bowls), use 'on_center'.  The object must be referenced by
         the 'relative_object_label' field.  If multiple objects have this
         label, one will be randomly chosen.
+        - `opposite_x` - The object will be placed in the exact same location
+        as the object referenced by `relative_object_label` except that its x
+        location will be on the opposite side of the room.  There is no
+        adjustments to find a valid location if another object already exists
+        in location specified by this keyword.
+        - `opposite_z` - The object will be placed in the exact same location
+        as the object referenced by `relative_object_label` except that its z
+        location will be on the opposite side of the room.  There is no
+        adjustments to find a valid location if another object already exists
+        in location specified by this keyword.
         - `random` - The object will be positioned in a random location, as if
         it did not have a keyword location.
         - `associated_with_agent` - This object will be held by an agent
@@ -149,6 +160,8 @@ class InteractableObjectConfig(BaseFeatureConfig):
     - `material` (string, or list of strings): The material (color/texture) to
     use on this object in each scene. For a list, a new material will be
     randomly chosen for each scene. Default: random
+    - `not_material` (string): The material (color/texture)
+    to NOT use on this object in each scene. Default: none
     - `position` ([VectorFloatConfig](#VectorFloatConfig) dict, or list of
     VectorFloatConfig dicts): The position of this object in each scene. For a
     list, a new position will be randomly chosen for each scene.
@@ -172,6 +185,12 @@ class InteractableObjectConfig(BaseFeatureConfig):
     - `shape` (string, or list of strings): The shape (object type) of this
     object in each scene. For a list, a new shape will be randomly chosen for
     each scene. Default: random
+    - `rotate_cylinders` (bool): Whether or not to rotate cylindrical shapes
+    along their x axis so that they are placed on their round sides (needed
+    for collision scenes). This would only apply to these shapes: 'cylinder',
+    'double_cone', 'dumbbell_1', 'dumbbell_2', 'tie_fighter', 'tube_narrow',
+    'tube_wide'. Note that this will override any x rotation previously
+    specified by 'rotation'. Default: False
 
     Example:
     ```
@@ -237,12 +256,14 @@ class InteractableObjectConfig(BaseFeatureConfig):
         RelativePositionConfig,
         List[RelativePositionConfig]
     ] = None
+    rotate_cylinders: bool = False
+    not_material: str = None
 
 
 DEFAULT_TEMPLATE_INTERACTABLE = InteractableObjectConfig(
     num=1, material=None, scale=1, shape=None, position=None, rotation=None,
     keyword_location=None, locked=False, labels=None, identical_to=None,
-    identical_except_color=None)
+    identical_except_color=None, not_material=None)
 
 
 class InteractableObjectCreationService(BaseObjectCreationService):
@@ -263,7 +284,7 @@ class InteractableObjectCreationService(BaseObjectCreationService):
             val = reconciled.dimensions
             reconciled.dimensions = Vector3d(x=val, y=val, z=val)
         (reconciled.shape, mat) = choose_shape_material(
-            reconciled.shape, reconciled.material)
+            reconciled.shape, reconciled.material, reconciled.not_material)
         reconciled.material = mat[0] if isinstance(mat, MaterialTuple) else mat
         reconciled.scale = choose_scale(
             source_template.scale,
@@ -309,7 +330,7 @@ class InteractableObjectCreationService(BaseObjectCreationService):
     def create_feature_from_specific_values(
             self, scene: Scene, reconciled: InteractableObjectConfig,
             source_template: InteractableObjectConfig):
-        defn = self._create_definition(reconciled)
+        defn = self.defn
         if (
             reconciled.keyword_location and
             reconciled.keyword_location.keyword != KeywordLocation.RANDOM
@@ -397,19 +418,28 @@ class InteractableObjectCreationService(BaseObjectCreationService):
     ) -> Dict[str, Any]:
         """Create and return an object location with properties randomly
         chosen from the config in this class."""
+
+        rotate_cylinders = (template.rotate_cylinders and
+                            defn.type in CYLINDRICAL_SHAPES)
+
         if template.position or template.rotation:
             location = {
                 'position': vars(template.position),
                 'rotation': vars(template.rotation)
             }
             location['position']['y'] += defn.positionY
+            if(rotate_cylinders):
+                location['rotation']['x'] = 90
         else:
+            if(rotate_cylinders):
+                defn.rotation.x = 90
+
             return geometry.calc_obj_pos(
-                asdict(performer_start.position),
+                vars(performer_start.position),
                 # calc_obj_pos addes to bounds, but we don't want this.
                 copy.deepcopy(bounds),
                 defn,
-                room_dimensions=asdict(room_dimensions)
+                room_dimensions=vars(room_dimensions)
             )
         location['boundingBox'] = geometry.create_bounds(
             dimensions=vars(defn.dimensions),

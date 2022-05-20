@@ -43,6 +43,8 @@ from .object_data import (
     identify_larger_definition,
 )
 
+logger = logging.getLogger(__name__)
+
 ROOM_DIMENSIONS = geometry.DEFAULT_ROOM_DIMENSIONS
 # Add or subtract the performer width to ensure it can move behind any object.
 ROOM_X_MIN = -(ROOM_DIMENSIONS['x'] / 2.0) + geometry.PERFORMER_WIDTH
@@ -203,7 +205,7 @@ class InteractiveHypercube(Hypercube):
         while True:
             tries += 1
             try:
-                logging.debug(
+                logger.debug(
                     f'\n\n{self.get_name()} initialize scenes try {tries}\n')
 
                 # Reset the half-finished scenes, all of their objects, and
@@ -236,7 +238,7 @@ class InteractiveHypercube(Hypercube):
                 for index, scene in enumerate(scenes):
                     self._update_scene_at_index(scene, index, goal_template)
 
-                logging.debug(
+                logger.debug(
                     f'\n\n{self.get_name()} initialize scenes is done\n ')
 
                 scenes = update_floor_and_walls(
@@ -249,7 +251,7 @@ class InteractiveHypercube(Hypercube):
                 break
 
             except SceneException:
-                logging.exception(
+                logger.exception(
                     f'{self.get_name()} _initialize_each_hypercube_object')
 
             if tries >= MAX_TRIES:
@@ -337,7 +339,7 @@ class InteractiveHypercube(Hypercube):
                         ),
                         second_definition=object_data.untrained_definition
                     )
-                    logging.debug(
+                    logger.debug(
                         f'{self.get_name()} obstacle/occluder location '
                         f'randomly chosen but not obstructing target: '
                         f'{location}')
@@ -359,7 +361,7 @@ class InteractiveHypercube(Hypercube):
                         bounds_list,
                         adjacent=True
                     )
-                    logging.debug(
+                    logger.debug(
                         f'{self.get_name()} confusor location close to: '
                         f'{location}')
                     bounds = confusor_data.assign_location_close(
@@ -376,7 +378,7 @@ class InteractiveHypercube(Hypercube):
                         performer_start,
                         bounds_list
                     )
-                    logging.debug(
+                    logger.debug(
                         f'{self.get_name()} confusor location far from: '
                         f'{location}')
                     bounds = confusor_data.assign_location_far(
@@ -406,7 +408,7 @@ class InteractiveHypercube(Hypercube):
                     performer_start,
                     bounds_list
                 )
-                logging.debug(
+                logger.debug(
                     f'{self.get_name()} container location randomly chosen: '
                     f'{location}')
                 bounds = container_data.assign_location_random(location)
@@ -439,10 +441,10 @@ class InteractiveHypercube(Hypercube):
                 target_or_receptacle_definition,
                 target_data.choice
             )
-            logging.debug(
+            logger.debug(
                 f'{self.get_name()} location in front of performer start:'
                 f'{location_front}')
-            logging.debug(
+            logger.debug(
                 f'{self.get_name()} location in back of performer start:'
                 f'{location_back}')
             for object_data in front_and_back_object_data_list:
@@ -454,7 +456,7 @@ class InteractiveHypercube(Hypercube):
             plans_to_locations[ObjectLocationPlan.BACK] = location_back
 
         # We assume the performer_start won't be modified past here.
-        logging.debug(
+        logger.debug(
             f'{self.get_name()} performer start: {self._performer_start}')
 
         return plans_to_locations
@@ -564,7 +566,7 @@ class InteractiveHypercube(Hypercube):
             obstruct=obstruct,
             unreachable=unreachable
         )
-        logging.debug(
+        logger.debug(
             f'{self.get_name()} trained obstacle/occluder location '
             f'{debug_label} target and performer start: {trained_location}')
         untrained_location = self._generate_close_to(
@@ -577,7 +579,7 @@ class InteractiveHypercube(Hypercube):
             obstruct=obstruct,
             unreachable=unreachable
         )
-        logging.debug(
+        logger.debug(
             f'{self.get_name()} untrained obstacle/occluder location '
             f'{debug_label} target and performer start: {untrained_location}')
         bounds_trained = location_function(trained_location, [
@@ -627,7 +629,7 @@ class InteractiveHypercube(Hypercube):
                 performer_start,
                 bounds_list
             )
-            logging.debug(
+            logger.debug(
                 f'{self.get_name()} container location randomly chosen: '
                 f'{target_container_location}')
             bounds = container_data.assign_location_random(
@@ -662,7 +664,7 @@ class InteractiveHypercube(Hypercube):
                 performer_start,
                 bounds_list
             )
-            logging.debug(
+            logger.debug(
                 f'{self.get_name()} target location close to the first '
                 f'large container: {location}')
             bounds = target_data.assign_location_close(
@@ -683,7 +685,7 @@ class InteractiveHypercube(Hypercube):
                 bounds_list,
                 target_choice=target_data.choice
             )
-            logging.debug(
+            logger.debug(
                 f'{self.get_name()} target location randomly chosen: '
                 f'{location}')
             bounds = target_data.assign_location_random(location)
@@ -703,7 +705,7 @@ class InteractiveHypercube(Hypercube):
             self._confusor_data
         )
 
-        logging.debug(
+        logger.debug(
             f'{self.get_name()} larger definition of trained/untrained '
             f'target/confusor/container: {larger_target_definition}')
 
@@ -791,7 +793,7 @@ class InteractiveHypercube(Hypercube):
                     f'size={untrained_dataset.size()} '
                     f'target={target_definition}')
 
-        logging.debug(
+        logger.debug(
             f'{self.get_name()} confusor definition: '
             f'trained={confusor_data.trained_definition}'
             f'untrained={confusor_data.untrained_definition}')
@@ -846,7 +848,7 @@ class InteractiveHypercube(Hypercube):
                 )
             )
 
-        logging.debug(
+        logger.debug(
             f'{self.get_name()} {"occluder" if is_occluder else "obstacle"} '
             f'definition: trained={object_data.trained_definition} '
             f'untrained={object_data.untrained_definition}')
@@ -940,7 +942,7 @@ class InteractiveHypercube(Hypercube):
                 confusor_angle
             )
 
-        logging.debug(
+        logger.debug(
             f'{self.get_name()} container definition: '
             f'trained={container_data.trained_definition} '
             f'untrained={container_data.untrained_definition}')
@@ -1073,7 +1075,7 @@ class InteractiveHypercube(Hypercube):
                 target_data.choice
             )
 
-        logging.debug(
+        logger.debug(
             f'{self.get_name()} target definition: '
             f'{target_data.trained_definition}')
 
@@ -1593,7 +1595,7 @@ class InteractiveHypercube(Hypercube):
                             f'{self._target_data.location_plan_list[i]}')
                 break
             except SceneException:
-                logging.exception(
+                logger.exception(
                     f'{self.get_name()} _assign_each_object_location')
             if tries >= MAX_TRIES:
                 raise SceneException(
@@ -1634,13 +1636,13 @@ class InteractiveHypercube(Hypercube):
         """Log debug info for the given object data."""
         for scene_index, instance in enumerate(object_data.instance_list):
             if instance:
-                logging.info(
+                logger.debug(
                     f'{self.get_name()} '
                     f'{object_data.role}_{scene_index} '
                     f'{instance["type"]} {instance["id"]} '
                     f'parent={instance.get("locationParent", None)}')
             else:
-                logging.info(
+                logger.debug(
                     f'{self.get_name()} '
                     f'{object_data.role}_{scene_index} None')
 

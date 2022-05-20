@@ -103,6 +103,11 @@ PLACER_TEMPLATE = {
     }
 }
 
+CYLINDRICAL_SHAPES = [
+    'cylinder', 'double_cone', 'dumbbell_1',
+    'dumbbell_2', 'tie_fighter', 'tube_narrow', 'tube_wide'
+]
+
 
 class MechanismDirection(Enum):
     X_POSITIVE = auto()
@@ -363,10 +368,7 @@ def rotate_x_for_cylinders_in_droppers_throwers(
     """For cylinder shaped projectiles in droppers and throwers,
     rotate 90 degrees along x-axis."""
     x_rot = 0
-    if(instance['type'] in [
-        'cylinder', 'double_cone', 'dumbbell_1',
-        'dumbbell_2', 'tie_fighter', 'tube_narrow', 'tube_wide'
-    ]):
+    if(instance['type'] in CYLINDRICAL_SHAPES):
         x_rot = 90
 
     return x_rot

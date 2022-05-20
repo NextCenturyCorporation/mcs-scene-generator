@@ -44,6 +44,7 @@ def test_global_settings():
     assert component.floor_material is None
     assert component.goal is None
     assert component.last_step is None
+    assert component.passive_physics_floor is None
     assert component.performer_start_position is None
     assert component.performer_start_rotation is None
     assert component.restrict_open_doors is None
@@ -58,6 +59,7 @@ def test_global_settings():
     assert isinstance(scene.ceiling_material, str)
     assert ILESharedConfiguration.get_instance().get_excluded_shapes() == []
     assert isinstance(scene.floor_material, str)
+    assert scene.floor_properties is None
     assert scene.goal.get('last_step') is None
     assert scene.goal.get('category') is None
     assert scene.goal.get('metadata') == {}
@@ -195,6 +197,7 @@ def test_global_settings_configured():
             }
         },
         'last_step': 1000,
+        'passive_physics_floor': True,
         'performer_start_position': {'x': -1, 'y': 0, 'z': 1},
         'performer_start_rotation': {'x': -10, 'y': 90, 'z': 0},
         'restrict_open_doors': True,
@@ -213,6 +216,7 @@ def test_global_settings_configured():
         target=InteractableObjectConfig(shape='soccer_ball')
     )
     assert component.last_step == 1000
+    assert component.passive_physics_floor is True
     assert component.performer_start_position == VectorFloatConfig(-1, 0, 1)
     assert component.performer_start_rotation == VectorIntConfig(-10, 90, 0)
     assert component.restrict_open_doors
@@ -229,6 +233,12 @@ def test_global_settings_configured():
         'ball', 'pacifier'
     ]
     assert scene.floor_material == 'Custom/Materials/GreyCarpetMCS'
+    assert scene.floor_properties['enable'] is True
+    assert scene.floor_properties['angularDrag'] == 0.5
+    assert scene.floor_properties['bounciness'] == 0
+    assert scene.floor_properties['drag'] == 0
+    assert scene.floor_properties['dynamicFriction'] == 0.1
+    assert scene.floor_properties['staticFriction'] == 0.1
     assert scene.goal['category'] == 'retrieval'
     assert scene.goal['description'] in [
         'Find and pick up the tiny light black white rubber ball',

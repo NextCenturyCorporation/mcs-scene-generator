@@ -1,10 +1,14 @@
 import copy
 import uuid
+from dataclasses import dataclass
 from typing import Any, Dict, List, Tuple
+
+from machine_common_sense.config_manager import Vector3d
 
 from generator.exceptions import SceneException
 
 from .geometry import create_bounds
+from .materials import MaterialTuple
 
 # Agents were scaled down to 0.6 from their original size.  However, lets
 # retain the original bounding box size though and just apply that scale.
@@ -28,6 +32,60 @@ AGENT_TEMPLATE = {
     'mass': None,
     'agentSettings': {},
     'actions': [],
+    'shows': [{
+        'stepBegin': 0,
+        'position': {
+            'x': 0,
+            'y': 0,
+            'z': 0
+        },
+        'rotation': {
+            'x': 0,
+            'y': 0,
+            'z': 0
+        },
+        'scale': {
+            'x': 1,
+            'y': 1,
+            'z': 1
+        }
+    }]
+}
+
+
+@dataclass
+class BlobInfo():
+    dimensions: Vector3d
+    standing_y: float = None
+
+    def __post_init__(self):
+        if self.standing_y is None:
+            self.standing_y = self.dimensions.y / 2.0
+
+
+BLOB_SHAPES = {
+    'blob_01': BlobInfo(Vector3d(x=0.26, y=0.8, z=0.36)),
+    'blob_02': BlobInfo(Vector3d(x=0.33, y=0.78, z=0.33)),
+    'blob_03': BlobInfo(Vector3d(x=0.25, y=0.69, z=0.25)),
+    'blob_04': BlobInfo(Vector3d(x=0.3, y=0.53, z=0.3), standing_y=0.225),
+    'blob_05': BlobInfo(Vector3d(x=0.38, y=0.56, z=0.38), standing_y=0.24),
+    'blob_06': BlobInfo(Vector3d(x=0.52, y=0.5, z=0.54)),
+    'blob_07': BlobInfo(Vector3d(x=0.25, y=0.55, z=0.25), standing_y=0.245),
+    'blob_08': BlobInfo(Vector3d(x=0.27, y=0.62, z=0.15)),
+    'blob_09': BlobInfo(Vector3d(x=0.33, y=0.78, z=0.44)),
+    'blob_10': BlobInfo(Vector3d(x=0.24, y=0.5, z=0.2))
+}
+
+BLOB_TEMPLATE = {
+    'id': 'blob_',
+    'type': '',
+    'debug': {
+        'color': [],
+        'info': []
+    },
+    'mass': 75,
+    'materials': [],
+    'physics': True,
     'shows': [{
         'stepBegin': 0,
         'position': {
@@ -81,7 +139,59 @@ def create_agent(
         standing_y=0
     )
     agent['debug']['dimensions'] = copy.deepcopy(AGENT_DIMENSIONS)
+    agent['debug']['offset'] = {'x': 0, 'y': 0, 'z': 0}
+    agent['debug']['positionY'] = 0
     return agent
+
+
+def create_blob(
+    type: str,
+    position_x: float,
+    position_z: float,
+    rotation_y: float,
+    material_tuple: MaterialTuple,
+    height: float = 0.9,
+    position_y_modifier: float = 0
+) -> Dict[str, Any]:
+    """Create and return an instance of a blob. By default, it will be
+    approximately as tall as a normal agent."""
+    blob = copy.deepcopy(BLOB_TEMPLATE)
+    blob['id'] += str(uuid.uuid4())
+    blob['type'] = type
+    blob['shows'][0]['rotation'] = {
+        'x': 0,
+        'y': rotation_y,
+        'z': 0
+    }
+
+    base_dimensions = BLOB_SHAPES[type].dimensions
+    scale = round(height / base_dimensions.y, 4)
+    blob['shows'][0]['scale'] = {'x': scale, 'y': scale, 'z': scale}
+    blob['debug']['dimensions'] = {
+        'x': round(base_dimensions.x * scale, 4),
+        'y': round(base_dimensions.y * scale, 4),
+        'z': round(base_dimensions.z * scale, 4)
+    }
+
+    standing_y = round(BLOB_SHAPES[type].standing_y * scale, 4)
+    blob['shows'][0]['position'] = {
+        'x': position_x,
+        'y': standing_y + position_y_modifier,
+        'z': position_z
+    }
+
+    blob['materials'] = [material_tuple.material]
+    blob['debug']['color'] = material_tuple.color
+
+    blob['shows'][0]['boundingBox'] = create_bounds(
+        dimensions=blob['debug']['dimensions'],
+        offset={'x': 0, 'y': 0, 'z': 0},
+        position=blob['shows'][0]['position'],
+        rotation=blob['shows'][0]['rotation'],
+        standing_y=standing_y
+    )
+
+    return blob
 
 
 def add_agent_action(agent: dict, action_id, step_begin,
@@ -139,6 +249,7 @@ AGENT_ANIMATIONS = [
     'TPE_clap',
     'TPE_cry',
     'TPE_freefall',
+    'TPE_freeze',
     'TPE_hitbackwards',
     'TPE_hitforward',
     'TPE_idle1',
@@ -196,6 +307,7 @@ AGENT_ANIMATIONS = [
     'TPF_fallforwardIN',
     'TPF_fallforwardOUT',
     'TPF_freefall',
+    'TPF_freeze',
     'TPF_hitbackwards',
     'TPF_hitforward',
     'TPF_idle1',
@@ -256,6 +368,7 @@ AGENT_ANIMATIONS = [
     'TPM_fallforwardIN',
     'TPM_fallforwardOUT',
     'TPM_freefall',
+    'TPM_freeze',
     'TPM_hitbackwards',
     'TPM_hitforward',
     'TPM_idle1',

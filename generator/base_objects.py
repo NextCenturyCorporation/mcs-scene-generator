@@ -348,12 +348,6 @@ _BOOKCASE_3_SHELF_SIZE = ObjectBaseSize(
             area_id='shelf_2',
             dimensions=Vector3d(x=0.5, y=0, z=0.25),
             position=Vector3d(x=0, y=1.02, z=0)
-            # Performer agent is too short to reach these areas effectively.
-            # ),
-            # ObjectInteractableArea(
-            #     area_id='shelf_3',
-            #     dimensions=Vector3d(x=0.5, y=0, z=0.25),
-            #     position=Vector3d(x=0, y=1.52, z=0)
         )
     ]
 )
@@ -376,17 +370,6 @@ _BOOKCASE_4_SHELF_SIZE = ObjectBaseSize(
             area_id='shelf_2',
             dimensions=Vector3d(x=0.5, y=0, z=0.25),
             position=Vector3d(x=0, y=1.02, z=0)
-            # Performer agent is too short to reach these areas effectively.
-            # ),
-            # ObjectInteractableArea(
-            #     area_id='shelf_3',
-            #     dimensions=Vector3d(x=0.5, y=0, z=0.25),
-            #     position=Vector3d(x=0, y=1.52, z=0)
-            # ),
-            # ObjectInteractableArea(
-            #     area_id='shelf_4',
-            #     dimensions=Vector3d(x=0.5, y=0, z=0.25),
-            #     position=Vector3d(x=0, y=2.02, z=0)
         )
     ]
 )
@@ -606,16 +589,11 @@ _CHANGING_TABLE_SIZE = ObjectBaseSize(
         )
     ],
     open_area_list=[
-        # Performer agent is too short to reach these areas effectively.
-        # ObjectInteractableArea(
-        #     dimensions=Vector3d(x=1, y=0, z=0.55),
-        #     position=Vector3d(x=0, y=0.85, z=0),
-        # ),
-        # ObjectInteractableArea(
-        #     dimensions=Vector3d(x=1.05, y=0.2, z=0.44),
-        #     position=Vector3d(x=0, y=0.725, z=-0.05),
-        #     area_id='_shelf_top'
-        # ),
+        ObjectInteractableArea(
+            dimensions=Vector3d(x=1.05, y=0.2, z=0.44),
+            position=Vector3d(x=0, y=0.725, z=-0.05),
+            area_id='_shelf_top'
+        ),
         ObjectInteractableArea(
             dimensions=Vector3d(x=0.32, y=0.25, z=0.44),
             position=Vector3d(x=-0.365, y=0.475, z=-0.05),
@@ -1208,12 +1186,10 @@ _SHELF_1_CUBBY_SIZE = ObjectBaseSize(
     offset=Vector3d(x=0, y=0.385, z=0),
     positionY=0,
     open_area_list=[
-        # Remove the top of the shelf from this object because it's not
-        # reachable by the performer agent at larger scales.
-        # ObjectInteractableArea(
-        #     dimensions=Vector3d(x=0.77, y=0, z=0.39),
-        #     position=Vector3d(x=0, y=0.78, z=0)
-        # ),
+        ObjectInteractableArea(
+            dimensions=Vector3d(x=0.77, y=0, z=0.39),
+            position=Vector3d(x=0, y=0.78, z=0)
+        ),
         ObjectInteractableArea(
             dimensions=Vector3d(x=0.38, y=0.33, z=0.33),
             position=Vector3d(x=0.175, y=0.56, z=0),
@@ -1242,12 +1218,10 @@ _SHELF_2_TABLE_SIZE = ObjectBaseSize(
     offset=Vector3d(x=0, y=0.355, z=0),
     positionY=0,
     open_area_list=[
-        # Remove the top of the shelf from this object because it's not
-        # reachable by the performer agent at larger scales.
-        # ObjectInteractableArea(
-        #     dimensions=Vector3d(x=0.92, y=0, z=1.01),
-        #     position=Vector3d(x=0, y=0.73, z=0)
-        # ),
+        ObjectInteractableArea(
+            dimensions=Vector3d(x=0.92, y=0, z=1.01),
+            position=Vector3d(x=0, y=0.73, z=0)
+        ),
         ObjectInteractableArea(
             dimensions=Vector3d(x=0.65, y=0.22, z=0.87),
             position=Vector3d(x=0, y=0.52, z=0),
@@ -1686,22 +1660,11 @@ _WARDROBE_SIZE = ObjectBaseSize(
     offset=Vector3d(x=0, y=1.05, z=0.17),
     positionY=0,
     enclosed_area_list=[
-        # Performer agent is too short to reach these areas effectively.
-        # ObjectInteractableArea(
-        #     dimensions=Vector3d(x=0.49, y=1.24, z=0.46),
-        #     position=Vector3d(x=0.255, y=1.165, z=0.005),
-        #     area_id='_middle_shelf_right'
-        # ),
-        # ObjectInteractableArea(
-        #     dimensions=Vector3d(x=0.49, y=0.98, z=0.46),
-        #     position=Vector3d(x=-0.255, y=1.295, z=0.005),
-        #     area_id='_middle_shelf_left'
-        # ),
-        # ObjectInteractableArea(
-        #     dimensions=Vector3d(x=0.49, y=0.24, z=0.46),
-        #     position=Vector3d(x=-0.255, y=0.665, z=0.005),
-        #     area_id='_bottom_shelf_left'
-        # ),
+        ObjectInteractableArea(
+            dimensions=Vector3d(x=0.49, y=0.24, z=0.46),
+            position=Vector3d(x=-0.255, y=0.665, z=0.005),
+            area_id='_bottom_shelf_left'
+        ),
         ObjectInteractableArea(
             dimensions=Vector3d(x=0.445, y=0.16, z=0.425),
             position=Vector3d(x=-0.265, y=0.42, z=0.015),
@@ -4406,3 +4369,16 @@ def create_soccer_ball(size: float = 1) -> ObjectDefinition:
         size_multiplier_list=[size],
         type='soccer_ball'
     ))
+
+
+def _get_types_by_prefix(prefix) -> List[str]:
+    return list(filter(lambda type: type.startswith(
+        prefix), _TYPES_TO_DETAILS.keys()))
+
+
+def get_asymmetric_types() -> List[str]:
+    return _get_types_by_prefix("container_asymmetric")
+
+
+def get_symmetric_types() -> List[str]:
+    return _get_types_by_prefix("container_symmetric")

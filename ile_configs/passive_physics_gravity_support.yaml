@@ -1,14 +1,15 @@
 # Can only use the Pass action through the whole scene.
 passive_scene: true
 
-# Max of 160 action steps in each passive gravity scene.
-last_step: 160
+# Max of 100 action steps in each passive gravity scene.
+last_step: 100
 
-# Large room with a high ceiling.
+# Large room with a high ceiling and a slippery floor.
 room_dimensions:
-    x: 16
+    x: 20
     y: 8
-    z: 10
+    z: 20
+passive_physics_floor: true
 
 # Specific starting position and rotation used in passive physics tasks.
 performer_start_position:
@@ -31,15 +32,17 @@ structural_platforms:
           x: 0.5
           y: 0.738
           z: 0.5
-    # Two platforms with semi-random heights at semi-random locations,
-    # each possibly underneath one of the placed objects.
+    # One platform with a semi-random height at a semi-random location,
+    # possibly partially or fully underneath the placed object.
     - num: 1
       position:
           x:
               min: -2.0
-              max: -0.5
+              max: 2.0
           y: 0
-          z: 1
+          z:
+              min: 1.6
+              max: 4.4
       rotation_y: 0
       scale:
           x:
@@ -49,62 +52,20 @@ structural_platforms:
               min: 0.5
               max: 2.0
           z: 1
-      labels: left_support
-    - num: 1
-      position:
-          x:
-              min: 0.5
-              max: 2.0
-          y: 0
-          z: 1
-      rotation_y: 0
-      scale:
-          x:
-              min: 0.5
-              max: 1.0
-          y:
-              min: 0.5
-              max: 2.0
-          z: 1
-      labels: right_support
+      labels: block_support
 
-# Two placers with semi-random locations. They each begin holding a random
-# small object, then lower it down into the scene and release it, either on
-# one of the supports (configured in "structural_platforms") or in mid-air.
+# Placers with a semi-random location. It begins holding a random small object,
+# then lowers it down into the scene and releases it, either on the block
+# support (configured in "structural_platforms") or in mid-air.
 placers:
     - num: 1
+      activation_step:
+          min: 1
+          max: 20
       end_height: 2.0
       # Position this placer above the left support platform.
       position_relative:
-          label: left_support
-          use_x: true
-          use_z: true
-          # Add either 0 (50%) or between -2 and 2 (50%) to the placer's X
-          # position. A value of 0 is directly above the support platform;
-          # a negative value is to its left; a positive value is to its right.
-          add_x:
-              - 0
-              - min: -2.0
-                max: 2.0
-      # Choose randomly from shapes normally used in gravity support tasks.
-      # Remove shapes from this list you don't want to generate.
-      # Copy lines for shapes you want to generate more often than others.
-      placed_object_shape:
-          - circle_frustum
-          - cone
-          - cube
-          - cylinder
-          - letter_l_wide
-          - letter_l_wide_tall
-          - pyramid
-          - sphere
-          - square_frustum
-          - triangle
-    - num: 1
-      end_height: 2.0
-      # Position this placer above the right support platform.
-      position_relative:
-          label: right_support
+          label: block_support
           use_x: true
           use_z: true
           # Add either 0 (50%) or between -2 and 2 (50%) to the placer's X

@@ -509,17 +509,30 @@ def _generate_materials_lists(
 
     output_materials_lists = []
     material_attr = material_category_list[0].upper() + '_MATERIALS'
+    # To improve runtime performance, for objects with multiple distinct slots
+    # that can be assigned different materials, we no longer return each
+    # possible combination of materials, and instead assign the same material
+    # to each slot. Keeping this code in case we ever want to use it again.
+    # ------------------------------------------------------------------------
+    # for material_and_color in getattr(materials, material_attr):
+    #     if not previous_materials_lists:
+    #         output_materials_lists.append([material_and_color])
+    #     else:
+    #         for material_list in previous_materials_lists:
+    #             output_materials_lists.append(
+    #                 copy.deepcopy(material_list) + [material_and_color])
+    # return _generate_materials_lists(
+    #     material_category_list[1:],
+    #     output_materials_lists
+    # )
     for material_and_color in getattr(materials, material_attr):
-        if not previous_materials_lists:
-            output_materials_lists.append([material_and_color])
-        else:
-            for material_list in previous_materials_lists:
-                output_materials_lists.append(
-                    copy.deepcopy(material_list) + [material_and_color])
-    return _generate_materials_lists(
-        material_category_list[1:],
-        output_materials_lists
-    )
+        output_materials_lists.append(
+            [material_and_color] * len(material_category_list)
+        )
+    return output_materials_lists
+
+
+CACHED_MATERIALS_LISTS = {}
 
 
 def finalize_object_materials_and_colors(
@@ -531,10 +544,16 @@ def finalize_object_materials_and_colors(
     and colors as a copy of the given object
     definition and returns the list."""
 
-    materials_lists = _generate_materials_lists(
-        object_definition.materialCategory,
-        []
-    )
+    # Cache the materials lists to improve runtime performance.
+    cache_key = ','.join(object_definition.materialCategory)
+    if cache_key in CACHED_MATERIALS_LISTS:
+        materials_lists = CACHED_MATERIALS_LISTS[cache_key]
+    else:
+        materials_lists = _generate_materials_lists(
+            object_definition.materialCategory,
+            []
+        )
+        CACHED_MATERIALS_LISTS[cache_key] = materials_lists
 
     if not materials_lists:
         definition_copy = copy.deepcopy(object_definition)

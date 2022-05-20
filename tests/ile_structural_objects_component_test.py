@@ -2293,7 +2293,7 @@ def test_structural_objects_thrower_non_impulse():
             'height': 1,
             'rotation_y': 0,
             'rotation_z': 0,
-            'throw_step': 0,
+            'throw_step': 5,
             'projectile_shape': 'soccer_ball',
             'projectile_scale': 1,
             'impulse': False
@@ -2308,7 +2308,7 @@ def test_structural_objects_thrower_non_impulse():
     assert pre_thrower.height == 1
     assert pre_thrower.rotation_y == 0
     assert pre_thrower.rotation_z == 0
-    assert pre_thrower.throw_step == 0
+    assert pre_thrower.throw_step == 5
     assert pre_thrower.throw_force is None
 
     scene = component.update_ile_scene(prior_scene())
@@ -2322,8 +2322,8 @@ def test_structural_objects_thrower_non_impulse():
     assert len(target['forces']) == 1
     assert not target['forces'][0]['impulse']
     assert target['forces'][0]['relative']
-    assert target['forces'][0]['stepBegin'] == 0
-    assert target['forces'][0]['stepEnd'] == 0
+    assert target['forces'][0]['stepBegin'] == 5
+    assert target['forces'][0]['stepEnd'] == 5
     axis = 'z' if target['debug']['originalRotation']['y'] == 90 else 'x'
     assert (mass * 500) <= target['forces'][0]['vector'][axis] <= (mass * 2000)
     assert target['forces'][0]['vector']['y'] == 0
@@ -2356,7 +2356,7 @@ def test_structural_objects_thrower_with_existing_labels():
             'height': 1,
             'rotation_y': 0,
             'rotation_z': 7,
-            'throw_step': 3,
+            'throw_step': 5,
             'throw_force': 15,
             'projectile_labels': TARGET_LABEL
         }
@@ -2370,7 +2370,7 @@ def test_structural_objects_thrower_with_existing_labels():
     assert pre_thrower.height == 1
     assert pre_thrower.rotation_y == 0
     assert pre_thrower.rotation_z == 7
-    assert pre_thrower.throw_step == 3
+    assert pre_thrower.throw_step == 5
     assert pre_thrower.throw_force == 15
     assert pre_thrower.projectile_labels == TARGET_LABEL
 
@@ -2388,8 +2388,8 @@ def test_structural_objects_thrower_with_existing_labels():
     assert len(target['forces']) == 1
     assert target['forces'][0]['impulse']
     assert target['forces'][0]['relative']
-    assert target['forces'][0]['stepBegin'] == 3
-    assert target['forces'][0]['stepEnd'] == 3
+    assert target['forces'][0]['stepBegin'] == 5
+    assert target['forces'][0]['stepEnd'] == 5
     assert target['forces'][0]['vector'] == {'x': mass * 15, 'y': 0, 'z': 0}
     assert len(target['shows']) == 1
     assert target['shows'][0]['position'] == device['shows'][0]['position']
@@ -2419,7 +2419,7 @@ def test_structural_objects_thrower_with_missing_targets():
             'height': 1,
             'rotation_y': 0,
             'rotation_z': 7,
-            'throw_step': 3,
+            'throw_step': 5,
             'throw_force': 15,
             'projectile_labels': TARGET_LABEL
         }
@@ -2440,7 +2440,7 @@ def test_structural_objects_thrower_with_new_labels():
             'height': 1,
             'rotation_y': 0,
             'rotation_z': 7,
-            'throw_step': 3,
+            'throw_step': 5,
             'throw_force': 15,
             'projectile_labels': 'my_projectile',
             'projectile_shape': 'soccer_ball',
@@ -2456,7 +2456,7 @@ def test_structural_objects_thrower_with_new_labels():
     assert pre_thrower.height == 1
     assert pre_thrower.rotation_y == 0
     assert pre_thrower.rotation_z == 7
-    assert pre_thrower.throw_step == 3
+    assert pre_thrower.throw_step == 5
     assert pre_thrower.throw_force == 15
     assert pre_thrower.projectile_labels == 'my_projectile'
     assert pre_thrower.projectile_shape == 'soccer_ball'
@@ -2495,8 +2495,8 @@ def test_structural_objects_thrower_with_new_labels():
     assert len(projectile['forces']) == 1
     assert projectile['forces'][0]['impulse']
     assert projectile['forces'][0]['relative']
-    assert projectile['forces'][0]['stepBegin'] == 3
-    assert projectile['forces'][0]['stepEnd'] == 3
+    assert projectile['forces'][0]['stepBegin'] == 5
+    assert projectile['forces'][0]['stepEnd'] == 5
     assert projectile['forces'][0]['vector'] == {
         'x': mass * 15, 'y': 0, 'z': 0
     }
@@ -2565,8 +2565,9 @@ def test_structural_objects_thrower_no_spec():
     )
     assert show['position']['z'] == throw_pos['z']
     assert show['rotation']['x'] in [0, 90]
+    original_rotation = proj['debug']['originalRotation']['y']
     # accounting for thrower rotation as well as walls here
-    assert -45 <= show['rotation']['y'] <= 315
+    assert -45 <= (show['rotation']['y'] - original_rotation) <= 315
     assert show['rotation']['z'] == 0
     assert ObjectRepository.get_instance().has_label('throwers')
     assert not ObjectRepository.get_instance().has_label('test_label')
@@ -2586,7 +2587,7 @@ def test_structural_objects_thrower_position_relative():
             'height': 1,
             'rotation_y': 0,
             'rotation_z': 7,
-            'throw_step': 3,
+            'throw_step': 5,
             'throw_force': 15,
             'projectile_shape': 'soccer_ball',
             'projectile_material': my_mats,
@@ -2605,7 +2606,7 @@ def test_structural_objects_thrower_position_relative():
     assert pre_thrower.height == 1
     assert pre_thrower.rotation_y == 0
     assert pre_thrower.rotation_z == 7
-    assert pre_thrower.throw_step == 3
+    assert pre_thrower.throw_step == 5
     assert pre_thrower.throw_force == 15
     assert pre_thrower.projectile_shape == 'soccer_ball'
     assert pre_thrower.projectile_material == my_mats
@@ -2637,8 +2638,8 @@ def test_structural_objects_thrower_position_relative():
     assert ball['type'] == 'soccer_ball'
     assert ball['debug']['positionedBy'] == 'mechanism'
     assert ball['moveable']
-    assert ball['forces'][0]['stepBegin'] == 3
-    assert ball['forces'][0]['stepEnd'] == 3
+    assert ball['forces'][0]['stepBegin'] == 5
+    assert ball['forces'][0]['stepEnd'] == 5
     assert ball['forces'][0]['impulse']
     assert ball['forces'][0]['relative']
     assert ball['forces'][0]['vector'] == {'x': mass * 15, 'y': 0, 'z': 0}
@@ -2670,7 +2671,7 @@ def test_structural_objects_thrower_position_relative_with_adjustment():
             'height': 1,
             'rotation_y': 0,
             'rotation_z': 7,
-            'throw_step': 3,
+            'throw_step': 5,
             'throw_force': 15,
             'projectile_shape': 'soccer_ball',
             'projectile_material': my_mats,
@@ -2691,7 +2692,7 @@ def test_structural_objects_thrower_position_relative_with_adjustment():
     assert pre_thrower.height == 1
     assert pre_thrower.rotation_y == 0
     assert pre_thrower.rotation_z == 7
-    assert pre_thrower.throw_step == 3
+    assert pre_thrower.throw_step == 5
     assert pre_thrower.throw_force == 15
     assert pre_thrower.projectile_shape == 'soccer_ball'
     assert pre_thrower.projectile_material == my_mats
@@ -2725,8 +2726,8 @@ def test_structural_objects_thrower_position_relative_with_adjustment():
     assert ball['type'] == 'soccer_ball'
     assert ball['debug']['positionedBy'] == 'mechanism'
     assert ball['moveable']
-    assert ball['forces'][0]['stepBegin'] == 3
-    assert ball['forces'][0]['stepEnd'] == 3
+    assert ball['forces'][0]['stepBegin'] == 5
+    assert ball['forces'][0]['stepEnd'] == 5
     assert ball['forces'][0]['impulse']
     assert ball['forces'][0]['relative']
     assert ball['forces'][0]['vector'] == {'x': mass * 15, 'y': 0, 'z': 0}
@@ -2754,7 +2755,7 @@ def test_structural_objects_thrower_with_used_target():
             'height': 1,
             'rotation_y': 0,
             'rotation_z': 7,
-            'throw_step': 3,
+            'throw_step': 5,
             'throw_force': 15,
             'projectile_labels': TARGET_LABEL
         }

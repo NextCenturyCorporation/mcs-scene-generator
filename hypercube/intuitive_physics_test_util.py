@@ -50,6 +50,7 @@ def verify_scene(
     last_step=None
 ):
     assert scene['intuitivePhysics']
+    assert scene['version'] == 3
     assert scene['debug']['evaluationOnly'] == (eval_only or implausible)
     assert scene['goal']['answer']['choice'] == (
         'implausible' if implausible else 'plausible'
@@ -266,7 +267,11 @@ def verify_hypercube_Collisions(
     assert last_step == 200
 
     assert verify_hypercube(object_dict, room_wall_material_name)
-    assert verify_object_list_move_across(object_dict['target'], [])
+    assert verify_object_list_move_across(
+        object_dict['target'],
+        [],
+        deeper=True
+    )
     assert verify_occluder_list_move_across(
         object_dict['intuitive physics occluder'],
         object_dict['target'],
@@ -504,7 +509,7 @@ def verify_object_list_fall_down(target_list, distractor_list):
     return True
 
 
-def verify_object_move_across(instance, name):
+def verify_object_move_across(instance, name, deeper=False):
     left_to_right = (instance['shows'][0]['position']['x'] < 0)
     last_action_step = intuitive_physics_hypercubes.LAST_STEP_MOVE_ACROSS - \
         occluders.OCCLUDER_MOVEMENT_TIME
@@ -527,7 +532,10 @@ def verify_object_move_across(instance, name):
         z_position = instance['shows'][0]['position']['z']
 
         min_z = intuitive_physics_hypercubes.MIN_TARGET_Z
-        max_z = intuitive_physics_hypercubes.MAX_TARGET_Z
+        max_z = (
+            intuitive_physics_hypercubes.MAX_TARGET_Z_EXTENDED if deeper else
+            intuitive_physics_hypercubes.MAX_TARGET_Z
+        )
         if z_position < min_z or z_position > max_z:
             print(f'[ERROR] {name} Z POSITION SHOULD BE WITHIN [{min_z}, '
                   f'{max_z}]\n{name}={instance}')
@@ -608,11 +616,15 @@ def verify_object_move_across(instance, name):
     return True
 
 
-def verify_object_list_move_across(target_list, distractor_list):
+def verify_object_list_move_across(target_list, distractor_list, deeper=False):
     for target in target_list:
-        assert verify_object_move_across(target, 'TARGET')
+        assert verify_object_move_across(target, 'TARGET', deeper=deeper)
     for distractor in distractor_list:
-        assert verify_object_move_across(distractor, 'NON-TARGET')
+        assert verify_object_move_across(
+            distractor,
+            'NON-TARGET',
+            deeper=deeper
+        )
 
     # Verify each object position relative to one another.
     position_dict = {}

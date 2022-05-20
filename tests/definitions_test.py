@@ -311,9 +311,7 @@ def test_finalize_object_materials_and_colors():
 def test_finalize_object_materials_and_colors_multiple_material_categories():
     materials.TEST1_MATERIALS = [
         ('test_material_grey', ['grey']),
-        ('test_material_multicolor', ['blue', 'yellow'])
-    ]
-    materials.TEST2_MATERIALS = [
+        ('test_material_multicolor', ['blue', 'yellow']),
         ('test_material_green', ['green']),
         ('test_material_red', ['red'])
     ]
@@ -325,7 +323,7 @@ def test_finalize_object_materials_and_colors_multiple_material_categories():
         size='test_size',
         scale=Vector3d(x=1, y=1, z=1),
         attributes=[],
-        materialCategory=['test1', 'test2']
+        materialCategory=['test1', 'test1']
     )
     definition_list = finalize_object_materials_and_colors(
         definition,
@@ -333,21 +331,21 @@ def test_finalize_object_materials_and_colors_multiple_material_categories():
     )
     assert len(definition_list) == 4
     assert definition_list[0].materials == [
-        'test_material_grey', 'test_material_green'
+        'test_material_grey', 'test_material_grey'
     ]
-    assert definition_list[0].color == ['grey', 'green']
+    assert definition_list[0].color == ['grey']
     assert definition_list[1].materials == [
-        'test_material_multicolor', 'test_material_green'
+        'test_material_multicolor', 'test_material_multicolor'
     ]
-    assert definition_list[1].color == ['blue', 'yellow', 'green']
+    assert definition_list[1].color == ['blue', 'yellow']
     assert definition_list[2].materials == [
-        'test_material_grey', 'test_material_red'
+        'test_material_green', 'test_material_green'
     ]
-    assert definition_list[2].color == ['grey', 'red']
+    assert definition_list[2].color == ['green']
     assert definition_list[3].materials == [
-        'test_material_multicolor', 'test_material_red'
+        'test_material_red', 'test_material_red'
     ]
-    assert definition_list[3].color == ['blue', 'yellow', 'red']
+    assert definition_list[3].color == ['red']
 
 
 def test_retrieve_complete_definition_list():

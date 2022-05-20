@@ -23,13 +23,21 @@ from ideal_learning_env.feature_creation_service import (
     FeatureCreationService,
     FeatureTypes,
 )
+from ideal_learning_env.interactable_object_service import (
+    KeywordLocationConfig,
+)
 from ideal_learning_env.object_services import (
+    KeywordLocation,
     add_random_placement_tag,
     reconcile_template,
 )
 
 from .choosers import choose_position, choose_random
-from .defs import RandomizableBool, RandomizableString
+from .defs import (
+    ILEConfigurationException,
+    RandomizableBool,
+    RandomizableString,
+)
 from .numerics import (
     MinMaxInt,
     RandomizableInt,
@@ -157,6 +165,10 @@ class AgentConfig(BaseFeatureConfig):
     agent to use.  Options are: agent_female_01, agent_female_02,
     agent_female_04, agent_male_02, agent_male_03, agent_male_04.
     Default: random
+    - `keyword_location`: ([KeywordLocationConfig](#KeywordLocationConfig)):
+    One of the keyword locations for this agent or set of agents. Any choices
+    in `keyword_location` are made for each object inside the group, not the
+    group as a whole.
 
     Example:
     ```
@@ -184,6 +196,7 @@ class AgentConfig(BaseFeatureConfig):
     rotation_y: Union[int, MinMaxInt, List[Union[int, MinMaxInt]]] = None
     actions: List[AgentActionConfig] = None
     movement: Union[AgentMovementConfig, List[AgentMovementConfig]] = None
+    keyword_location: KeywordLocationConfig = None
 
 
 def get_default_agent_settings():
@@ -273,6 +286,7 @@ class AgentCreationService(BaseObjectCreationService):
             self, scene: Scene, reconciled: AgentConfig,
             source_template: AgentConfig):
         logger.trace(f"Creating agent:\n{source_template=}\n{reconciled=}")
+
         agent = create_agent(
             type=reconciled.type,
             position_x=reconciled.position.x,
@@ -280,6 +294,30 @@ class AgentCreationService(BaseObjectCreationService):
             rotation_y=reconciled.rotation_y,
             settings=vars(reconciled.agent_settings),
             position_y_modifier=reconciled.position.y)
+
+        if reconciled.keyword_location:
+            if source_template.position:
+                raise ILEConfigurationException(
+                    "Cannot assign position and keyword location for agent")
+            if (reconciled.keyword_location.keyword in [
+                KeywordLocation.ASSOCIATED_WITH_AGENT,
+                KeywordLocation.IN_CONTAINER,
+                KeywordLocation.IN_CONTAINER_WITH_OBJECT,
+                KeywordLocation.OCCLUDE_OBJECT
+            ]):
+                raise ILEConfigurationException(
+                    f"Agents cannot use keyword location "
+                    f"{reconciled.keyword_location.keyword}")
+            # If random, just pass through as we already set a random position
+            # when reconciling template.
+            if reconciled.keyword_location.keyword != KeywordLocation.RANDOM:
+                KeywordLocation.move_to_keyword_location(
+                    instance=agent,
+                    keyword_location=reconciled.keyword_location,
+                    performer_start=scene.performer_start,
+                    room_dimensions=scene.room_dimensions,
+                    bounds=self.bounds)
+
         for action in reconciled.actions or []:
             if not action.id:
                 raise ILEException(

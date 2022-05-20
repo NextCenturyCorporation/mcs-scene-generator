@@ -1,14 +1,15 @@
 # Can only use the Pass action through the whole scene.
 passive_scene: true
 
-# Max of 160 action steps in each passive collisions scene.
-last_step: 160
+# Max of 200 action steps in each passive collisions scene.
+last_step: 200
 
-# Large room with a high ceiling.
+# Large room with a high ceiling and a slippery floor.
 room_dimensions:
-    x: 16
+    x: 20
     y: 8
-    z: 10
+    z: 20
+passive_physics_floor: true
 
 # Specific starting position and rotation used in passive physics tasks.
 performer_start_position:
@@ -56,8 +57,8 @@ structural_throwers:
     - num: 1
       wall: ['left', 'right']
       position_wall:
-          min: 2.6
-          max: 3.4
+          min: 4.6
+          max: 6.4
       height: 0
       rotation_y: 0
       rotation_z: 0
@@ -87,11 +88,11 @@ structural_throwers:
           - tube_wide
           - turtle_on_wheels
       throw_force:
-          min: 20
-          max: 25
+          min: 8
+          max: 12
       throw_step:
           min: 41
-          max: 60
+          max: 80
 
 # One object with the same shape and size as the rolled object, but a different
 # color, positioned so it will sometimes (50%) cause a collision.
@@ -101,19 +102,26 @@ specific_interactable_objects:
       position_relative:
           # Give this object a Z position either in line with the thrower and
           # rolled object, and will therefore cause a collision (50%), or off
-          # by 1, and will therefore NOT cause a collision (50%).
+          # by 3, and will therefore NOT cause a collision (50%).
           # Change "add_z" to 0 if you want to always generate collisions.
           - label: rolled_object
             use_z: true
-            add_z: [-1, 0, 0, 1]
+            add_z: [-3, 0, 0, 3]
           # Give this object a X position hidden behind the occluder.
-          # Remove these lines if you don't have an occluder in your scenes.
+          # Remove these lines if you don't want an occluder in your scenes.
           - label: occluder
             use_x: true
             view_angle_x: true
       # The object will either face directly to the left or the right.
       rotation:
           y: [0, 180]
+      rotate_cylinders: True
+      # Uncomment these lines if you don't want an occluder in your scenes
+      # to ensure this object is positioned within the camera's view.
+      # position:
+      #     x:
+      #         min: -2
+      #         max: 2
 
 # Override the defaults to avoid randomly generating any other objects.
 keyword_objects:

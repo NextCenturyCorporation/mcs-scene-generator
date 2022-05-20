@@ -1,7 +1,13 @@
 import pytest
 from machine_common_sense.config_manager import Vector3d
 
-from generator import ObjectBounds, exceptions, geometry, materials
+from generator import (
+    MaterialTuple,
+    ObjectBounds,
+    exceptions,
+    geometry,
+    materials,
+)
 from hypercube import hypercubes
 from hypercube.agent_scene_pair_json_converter import (
     AGENT_OBJECT_MATERIAL_LIST,
@@ -172,6 +178,18 @@ def verify_fuse_wall_list_trial_1(wall_object_list):
     assert wall_object_list[4]['hides'][0]['stepBegin'] == 2
 
 
+def verify_border_wall_list(wall_object_list):
+    assert len(wall_object_list) == 4
+    verify_show(wall_object_list[0], 0, 0, 0, 0.0625, 2.25)
+    verify_show(wall_object_list[1], 0, 0, 0, 0.0625, -2.25)
+    verify_show(wall_object_list[2], 0, 0, -2.25, 0.0625, 0)
+    verify_show(wall_object_list[3], 0, 0, 2.25, 0.0625, 0)
+    verify_static_wall_list_properties(wall_object_list[0:1], scale_x=5)
+    verify_static_wall_list_properties(wall_object_list[1:2], scale_x=5)
+    verify_static_wall_list_properties(wall_object_list[2:3], scale_z=4)
+    verify_static_wall_list_properties(wall_object_list[3:4], scale_z=4)
+
+
 def verify_fuse_wall_list_trial_2(wall_object_list):
     verify_show(wall_object_list[5], 0, 7, -1.25, 0.06, -1.25)
     verify_show(wall_object_list[6], 0, 7, 1.25, 0.06, 1.25)
@@ -203,7 +221,12 @@ def verify_static_wall_list(
     verify_static_wall_list_properties(wall_object_list, hidden_step)
 
 
-def verify_static_wall_list_properties(wall_object_list, hidden_step=-1):
+def verify_static_wall_list_properties(
+    wall_object_list,
+    hidden_step=-1,
+    scale_x=0.5,
+    scale_z=0.5
+):
     for _, wall_object in enumerate(wall_object_list):
         assert wall_object['id'].startswith('wall_')
         assert wall_object['type'] == 'cube'
@@ -211,13 +234,15 @@ def verify_static_wall_list_properties(wall_object_list, hidden_step=-1):
         assert wall_object['kinematic']
         assert wall_object['structure']
         assert wall_object['debug']['info'] == ['black', 'cube', 'black cube']
-        assert wall_object['debug']['configHeight'] == [0.0625, 0.125]
-        assert wall_object['debug']['configSize'] == [0.5, 0.5]
+        if 'configHeight' in wall_object['debug']:
+            assert wall_object['debug']['configHeight'] == [0.0625, 0.125]
+        if 'configSize' in wall_object['debug']:
+            assert wall_object['debug']['configSize'] == [0.5, 0.5]
 
         assert len(wall_object['shows']) == 1
-        assert wall_object['shows'][0]['scale']['x'] == 0.5
+        assert wall_object['shows'][0]['scale']['x'] == scale_x
         assert wall_object['shows'][0]['scale']['y'] == 0.125
-        assert wall_object['shows'][0]['scale']['z'] == 0.5
+        assert wall_object['shows'][0]['scale']['z'] == scale_z
 
         if hidden_step >= 0:
             assert wall_object['hides'][0]['stepBegin'] == hidden_step
@@ -270,6 +295,7 @@ def test_materials():
 
 def test_append_each_show_to_object():
     mcs_object = {
+        'type': 'cube',
         'debug': {
             'boundsAtStep': [],
             'configHeight': [0.25, 0.5],
@@ -326,6 +352,7 @@ def test_append_each_show_to_object():
 
 def test_append_each_show_to_object_agent():
     mcs_object = {
+        'type': 'cube',
         'debug': {
             'boundsAtStep': [],
             'configHeight': [0.25, 0.5],
@@ -655,8 +682,8 @@ def test_create_agent_object_list():
 
     object_config_with_material_list = [
         ObjectConfigWithMaterial(
-            ObjectConfig('test_type', 1, 2, 3, 4),
-            ('test_material', ['test_color_a', 'test_color_b'])
+            ObjectConfig('cube', 1, 2, 3, 4),
+            MaterialTuple('test_material', ['test_color_a', 'test_color_b'])
         )
     ]
 
@@ -670,47 +697,47 @@ def test_create_agent_object_list():
     agent_object = agent_object_list[0]
 
     assert agent_object['id'].startswith('agent_')
-    assert agent_object['type'] == 'test_type'
+    assert agent_object['type'] == 'cube'
     assert agent_object['materials'] == ['test_material']
     assert agent_object['kinematic']
     assert not agent_object.get('structure')
     assert agent_object['debug']['info'] == [
-        'test_color_a', 'test_color_b', 'test_type',
-        'test_color_a test_color_b test_type'
+        'test_color_a', 'test_color_b', 'cube',
+        'test_color_a test_color_b cube'
     ]
-    assert agent_object['debug']['configHeight'] == [1, 3]
-    assert agent_object['debug']['configSize'] == [2, 4]
+    assert agent_object['debug']['configHeight'] == [0.25, 0.5]
+    assert agent_object['debug']['configSize'] == [0.25, 0.25]
 
     assert len(agent_object['shows']) == 10
-    verify_show(agent_object, 0, 0, -1.75, 1, -1.75)
-    assert agent_object['shows'][0]['scale']['x'] == 2
-    assert agent_object['shows'][0]['scale']['y'] == 3
-    assert agent_object['shows'][0]['scale']['z'] == 4
+    verify_show(agent_object, 0, 0, -1.75, 0.25, -1.75)
+    assert agent_object['shows'][0]['scale']['x'] == 0.25
+    assert agent_object['shows'][0]['scale']['y'] == 0.5
+    assert agent_object['shows'][0]['scale']['z'] == 0.25
 
-    verify_show(agent_object, 1, 1, -1.625, 1, -1.625)
-    verify_show(agent_object, 2, 2, -1.5, 1, -1.5)
-    verify_show(agent_object, 3, 4, 0, 1, 0)
-    verify_show(agent_object, 4, 5, 0, 1, 0.125)
-    verify_show(agent_object, 5, 6, 0, 1, 0.25)
-    verify_show(agent_object, 6, 7, 0, 1, 0.375)
-    verify_show(agent_object, 7, 9, 1.75, 1, 1.75)
-    verify_show(agent_object, 8, 10, 1.625, 1, 1.75)
-    verify_show(agent_object, 9, 11, 1.5, 1, 1.75)
+    verify_show(agent_object, 1, 1, -1.625, 0.25, -1.625)
+    verify_show(agent_object, 2, 2, -1.5, 0.25, -1.5)
+    verify_show(agent_object, 3, 4, 0, 0.25, 0)
+    verify_show(agent_object, 4, 5, 0, 0.25, 0.125)
+    verify_show(agent_object, 5, 6, 0, 0.25, 0.25)
+    verify_show(agent_object, 6, 7, 0, 0.25, 0.375)
+    verify_show(agent_object, 7, 9, 1.75, 0.25, 1.75)
+    verify_show(agent_object, 8, 10, 1.625, 0.25, 1.75)
+    verify_show(agent_object, 9, 11, 1.5, 0.25, 1.75)
 
     assert len(agent_object['debug']['boundsAtStep']) == 13
-    verify_bounds(agent_object, 0, -0.75, -2.75, 0.25, -3.75)
-    verify_bounds(agent_object, 1, -0.625, -2.625, 0.375, -3.625)
-    verify_bounds(agent_object, 2, -0.5, -2.5, 0.5, -3.5)
-    verify_bounds(agent_object, 3, -0.5, -2.5, 0.5, -3.5)
-    verify_bounds(agent_object, 4, 1, -1, 2, -2)
-    verify_bounds(agent_object, 5, 1, -1, 2.125, -1.875)
-    verify_bounds(agent_object, 6, 1, -1, 2.25, -1.75)
-    verify_bounds(agent_object, 7, 1, -1, 2.375, -1.625)
-    verify_bounds(agent_object, 8, 1, -1, 2.375, -1.625)
-    verify_bounds(agent_object, 9, 2.75, 0.75, 3.75, -0.25)
-    verify_bounds(agent_object, 10, 2.625, 0.625, 3.75, -0.25)
-    verify_bounds(agent_object, 11, 2.5, 0.5, 3.75, -0.25)
-    verify_bounds(agent_object, 12, 2.5, 0.5, 3.75, -0.25)
+    verify_bounds(agent_object, 0, -1.625, -1.875, -1.625, -1.875)
+    verify_bounds(agent_object, 1, -1.5, -1.75, -1.5, -1.75)
+    verify_bounds(agent_object, 2, -1.375, -1.625, -1.375, -1.625)
+    verify_bounds(agent_object, 3, -1.375, -1.625, -1.375, -1.625)
+    verify_bounds(agent_object, 4, 0.125, -0.125, 0.125, -0.125)
+    verify_bounds(agent_object, 5, 0.125, -0.125, 0.25, 0)
+    verify_bounds(agent_object, 6, 0.125, -0.125, 0.375, 0.125)
+    verify_bounds(agent_object, 7, 0.125, -0.125, 0.5, 0.25)
+    verify_bounds(agent_object, 8, 0.125, -0.125, 0.5, 0.25)
+    verify_bounds(agent_object, 9, 1.875, 1.625, 1.875, 1.625)
+    verify_bounds(agent_object, 10, 1.75, 1.5, 1.875, 1.625)
+    verify_bounds(agent_object, 11, 1.625, 1.375, 1.875, 1.625)
+    verify_bounds(agent_object, 12, 1.625, 1.375, 1.875, 1.625)
 
 
 def test_create_fuse_wall_object_list():
@@ -769,8 +796,8 @@ def test_create_goal_object_list_single_object():
 
     object_config_with_material_list = [
         ObjectConfigWithMaterial(
-            ObjectConfig('test_type', 1, 2, 3, 4),
-            ('test_material', ['test_color_a', 'test_color_b'])
+            ObjectConfig('cube', 1, 2, 3, 4),
+            MaterialTuple('test_material', ['test_color_a', 'test_color_b'])
         )
     ]
 
@@ -792,33 +819,33 @@ def test_create_goal_object_list_single_object():
     goal_object_1 = goal_object_list[0]
 
     assert goal_object_1['id'].startswith('object_')
-    assert goal_object_1['type'] == 'test_type'
+    assert goal_object_1['type'] == 'cube'
     assert goal_object_1['materials'] == ['test_material']
     assert goal_object_1['kinematic']
     assert not goal_object_1.get('structure')
     assert goal_object_1['debug']['info'] == [
-        'test_color_a', 'test_color_b', 'test_type',
-        'test_color_a test_color_b test_type'
+        'test_color_a', 'test_color_b', 'cube',
+        'test_color_a test_color_b cube'
     ]
-    assert goal_object_1['debug']['configHeight'] == [1, 3]
-    assert goal_object_1['debug']['configSize'] == [2, 4]
+    assert goal_object_1['debug']['configHeight'] == [0.25, 0.5]
+    assert goal_object_1['debug']['configSize'] == [0.25, 0.25]
 
     assert len(goal_object_1['shows']) == 3
-    verify_show(goal_object_1, 0, 0, -1.75, 1, -1.75)
-    assert goal_object_1['shows'][0]['scale']['x'] == 2
-    assert goal_object_1['shows'][0]['scale']['y'] == 3
-    assert goal_object_1['shows'][0]['scale']['z'] == 4
+    verify_show(goal_object_1, 0, 0, -1.75, 0.25, -1.75)
+    assert goal_object_1['shows'][0]['scale']['x'] == 0.25
+    assert goal_object_1['shows'][0]['scale']['y'] == 0.5
+    assert goal_object_1['shows'][0]['scale']['z'] == 0.25
 
-    verify_show(goal_object_1, 1, 2, 0, 1, 0)
-    verify_show(goal_object_1, 2, 4, 1.75, 1, 1.75)
+    verify_show(goal_object_1, 1, 2, 0, 0.25, 0)
+    verify_show(goal_object_1, 2, 4, 1.75, 0.25, 1.75)
 
     assert len(goal_object_1['debug']['boundsAtStep']) == 6
-    verify_bounds(goal_object_1, 0, -0.75, -2.75, 0.25, -3.75)
-    verify_bounds(goal_object_1, 1, -0.75, -2.75, 0.25, -3.75)
-    verify_bounds(goal_object_1, 2, 1, -1, 2, -2)
-    verify_bounds(goal_object_1, 3, 1, -1, 2, -2)
-    verify_bounds(goal_object_1, 4, 2.75, 0.75, 3.75, -0.25)
-    verify_bounds(goal_object_1, 5, 2.75, 0.75, 3.75, -0.25)
+    verify_bounds(goal_object_1, 0, -1.625, -1.875, -1.625, -1.875)
+    verify_bounds(goal_object_1, 1, -1.625, -1.875, -1.625, -1.875)
+    verify_bounds(goal_object_1, 2, 0.125, -0.125, 0.125, -0.125)
+    verify_bounds(goal_object_1, 3, 0.125, -0.125, 0.125, -0.125)
+    verify_bounds(goal_object_1, 4, 1.875, 1.625, 1.875, 1.625)
+    verify_bounds(goal_object_1, 5, 1.875, 1.625, 1.875, 1.625)
 
 
 def test_create_goal_object_list_multiple_object():
@@ -836,12 +863,12 @@ def test_create_goal_object_list_multiple_object():
 
     object_config_with_material_list = [
         ObjectConfigWithMaterial(
-            ObjectConfig('test_type_1', 1, 2, 3, 4),
-            ('test_material_1', ['test_color_a', 'test_color_b'])
+            ObjectConfig('cube', 1, 2, 3, 4),
+            MaterialTuple('test_material_1', ['test_color_a', 'test_color_b'])
         ),
         ObjectConfigWithMaterial(
-            ObjectConfig('test_type_2', 5, 6, 7, 8),
-            ('test_material_2', ['test_color_c'])
+            ObjectConfig('sphere', 5, 6, 7, 8),
+            MaterialTuple('test_material_2', ['test_color_c'])
         )
     ]
 
@@ -864,53 +891,53 @@ def test_create_goal_object_list_multiple_object():
     goal_object_2 = goal_object_list[1]
 
     assert goal_object_1['id'].startswith('object_')
-    assert goal_object_1['type'] == 'test_type_1'
+    assert goal_object_1['type'] == 'cube'
     assert goal_object_1['materials'] == ['test_material_1']
     assert goal_object_1['kinematic']
     assert not goal_object_1.get('structure')
     assert goal_object_1['debug']['info'] == [
-        'test_color_a', 'test_color_b', 'test_type_1',
-        'test_color_a test_color_b test_type_1'
+        'test_color_a', 'test_color_b', 'cube',
+        'test_color_a test_color_b cube'
     ]
-    assert goal_object_1['debug']['configHeight'] == [1, 3]
-    assert goal_object_1['debug']['configSize'] == [2, 4]
+    assert goal_object_1['debug']['configHeight'] == [0.25, 0.5]
+    assert goal_object_1['debug']['configSize'] == [0.25, 0.25]
 
     assert len(goal_object_1['shows']) == 2
-    verify_show(goal_object_1, 0, 0, -1.75, 1, 1.75)
-    assert goal_object_1['shows'][0]['scale']['x'] == 2
-    assert goal_object_1['shows'][0]['scale']['y'] == 3
-    assert goal_object_1['shows'][0]['scale']['z'] == 4
-    verify_show(goal_object_1, 1, 2, -0.125, 1, 0.125)
+    verify_show(goal_object_1, 0, 0, -1.75, 0.25, 1.75)
+    assert goal_object_1['shows'][0]['scale']['x'] == 0.25
+    assert goal_object_1['shows'][0]['scale']['y'] == 0.5
+    assert goal_object_1['shows'][0]['scale']['z'] == 0.25
+    verify_show(goal_object_1, 1, 2, -0.125, 0.25, 0.125)
 
     assert len(goal_object_1['debug']['boundsAtStep']) == 4
-    verify_bounds(goal_object_1, 0, -0.75, -2.75, 3.75, -0.25)
-    verify_bounds(goal_object_1, 1, -0.75, -2.75, 3.75, -0.25)
-    verify_bounds(goal_object_1, 2, 0.875, -1.125, 2.125, -1.875)
-    verify_bounds(goal_object_1, 3, 0.875, -1.125, 2.125, -1.875)
+    verify_bounds(goal_object_1, 0, -1.625, -1.875, 1.875, 1.625)
+    verify_bounds(goal_object_1, 1, -1.625, -1.875, 1.875, 1.625)
+    verify_bounds(goal_object_1, 2, 0, -0.25, 0.25, 0)
+    verify_bounds(goal_object_1, 3, 0, -0.25, 0.25, 0)
 
     assert goal_object_2['id'].startswith('object_')
-    assert goal_object_2['type'] == 'test_type_2'
+    assert goal_object_2['type'] == 'sphere'
     assert goal_object_2['materials'] == ['test_material_2']
     assert goal_object_2['kinematic']
     assert not goal_object_2.get('structure')
     assert goal_object_2['debug']['info'] == [
-        'test_color_c', 'test_type_2', 'test_color_c test_type_2'
+        'test_color_c', 'sphere', 'test_color_c sphere'
     ]
-    assert goal_object_2['debug']['configHeight'] == [5, 7]
-    assert goal_object_2['debug']['configSize'] == [6, 8]
+    assert goal_object_2['debug']['configHeight'] == [1.5, 3]
+    assert goal_object_2['debug']['configSize'] == [2.5, 2.5]
 
     assert len(goal_object_2['shows']) == 2
-    verify_show(goal_object_2, 0, 0, 1.75, 5, -1.75)
-    assert goal_object_2['shows'][0]['scale']['x'] == 6
-    assert goal_object_2['shows'][0]['scale']['y'] == 7
-    assert goal_object_2['shows'][0]['scale']['z'] == 8
-    verify_show(goal_object_2, 1, 2, 0.125, 5, -0.125)
+    verify_show(goal_object_2, 0, 0, 1.75, 1.5, -1.75)
+    assert goal_object_2['shows'][0]['scale']['x'] == 2.5
+    assert goal_object_2['shows'][0]['scale']['y'] == 3
+    assert goal_object_2['shows'][0]['scale']['z'] == 2.5
+    verify_show(goal_object_2, 1, 2, 0.125, 1.5, -0.125)
 
     assert len(goal_object_2['debug']['boundsAtStep']) == 4
-    verify_bounds(goal_object_2, 0, 4.75, -1.25, 2.25, -5.75)
-    verify_bounds(goal_object_2, 1, 4.75, -1.25, 2.25, -5.75)
-    verify_bounds(goal_object_2, 2, 3.125, -2.875, 3.875, -4.125)
-    verify_bounds(goal_object_2, 3, 3.125, -2.875, 3.875, -4.125)
+    verify_bounds(goal_object_2, 0, 3, 0.5, -0.5, -3)
+    verify_bounds(goal_object_2, 1, 3, 0.5, -0.5, -3)
+    verify_bounds(goal_object_2, 2, 1.375, -1.125, 1.125, -1.375)
+    verify_bounds(goal_object_2, 3, 1.375, -1.125, 1.125, -1.375)
 
 
 def test_create_goal_object_list_multiple_object_swap_icon():
@@ -928,12 +955,12 @@ def test_create_goal_object_list_multiple_object_swap_icon():
 
     object_config_with_material_list = [
         ObjectConfigWithMaterial(
-            ObjectConfig('test_type_1', 1, 2, 3, 4),
-            ('test_material_1', ['test_color_a', 'test_color_b'])
+            ObjectConfig('cube', 1, 2, 3, 4),
+            MaterialTuple('test_material_1', ['test_color_a', 'test_color_b'])
         ),
         ObjectConfigWithMaterial(
-            ObjectConfig('test_type_2', 5, 6, 7, 8),
-            ('test_material_2', ['test_color_c'])
+            ObjectConfig('sphere', 5, 6, 7, 8),
+            MaterialTuple('test_material_2', ['test_color_c'])
         )
     ]
 
@@ -956,53 +983,53 @@ def test_create_goal_object_list_multiple_object_swap_icon():
     goal_object_2 = goal_object_list[1]
 
     assert goal_object_1['id'].startswith('object_')
-    assert goal_object_1['type'] == 'test_type_1'
+    assert goal_object_1['type'] == 'cube'
     assert goal_object_1['materials'] == ['test_material_1']
     assert goal_object_1['kinematic']
     assert not goal_object_1.get('structure')
     assert goal_object_1['debug']['info'] == [
-        'test_color_a', 'test_color_b', 'test_type_1',
-        'test_color_a test_color_b test_type_1'
+        'test_color_a', 'test_color_b', 'cube',
+        'test_color_a test_color_b cube'
     ]
-    assert goal_object_1['debug']['configHeight'] == [1, 3]
-    assert goal_object_1['debug']['configSize'] == [2, 4]
+    assert goal_object_1['debug']['configHeight'] == [0.25, 0.5]
+    assert goal_object_1['debug']['configSize'] == [0.25, 0.25]
 
     assert len(goal_object_1['shows']) == 2
-    verify_show(goal_object_1, 0, 0, -1.75, 1, 1.75)
-    assert goal_object_1['shows'][0]['scale']['x'] == 2
-    assert goal_object_1['shows'][0]['scale']['y'] == 3
-    assert goal_object_1['shows'][0]['scale']['z'] == 4
-    verify_show(goal_object_1, 1, 2, 0.125, 1, -0.125)
+    verify_show(goal_object_1, 0, 0, -1.75, 0.25, 1.75)
+    assert goal_object_1['shows'][0]['scale']['x'] == 0.25
+    assert goal_object_1['shows'][0]['scale']['y'] == 0.5
+    assert goal_object_1['shows'][0]['scale']['z'] == 0.25
+    verify_show(goal_object_1, 1, 2, 0.125, 0.25, -0.125)
 
     assert len(goal_object_1['debug']['boundsAtStep']) == 4
-    verify_bounds(goal_object_1, 0, -0.75, -2.75, 3.75, -0.25)
-    verify_bounds(goal_object_1, 1, -0.75, -2.75, 3.75, -0.25)
-    verify_bounds(goal_object_1, 2, 1.125, -0.875, 1.875, -2.125)
-    verify_bounds(goal_object_1, 3, 1.125, -0.875, 1.875, -2.125)
+    verify_bounds(goal_object_1, 0, -1.625, -1.875, 1.875, 1.625)
+    verify_bounds(goal_object_1, 1, -1.625, -1.875, 1.875, 1.625)
+    verify_bounds(goal_object_1, 2, 0.25, 0, 0, -0.25)
+    verify_bounds(goal_object_1, 3, 0.25, 0, 0, -0.25)
 
     assert goal_object_2['id'].startswith('object_')
-    assert goal_object_2['type'] == 'test_type_2'
+    assert goal_object_2['type'] == 'sphere'
     assert goal_object_2['materials'] == ['test_material_2']
     assert goal_object_2['kinematic']
     assert not goal_object_2.get('structure')
     assert goal_object_2['debug']['info'] == [
-        'test_color_c', 'test_type_2', 'test_color_c test_type_2'
+        'test_color_c', 'sphere', 'test_color_c sphere'
     ]
-    assert goal_object_2['debug']['configHeight'] == [5, 7]
-    assert goal_object_2['debug']['configSize'] == [6, 8]
+    assert goal_object_2['debug']['configHeight'] == [1.5, 3]
+    assert goal_object_2['debug']['configSize'] == [2.5, 2.5]
 
     assert len(goal_object_2['shows']) == 2
-    verify_show(goal_object_2, 0, 0, 1.75, 5, -1.75)
-    assert goal_object_2['shows'][0]['scale']['x'] == 6
-    assert goal_object_2['shows'][0]['scale']['y'] == 7
-    assert goal_object_2['shows'][0]['scale']['z'] == 8
-    verify_show(goal_object_2, 1, 2, -0.125, 5, 0.125)
+    verify_show(goal_object_2, 0, 0, 1.75, 1.5, -1.75)
+    assert goal_object_2['shows'][0]['scale']['x'] == 2.5
+    assert goal_object_2['shows'][0]['scale']['y'] == 3
+    assert goal_object_2['shows'][0]['scale']['z'] == 2.5
+    verify_show(goal_object_2, 1, 2, -0.125, 1.5, 0.125)
 
     assert len(goal_object_2['debug']['boundsAtStep']) == 4
-    verify_bounds(goal_object_2, 0, 4.75, -1.25, 2.25, -5.75)
-    verify_bounds(goal_object_2, 1, 4.75, -1.25, 2.25, -5.75)
-    verify_bounds(goal_object_2, 2, 2.875, -3.125, 4.125, -3.875)
-    verify_bounds(goal_object_2, 3, 2.875, -3.125, 4.125, -3.875)
+    verify_bounds(goal_object_2, 0, 3, 0.5, -0.5, -3)
+    verify_bounds(goal_object_2, 1, 3, 0.5, -0.5, -3)
+    verify_bounds(goal_object_2, 2, 1.125, -1.375, 1.375, -1.125)
+    verify_bounds(goal_object_2, 3, 1.125, -1.375, 1.375, -1.125)
 
 
 def test_create_goal_object_list_single_object_on_home():
@@ -1022,8 +1049,8 @@ def test_create_goal_object_list_single_object_on_home():
 
     object_config_with_material_list = [
         ObjectConfigWithMaterial(
-            ObjectConfig('test_type', 0.125, 0.25, 0.25, 0.25),
-            ('test_material', ['test_color_a', 'test_color_b'])
+            ObjectConfig('cube', 0.125, 0.25, 0.25, 0.25),
+            MaterialTuple('test_material', ['test_color_a', 'test_color_b'])
         )
     ]
 
@@ -1052,12 +1079,12 @@ def test_create_goal_object_list_multiple_object_on_home():
 
     object_config_with_material_list = [
         ObjectConfigWithMaterial(
-            ObjectConfig('test_type_1', 0.125, 0.25, 0.25, 0.25),
-            ('test_material_1', ['test_color_a', 'test_color_b'])
+            ObjectConfig('cube', 0.125, 0.25, 0.25, 0.25),
+            MaterialTuple('test_material_1', ['test_color_a', 'test_color_b'])
         ),
         ObjectConfigWithMaterial(
-            ObjectConfig('test_type_2', 0.125, 0.25, 0.25, 0.25),
-            ('test_material_2', ['test_color_c'])
+            ObjectConfig('sphere', 0.125, 0.25, 0.25, 0.25),
+            MaterialTuple('test_material_2', ['test_color_c'])
         )
     ]
 
@@ -1089,13 +1116,13 @@ def test_create_home_object():
     assert home_object['kinematic']
     assert home_object['structure']
     assert home_object['debug']['info'] == ['magenta', 'cube', 'magenta cube']
-    assert home_object['debug']['configHeight'] == [0.000625, 0.00125]
+    assert home_object['debug']['configHeight'] == [0.01, 0.02]
     assert home_object['debug']['configSize'] == [0.5, 0.5]
 
     assert len(home_object['shows']) == 1
-    verify_show(home_object, 0, 0, 0, 0.000625, 0)
+    verify_show(home_object, 0, 0, 0, 0.01, 0)
     assert home_object['shows'][0]['scale']['x'] == 0.5
-    assert home_object['shows'][0]['scale']['y'] == 0.00125
+    assert home_object['shows'][0]['scale']['y'] == 0.02
     assert home_object['shows'][0]['scale']['z'] == 0.5
 
 
@@ -1116,13 +1143,13 @@ def test_create_home_object_uses_first_frame_of_first_trial():
     assert home_object['kinematic']
     assert home_object['structure']
     assert home_object['debug']['info'] == ['magenta', 'cube', 'magenta cube']
-    assert home_object['debug']['configHeight'] == [0.000625, 0.00125]
+    assert home_object['debug']['configHeight'] == [0.01, 0.02]
     assert home_object['debug']['configSize'] == [0.5, 0.5]
 
     assert len(home_object['shows']) == 1
-    verify_show(home_object, 0, 0, -1.75, 0.000625, 1.75)
+    verify_show(home_object, 0, 0, -1.75, 0.01, 1.75)
     assert home_object['shows'][0]['scale']['x'] == 0.5
-    assert home_object['shows'][0]['scale']['y'] == 0.00125
+    assert home_object['shows'][0]['scale']['y'] == 0.02
     assert home_object['shows'][0]['scale']['z'] == 0.5
 
 
@@ -1132,7 +1159,7 @@ def test_create_key_object():
         'key': [[[90, 90], 10, 'triangle0.png']]
     }]]
 
-    key_object = _create_key_object(trial_list, UNIT_SIZE)
+    key_object = _create_key_object(trial_list, UNIT_SIZE, 0.5)
     assert len(key_object['shows']) == 1
     verify_key_properties(key_object)
     verify_show(key_object, 0, 0, 0.25, 0.06, 0)
@@ -1143,7 +1170,7 @@ def test_create_key_object():
         'key': [[[90, 90], 10, 'triangle90.png']]
     }]]
 
-    key_object = _create_key_object(trial_list, UNIT_SIZE)
+    key_object = _create_key_object(trial_list, UNIT_SIZE, 0.5)
     assert len(key_object['shows']) == 1
     verify_key_properties(key_object)
     verify_show(key_object, 0, 0, 0, 0.06, 0.25)
@@ -1154,7 +1181,7 @@ def test_create_key_object():
         'key': [[[90, 90], 10, 'triangle180.png']]
     }]]
 
-    key_object = _create_key_object(trial_list, UNIT_SIZE)
+    key_object = _create_key_object(trial_list, UNIT_SIZE, 0.5)
     assert len(key_object['shows']) == 1
     verify_key_properties(key_object)
     verify_show(key_object, 0, 0, -0.25, 0.06, 0)
@@ -1165,7 +1192,7 @@ def test_create_key_object():
         'key': [[[90, 90], 10, 'triangle270.png']]
     }]]
 
-    key_object = _create_key_object(trial_list, UNIT_SIZE)
+    key_object = _create_key_object(trial_list, UNIT_SIZE, 0.5)
     assert len(key_object['shows']) == 1
     verify_key_properties(key_object)
     verify_show(key_object, 0, 0, 0, 0.06, -0.25)
@@ -1195,7 +1222,7 @@ def test_create_key_object_move_in_one_trial():
         'key': [[[90, 65], 10, 'triangle0.png']]
     }]]
 
-    key_object = _create_key_object(trial_list, UNIT_SIZE)
+    key_object = _create_key_object(trial_list, UNIT_SIZE, 0.5)
 
     assert len(key_object['shows']) == 10
     verify_key_properties(key_object)
@@ -1236,7 +1263,7 @@ def test_create_key_object_rotate_in_one_trial():
         'key': [[[90, 65], 10, 'triangle180.png']]
     }]]
 
-    key_object = _create_key_object(trial_list, UNIT_SIZE)
+    key_object = _create_key_object(trial_list, UNIT_SIZE, 0.5)
 
     assert len(key_object['shows']) == 10
     verify_key_properties(key_object)
@@ -1283,7 +1310,7 @@ def test_create_key_object_move_in_multiple_trials():
         'key': [[[30, 160], 10, 'triangle90.png']]
     }]]
 
-    key_object = _create_key_object(trial_list, UNIT_SIZE)
+    key_object = _create_key_object(trial_list, UNIT_SIZE, 0.5)
 
     assert len(key_object['shows']) == 10
     verify_key_properties(key_object)
@@ -1315,7 +1342,7 @@ def test_create_key_object_if_property_is_pin():
         'pin': [[[90, 90], 10, 'triangle0.png']]
     }]]
 
-    key_object = _create_key_object(trial_list, UNIT_SIZE)
+    key_object = _create_key_object(trial_list, UNIT_SIZE, 0.5)
     assert len(key_object['shows']) == 1
     verify_key_properties(key_object)
     verify_show(key_object, 0, 0, 0.25, 0.06, 0)
@@ -1333,7 +1360,7 @@ def test_create_key_object_no_key_some_trials():
         'key': [[[20, 160], 10, 'triangle90.png']]
     }]]
 
-    key_object = _create_key_object(trial_list, UNIT_SIZE)
+    key_object = _create_key_object(trial_list, UNIT_SIZE, 0.5)
 
     assert len(key_object['shows']) == 4
     verify_key_properties(key_object)
@@ -1525,8 +1552,8 @@ def test_create_lock_wall_object_list_final_trial_no_lock():
 def test_create_object():
     mcs_object = _create_object(
         'id_',
-        'test_type',
-        ('test_material', ['test_color_a', 'test_color_b']),
+        'cube',
+        MaterialTuple('test_material', ['test_color_a', 'test_color_b']),
         [1, 2],
         [3, 4],
         [25, 50],
@@ -1535,11 +1562,11 @@ def test_create_object():
     )
 
     assert mcs_object['id'].startswith('id_')
-    assert mcs_object['type'] == 'test_type'
+    assert mcs_object['type'] == 'cube'
     assert mcs_object['materials'] == ['test_material']
     assert mcs_object['debug']['info'] == [
-        'test_color_a', 'test_color_b', 'test_type',
-        'test_color_a test_color_b test_type'
+        'test_color_a', 'test_color_b', 'cube',
+        'test_color_a test_color_b cube'
     ]
     assert mcs_object['debug']['configHeight'] == [1, 2]
     assert mcs_object['debug']['configSize'] == [3, 4]
@@ -1555,25 +1582,25 @@ def test_create_object():
 
 
 def test_create_scene():
-    body_template = {'objects': []}
+    body_template = {'objects': [], 'debug': {}}
     goal_template = hypercubes.initialize_goal(
         {'category': 'mock', 'domainsInfo': {}, 'sceneInfo': {}}
     )
 
     agent_object_config_list = [
         ObjectConfigWithMaterial(
-            ObjectConfig('test_type', 0.1, 0.2, 0.3, 0.4),
-            ('test_material', ['test_color'])
+            ObjectConfig('cube', 0.1, 0.2, 0.3, 0.4),
+            MaterialTuple('test_material', ['test_color'])
         )
     ]
     goal_object_config_list = [
         ObjectConfigWithMaterial(
-            ObjectConfig('test_type', 0.1, 0.2, 0.3, 0.4),
-            ('test_material', ['test_color'])
+            ObjectConfig('cube', 0.1, 0.2, 0.3, 0.4),
+            MaterialTuple('test_material', ['test_color'])
         ),
         ObjectConfigWithMaterial(
-            ObjectConfig('test_type', 0.1, 0.2, 0.3, 0.4),
-            ('test_material', ['test_color'])
+            ObjectConfig('cube', 0.1, 0.2, 0.3, 0.4),
+            MaterialTuple('test_material', ['test_color'])
         )
     ]
 
@@ -1634,8 +1661,6 @@ def test_create_scene():
         )
 
         assert scene['isometric']
-        assert scene['floorMaterial'] == 'Custom/Materials/White'
-        assert scene['wallMaterial'] == 'Custom/Materials/Black'
         assert scene['goal']['answer']['choice'] == (
             'expected' if is_expected else 'unexpected'
         )
@@ -1647,7 +1672,7 @@ def test_create_scene():
         assert scene['goal']['habituation_total'] == 1
         assert scene['goal']['last_step'] == 11
 
-        assert len(scene['objects']) == 8
+        assert len(scene['objects']) == 13
         agent_object_list = [
             mcs_object for mcs_object in scene['objects']
             if mcs_object['debug']['role'] == 'agent'
@@ -1668,16 +1693,22 @@ def test_create_scene():
             if mcs_object['debug']['role'] == 'target'
         ]
         assert len(target_object_list) == 1
+        platform_object_list = [
+            mcs_object for mcs_object in scene['objects']
+            if mcs_object['debug']['role'] == 'structural'
+        ]
+        assert len(platform_object_list) == 1
         wall_object_list = [
             mcs_object for mcs_object in scene['objects']
             if mcs_object['debug']['role'] == 'wall'
         ]
-        assert len(wall_object_list) == 4
+        assert len(wall_object_list) == 8
 
 
 def test_create_show():
     show = _create_show(
         1234,
+        'blob_01',
         [1, 2],
         [3, 4],
         [25, 50],
@@ -1692,6 +1723,14 @@ def test_create_show():
     assert show['scale']['x'] == 3
     assert show['scale']['y'] == 2
     assert show['scale']['z'] == 4
+    assert show['boundingBox'].box_xz == [
+        Vector3d(x=-1.36, y=0, z=-0.28),
+        Vector3d(x=-1.36, y=0, z=-1.72),
+        Vector3d(x=-2.14, y=0, z=-1.72),
+        Vector3d(x=-2.14, y=0, z=-0.28)
+    ]
+    assert show['boundingBox'].max_y == pytest.approx(1.8)
+    assert show['boundingBox'].min_y == pytest.approx(0.2)
 
 
 def test_create_static_wall_object_list():
@@ -2164,8 +2203,9 @@ def test_create_wall_object_list():
         'walls': create_wall_json_list()
     }]]
     wall_object_list = _create_wall_object_list(trial_list, UNIT_SIZE)
-    assert len(wall_object_list) == 5
-    verify_static_wall_list(wall_object_list)
+    assert len(wall_object_list) == 9
+    verify_static_wall_list(wall_object_list[:5])
+    verify_border_wall_list(wall_object_list[5:])
 
 
 def test_create_wall_object_list_remove_wall():
@@ -2176,9 +2216,10 @@ def test_create_wall_object_list_remove_wall():
     }]]
 
     wall_object_list = _create_wall_object_list(trial_list, UNIT_SIZE)
-    assert len(wall_object_list) == 9
+    assert len(wall_object_list) == 13
     verify_static_wall_list(wall_object_list[:5], hidden_step=2)
-    verify_static_wall_list(wall_object_list[5:], list_length=4, show_step=2)
+    verify_static_wall_list(wall_object_list[5:9], list_length=4, show_step=2)
+    verify_border_wall_list(wall_object_list[9:])
 
 
 def test_create_wall_object_list_change_in_some_trials():
@@ -2208,7 +2249,7 @@ def test_create_wall_object_list_change_in_some_trials():
         ]
     }]]
     wall_object_list = _create_wall_object_list(trial_list, UNIT_SIZE)
-    assert len(wall_object_list) == 15
+    assert len(wall_object_list) == 19
     verify_show(wall_object_list[0], 0, 0, -1.75, 0.0625, -1.75)
     verify_show(wall_object_list[1], 0, 0, -1.75, 0.0625, 1.75)
     verify_show(wall_object_list[2], 0, 0, 1.75, 0.0625, -1.75)
@@ -2226,7 +2267,8 @@ def test_create_wall_object_list_change_in_some_trials():
     verify_show(wall_object_list[14], 0, 4, -1.75, 0.0625, 0.75)
     verify_static_wall_list_properties(wall_object_list[:5], hidden_step=2)
     verify_static_wall_list_properties(wall_object_list[5:11], hidden_step=4)
-    verify_static_wall_list_properties(wall_object_list[11:])
+    verify_static_wall_list_properties(wall_object_list[11:15])
+    verify_border_wall_list(wall_object_list[15:])
 
 
 def test_create_wall_object_list_with_fuse():
@@ -2244,9 +2286,10 @@ def test_create_wall_object_list_with_fuse():
     ]]
 
     wall_object_list = _create_wall_object_list(trial_list, UNIT_SIZE)
-    assert len(wall_object_list) == 10
+    assert len(wall_object_list) == 14
     verify_static_wall_list(wall_object_list[:5])
-    verify_fuse_wall_list_trial_1(wall_object_list[5:])
+    verify_border_wall_list(wall_object_list[5:9])
+    verify_fuse_wall_list_trial_1(wall_object_list[9:])
 
 
 def test_create_wall_object_list_with_fuse_multiple_trials():
@@ -2273,16 +2316,17 @@ def test_create_wall_object_list_with_fuse_multiple_trials():
     ]]
 
     wall_object_list = _create_wall_object_list(trial_list, UNIT_SIZE)
-    assert len(wall_object_list) == 13
+    assert len(wall_object_list) == 17
     verify_static_wall_list(wall_object_list[:5])
-    verify_fuse_wall_list_trial_1(wall_object_list[5:])
-    verify_fuse_wall_list_trial_2(wall_object_list[5:])
+    verify_border_wall_list(wall_object_list[5:9])
+    verify_fuse_wall_list_trial_1(wall_object_list[9:])
+    verify_fuse_wall_list_trial_2(wall_object_list[9:])
 
 
 def test_fix_key_location():
     # negative_x
     json_key = [[90, 90], 10, 'triangle0.png']
-    input_key_object = {'shows': [{
+    input_key_object = {'debug': {'agentHeight': 0.5}, 'shows': [{
         'stepBegin': 0,
         'position': {'x': 0, 'y': 0, 'z': 0},
         'rotation': {'x': 0, 'y': 0, 'z': 0},
@@ -2297,7 +2341,7 @@ def test_fix_key_location():
 
     # negative_z
     json_key = [[90, 90], 10, 'triangle90.png']
-    input_key_object = {'shows': [{
+    input_key_object = {'debug': {'agentHeight': 0.5}, 'shows': [{
         'stepBegin': 0,
         'position': {'x': 0, 'y': 0, 'z': 0},
         'rotation': {'x': 0, 'y': 0, 'z': 0},
@@ -2312,7 +2356,7 @@ def test_fix_key_location():
 
     # positive_x
     json_key = [[90, 90], 10, 'triangle180.png']
-    input_key_object = {'shows': [{
+    input_key_object = {'debug': {'agentHeight': 0.5}, 'shows': [{
         'stepBegin': 0,
         'position': {'x': 0, 'y': 0, 'z': 0},
         'rotation': {'x': 0, 'y': 0, 'z': 0},
@@ -2327,7 +2371,7 @@ def test_fix_key_location():
 
     # positive_z
     json_key = [[90, 90], 10, 'triangle270.png']
-    input_key_object = {'shows': [{
+    input_key_object = {'debug': {'agentHeight': 0.5}, 'shows': [{
         'stepBegin': 0,
         'position': {'x': 0, 'y': 0, 'z': 0},
         'rotation': {'x': 0, 'y': 0, 'z': 0},
@@ -2344,7 +2388,7 @@ def test_fix_key_location():
 def test_fix_key_location_nondefault_position():
     # negative_x
     json_key = [[90, 90], 10, 'triangle0.png']
-    input_key_object = {'shows': [{
+    input_key_object = {'debug': {'agentHeight': 0.5}, 'shows': [{
         'stepBegin': 0,
         'position': {'x': 1, 'y': 0.1, 'z': -1},
         'rotation': {'x': 0, 'y': 0, 'z': 0},
@@ -2359,7 +2403,7 @@ def test_fix_key_location_nondefault_position():
 
 def test_fix_key_location_multiple_show_no_movement():
     json_key = [[90, 90], 10, 'triangle0.png']
-    input_key_object = {'shows': [{
+    input_key_object = {'debug': {'agentHeight': 0.5}, 'shows': [{
         'stepBegin': 0,
         'position': {'x': 1.25, 'y': 0.1, 'z': -1},
         'rotation': {'x': 0, 'y': -135, 'z': 90},
@@ -2380,7 +2424,7 @@ def test_fix_key_location_multiple_show_no_movement():
 
 def test_fix_key_location_multiple_show_movement_during_first_trial():
     json_key = [[90, 90], 10, 'triangle0.png']
-    input_key_object = {'shows': [{
+    input_key_object = {'debug': {'agentHeight': 0.5}, 'shows': [{
         'stepBegin': 0,
         'position': {'x': 1.25, 'y': 0.1, 'z': -1},
         'rotation': {'x': 0, 'y': -135, 'z': 90},
@@ -2401,7 +2445,7 @@ def test_fix_key_location_multiple_show_movement_during_first_trial():
 
 def test_fix_key_location_multiple_show_reset_between_two_trials():
     json_key = [[90, 90], 10, 'triangle0.png']
-    input_key_object = {'shows': [{
+    input_key_object = {'debug': {'agentHeight': 0.5}, 'shows': [{
         'stepBegin': 0,
         'position': {'x': 1.25, 'y': 0.1, 'z': -1},
         'rotation': {'x': 0, 'y': -135, 'z': 90},
@@ -2422,7 +2466,7 @@ def test_fix_key_location_multiple_show_reset_between_two_trials():
 
 def test_fix_key_location_multiple_show_movement_during_later_trial():
     json_key = [[90, 90], 10, 'triangle0.png']
-    input_key_object = {'shows': [{
+    input_key_object = {'debug': {'agentHeight': 0.5}, 'shows': [{
         'stepBegin': 0,
         'position': {'x': 1.25, 'y': 0.1, 'z': -1},
         'rotation': {'x': 0, 'y': -135, 'z': 90},
@@ -2457,7 +2501,7 @@ def test_fix_key_location_multiple_show_movement_during_later_trial():
 
 def test_fix_key_location_multiple_show_rotate_during_first_trial():
     json_key = [[90, 90], 10, 'triangle90.png']
-    input_key_object = {'shows': [{
+    input_key_object = {'debug': {'agentHeight': 0.5}, 'shows': [{
         'stepBegin': 0,
         'position': {'x': 1.25, 'y': 0.1, 'z': -1},
         'rotation': {'x': 0, 'y': -135, 'z': 90},
@@ -2478,7 +2522,7 @@ def test_fix_key_location_multiple_show_rotate_during_first_trial():
 
 def test_fix_key_location_multiple_show_rotate_between_two_trials():
     json_key = [[90, 90], 10, 'triangle90.png']
-    input_key_object = {'shows': [{
+    input_key_object = {'debug': {'agentHeight': 0.5}, 'shows': [{
         'stepBegin': 0,
         'position': {'x': 1.25, 'y': 0.1, 'z': -1},
         'rotation': {'x': 0, 'y': -135, 'z': 90},
