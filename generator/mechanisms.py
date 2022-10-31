@@ -104,8 +104,9 @@ PLACER_TEMPLATE = {
 }
 
 CYLINDRICAL_SHAPES = [
-    'cylinder', 'double_cone', 'dumbbell_1',
-    'dumbbell_2', 'tie_fighter', 'tube_narrow', 'tube_wide'
+    'cylinder', 'double_cone', 'dumbbell_1', 'dumbbell_2',
+    'rollable_1', 'rollable_2', 'rollable_3', 'rollable_4',
+    'tie_fighter', 'tube_narrow', 'tube_wide'
 ]
 
 

@@ -5,45 +5,52 @@ from .choosers import (
     choose_position,
     choose_random,
     choose_rotation,
-    choose_scale,
+    choose_scale
 )
 from .components import ILEComponent
 from .decorators import ile_config_setter
 from .defs import (
+    TARGET_LABEL,
     ConverterClass,
     ILEConfigurationException,
     ILEException,
     ILESharedConfiguration,
     find_bounds,
-    return_list,
+    return_list
+)
+from .feature_creation_service import (
+    BaseFeatureConfig,
+    BaseObjectCreationService,
+    FeatureCreationService,
+    FeatureTypes
 )
 from .global_settings_component import GlobalSettingsComponent
-from .goal_services import TARGET_LABEL, GoalConfig
+from .goal_services import GoalConfig
 from .interactable_object_service import InteractableObjectConfig
 from .interactable_objects_component import (
     KeywordLocationConfig,
     KeywordObjectsConfig,
     RandomInteractableObjectsComponent,
     RandomKeywordObjectsComponent,
-    SpecificInteractableObjectsComponent,
+    SpecificInteractableObjectsComponent
 )
 from .numerics import (
     MinMax,
     MinMaxFloat,
     MinMaxInt,
     VectorFloatConfig,
-    VectorIntConfig,
+    VectorIntConfig
 )
 from .object_services import (
     InstanceDefinitionLocationTuple,
     KeywordLocation,
     MaterialRestrictions,
-    ObjectRepository,
+    ObjectRepository
 )
 from .shortcut_component import ShortcutComponent
 from .structural_objects_component import (
     RandomStructuralObjectsComponent,
-    SpecificStructuralObjectsComponent,
+    SpecificStructuralObjectsComponent
 )
 from .validation_component import ValidPathComponent
 from .validators import (
@@ -55,5 +62,5 @@ from .validators import (
     ValidateNumber,
     ValidateOptions,
     ValidateOr,
-    ValidateSpecific,
+    ValidateSpecific
 )

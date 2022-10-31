@@ -72,12 +72,6 @@ def instantiate_object(
     object_location['position']['z'] -= definition.offset.z
 
     instance['debug']['offset'] = vars(definition.offset)
-    if definition.closedDimensions:
-        instance['debug']['closedDimensions'] = vars(
-            definition.closedDimensions
-        )
-    if definition.closedOffset:
-        instance['debug']['closedOffset'] = vars(definition.closedOffset)
 
     if 'rotation' not in object_location:
         object_location['rotation'] = {'x': 0, 'y': 0, 'z': 0}

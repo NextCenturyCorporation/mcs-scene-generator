@@ -1,11 +1,13 @@
 from generator import occluders
-from hypercube.intuitive_physics_hypercubes import (
+from generator.intuitive_physics_util import (
     MAX_TARGET_Z,
     MIN_TARGET_Z,
-    MOVEMENT,
     STEP_Z,
-    object_x_to_occluder_x,
-    retrieve_off_screen_position_x,
+    retrieve_off_screen_position_x
+)
+from hypercube.intuitive_physics_hypercubes import (
+    MOVEMENT,
+    object_x_to_occluder_x
 )
 
 
@@ -74,7 +76,7 @@ def test_exit_only_movement():
         ('deepExit', MOVEMENT.DEEP_EXIT_LIST, False, False),
         ('tossExit', MOVEMENT.TOSS_EXIT_LIST, False, False)
     ]
-    iterator_z_max = (MAX_TARGET_Z - MIN_TARGET_Z) / STEP_Z
+    iterator_z_max = round((MAX_TARGET_Z - MIN_TARGET_Z) / STEP_Z, 4)
     for iterator_z in range(int(iterator_z_max) + 1):
         position_z = round(MIN_TARGET_Z + (STEP_Z * iterator_z), 2)
         print(f'POSITION_Z={position_z}')
@@ -91,13 +93,7 @@ def test_exit_only_movement():
 
 
 def is_known_exit_stop_failure(movement, position_z):
-    # Based on output from running the generate_movement.py script.
-    if movement['forceX'] == 670:
-        return position_z in [4.4]
-    if movement['forceX'] == 690:
-        return position_z in [4.25, 4.3, 4.35, 4.4]
-    if movement['forceX'] == 700:
-        return position_z in [4.4]
+    # Based on output from running the cross_reference_movement.py script.
     return False
 
 
@@ -109,7 +105,7 @@ def test_exit_stop_movement():
         ('deepStop', MOVEMENT.DEEP_STOP_LIST, True, False),
         ('tossStop', MOVEMENT.TOSS_STOP_LIST, True, True)
     ]
-    iterator_z_max = (MAX_TARGET_Z - MIN_TARGET_Z) / STEP_Z
+    iterator_z_max = round((MAX_TARGET_Z - MIN_TARGET_Z) / STEP_Z, 4)
     for iterator_z in range(int(iterator_z_max) + 1):
         position_z = round(MIN_TARGET_Z + (STEP_Z * iterator_z), 2)
         print(f'POSITION_Z={position_z}')
@@ -135,6 +131,7 @@ def validate_double_occluder(
     position_z
 ):
     full_option_list = movement[option_list_property]
+    best = float('inf')
     for step_1, option_list_1 in full_option_list[position_z].items():
         x_1 = object_x_to_occluder_x(
             (starting_x + movement['xDistanceByStep'][step_1]),
@@ -149,32 +146,37 @@ def validate_double_occluder(
                 (position_z + movement['zDistanceByStep'][step_2])
                 if 'zDistanceByStep' in movement else position_z
             )
-            if occluders.calculate_separation_distance(
+            distance = round(occluders.calculate_separation_distance(
                 x_1,
                 occluders.OCCLUDER_MAX_SCALE_X,
                 x_2,
                 occluders.OCCLUDER_MAX_SCALE_X
-            ) < 0:
+            ), 4)
+            best = distance if abs(distance) < abs(best) else best
+            if distance < 0:
                 continue
             for option_1 in option_list_1:
                 for option_2 in option_list_2:
                     if option_1 == option_2:
                         return True
+    # print(
+    #     f'  FAILED DOUBLE OCCLUDER AT Z POSITION {position_z} '
+    #     f'WITH X FORCE {movement["forceX"]} AND SEPARATION DISTANCE {best}'
+    # )
     return False
 
 
 def is_known_double_occluder_failure(position_z):
     # Based on output from running this test case.
-    return position_z in [4.3, 4.35, 4.4]
+    return position_z >= 3.75
 
 
 def test_exit_only_movement_double_occluder():
-    iterator_z_max = (MAX_TARGET_Z - MIN_TARGET_Z) / STEP_Z
+    iterator_z_max = round((MAX_TARGET_Z - MIN_TARGET_Z) / STEP_Z, 4)
     for iterator_z in range(int(iterator_z_max) + 1):
         position_z = round(MIN_TARGET_Z + (STEP_Z * iterator_z), 2)
         if is_known_double_occluder_failure(position_z):
             continue
-        print(f'POSITION_Z={position_z}')
         starting_x = -1 * retrieve_off_screen_position_x(position_z)
         successful = False
         for movement in MOVEMENT.MOVE_EXIT_LIST:
@@ -184,6 +186,8 @@ def test_exit_only_movement_double_occluder():
                 starting_x,
                 position_z
             ) or successful
+        # if successful:
+        #     print(f'SUCCESSFUL DOUBLE OCCLUDER AT Z POSITION {position_z}')
         if not successful:
             print(f'FAILED DOUBLE OCCLUDER AT Z POSITION {position_z}')
         assert successful

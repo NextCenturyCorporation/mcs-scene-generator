@@ -9,7 +9,7 @@ from typing import (
     Union,
     get_args,
     get_origin,
-    get_type_hints,
+    get_type_hints
 )
 
 from generator import (
@@ -17,7 +17,7 @@ from generator import (
     MaterialTuple,
     ObjectBounds,
     ObjectDefinition,
-    geometry,
+    geometry
 )
 from generator.materials import find_colors
 from generator.scene import Scene
@@ -42,7 +42,7 @@ class ILEDelayException(ILEException):
     ...
 
 
-class ILEConfigurationException(Exception):
+class ILEConfigurationException(ILEException):
     """Configuration exceptions should be thrown when the ILE configuration
     file has been configured in a way that cannot be processed and no retries
     are necessary.

@@ -21,16 +21,18 @@ from ideal_learning_env import (
     RandomStructuralObjectsComponent,
     ShortcutComponent,
     SpecificInteractableObjectsComponent,
-    ValidPathComponent,
+    ValidPathComponent
 )
 from ideal_learning_env.agent_component import (
     RandomAgentComponent,
-    SpecificAgentComponent,
+    SpecificAgentComponent
 )
 from ideal_learning_env.interactable_object_service import ObjectRepository
 from ideal_learning_env.structural_objects_component import (
-    SpecificStructuralObjectsComponent,
+    SpecificStructuralObjectsComponent
 )
+
+logger = None
 
 ILE_COMPONENTS: List[Type[ILEComponent]] = [
     GlobalSettingsComponent,
@@ -106,9 +108,8 @@ def _handle_delayed_actions(component_list, scene):
 
 def main(args):
     """Generate and save one or more MCS JSON scenes using the given config
-    for the Ideal Learning Environment (ILE)."""
-    logger = logging.getLogger()
-    logger.info('[*] Starting the Ideal Learning Environment Scene Generator')
+    for the Interactive Learning Environment (ILE)."""
+    logger.info('[*] Starting the ILE Scene Generator')
 
     # Read the ILE config data from the YAML config file.
     config_data = {}
@@ -159,34 +160,21 @@ def main(args):
                 TypeError,
                 ValueError,
                 ZeroDivisionError
-            ) as e:
-                exc = e if logger.isEnabledFor(logging.DEBUG) else None
-                cause = getattr(e, '__cause__', '') or ''
-                cause = f" caused by '{cause}'" if cause else cause
-                reason = "" if logger.isEnabledFor(
-                    logging.DEBUG) else f" due to '{e}'{cause}"
-
-                if tries >= MAX_TRIES:
-                    logger.error(
-                        f"Failed to generate scene "
-                        f"after {MAX_TRIES} tries{reason}.",
-                        exc_info=exc
-                    )
-                    # The ultimate cause gets hidden higher up so lets repeat
-                    # it.
-                    if cause and logger.isEnabledFor(logging.DEBUG):
-                        logger.error(f"Failure reason: '{e}'{cause}")
+            ):
+                error_message = (
+                    f'Failed to generate scene {index + 1} of '
+                    f'{args.number} (try {tries} / {MAX_TRIES}), '
+                    f'filename: {scene_filename}{suffix}'
+                )
+                if logger.isEnabledFor(logging.DEBUG) or (tries >= MAX_TRIES):
+                    logging.exception(error_message)
                 else:
-                    logger.debug(
-                        f'Failed to generate scene '
-                        f'(try {tries} / {MAX_TRIES}){reason}.',
-                        exc_info=exc
-                    )
-                if args.throw_error or tries >= MAX_TRIES:
-                    sys.exit()
+                    logger.info(error_message)
+                if tries >= MAX_TRIES:
+                    sys.exit(1)
 
         # If successful, save the normal and debug JSON scene files.
-        save_scene_files(scene.to_dict(), scene_filename)
+        save_scene_files(scene, scene_filename)
         logger.info(
             f'Finished generating scene {index + 1} of {args.number}, '
             f'filename: {scene_filename}{suffix}'
@@ -246,9 +234,6 @@ if __name__ == '__main__':
             log_file_name="mcs", file_format='precise',
             console_format='precise'
         )
-        # Remove after fix in MCS is released (0.5.2)
-        if args.log_level == 'TRACE':
-            dev['handlers']['console']['level'] = 'TRACE'
         LoggingConfig.init_logging(log_config=dev)
     elif not args.log_config:
         std = LoggingConfig.get_configurable_logging_config(
@@ -258,14 +243,11 @@ if __name__ == '__main__':
             log_file_name="mcs", file_format='precise',
             console_format='precise'
         )
-        # Remove after fix in MCS is released (0.5.2)
-        if args.log_level == 'TRACE':
-            std['handlers']['console']['level'] = 'TRACE'
         LoggingConfig.init_logging(log_config=std)
     else:
         LoggingConfig.init_logging(
             log_config=None,
             log_config_file=args.log_config
         )
-    logger = logging.getLogger()
+    logger = logging.getLogger('ideal_learning_env')
     main(args)

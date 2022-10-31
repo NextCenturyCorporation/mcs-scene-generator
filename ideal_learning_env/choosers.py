@@ -8,7 +8,7 @@ from generator import (
     MaterialTuple,
     base_objects,
     geometry,
-    materials,
+    materials
 )
 
 from .defs import ILEException, ILESharedConfiguration
@@ -51,7 +51,8 @@ def choose_position(
     object_z: float = None,
     room_x: float = None,
     room_y: float = None,
-    room_z: float = None
+    room_z: float = None,
+    is_placer_obj: bool = False
 ) -> Vector3d:
     """Choose and return a random position for the given position config or,
     if it is null, a random object position within the room bounds."""
@@ -66,7 +67,7 @@ def choose_position(
         if room_x is not None:
             constrained_x = _constrain_position_x_z(pos.x, object_x, room_x)
         if room_y is not None:
-            constrained_y = _constrain_position_y(pos.y, room_y)
+            constrained_y = _constrain_position_y(pos.y, room_y, is_placer_obj)
         if room_z is not None:
             constrained_z = _constrain_position_x_z(pos.z, object_z, room_z)
         constrained_position = VectorFloatConfig(
@@ -125,8 +126,15 @@ def _constrain_position_x_z(
 
 def _constrain_position_y(
         position: Union[float, MinMaxFloat, List[float]] = None,
-        room_dim: float = None):
+        room_dim: float = None, is_placer_obj: bool = False):
     max_y = room_dim - geometry.PERFORMER_HEIGHT
+
+    # if placer object, just check against room dimensions (don't need to
+    # worry about performer being able to reach the top, since placer
+    # will come down anyway)
+    if is_placer_obj:
+        max_y = room_dim
+
     constrained_y = position
     if position is None:
         constrained_y = 0
@@ -215,24 +223,35 @@ def choose_rotation(
 
 
 def choose_material_tuple_from_material(
-    material_or_color: Union[str, List[str]],
+    material_or_category: Union[str, List[str]],
     prohibited_material: str = None
 ) -> MaterialTuple:
     """Return a MaterialTuple chosen randomly from the given materials that can
     either be specific materials or names of lists in materials.py."""
-    material_or_color = (
-        material_or_color if isinstance(material_or_color, List) else
-        [material_or_color]
+    material_or_category = (
+        material_or_category if isinstance(material_or_category, List) else
+        [material_or_category]
     )
-    material_or_color = [
-        material for material in material_or_color
-        if material != prohibited_material
-    ]
-    mat = choose_random(material_or_color)
+    prohibited_colors = materials.find_colors(prohibited_material, [])
+    available_materials = []
+    for item in material_or_category:
+        if item == prohibited_material:
+            continue
+        if hasattr(materials, str(item)):
+            available_materials.append(item)
+            continue
+        colors = materials.find_colors(str(item), [])
+        if any([color in prohibited_colors for color in colors]):
+            continue
+        available_materials.append(item)
+    mat = choose_random(available_materials)
     if hasattr(materials, str(mat)):
         return random.choice([
             material_tuple for material_tuple in getattr(materials, mat)
-            if material_tuple.material != prohibited_material
+            if material_tuple.material != prohibited_material and all([
+                color not in prohibited_colors
+                for color in material_tuple.color
+            ])
         ])
     colors = materials.find_colors(mat, [])
     return MaterialTuple(mat, colors)
@@ -289,10 +308,10 @@ def choose_scale(
 
 def choose_shape_material(
     shape_list: Union[str, List[str]] = None,
-    material_or_color: Union[str, List[str]] = None,
+    material_or_category: Union[str, List[str]] = None,
     prohibited_material: str = None
 ) -> Optional[Tuple[str, MaterialTuple]]:
-    """Takes choices for shape and material_or_color and returns a valid
+    """Takes choices for shape and material_or_category and returns a valid
     combination or throws and exception.  Throwing an exception will mean
     there is a possible shape without a possible material and thus will not be
     retryable."""
@@ -304,7 +323,7 @@ def choose_shape_material(
     #   Only material is none - choose shape, then pick valid material
     #       (similar to both are none)
     #   Neither are none - Choose shape, find material that fits?
-    if material_or_color is None:
+    if material_or_category is None:
         # Case 1 and 3 above
         if shape_list:
             shape = choose_random(shape_list)
@@ -329,7 +348,7 @@ def choose_shape_material(
     elif shape_list is None:
         # Case 2 above
         mat = choose_material_tuple_from_material(
-            material_or_color,
+            material_or_category,
             prohibited_material
         )
         for _ in range(MAX_TRIES):
@@ -355,7 +374,7 @@ def choose_shape_material(
             # The color option somewhat creates an issue
             for _ in range(MAX_TRIES):
                 mat = choose_material_tuple_from_material(
-                    material_or_color,
+                    material_or_category,
                     prohibited_material
                 )
                 if mat[0] in material_restriction:
@@ -365,7 +384,7 @@ def choose_shape_material(
                 f'shape {shape} and {len(material_restriction)} materials'
             )
         mat = choose_material_tuple_from_material(
-            material_or_color,
+            material_or_category,
             prohibited_material
         )
         return (shape, mat)

@@ -5,10 +5,15 @@ import random
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
+import numpy as np
 from machine_common_sense.config_manager import Vector3d
-from shapely import affinity, geometry
+from shapely import affinity, geometry, ops
 
-from .definitions import DefinitionDataset, ObjectDefinition
+from .definitions import (
+    DefinitionDataset,
+    ImmutableObjectDefinition,
+    ObjectDefinition
+)
 from .separating_axis_theorem import sat_entry
 
 MAX_TRIES = 50
@@ -19,7 +24,7 @@ MOVE_DISTANCE = 0.1
 FLOOR_FEATURE_BOUNDS_BUFFER = 0.001
 
 PERFORMER_CAMERA_Y = 0.762
-PERFORMER_HALF_WIDTH = 0.27
+PERFORMER_HALF_WIDTH = 0.25
 PERFORMER_HEIGHT = 1.25
 PERFORMER_MASS = 2
 PERFORMER_WIDTH = PERFORMER_HALF_WIDTH * 2.0
@@ -33,7 +38,12 @@ DEFAULT_ROOM_DIMENSIONS = {'x': 10, 'y': 3, 'z': 10}
 MAX_OBJECTS_ADJACENT_DISTANCE = 0.5
 MIN_OBJECTS_SEPARATION_DISTANCE = 2
 MIN_FORWARD_VISIBILITY_DISTANCE = 1.25
-MIN_GAP = 0.1
+MIN_GAP = 0.5
+
+FRONT_WALL_LABEL = "front_wall"
+BACK_WALL_LABEL = "back_wall"
+LEFT_WALL_LABEL = "left_wall"
+RIGHT_WALL_LABEL = "right_wall"
 
 ORIGIN = {
     "x": 0.0,
@@ -66,6 +76,12 @@ class ObjectBounds():
 
     def __post_init__(self):
         self._update_poly()
+
+    def __eq__(self, other) -> bool:
+        return (
+            self.box_xz == other.box_xz and self.max_y == other.max_y and
+            self.min_y == other.min_y
+        )
 
     def _update_poly(self) -> None:
         for point in self.box_xz:
@@ -122,7 +138,7 @@ def create_bounds(
     position = __dict_to_vector(position)
     rotation = __dict_to_vector(rotation)
 
-    radian_amount = math.pi * (2 - rotation.y / 180.0)
+    radian_amount = math.pi * (2 - (rotation.y % 360) / 180.0)
 
     rotate_sin = math.sin(radian_amount)
     rotate_cos = math.cos(radian_amount)
@@ -433,6 +449,123 @@ def get_location_in_back_of_performer(
     )
 
 
+def get_location_adjacent_to_performer(
+    performer_start: Dict[str, Dict[str, float]],
+    # TODO MCS-697 Define an ObjectInstance class extending ObjectDefinition.
+    target_definition_or_instance: Union[ObjectDefinition, Dict[str, Any]],
+    distance: float, direction_rotation: int,
+    room_dimensions: Dict[str, float] = None
+) -> Optional[Dict[str, Any]]:
+    """Returns the instance positioned relative to the performer.  It will be
+    placed in a direction based on the `direction_rotation` relative to the
+    performers starting rotation.  The `distance` field is the dimensions edge
+    to edge distance."""
+    if isinstance(target_definition_or_instance, dict):
+        debug = target_definition_or_instance['debug']
+        dimensions = debug['dimensions']
+        offset = debug.get('offset', {'x': 0, 'z': 0})
+    else:
+        dimensions = vars(target_definition_or_instance.dimensions)
+        offset = vars(target_definition_or_instance.offset)
+
+    perf_rot = performer_start['rotation']['y']
+
+    # determine if we want the x orientation facing the performer
+    x_oriented = random.choice([True, False])
+
+    # rotation only for the object to match which dimension we use
+    extra_obj_rot = (random.choice([90, 270]) if x_oriented
+                     else random.choice([0, 180]))
+
+    def compute_xz(_room_dimensions: Dict[str, float]) -> Tuple[float, float]:
+        # Desired edge to edge distance
+
+        obj_half_dist = (dimensions['x'] if
+                         x_oriented else dimensions['z']) / 2
+        origin_dist = PERFORMER_HALF_WIDTH + distance + obj_half_dist
+
+        calc_rot = (perf_rot + direction_rotation)
+
+        x = origin_dist * math.sin(math.radians(calc_rot)) + \
+            performer_start['position']['x'] + offset['x']
+        z = origin_dist * math.cos(math.radians(calc_rot)) + \
+            performer_start['position']['z'] + offset['z']
+
+        return x, z
+
+    def compute_rot():
+        return (perf_rot + direction_rotation + extra_obj_rot) % 360
+
+    return calc_obj_pos(
+        performer_start['position'],
+        [],
+        target_definition_or_instance,
+        xz_func=compute_xz,
+        rotation_func=compute_rot,
+        room_dimensions=(room_dimensions or DEFAULT_ROOM_DIMENSIONS)
+    )
+
+
+def get_location_along_wall(
+        performer_start: Dict[str, Dict[str, float]],
+        wall: str, instance: Dict[str, Any],
+        room_dimensions: Dict[str, Any]) -> Dict[str, Any]:
+    """returns an object with a new location along a wall for a given room.
+    The `wall` parameter must be either `back_wall`, `front_wall`,
+    `left_wall`, or `right_wall`"""
+    dimensions = instance['debug']['dimensions']
+    offset_x = instance['debug']['offset']['x']
+    offset_z = instance['debug']['offset']['z']
+
+    def compute_xz(_room_dimensions: Dict[str, float]) -> Tuple[float, float]:
+        return get_along_wall_xz(
+            wall, _room_dimensions, dimensions, offset_x, offset_z)
+
+    return calc_obj_pos(
+        performer_start['position'],
+        [],
+        instance,
+        xz_func=compute_xz,
+        room_dimensions=(room_dimensions or DEFAULT_ROOM_DIMENSIONS)
+    )
+
+
+def get_along_wall_xz(wall_label, room_dimensions, dimensions,
+                      offset_x=0, offset_z=0):
+    """Return an x, z coordinate for a location along the wall.  The
+    `wall_label` parameter must be either `back_wall`, `front_wall`,
+    `left_wall`, or `right_wall`"""
+    buffer = 0.01
+
+    x_limit = room_dimensions['x'] / 2
+    z_limit = room_dimensions['z'] / 2
+
+    dim_x = dimensions['x']
+    dim_z = dimensions['z']
+
+    # Is this the proper use of offset?
+    x_min = -x_limit + dim_x / 2 + offset_x + buffer
+    x_max = x_limit - dim_x / 2 - offset_x - buffer
+    z_min = -z_limit + dim_z / 2 + offset_z + buffer
+    z_max = z_limit - dim_z / 2 - offset_z - buffer
+
+    # Verify front/back term is consistent
+    if wall_label == BACK_WALL_LABEL:
+        z_min = z_max
+    elif wall_label == FRONT_WALL_LABEL:
+        z_max = z_min
+    elif wall_label == LEFT_WALL_LABEL:
+        x_max = x_min
+    elif wall_label == RIGHT_WALL_LABEL:
+        x_min = x_max
+    else:
+        raise Exception(f"{wall_label} is not a valid wall label.")
+
+    x = random.uniform(x_min, x_max)
+    z = random.uniform(z_min, z_max)
+    return x, z
+
+
 def generate_location_on_object(
     # TODO MCS-697 Define an ObjectInstance class extending ObjectDefinition.
     object_definition_or_instance: Union[ObjectDefinition, Dict[str, Any]],
@@ -441,7 +574,8 @@ def generate_location_on_object(
     performer_start: Dict[str, Dict[str, float]],
     bounds_list: List[ObjectBounds],
     room_dimensions: Dict[str, float] = None,
-    center: bool = False
+    center: bool = False,
+    position_relative_to_start: Dict[str, float] = None
 ) -> Dict[str, Any]:
     """Creates a location for the object to place it on top of the static object.
 
@@ -455,19 +589,11 @@ def generate_location_on_object(
         offset = debug.get('offset', {'x': 0, 'y': 0, 'z': 0})
         position_y = debug.get('positionY', 0)
         rotation = debug.get('rotation', {'x': 0, 'y': 0, 'z': 0})
-        if debug.get('closedDimensions'):
-            dimensions = debug.get('closedDimensions')
-        if debug.get('closedOffset'):
-            offset = debug.get('closedOffset')
     else:
         dimensions = vars(object_definition_or_instance.dimensions)
         offset = vars(object_definition_or_instance.offset)
         position_y = object_definition_or_instance.positionY
         rotation = vars(object_definition_or_instance.rotation)
-        if object_definition_or_instance.closedDimensions:
-            dimensions = vars(object_definition_or_instance.closedDimensions)
-        if object_definition_or_instance.closedOffset:
-            offset = vars(object_definition_or_instance.closedOffset)
 
     if not isinstance(static_instance, dict):
         raise Exception(
@@ -484,6 +610,35 @@ def generate_location_on_object(
         # determine x,z of object in static bounds
         if center:
             x, z = static_bounds.polygon_xz.centroid.coords[0]
+
+            if(position_relative_to_start is not None):
+                relative_obj_dim = static_instance['debug']['dimensions']
+                buffer = max(dimensions['x'], dimensions['z']) / 2.0
+
+                # determine how much to move away from center/where to place
+                # the object
+                x_axis_move = relative_obj_dim['x'] / 2.0 - buffer
+                z_axis_move = relative_obj_dim['z'] / 2.0 - buffer
+
+                # take rotation of relative object into account
+                rel_obj_rot = static_instance['shows'][0]['rotation']['y']
+
+                radians = math.radians(rel_obj_rot)
+                new_x = x + (x_axis_move * position_relative_to_start.x)
+                new_z = z + (z_axis_move * position_relative_to_start.z)
+
+                # rotation around arbitrary center is:
+                # x1 = (x0 -xc) cos(theta) - (z0 -zc)sin(theta) + xc
+                # z1 = (x0 -xc) sin(theat) + (z0 -zc)cos(theta) + zc
+                #
+                # rotate placement point around centroid point of relative
+                # object position
+                center_x, center_z = x, z
+                x = (new_x - center_x) * math.cos(radians) - \
+                    (new_z - center_z) * math.sin(radians) + center_x
+
+                z = -(new_x - center_x) * math.sin(radians) - \
+                    (new_z - center_z) * math.cos(radians) + center_z
         else:
             # Create some basic bounds to limit where we place the object
             # We will test more precisely later
@@ -573,19 +728,11 @@ def generate_location_in_line_with_object(
         offset = debug.get('offset', {'x': 0, 'z': 0})
         position_y = debug.get('positionY', 0)
         rotation = debug.get('rotation', {'x': 0, 'y': 0, 'z': 0})
-        if debug.get('closedDimensions'):
-            dimensions = debug.get('closedDimensions')
-        if debug.get('closedOffset'):
-            offset = debug.get('closedOffset')
     else:
         dimensions = vars(object_definition_or_instance.dimensions)
         offset = vars(object_definition_or_instance.offset)
         position_y = object_definition_or_instance.positionY
         rotation = vars(object_definition_or_instance.rotation)
-        if object_definition_or_instance.closedDimensions:
-            dimensions = vars(object_definition_or_instance.closedDimensions)
-        if object_definition_or_instance.closedOffset:
-            offset = vars(object_definition_or_instance.closedOffset)
 
     # TODO MCS-697 Define an ObjectInstance class extending ObjectDefinition.
     if isinstance(static_definition_or_instance, dict):
@@ -745,7 +892,7 @@ def retrieve_obstacle_occluder_definition_list(
     target_definition_or_instance: Union[ObjectDefinition, Dict[str, Any]],
     definition_dataset: DefinitionDataset,
     is_occluder: bool
-) -> List[Tuple[ObjectDefinition, int]]:
+) -> Optional[Tuple[ObjectDefinition, int]]:
     """Return each object definition from the given list that is both taller
     and wider/deeper that the given target, tupled with a Y rotation amount.
     If wider (x-axis), rotation 0 is returned; if deeper (z-axis), rotation 90
@@ -756,23 +903,40 @@ def retrieve_obstacle_occluder_definition_list(
     if isinstance(target_definition_or_instance, dict):
         debug = target_definition_or_instance['debug']
         target_dimensions = debug['dimensions']
-        if debug.get('closedDimensions'):
-            target_dimensions = debug.get('closedDimensions')
     else:
         target_dimensions = vars(target_definition_or_instance.dimensions)
-        if target_definition_or_instance.closedDimensions:
-            target_dimensions = vars(
-                target_definition_or_instance.closedDimensions
-            )
 
-    output_list = []
     object_attr = ('occluder' if is_occluder else 'obstacle')
-    for definition in definition_dataset.definitions():
-        if not getattr(definition, object_attr):
-            continue
+
+    def _callback(definition: ImmutableObjectDefinition) -> bool:
+        return getattr(definition, object_attr)
+
+    # Filter down the dataset to have only obstacle/occluder definitions.
+    filtered_dataset = definition_dataset.filter_on_custom(_callback)
+
+    # Get the groups from the dataset so we can randomize them correctly.
+    definition_groups = filtered_dataset.groups()
+    group_indexes = list(range(len(definition_groups)))
+    inner_indexes = [
+        list(range(len(definition_selections)))
+        for definition_selections in definition_groups
+    ]
+
+    while any([len(indexes) for indexes in inner_indexes]):
+        # Choose a random group, then choose a random list within that group.
+        group_index = random.choice(group_indexes)
+        inner_index = random.choice(inner_indexes[group_index])
+        # Remove the chosen inner index from its list.
+        inner_indexes[group_index] = [
+            i for i in inner_indexes[group_index] if i != inner_index
+        ]
+        # If there are no more definitions available for a group, remove it.
+        if not len(inner_indexes[group_index]):
+            group_indexes = [i for i in group_indexes if i != group_index]
+        # Choose a random material for the chosen definition.
+        definition = random.choice(definition_groups[group_index][inner_index])
+        # Identify the dimensions of the chosen obstacle/occluder.
         dimensions = definition.dimensions
-        if definition.closedDimensions:
-            dimensions = definition.closedDimensions
         cannot_walk_over = dimensions.y >= PERFORMER_HALF_WIDTH
         cannot_walk_into = definition.mass > PERFORMER_MASS
         # Only need a larger Y dimension if the object is an occluder.
@@ -780,11 +944,12 @@ def retrieve_obstacle_occluder_definition_list(
             not is_occluder or dimensions.y >= target_dimensions['y']
         ):
             if dimensions.x >= target_dimensions['x']:
-                output_list.append((definition, 0))
+                return (definition, 0)
             # If the object's Z is bigger than the target's X, rotate it.
             elif dimensions.z >= target_dimensions['x']:
-                output_list.append((definition, 90))
-    return output_list
+                return (definition, 90)
+
+    return None
 
 
 def get_bounding_polygon(
@@ -1015,7 +1180,8 @@ def object_x_to_occluder_x(
     object_distance_z = object_z - performer_start_z
     occluder_distance_z = occluder_z - performer_start_z
     # Note: This may need to change if we adjust the camera's field of view.
-    return (object_distance_x / object_distance_z) * occluder_distance_z
+    offset = (object_distance_x / object_distance_z) * occluder_distance_z
+    return round(performer_start_x + offset, 4)
 
 
 def occluder_x_to_object_x(
@@ -1031,4 +1197,211 @@ def occluder_x_to_object_x(
     occluder_distance_x = occluder_x - performer_start_x
     occluder_distance_z = occluder_z - performer_start_z
     # Note: This may need to change if we adjust the camera's field of view.
-    return (occluder_distance_x / occluder_distance_z) * object_distance_z
+    offset = (occluder_distance_x / occluder_distance_z) * object_distance_z
+    return round(performer_start_x + offset, 4)
+
+
+def calculate_rotations(
+    one: Vector3d,
+    two: Vector3d,
+    no_rounding_to_tens: bool = False
+) -> Tuple[int, int]:
+    """Calculates and returns the X and Y rotations for the performer agent in
+    position one to look at the object centered in position two. By default,
+    will round to nearest 10 (because Rotate actions are in increments of 10)
+    unless no_rounding_to_tens is False."""
+    dx = -(one.x - two.x)
+    dy = one.y + PERFORMER_CAMERA_Y - two.y
+    dz = -(one.z - two.z)
+    rotation_y = math.degrees(math.atan2(float(dx), dz))
+    rotation_x = math.degrees(math.atan2(dy, math.sqrt(dx * dx + dz * dz)))
+    if not no_rounding_to_tens:
+        rotation_y = round(rotation_y, -1)
+        rotation_x = round(rotation_x, -1)
+    return int(round(rotation_x)), int(round(rotation_y)) % 360
+
+
+def get_position_distance_away_from_obj(
+        room_dimensions: Vector3d, obj,
+        distance, bounds) -> Tuple[float, float]:
+    """ Calculates and returns a position around an object at a
+    specified distance away from an edge of the objects bounding box
+    """
+    bb_boxes = obj['shows'][0]['boundingBox'].box_xz
+    top_right = geometry.Point(bb_boxes[0].x, bb_boxes[0].z)
+    bottom_right = geometry.Point(bb_boxes[1].x, bb_boxes[1].z)
+    bottom_left = geometry.Point(bb_boxes[2].x, bb_boxes[2].z)
+    top_left = geometry.Point(bb_boxes[3].x, bb_boxes[3].z)
+    normalized_vertical_vector = \
+        get_normalized_vector_from_two_points(
+            top_right, bottom_right)
+    normalized_horizontal_vector = \
+        get_normalized_vector_from_two_points(
+            top_right, top_left)
+    distance_away = distance + PERFORMER_HALF_WIDTH
+    """
+    p4----------p1
+    |  tl   tr  |
+    |    [o]    |
+    |    [b]    |
+    |    [j]    |
+    |  bl   br  |
+    p3---------p2
+    """
+    resultant_vector_up_right = Vector3d(
+        x=(normalized_vertical_vector.x +
+           normalized_horizontal_vector.x) * distance_away,
+        z=(normalized_vertical_vector.y +
+           normalized_horizontal_vector.y) * distance_away)
+    resultant_vector_down_right = Vector3d(
+        x=(-normalized_vertical_vector.x +
+           normalized_horizontal_vector.x) * distance_away,
+        z=(-normalized_vertical_vector.y +
+            normalized_horizontal_vector.y) * distance_away)
+    resultant_vector_down_left = Vector3d(
+        x=-(normalized_vertical_vector.x +
+            normalized_horizontal_vector.x) * distance_away,
+        z=-(normalized_vertical_vector.y +
+            normalized_horizontal_vector.y) * distance_away)
+    resultant_vector_up_left = Vector3d(
+        x=(normalized_vertical_vector.x -
+           normalized_horizontal_vector.x) * distance_away,
+        z=(normalized_vertical_vector.y -
+            normalized_horizontal_vector.y) * distance_away)
+
+    p1 = geometry.Point(
+        top_right.x + resultant_vector_up_right.x,
+        top_right.y + resultant_vector_up_right.z)
+    p2 = geometry.Point(
+        bottom_right.x + resultant_vector_down_right.x,
+        bottom_right.y + resultant_vector_down_right.z)
+    p3 = geometry.Point(
+        bottom_left.x + resultant_vector_down_left.x,
+        bottom_left.y + resultant_vector_down_left.z)
+    p4 = geometry.Point(
+        top_left.x + resultant_vector_up_left.x,
+        top_left.y + resultant_vector_up_left.z)
+
+    pos = Vector3d(x=0, y=0, z=0)
+    # The perimeter line
+    line = geometry.LineString((
+        [p1.x, p1.y],
+        [p2.x, p2.y],
+        [p3.x, p3.y],
+        [p4.x, p4.y],
+        [p1.x, p1.y]))
+    mp = geometry.MultiPoint()
+    # Seperation of spawn points on the line
+    seperation_between_spawn_points = 0.5
+    for i in np.arange(0, line.length,
+                       seperation_between_spawn_points):
+        segment = ops.substring(
+            line, i, i + seperation_between_spawn_points)
+        mp = mp.union(segment.boundary)
+    x = [point.x for point in mp]
+    y = [point.y for point in mp]
+    for _ in range(MAX_TRIES):
+        index = random.randint(0, len(x) - 1)
+        pos.x = x[index]
+        pos.z = y[index]
+        """
+        If you want to visually see how this picks points around the
+        perimeter uncomment this
+        import matplotlib.pyplot as plt
+        plt.gca().set_aspect('equal', adjustable='box')
+        plt.scatter(x, y)
+        x_point = [pos.x]
+        y_point = [pos.z]
+        plt.scatter(x_point, y_point)
+        plt.savefig("perimeter_graph.png")
+        """
+        """
+        Check the new performer start bounds.
+        Move the old performer start out of the room for the check.
+        """
+        performer_bounds = find_performer_bounds(vars(pos))
+        if not performer_bounds.is_within_room(vars(room_dimensions)):
+            continue
+        valid = validate_location_rect(
+            location_bounds=performer_bounds,
+            performer_start_position=vars(
+                Vector3d(x=math.inf, y=math.inf, z=math.inf)),
+            bounds_list=bounds,
+            room_dimensions=vars(room_dimensions)
+        )
+        if not valid:
+            continue
+
+        """
+        This is another check to verify the distance is correct
+        If its not, it means the position is in the corner of the
+        perimeter. Try to nudge the position a little bit in a direction.
+        If that nudge moves it further away, go a different direction.
+        Once the direction is found, then keep nudging it from the corner
+        toward the object until the distance is correct. This is kind of like
+        turning a corner into an oval.
+        """
+        (valid, start_difference) = \
+            distance_between_point_and_bounding_box_is_valid(
+                pos.x, pos.z, top_right, bottom_right,
+                bottom_left, top_left, distance_away)
+        if not valid:
+            directions = [
+                resultant_vector_up_left, resultant_vector_down_right,
+                resultant_vector_down_left, resultant_vector_up_left]
+            for direction in directions:
+                shift_amount = start_difference
+                shift_amount = start_difference
+                for _ in range(MAX_TRIES):
+                    reverse_x = -direction.x * shift_amount
+                    reverse_z = -direction.z * shift_amount
+                    new_pos_x = pos.x + reverse_x
+                    new_pos_z = pos.z + reverse_z
+                    (valid, difference_after_shift) = \
+                        distance_between_point_and_bounding_box_is_valid(
+                            new_pos_x, new_pos_z,
+                            top_right, bottom_right, bottom_left,
+                            top_left, distance_away)
+                    shift_amount += 0.01
+                    # the shift is in the wrong direction
+                    if difference_after_shift > start_difference:
+                        break
+                    if valid:
+                        return (new_pos_x, new_pos_z)
+        if valid:
+            return (pos.x, pos.z)
+
+    raise Exception(
+        f"Failed to find valid performer location "
+        f"with distance away: ({distance}) from object: ({obj['id']})"
+        f"because location is obstructed or outside of room bounds")
+
+
+def distance_between_point_and_bounding_box_is_valid(
+        x, z, top_right, bottom_right,
+        bottom_left, top_left, target_distance_away):
+    """
+    Checks if an x,z position is a distance away from a bounding box.
+    """
+    point = geometry.Point(x, z)
+    polygon = geometry.Polygon(
+        [top_right, bottom_right, bottom_left, top_left])
+    target_distance_away = round(target_distance_away, 2)
+    end_distance = round(point.distance(polygon), 2)
+    difference = round(end_distance - target_distance_away, 2)
+    valid = end_distance == target_distance_away
+    return valid, difference
+
+
+def get_normalized_vector_from_two_points(
+        p1: geometry.Point, p2: geometry.Point):
+    """Calculates and returns a normalized vector between two points"""
+    # got this math from here https://math.stackexchange.com/a/175906
+    vector_direction = Vector3d(x=p1.x - p2.x, y=p1.y - p2.y)
+    length_of_vector = math.sqrt(
+        vector_direction.x ** 2 +
+        vector_direction.y ** 2)
+    normalized_vector = Vector3d(
+        x=vector_direction.x / length_of_vector,
+        y=vector_direction.y / length_of_vector)
+    return normalized_vector

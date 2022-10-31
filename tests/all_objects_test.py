@@ -7,7 +7,7 @@ from generator import (
     gravity_support_objects,
     intuitive_physics_objects,
     occluders,
-    specific_objects,
+    specific_objects
 )
 
 

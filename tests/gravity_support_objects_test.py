@@ -1,7 +1,7 @@
 from generator import (
     DefinitionDataset,
     ObjectDefinition,
-    gravity_support_objects,
+    gravity_support_objects
 )
 
 

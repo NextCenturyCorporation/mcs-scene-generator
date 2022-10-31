@@ -1,0 +1,88 @@
+# Setup the scene in exactly the same way as the "passive physics" eval scenes.
+# This automatically sets the performer agent's starting position and rotation,
+# room dimensions, floor friction, and a platform to adjust the camera height.
+passive_physics_scene: true
+
+# Max of 240 action steps in each passive "move across" scene.
+last_step: 240
+
+# One moving-and-rotating occluding wall with semi-random width and position.
+structural_moving_occluders:
+    - num: 1
+      occluder_height: 3
+      occluder_thickness: 0.1
+      # Note that this occluder is usually wider than other occluders.
+      occluder_width:
+          min: 2.0
+          max: 4.0
+      origin: 'top'
+      position_x:
+          min: -1.0
+          max: 1.0
+      position_z: 1
+      move_up_before_last_step: true
+      reverse_direction: false
+      rotation_y: 0
+      labels: occluder
+
+# One thrower with a random small object at a semi-random locations.
+structural_throwers:
+    - num: 1
+
+      # Will position the thrower/object on either the left or the right with
+      # either a straight, angled, or tossed movement arc. Overrides the
+      # "wall", "position_wall", "height", "rotation_y", and "rotation_z"
+      # config options. See the ILE_API for information on the values used.
+      # In rare circumstances, objects may collide; you can avoid this by
+      # reducing the number of throwers to 1.
+      passive_physics_setup:
+          - roll_angled
+          - roll_straight
+          - toss_straight
+
+      # Will assign a throw force so the object will come to a stop behind
+      # the occluder.
+      stop_position:
+          behind: occluder
+
+      # Choose randomly from shapes normally used in "move across" tasks.
+      # Remove shapes from this list you don't want to generate.
+      # Copy lines for shapes you want to generate more often than others.
+      # Note that spherical and cylindrical shapes do not work well with a
+      # "stop_position" of "behind: occluder" and have thus been omitted.
+      projectile_shape:
+          - bobcat
+          - bus_1
+          - car_1
+          - car_2
+          - car_3
+          - cart_2
+          - dog_on_wheels
+          - dog_on_wheels_2
+          - duck_on_wheels
+          - duck_on_wheels_2
+          - jeep
+          - racecar_red
+          - roller
+          - skateboard
+          - tank_1
+          - tank_2
+          - train_1
+          - train_2
+          - trolley_1
+          - truck_1
+          - truck_2
+          - truck_3
+          - truck_4
+          - turtle_on_wheels
+
+      throw_step:
+          min: 71
+          max: 80
+
+# Override the defaults to avoid randomly generating any other objects.
+keyword_objects:
+    - num: 0
+random_structural_objects:
+    - num: 0
+excluded_shapes: soccer_ball

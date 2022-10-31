@@ -2,46 +2,53 @@ import copy
 import logging
 import math
 import random
-from collections import namedtuple
 from dataclasses import dataclass
 from typing import Any, Dict, List, Union
 
 from machine_common_sense.config_manager import Vector3d
 
-from generator import MAX_TRIES, ObjectBounds, Scene, geometry, materials
+from generator import (
+    MAX_TRIES,
+    ObjectBounds,
+    Scene,
+    agents,
+    geometry,
+    materials,
+    tags
+)
 from generator.base_objects import LARGE_BLOCK_TOOLS_TO_DIMENSIONS
 from generator.structures import (
     BASE_DOOR_HEIGHT,
     BASE_DOOR_WIDTH,
-    create_guide_rails_around,
+    create_guide_rails_around
 )
 from ideal_learning_env.action_service import ActionService
 from ideal_learning_env.actions_component import StepBeginEnd
 from ideal_learning_env.agent_service import (
     DEFAULT_TEMPLATE_AGENT_MOVEMENT,
     AgentConfig,
-    AgentCreationService,
+    AgentCreationService
 )
 from ideal_learning_env.goal_services import GoalConfig, GoalServices
 from ideal_learning_env.interactable_object_service import (
     InteractableObjectConfig,
-    KeywordLocationConfig,
+    KeywordLocationConfig
 )
 from ideal_learning_env.numerics import (
     MinMaxFloat,
     MinMaxInt,
     RandomizableVectorFloat3d,
     VectorFloatConfig,
-    VectorIntConfig,
+    VectorIntConfig
 )
 from ideal_learning_env.object_services import (
     KeywordLocation,
-    ObjectRepository,
+    ObjectRepository
 )
 from ideal_learning_env.validators import (
     ValidateNumber,
     ValidateOptions,
-    ValidateOr,
+    ValidateOr
 )
 
 from .components import ILEComponent
@@ -55,7 +62,7 @@ from .structural_object_service import (
     PartitionFloorConfig,
     StructuralDoorConfig,
     StructuralPlatformConfig,
-    ToolConfig,
+    ToolConfig
 )
 
 logger = logging.getLogger(__name__)
@@ -66,12 +73,14 @@ DOOR_OCCLUDER_MIN_ROOM_Y = 5
 EXTENSION_LENGTH_MIN = 0.5
 EXTENSION_WIDTH = 1
 
-MAX_LAVA_ISLAND_SIZE = 3
 MIN_LAVA_ISLAND_SIZE = 1
-MAX_LAVA_WIDTH = 6
+MAX_LAVA_ISLAND_SIZE = 5
 MIN_LAVA_WIDTH = 2
-MIN_LAVA_ISLAND_ROOM_LONG_LENGTH = 13
-MIN_LAVA_ISLAND_ROOM_SHORT_LENGTH = 7
+MAX_LAVA_WIDTH = 6
+MIN_LAVA_ISLAND_LONG_ROOM_DIMENSION_LENGTH = 13
+MIN_LAVA_ISLAND_SHORT_ROOM_DIMENSION_LENGTH = 7
+MIN_LAVA_WITH_ISLAND_WIDTH = 5
+MAX_LAVA_WITH_ISLAND_WIDTH = 9
 
 
 @dataclass
@@ -89,8 +98,11 @@ class LavaTargetToolConfig():
     used with `tool_rotation`. Default: False
     - `island_size` (int, or list of ints, or [MinMaxInt](#MinMaxInt) dict,
     or list of MinMaxInt dicts): The width and lenght of the island inside the
-    lava.  Must produce value from 1 to 3.
+    lava.  Must produce value from 1 to 5.
     Default: Random based on room size
+    - `left_lava_width` (int, or list of ints, or [MinMaxInt](#MinMaxInt):
+    The number of tiles of lava left of the island.  Must produce value
+    between 2 and 6. Default: Random based on room size and island size
     - `random_performer_position` (bool, or list of bools): If True, the
     performer will be randomly placed in the room. They will not be placed in
     the lava or the island   Default: False
@@ -101,18 +113,43 @@ class LavaTargetToolConfig():
     The number of tiles of lava behind of the island.  Must produce value
     between 2 and 6. Default: Random based on room size, island size, and
     other lava widths.
+    - `right_lava_width` (int, or list of ints, or [MinMaxInt](#MinMaxInt):
+    The number of tiles right of the island.  Must produce value
+    between 2 and 6. Default: Random based on room size and island size
+    - `random_performer_position` (bool, or list of bools): If True, the
+    performer will be randomly placed in the room. They will not be placed in
+    the lava or the island   Default: False
     - `tool_rotation` (int, or list of ints, or [MinMaxInt](#MinMaxInt):
-    Angle that too should be rotated out of alignment with target.
+    Angle that tool should be rotated out of alignment with target.
     This option cannot be used with `guide_rails`.  Default: 0
+    - `distance_between_performer_and_tool` (float, or list of floats,
+    or [MinMaxFloat](#MinMaxFloat): The distance away the performer is from the
+    tool at start. The performer will be at random point around a rectangular
+    perimeter surrounding the tool. This option cannot be used with
+    `random_performer_position`.  Default: None
     """
     island_size: Union[int, MinMaxInt, List[Union[int, MinMaxInt]]] = None
-    front_lava_width: Union[int, MinMaxInt,
-                            List[Union[int, MinMaxInt]]] = None
+    front_lava_width: Union[int, MinMaxInt, List[Union[int, MinMaxInt]]] = None
     rear_lava_width: Union[int, MinMaxInt, List[Union[int, MinMaxInt]]] = None
+    left_lava_width: Union[int, MinMaxInt, List[Union[int, MinMaxInt]]] = None
+    right_lava_width: Union[int, MinMaxInt, List[Union[int, MinMaxInt]]] = None
     guide_rails: Union[bool, List[bool]] = False
     tool_rotation: Union[int, MinMaxInt, List[Union[int, MinMaxInt]]] = 0
     random_performer_position: Union[bool, List[bool]] = False
     random_target_position: Union[bool, List[bool]] = False
+    distance_between_performer_and_tool: Union[
+        float, MinMaxFloat, List[Union[float, MinMaxFloat]]
+    ] = None
+
+
+@dataclass
+class LavaIslandSizes():
+    # internal class for storing lava widths and island sizes
+    island_size: int = 0
+    front: int = 0
+    rear: int = 0
+    left: int = 0
+    right: int = 0
 
 
 @dataclass
@@ -185,6 +222,8 @@ class AgentTargetConfig():
     - `agent_position` ([VectorFloatConfig](#VectorFloatConfig) or list of
     [VectorFloatConfig](#VectorFloatConfig)): Determines the position of the
     agent.  Default: Random
+    - `movement` (bool, or list of bools): Whether the agent should move
+    around. Default: true
     - `movement_bounds` (list of [VectorFloatConfig](#VectorFloatConfig))
     points to generate a polygon that bounds the agents random movement.
     If the polygon has an area of 0, no movement will occur.  Polygons with
@@ -194,6 +233,7 @@ class AgentTargetConfig():
 
     agent_position: RandomizableVectorFloat3d = None
     movement_bounds: List[RandomizableVectorFloat3d] = None
+    movement: Union[bool, List[bool]] = None
 
 
 @dataclass
@@ -205,8 +245,11 @@ class BisectingPlatformConfig():
     to choose a side to drop off of the platform, but this can be disabled.
     - `has_blocking_wall` (bool): Enables the blocking wall so that the
     performer has to stop and choose a side of the room. Default: True
+    - `has_long_blocking_wall` (bool): Enables the long blocking wall used in
+    Spatial Reorientation tasks. Overrides `has_blocking_wall`. Default: False
     """
     has_blocking_wall: bool = True
+    has_long_blocking_wall: bool = False
 
 
 class ShortcutComponent(ILEComponent):
@@ -310,9 +353,13 @@ class ShortcutComponent(ILEComponent):
     (bool or [LavaTargetToolConfig](#LavaTargetToolConfig)):
     Creates a room with a goal object on an island surrounded by lava.
     There will also be a block tool to facilitate acquiring the goal object.
-    One dimension of the room must be 13 or greater.  The other dimension must
-    be 7 or greater.  By default, the target is a soccer ball with scale
-    between 1 and 3. The tool is a pushable tool object with a length equal
+    One dimension of the room must be 13 or greater. The other dimension must
+    be 7 or greater. The max width across for front + island_size + rear is 9.
+    The min width across for front + island_size + rear is 5. Lava can be
+    asymmetric but the same restrictions of width min: 5 and max: 9 apply for
+    left + island_size + right as well.
+    By default, the target is a soccer ball with scale between 1 and 3.
+    The tool is a pushable tool object with a length equal
     to the span from the front of the lava over the island to the back of the
     lava.  It will have a width of either 0.5, 0.75, 1.0. Default: False
 
@@ -329,6 +376,10 @@ class ShortcutComponent(ILEComponent):
         max: 3
       front_lava_width: 2
       rear_lava_width: [2, 3]
+      left_lava_width: 2
+      right_lava_width:
+        min: 2
+        max: 4
       guide_rails: [True, False]
     ```
     """
@@ -443,7 +494,9 @@ class ShortcutComponent(ILEComponent):
             self) -> bool:
         return self.shortcut_lava_room
 
-    @ile_config_setter()
+    @ile_config_setter(validator=ValidateNumber(
+        props=['distance_between_performer_and_tool'],
+        min_value=0, null_ok=True))
     def set_shortcut_lava_target_tool(self, data: Any) -> None:
         self.shortcut_lava_target_tool = data
 
@@ -499,15 +552,23 @@ class ShortcutComponent(ILEComponent):
 
         logger.trace("Adding bisecting platform shortcut")
         config = self.get_shortcut_bisecting_platform()
-        self._do_add_bisecting_platform(scene, room_dim,
-                                        config.has_blocking_wall)
+        self._do_add_bisecting_platform(
+            scene,
+            room_dim,
+            blocking_wall=config.has_blocking_wall,
+            long_blocking_wall=config.has_long_blocking_wall
+        )
 
         return scene
 
     def _do_add_bisecting_platform(
-            self, scene: Scene, room_dim: Vector3d,
-            blocking_wall: bool = False,
-            platform_height=1):
+        self,
+        scene: Scene,
+        room_dim: Vector3d,
+        blocking_wall: bool = False,
+        platform_height: float = 1,
+        long_blocking_wall: bool = False
+    ) -> None:
 
         # Second platform is the wall to prevent performer from moving too
         # far before getting off the platform.  Since walls go to the
@@ -519,10 +580,17 @@ class ShortcutComponent(ILEComponent):
         platform = StructuralPlatformConfig(
             num=1, position=VectorFloatConfig(0, 0, 0), rotation_y=0,
             scale=VectorFloatConfig(1, platform_height, room_dim.z))
+
+        # Create the blocking wall.
+        length = (scene.room_dimensions.z - 3) if long_blocking_wall else 0.1
+        position_z = 0 if long_blocking_wall else (performer_z + 1.5)
         blocking_wall_platform = StructuralPlatformConfig(
-            num=1, position=VectorFloatConfig(0, 0, performer_z + 1.5),
+            num=1,
+            position=VectorFloatConfig(0, 0, position_z),
             rotation_y=0,
-            scale=VectorFloatConfig(0.99, platform_height + 0.25, 0.1))
+            scale=VectorFloatConfig(0.99, platform_height + 0.25, length)
+        )
+
         scene.set_performer_start_position(
             x=0, y=platform.scale.y, z=(performer_z) + 0.5)
         scene.set_performer_start_rotation(0)
@@ -530,7 +598,7 @@ class ShortcutComponent(ILEComponent):
         struct_type = FeatureTypes.PLATFORMS
         FeatureCreationService.create_feature(
             scene, struct_type, platform, bounds)
-        if blocking_wall:
+        if blocking_wall or long_blocking_wall:
             FeatureCreationService.create_feature(
                 # Ignore the platform's bounds
                 scene, struct_type, blocking_wall_platform, bounds[:-1])
@@ -840,14 +908,7 @@ class ShortcutComponent(ILEComponent):
                 f"platform failed. Unable to place performer "
                 f"on platform with '{self.LABEL_START_PLATFORM}' label.")
 
-    LavaSizes = namedtuple('LavaIslandSizes', (
-        'island_size',
-        'front_lava_width',
-        'rear_lava_width',
-        'short_lava_width'))
-
     def _add_tool_lava_goal(self, scene: Scene, room_dim: Vector3d):
-
         last_exception = None
         config = self.get_shortcut_lava_target_tool()
         if not config:
@@ -861,6 +922,20 @@ class ShortcutComponent(ILEComponent):
                 "Unable to use 'guide_rails' and 'tool_rotation' from "
                 "shortcut_lava_target_tool at the same time")
 
+        if (max(scene.room_dimensions.x, scene.room_dimensions.z) <
+                MIN_LAVA_ISLAND_LONG_ROOM_DIMENSION_LENGTH):
+            raise ILEException(
+                f"One scene room dimension must be at least "
+                f"{MIN_LAVA_ISLAND_LONG_ROOM_DIMENSION_LENGTH} "
+                f"to place lava and tool")
+
+        if (min(scene.room_dimensions.x, scene.room_dimensions.z) <
+                MIN_LAVA_ISLAND_SHORT_ROOM_DIMENSION_LENGTH):
+            raise ILEException(
+                f"Scene room dimensions must not be below "
+                f"{MIN_LAVA_ISLAND_SHORT_ROOM_DIMENSION_LENGTH} "
+                f"to place lava and tool")
+
         for _ in range(MAX_TRIES):
             try:
                 self.remove_target_on_error = False
@@ -868,8 +943,9 @@ class ShortcutComponent(ILEComponent):
                 # Test room size and determine sizes
                 long_length = max(room_dim.x, room_dim.z)
                 short_length = min(room_dim.x, room_dim.z)
-                long_key, short_key = (('z', 'x') if long_length ==
-                                       room_dim.z else ('x', 'z'))
+                long_key, short_key = (
+                    ('z', 'x') if long_length == room_dim.z else (
+                        'x', 'z'))
 
                 # place performer
                 start = scene.performer_start.position
@@ -878,7 +954,7 @@ class ShortcutComponent(ILEComponent):
                     0 if long_key == 'z' else 90)
 
                 sizes = self._compute_lava_sizes(
-                    long_length, short_length, long_key, short_key, config)
+                    long_length, short_length, config)
 
                 setattr(
                     start,
@@ -887,15 +963,15 @@ class ShortcutComponent(ILEComponent):
                     2 == 1 else 0.5)
 
                 tool_length = (
-                    sizes.rear_lava_width +
-                    sizes.front_lava_width +
+                    sizes.rear +
+                    sizes.front +
                     sizes.island_size)
 
                 # if size 13, edge is whole tiles at 6, buffer should be 6,
                 # if size 14, dges is half tile at 7, buffer should be 6
                 long_buffer_coord = math.floor(long_length / 2.0 - 0.5)
                 long_far_island_coord = (
-                    long_buffer_coord - sizes.rear_lava_width - 1)
+                    long_buffer_coord - sizes.rear - 1)
                 long_near_island_coord = (
                     long_far_island_coord - sizes.island_size + 1)
                 short_left_island_coord = - \
@@ -917,10 +993,18 @@ class ShortcutComponent(ILEComponent):
 
                 # Encircle island with lava
                 self._add_lava_around_island(
-                    scene, bounds, long_key, sizes.front_lava_width,
-                    sizes.rear_lava_width, sizes.short_lava_width,
-                    long_far_island_coord, long_near_island_coord,
-                    short_left_island_coord, short_right_island_coord)
+                    scene, bounds, long_key, sizes,
+                    list(
+                        range(
+                            long_near_island_coord,
+                            long_far_island_coord +
+                            1)),
+                    list(
+                        range(
+                            short_left_island_coord,
+                            short_right_island_coord +
+                            1))
+                )
 
                 # Add the island to the bounds list so that no additional
                 # objects will be randomly positioned there in the future.
@@ -952,7 +1036,7 @@ class ShortcutComponent(ILEComponent):
                     sizes.island_size,
                     long_key,
                     short_key,
-                    sizes.front_lava_width,
+                    sizes.front,
                     tool_length,
                     long_near_island_coord,
                     config.tool_rotation)
@@ -964,7 +1048,8 @@ class ShortcutComponent(ILEComponent):
 
                 # Create the target and position it randomly, if needed
                 if config.random_target_position:
-                    target = scene.get_target_object()
+                    targets = scene.get_targets()
+                    target = random.choice(targets) if targets else None
                     if not target:
                         # Ensure the bounds list is up-to-date.
                         bounds = find_bounds(scene)
@@ -975,11 +1060,23 @@ class ShortcutComponent(ILEComponent):
                         )
                         target = scene.objects[-1]
 
+                if (config.distance_between_performer_and_tool is not None and
+                        config.random_performer_position):
+                    raise ILEException(
+                        "Cannot have distance_between_performer_and_tool "
+                        "and random_performer_position"
+                    )
                 if config.random_performer_position:
                     self._randomize_performer_position(
                         scene,
                         long_key, short_key, long_near_island_coord,
                         long_far_island_coord, sizes)
+                elif config.distance_between_performer_and_tool is not None:
+                    (x, z) = geometry.get_position_distance_away_from_obj(
+                        scene.room_dimensions, tool,
+                        config.distance_between_performer_and_tool,
+                        bounds + [island_bounds])
+                    scene.set_performer_start_position(x=x, y=None, z=z)
                 return scene
             except Exception as e:
                 last_exception = e
@@ -1041,17 +1138,18 @@ class ShortcutComponent(ILEComponent):
     def _randomize_performer_position(self, scene: Scene,
                                       long_key, short_key,
                                       long_near_island_coord,
-                                      long_far_island_coord, sizes: LavaSizes):
-        no_go_long_min = long_near_island_coord - sizes.front_lava_width - 0.5
-        no_go_long_max = long_far_island_coord + sizes.rear_lava_width + 0.5
+                                      long_far_island_coord,
+                                      sizes: LavaIslandSizes):
+        no_go_long_min = long_near_island_coord - sizes.front - 0.5
+        no_go_long_max = long_far_island_coord + sizes.rear + 0.5
 
         # for island size 1, 2, 3; island bounds are :
         # min is -0.5, -0.5, -1.5
         # max is 0.5, 1.5, 1.5
         no_go_short_min = math.floor(-sizes.island_size / 2.0) + \
-            0.5 - sizes.short_lava_width
+            0.5 - sizes.left
         no_go_short_max = math.floor(
-            sizes.island_size / 2.0) + 0.5 + sizes.short_lava_width
+            sizes.island_size / 2.0) + 0.5 + sizes.right
 
         # here 0.5 is a buffer so the performer doesn't end up in the wall
         long_extent = getattr(scene.room_dimensions, long_key) / 2.0 - 0.5
@@ -1078,7 +1176,8 @@ class ShortcutComponent(ILEComponent):
     def _add_target_to_lava_island(
             self, scene: Scene, long_key, short_key, island_size,
             long_far_island_coord, long_near_island_coord):
-        target = scene.get_target_object()
+        targets = scene.get_targets()
+        target = random.choice(targets) if targets else None
 
         # put target in middle of island
         pos = VectorFloatConfig()
@@ -1110,13 +1209,12 @@ class ShortcutComponent(ILEComponent):
     ) -> None:
         self.remove_target_on_error = True
         goal_template = GoalConfig(
-            category="retrieval",
+            category=tags.SCENE.RETRIEVAL,
             target=InteractableObjectConfig(
                 shape='soccer_ball',
                 position=position,
                 scale=MinMaxFloat(1.0, 3.0)))
-        goal_specific: GoalConfig = choose_random(goal_template)
-        GoalServices.attempt_to_add_goal(scene, goal_specific)
+        GoalServices.attempt_to_add_goal(scene, goal_template)
 
     def _add_tool(self, scene, bounds, island_size, long_key, short_key,
                   front_lava_width, tool_length, long_near_island_coord,
@@ -1127,7 +1225,7 @@ class ShortcutComponent(ILEComponent):
             tool_rot += tool_rotation
         tool_pos = VectorFloatConfig(y=0)
         long_tool_pos = (long_near_island_coord -
-                         front_lava_width - 1 - tool_length / 2.0 - 0.5)
+                         front_lava_width - tool_length / 2.0 - 0.5)
         short_coord = 0 if island_size % 2 == 1 else 0.5
         setattr(tool_pos, short_key, short_coord)
         setattr(tool_pos, long_key, long_tool_pos)
@@ -1139,123 +1237,158 @@ class ShortcutComponent(ILEComponent):
         FeatureCreationService.create_feature(
             scene, FeatureTypes.TOOLS, tool_template, bounds)
 
-    def _compute_lava_sizes(
-            self, long_length, short_length, long_key, short_key,
-            config: LavaTargetToolConfig):
-        buffer = 1.5
-        if config.island_size:
-            island_size = config.island_size
-        else:
-            local_max = math.floor(
-                long_length / 2.0 - buffer - 2 * MIN_LAVA_WIDTH)
-            if local_max < 1:
+    def _add_asymmetric_lava_around_island(
+            self,
+            scene: Scene,
+            bounds,
+            long_key,
+            island_range_long: list,
+            island_range_short: list,
+            sizes: LavaIslandSizes):
+        """
+        Get the ranges of the lava pools. If any of those points are inside the
+        island, do not place them.
+        """
+        z_is_front = long_key == 'z'
+        left, right = (
+            sizes.left, sizes.right) if z_is_front else (
+            sizes.front, sizes.rear)
+        front, rear = (
+            sizes.front, sizes.rear) if z_is_front else (
+            sizes.right, sizes.left)
+        island_range_x, island_range_z = (
+            (island_range_short, island_range_long) if
+            z_is_front else (island_range_long, island_range_short))
+        lava_range_x_min = island_range_x[0] - left
+        lava_range_x_max = island_range_x[-1] + \
+            1 + right
+        lava_range_z_max = island_range_z[-1] + rear + 1
+        lava_range_z_min = island_range_z[0] - front
+
+        total_lava_range_x = range(lava_range_x_min, lava_range_x_max)
+        total_lava_range_z = range(lava_range_z_min, lava_range_z_max)
+        for x in total_lava_range_x:
+            for z in total_lava_range_z:
+                island_x = x in island_range_x
+                island_z = z in island_range_z
+                inside_island = island_x and island_z
+                if not inside_island:
+                    lava = FloorAreaConfig(
+                        num=1, position_x=x, position_z=z)
+                    FeatureCreationService.create_feature(
+                        scene, FeatureTypes.LAVA, lava, bounds
+                    )
+
+    def _get_island_and_lava_size_by_dimension(
+            self, dimension_length, island_size,
+            side_one, side_two, long_side, side_one_label, side_two_label):
+
+        buffer = 1.5 if long_side else \
+            (3 if dimension_length % 2 == 0 else 1.5)
+        total_max_width_in_dimension = math.floor(
+            (dimension_length / (2 if long_side else 1)) - buffer)
+        total_max_width_in_dimension = min(
+            MAX_LAVA_WITH_ISLAND_WIDTH,
+            total_max_width_in_dimension)
+        total_accumulated_size = 0
+
+        # Island
+        max_island_size = min(
+            total_max_width_in_dimension - MIN_LAVA_WIDTH * 2,
+            MAX_LAVA_ISLAND_SIZE)
+        if island_size:
+            if island_size > max_island_size:
                 raise ILEException(
-                    f"Not enough space in the long ({long_key}) direction "
-                    f"with size {long_length}.  This dimension must be "
-                    f"atleast {MIN_LAVA_ISLAND_ROOM_LONG_LENGTH}.")
+                    f"Island size ({island_size}) is larger than "
+                    f"max island size ({max_island_size})")
+        else:
             island_size = random.randint(
-                MIN_LAVA_ISLAND_SIZE, min(local_max, MAX_LAVA_ISLAND_SIZE))
+                MIN_LAVA_ISLAND_SIZE, max_island_size)
+        total_accumulated_size += island_size
 
-        if config.front_lava_width:
-            front_lava_width = config.front_lava_width
-        else:
-            # max length with 1 on either end for performer, length of
-            # Tool that can span the whole the whole lava and island with
-            # min lava on other end.
-            local_max = math.floor(long_length / 2.0 - island_size -
-                                   MIN_LAVA_WIDTH - buffer)
-            front_lava_width = random.randint(
-                MIN_LAVA_WIDTH,
-                min(MAX_LAVA_WIDTH, local_max))
-
-        local_max = math.floor(
-            long_length / 2.0 - island_size -
-            front_lava_width - buffer)
-        if local_max < 2:
-            raise ILEException(
-                f"Not enough space in the long ({long_key}) direction "
-                f"with current choices. Need to retry: "
-                f"Island size = {island_size} "
-                f"Front lava width = {front_lava_width}"
-                f"Long length = {long_length}")
-        if config.rear_lava_width:
-            if (config.rear_lava_width > MAX_LAVA_WIDTH or
-                    config.rear_lava_width < MIN_LAVA_WIDTH):
+        # Side 1
+        side_two = side_two if side_two else MIN_LAVA_WIDTH
+        max_side_one_width = (
+            total_max_width_in_dimension - total_accumulated_size - side_two)
+        if side_one:
+            if side_one > max_side_one_width:
                 raise ILEException(
-                    "Unable to create lava island with configuration")
-            rear_lava_width = config.rear_lava_width
+                    f"{side_one_label}: ({side_one}) is larger than max width "
+                    f"available in this dimension with length: "
+                    f"{int(dimension_length)}, island size: {island_size}, "
+                    f"and {side_two_label}: {side_two}. Max width available "
+                    f"for {side_one_label}: ({max_side_one_width})")
+            elif side_one < MIN_LAVA_WIDTH:
+                raise ILEException(
+                    f"{side_one_label}: {side_one} is smaller "
+                    f"than {MIN_LAVA_WIDTH}")
         else:
-            rear_lava_width = random.randint(
-                MIN_LAVA_WIDTH,
-                min(MAX_LAVA_WIDTH, local_max))
+            side_one = random.randint(
+                MIN_LAVA_WIDTH, max_side_one_width)
+        total_accumulated_size += side_one
 
-        # keep this uniform on both sides for now
-        short_lava_width_max = math.floor(
-            (short_length - island_size - buffer) / 2.0)
-        local_max = min(short_lava_width_max, MAX_LAVA_WIDTH)
-        if local_max < 2:
+        # Side 2
+        max_side_two_width = total_max_width_in_dimension - \
+            total_accumulated_size
+        if side_two:
+            if side_two > max_side_two_width:
+                raise ILEException(
+                    f"{side_two_label}: ({side_two}) is larger than max width "
+                    f"available in this dimension with length: "
+                    f"{int(dimension_length)}, island size: {island_size}, "
+                    f"and {side_one_label}: {side_one}. Max width available "
+                    f"for {side_two_label}: ({max_side_one_width})")
+            elif side_two < MIN_LAVA_WIDTH:
+                raise ILEException(
+                    f"{side_two_label}: {side_two} is smaller "
+                    f"than {MIN_LAVA_WIDTH}")
+        else:
+            side_two = random.randint(
+                MIN_LAVA_WIDTH, max_side_two_width)
+
+        total_accumulated_size += side_two
+        if total_accumulated_size > total_max_width_in_dimension:
             raise ILEException(
-                f"Not enough space in short ({short_key}) direction "
-                f"with size {short_length} and island size "
-                f"{island_size}. This dimension must be atleast "
-                f"{MIN_LAVA_ISLAND_ROOM_SHORT_LENGTH}.")
-        short_lava_width = random.randint(MIN_LAVA_WIDTH, local_max)
-        return self.LavaSizes(island_size, front_lava_width,
-                              rear_lava_width, short_lava_width)
+                f"{side_one_label} ({side_one}) + Island Size ({island_size}) "
+                f"+ {side_two_label} ({side_two}) width larger than "
+                f"max width available in dimension "
+                f"({total_max_width_in_dimension})")
+
+        return island_size, side_one, side_two
+
+    def _compute_lava_sizes(
+            self, long_length, short_length,
+            config: LavaTargetToolConfig):
+        (island_size, front, rear) = self._get_island_and_lava_size_by_dimension(  # noqa
+            long_length,
+            config.island_size,
+            config.front_lava_width,
+            config.rear_lava_width,
+            True,
+            "front_lava_width",
+            "rear_lava_width")
+        (_, left, right) = self._get_island_and_lava_size_by_dimension(
+            short_length,
+            island_size,
+            config.left_lava_width,
+            config.right_lava_width,
+            False,
+            "left_lava_width",
+            "right_lava_width")
+
+        return LavaIslandSizes(island_size, front, rear, left, right)
 
     def _add_lava_around_island(
-            self, scene, bounds, long_key, front_lava_width,
-            rear_lava_width, short_lava_width,
-            long_far_island_coord, long_near_island_coord,
-            short_left_island_coord, short_right_island_coord):
+            self, scene, bounds, long_key, sizes: LavaIslandSizes,
+            island_long_range, island_short_range):
         try:
-            long_range = range(
-                long_near_island_coord - front_lava_width,
-                long_near_island_coord)
-            short_range = range(short_left_island_coord - short_lava_width,
-                                short_right_island_coord + short_lava_width +
-                                1)
-            self._add_lava_range(
-                scene, bounds, long_key, long_range, short_range)
-
-            long_range = range(long_far_island_coord + 1,
-                               long_far_island_coord + rear_lava_width + 1,
-                               )
-            self._add_lava_range(
-                scene, bounds, long_key, long_range, short_range)
-
-            long_range = range(
-                long_near_island_coord,
-                long_far_island_coord + 1)
-            short_range = range(short_left_island_coord -
-                                short_lava_width,
-                                short_left_island_coord)
-
-            self._add_lava_range(
-                scene, bounds, long_key, long_range, short_range)
-
-            short_range = range(
-                short_right_island_coord + 1,
-                short_right_island_coord + 1 + short_lava_width)
-            self._add_lava_range(
-                scene, bounds, long_key, long_range, short_range)
+            self._add_asymmetric_lava_around_island(
+                scene, bounds, long_key,
+                island_long_range, island_short_range, sizes)
         except Exception as e:
             scene.lava = []
             # sourcery recommends the 'from e'
             raise e from e
-
-    def _add_lava_range(self, scene, bounds, long_key,
-                        long_range, short_range):
-        logger.trace(f"Adding lava with ranges {long_range} {short_range}")
-        for long in long_range:
-            for short in short_range:
-                (x, z) = (long, short) if long_key == 'x' else (short, long)
-                logger.trace(f"Adding lava at {x},{z}")
-                lava = FloorAreaConfig(
-                    num=1, position_x=x, position_z=z)
-                FeatureCreationService.create_feature(
-                    scene, FeatureTypes.LAVA, lava, bounds
-                )
 
     def _get_tool_shape(self, tool_length):
         tools = [
@@ -1270,14 +1403,14 @@ class ShortcutComponent(ILEComponent):
         if not config:
             return scene
         logger.trace("Adding agent with target shortcut")
-        target = scene.get_target_object()
+        targets = scene.get_targets()
+        target = random.choice(targets) if targets else None
 
         bounds = find_bounds(scene)
         agentConfig = AgentConfig(position=config.agent_position)
 
-        agents = FeatureCreationService.create_feature(
-            scene, FeatureTypes.AGENT, agentConfig, bounds)
-        agent = agents[0]
+        agent = FeatureCreationService.create_feature(
+            scene, FeatureTypes.AGENT, agentConfig, bounds)[0]
 
         agent_keyword_loc = KeywordLocationConfig(
             keyword=KeywordLocation.ASSOCIATED_WITH_AGENT,
@@ -1288,7 +1421,7 @@ class ShortcutComponent(ILEComponent):
         else:
             rot = VectorIntConfig(0, choose_random(MinMaxInt(0, 359)), 0)
             goal_template = GoalConfig(
-                category="retrieval",
+                category=tags.SCENE.RETRIEVAL,
                 target=InteractableObjectConfig(
                     shape='soccer_ball',
                     keyword_location=agent_keyword_loc,
@@ -1297,8 +1430,16 @@ class ShortcutComponent(ILEComponent):
             GoalServices.attempt_to_add_goal(scene, goal_template)
         movement_template = choose_random(DEFAULT_TEMPLATE_AGENT_MOVEMENT)
         movement_template.bounds = config.movement_bounds
-        AgentCreationService.add_random_agent_movement(
-            scene, agent, movement_template)
+        if config.movement is None or config.movement is True:
+            AgentCreationService.add_random_agent_movement(
+                scene, agent, movement_template)
+        else:
+            agents.add_agent_action(
+                agent=agent,
+                action_id=agents.get_default_idle_animation(agent),
+                step_begin=1,
+                is_loop=True
+            )
         return scene
 
     def get_num_delayed_actions(self) -> int:

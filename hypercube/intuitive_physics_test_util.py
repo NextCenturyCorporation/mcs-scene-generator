@@ -1,79 +1,53 @@
 import math
 
-import pytest
-
-from generator import definitions, materials, occluders
+from generator import (
+    Scene,
+    definitions,
+    materials,
+    mechanisms,
+    occluders,
+    tags
+)
 
 from . import intuitive_physics_hypercubes
-
-BODY_TEMPLATE = {
-    'name': '',
-    'ceilingMaterial': 'AI2-THOR/Materials/Walls/Drywall',
-    'floorMaterial': 'AI2-THOR/Materials/Fabrics/CarpetWhite 3',
-    'wallMaterial': 'AI2-THOR/Materials/Walls/DrywallBeige',
-    'performerStart': {
-        'position': {
-            'x': 0,
-            'y': 0,
-            'z': 0
-        },
-        'rotation': {
-            'x': 0,
-            'y': 0
-        }
-    },
-    'objects': [],
-    'goal': {},
-    'debug': {
-        'floorColors': ['white'],
-        'wallColors': ['white']
-    }
-}
-
 
 OPPOSITE_MATERIAL_STRING_LIST = [
     item[0] for item in materials.OPPOSITE_MATERIALS
 ]
 
 
-CYLINDRICAL_SHAPES = [
-    'cylinder', 'double_cone', 'dumbbell_1', 'dumbbell_2', 'tie_fighter',
-    'tube_narrow', 'tube_wide'
-]
-
-
 def verify_scene(
-    scene,
+    scene: Scene,
     is_move_across,
     implausible=False,
     eval_only=False,
     last_step=None
 ):
-    assert scene['intuitivePhysics']
-    assert scene['version'] == 3
-    assert scene['debug']['evaluationOnly'] == (eval_only or implausible)
-    assert scene['goal']['answer']['choice'] == (
+    assert scene.intuitive_physics
+    assert scene.version == 3
+    assert scene.debug['evaluationOnly'] == (eval_only or implausible)
+    assert scene.goal['answer']['choice'] == (
         'implausible' if implausible else 'plausible'
     )
 
     if is_move_across:
-        assert scene['goal']['last_step'] == (last_step if last_step else 200)
+        assert scene.goal['last_step'] == (last_step if last_step else 200)
     else:
-        assert scene['goal']['last_step'] == (last_step if last_step else 160)
-    assert scene['goal']['action_list'] == (
-        [['Pass']] * scene['goal']['last_step']
+        assert scene.goal['last_step'] == (last_step if last_step else 160)
+    assert scene.goal['action_list'] == (
+        [['Pass']] * scene.goal['last_step']
     )
-    assert scene['goal']['category'] == 'intuitive physics'
-    assert scene['goal']['sceneInfo']['primaryType'] == 'passive'
-    assert scene['goal']['sceneInfo']['secondaryType'] == 'intuitive physics'
-    assert scene['goal']['sceneInfo']['quaternaryType'] == 'action none'
+    assert scene.goal['category'] == 'intuitive physics'
+    assert scene.goal['sceneInfo']['primaryType'] == 'passive'
+    assert scene.goal['sceneInfo']['secondaryType'] == 'intuitive physics'
+    assert scene.goal['sceneInfo']['quaternaryType'] == 'action none'
 
     if is_move_across:
-        assert scene['goal']['sceneInfo']['moveAcross']
-        assert 'move across' == scene['goal']['sceneInfo']['sceneSetup']
+        assert scene.goal['sceneInfo']['moveAcross']
+        assert 'move across' == scene.goal['sceneInfo']['sceneSetup']
     else:
-        assert scene['goal']['sceneInfo']['fallDown']
-        assert 'fall down' == scene['goal']['sceneInfo']['sceneSetup']
+        assert scene.goal['sceneInfo']['fallDown']
+        assert 'fall down' == scene.goal['sceneInfo']['sceneSetup']
 
 
 def verify_hypercube(object_dict, room_wall_material):
@@ -99,8 +73,16 @@ def verify_hypercube(object_dict, room_wall_material):
 
     for occluder in object_dict.get('intuitive physics occluder', []):
         if 'wall' in occluder['debug']['shape']:
-            if room_wall_material in occluder['materials']:
+            if room_wall_material[0] in occluder['materials']:
                 print(f'[ERROR] OCCLUDER MATERIAL SAME AS ROOM WALL '
+                      f'ROOM_WALL_MATERIAL={room_wall_material} '
+                      f'OCCLUDER={occluder}')
+                return False
+            if any([
+                color in occluder['debug']['color'] for color in
+                room_wall_material[1]
+            ]):
+                print(f'[ERROR] OCCLUDER COLOR SAME AS ROOM WALL '
                       f'ROOM_WALL_MATERIAL={room_wall_material} '
                       f'OCCLUDER={occluder}')
                 return False
@@ -111,9 +93,9 @@ def verify_hypercube(object_dict, room_wall_material):
 def verify_object_tags(scene, object_list, role_info, role_prop):
     for instance in object_list:
         for info in instance['debug']['info']:
-            assert info in scene['goal']['objectsInfo']['all']
+            assert info in scene.goal['objectsInfo']['all']
             if info != role_info:
-                assert info in scene['goal']['objectsInfo'][role_prop]
+                assert info in scene.goal['objectsInfo'][role_prop]
     return True
 
 
@@ -261,12 +243,12 @@ def verify_hypercube_Collisions(
     is_move_across,
     object_dict,
     last_step,
-    room_wall_material_name
+    room_wall_material
 ):
     assert is_move_across
     assert last_step == 200
 
-    assert verify_hypercube(object_dict, room_wall_material_name)
+    assert verify_hypercube(object_dict, room_wall_material)
     assert verify_object_list_move_across(
         object_dict['target'],
         [],
@@ -299,10 +281,10 @@ def verify_hypercube_ObjectPermanence(
     is_move_across,
     object_dict,
     last_step,
-    room_wall_material_name,
+    room_wall_material,
     eval_4=False
 ):
-    assert verify_hypercube(object_dict, room_wall_material_name)
+    assert verify_hypercube(object_dict, room_wall_material)
 
     assert len(object_dict['non target']) == 0
 
@@ -326,12 +308,14 @@ def verify_hypercube_ObjectPermanence(
             object_dict['target'],
             object_dict['non target']
         )
-        assert len(object_dict['intuitive physics occluder']) == 4
+        assert len(object_dict['intuitive physics occluder']) == (
+            2 if eval_4 else 4
+        )
         assert verify_occluder_list_fall_down(
             object_dict['intuitive physics occluder'],
             object_dict['target']
         )
-        assert last_step == 160
+        assert last_step == (240 if eval_4 else 160)
 
     return True
 
@@ -340,9 +324,9 @@ def verify_hypercube_ShapeConstancy(
     is_move_across,
     object_dict,
     last_step,
-    room_wall_material_name
+    room_wall_material
 ):
-    assert verify_hypercube(object_dict, room_wall_material_name)
+    assert verify_hypercube(object_dict, room_wall_material)
 
     assert len(object_dict['non target']) == 0
 
@@ -377,11 +361,11 @@ def verify_hypercube_SpatioTemporalContinuity(
     is_move_across,
     object_dict,
     last_step,
-    room_wall_material_name,
+    room_wall_material,
     hypercube_target,
     eval_4=False
 ):
-    assert verify_hypercube(object_dict, room_wall_material_name)
+    assert verify_hypercube(object_dict, room_wall_material)
 
     if is_move_across:
         assert verify_object_list_move_across(
@@ -476,7 +460,8 @@ def verify_object_fall_down_position(instance, name, bigger=False):
                 z_position
             )
         )
-        if y_position < y_expected:
+        # Y position may be adjusted by up to 0.5 by placer function.
+        if y_position < (y_expected - 0.5):
             print(f'[ERROR] {name} Y POSITION SHOULD BE GREATER THAN '
                   f'{y_expected} BUT WAS {y_position}\n{name}={instance}')
             return False
@@ -515,7 +500,9 @@ def verify_object_move_across(instance, name, deeper=False):
         occluders.OCCLUDER_MOVEMENT_TIME
 
     # Verify object X and Z rotation.
-    expected_rotation_x = 90 if instance['type'] in CYLINDRICAL_SHAPES else 0
+    expected_rotation_x = (
+        90 if instance['type'] in mechanisms.CYLINDRICAL_SHAPES else 0
+    )
     rotation = instance['shows'][0]['rotation']
     if rotation['x'] != expected_rotation_x:
         print(f'[ERROR] {name} X ROTATION SHOULD BE {expected_rotation_x} BUT '
@@ -546,7 +533,7 @@ def verify_object_move_across(instance, name, deeper=False):
                 z_position
             ) * (-1 if x_position < 0 else 1)
         )
-        if x_position != pytest.approx(x_expected):
+        if not math.isclose(x_position, x_expected, abs_tol=0.01):
             print(f'[ERROR] {name} X POSITION SHOULD BE {x_expected} BUT WAS '
                   f'{x_position}\n{name}={instance}')
             return False
@@ -756,7 +743,8 @@ def verify_occluder_list_fall_down(occluder_list, target_list):
             occluder_wall['shows'][0]['position']['x'],
             target['shows'][0]['position']['z']
         )
-        if target['shows'][0]['position']['x'] != pytest.approx(adjusted_x):
+        position_x = target['shows'][0]['position']['x']
+        if not math.isclose(position_x, adjusted_x, abs_tol=0.01):
             print(f'[ERROR] PAIRED FALL DOWN OCCLUDER WALL X POSITION '
                   f'SHOULD BE CALCULATED FROM TARGET X POSITION\n'
                   f'OCCLUDER_WALL={occluder_wall}\nTARGET={target}\n'
@@ -784,7 +772,7 @@ def verify_occluder_list_move_across(
         for position in (
             target['debug']['movement']['moveExit']['xDistanceByStep']
         ):
-            if position == pytest.approx(adjusted_x):
+            if math.isclose(position, adjusted_x, abs_tol=0.01):
                 x_position_verified = True
                 break
         if not ignore_x_position and not x_position_verified:
@@ -936,7 +924,7 @@ def verify_target_implausible_shroud_step(is_move_across, occluder_1,
 
 def get_object_list(scene, role):
     return [
-        instance for instance in scene['objects']
+        instance for instance in scene.objects
         if instance['debug']['role'] == role
     ]
 
@@ -950,3 +938,20 @@ def verify_same_object(one, two):
         one['materials'] == two['materials'] and
         one['debug']['dimensions'] == two['debug']['dimensions']
     )
+
+
+def create_goal_template(task_type):
+    scene_info = {}
+    scene_info[tags.SCENE.PRIMARY] = tags.tag_to_label(tags.SCENE.PASSIVE)
+    scene_info[tags.SCENE.SECONDARY] = tags.tag_to_label(
+        tags.SCENE.INTUITIVE_PHYSICS
+    )
+    scene_info[tags.SCENE.TERTIARY] = tags.tag_to_label(task_type)
+    scene_info[tags.SCENE.QUATERNARY] = tags.tag_to_label(
+        tags.SCENE.ACTION_NONE
+    )
+    return {
+        'category': tags.tag_to_label(tags.SCENE.INTUITIVE_PHYSICS),
+        'domainsInfo': {},
+        'sceneInfo': scene_info
+    }

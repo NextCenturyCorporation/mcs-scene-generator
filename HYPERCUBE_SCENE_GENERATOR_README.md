@@ -110,35 +110,28 @@ Training intuitive physics scenes are not implausible and do not have any "untra
 ```
 python generate_public_scenes.py -p <prefix> -t CollisionTraining
 python generate_public_scenes.py -p <prefix> -t GravitySupportTraining
-python generate_public_scenes.py -p <prefix> -t ObjectPermanenceTraining3
-python generate_public_scenes.py -p <prefix> -t ObjectPermanenceTraining4
+python generate_public_scenes.py -p <prefix> -t ObjectPermanenceTraining
 python generate_public_scenes.py -p <prefix> -t ShapeConstancyTraining
-python generate_public_scenes.py -p <prefix> -t SpatioTemporalContinuityTraining3
-python generate_public_scenes.py -p <prefix> -t SpatioTemporalContinuityTraining4
+python generate_public_scenes.py -p <prefix> -t SpatioTemporalContinuityTraining
 ```
 
 - Each Collisions training hypercube contains 3 scenes.
 - Each Gravity Support training hypercube contains 8 scenes.
-- Each Eval 3 or 4 Object Permanence training hypercube contains 2 scenes.
-- Each Shape Constancy training hypercube contains 2 scenes.
-- Each Eval 3 Spatio-Temporal Continuity training hypercube contains 9 scenes.
-- Each Eval 4 Spatio-Temporal Continuity training hypercube contains 2 scenes.
+- Each Object Permanence training hypercube contains 2 scenes.
+- Each Shape Constancy training hypercube contains 5 scenes.
+- Each Spatio-Temporal Continuity training hypercube contains 2 scenes.
 
 #### Evaluation Intuitive Physics Datasets
 
 Evaluation intuitive physics scenes are either plausible or implausible and can have "untrained" objects.
 
 ```
-python generate_public_scenes.py -p <prefix> -t GravitySupportEvaluation
-python generate_public_scenes.py -p <prefix> -t ObjectPermanenceEvaluation3
-python generate_public_scenes.py -p <prefix> -t ShapeConstancyEvaluation
-python generate_public_scenes.py -p <prefix> -t SpatioTemporalContinuityEvaluation3
+python generate_public_scenes.py -p <prefix> -t GravitySupport
+python generate_public_scenes.py -p <prefix> -t ShapeConstancy
 ```
 
 - Each Gravity Support evaluation hypercube contains 16 scenes.
-- Each Eval 3 Object Permanence evaluation hypercube contains 90 scenes.
-- Each Shape Constancy evaluation hypercube contains 42 scenes.
-- Each Eval 3 Spatio-Temporal Continuity evaluation hypercube contains 42 scenes.
+- Each Shape Constancy evaluation hypercube contains 10 scenes.
 
 ### Interactive Scenes
 
@@ -173,14 +166,12 @@ python generate_public_scenes.py -p <prefix> -t OccluderRetrievalTraining
 Evaluation interactive scenes can have "untrained" objects.
 
 ```
-python generate_public_scenes.py -p <prefix> -t ContainerRetrievalEvaluation
-python generate_public_scenes.py -p <prefix> -t ContainerRetrievalEvaluation4
-python generate_public_scenes.py -p <prefix> -t ObstacleRetrievalEvaluation
-python generate_public_scenes.py -p <prefix> -t OccluderRetrievalEvaluation
+python generate_public_scenes.py -p <prefix> -t ContainerRetrieval
+python generate_public_scenes.py -p <prefix> -t ObstacleRetrieval
+python generate_public_scenes.py -p <prefix> -t OccluderRetrieval
 ```
 
-- Each container evaluation hypercube contains 36 scenes.
-- Each Eval 4 container evaluation hypercube contains 12 scenes.
+- Each container evaluation hypercube contains 12 scenes.
 - Each obstacle evaluation hypercube contains 8 scenes.
 - Each occluder evaluation hypercube contains 24 scenes.
 

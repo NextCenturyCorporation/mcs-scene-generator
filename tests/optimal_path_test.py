@@ -261,7 +261,7 @@ def test_generate_shortest_path_position_list_basic():
         environment
     )
     assert_array_almost_equal_nulp(numpy.array(position_list), numpy.array([
-        (0, 0), (0.5, 0.22), (0.78, 0.5), (0.78, 1.0), (0, 4.5)
+        (0, 0), (0.5, 0.24), (0.76, 0.5), (0.76, 1.0), (0, 4.5)
     ]))
 
 
@@ -293,9 +293,9 @@ def test_generate_shortest_path_position_list_complex():
         environment
     )
     assert_array_almost_equal_nulp(numpy.array(position_list), numpy.array([
-        (0, 0), (-1.0, 0.22), (-1.28, 0.5), (-1.28, 0.75), (-0.78, 1.75),
-        (-0.5, 2.03), (0.5, 2.22), (0.78, 2.5), (1.28, 3.5), (1.28, 3.75),
-        (1.0, 4.03), (0, 4.5)
+        (0, 0), (-1.0, 0.24), (-1.26, 0.5), (-1.26, 0.75), (-0.76, 1.75),
+        (-0.5, 2.01), (0.5, 2.24), (0.76, 2.5), (1.26, 3.5), (1.26, 3.75),
+        (1.0, 4.01), (0, 4.5)
     ]))
 
 
@@ -323,7 +323,7 @@ def test_generate_shortest_path_position_list_squeeze():
         environment
     )
     assert_array_almost_equal_nulp(numpy.array(position_list), numpy.array([
-        (0, 0), (1.0, 0.22), (1.28, 0.5), (1.28, 1.0), (0, 4.5)
+        (0, 0), (1.0, 0.24), (1.26, 0.5), (1.26, 1.0), (0, 4.5)
     ]))
 
 
@@ -343,14 +343,14 @@ def test_generate_shortest_path_position_list_almost_impossible():
         environment
     )
     assert_array_almost_equal_nulp(numpy.array(position_list), numpy.array([
-        (0, 0), (4.43, 0.22), (4.71, 0.5), (4.71, 1.0), (4.43, 1.28), (0, 4.5)
+        (0, 0), (4.43, 0.24), (4.69, 0.5), (4.69, 1.0), (4.43, 1.26), (0, 4.5)
     ]))
 
 
 def test_generate_shortest_path_position_list_impossible():
     bounds_1 = [
-        {'x': -4.45, 'z': 0.5}, {'x': -4.45, 'z': 1.0}, {'x': 4.45, 'z': 1.0},
-        {'x': 4.45, 'z': 0.5}
+        {'x': -4.45, 'z': 0.3}, {'x': -4.45, 'z': 1.0}, {'x': 4.45, 'z': 1.0},
+        {'x': 4.45, 'z': 0.1}
     ]
     environment = optimal_path._generate_pathfinding_environment(
         geometry.DEFAULT_ROOM_DIMENSIONS,

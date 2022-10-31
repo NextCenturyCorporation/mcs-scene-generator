@@ -10,6 +10,7 @@ from generator.occluders import (
     find_rotate_step_length,
     generate_occluder_position,
     generate_sideways_pole_position_x,
+    make_occluder_sideways
 )
 
 TEST_MATERIAL_POLE = MaterialTuple('test_material_pole', ['brown'])
@@ -1253,3 +1254,63 @@ def test_generate_sideways_pole_position_x():
     assert generate_sideways_pole_position_x(-1, 1, True, 6) == -2.25
     assert generate_sideways_pole_position_x(0, 1, True, 6) == -1.75
     assert generate_sideways_pole_position_x(1, 1, True, 6) == -1.25
+
+
+def test_make_occluder_sideways():
+    # Test a right occluder.
+    sideways_occluder_1 = create_occluder(
+        wall_material=TEST_MATERIAL_WALL,
+        pole_material=TEST_MATERIAL_POLE,
+        x_position=1,
+        occluder_width=2,
+        last_step=200,
+        sideways_right=True
+    )
+
+    occluder_1 = create_occluder(
+        wall_material=TEST_MATERIAL_WALL,
+        pole_material=TEST_MATERIAL_POLE,
+        x_position=1,
+        occluder_width=2,
+        last_step=200
+    )
+    make_occluder_sideways(
+        occluder_1[0],
+        occluder_1[1],
+        is_left=False
+    )
+
+    # Clear the occluder object IDs to prepare for the comparison.
+    for part in sideways_occluder_1 + occluder_1:
+        part['id'] = ''
+
+    assert sideways_occluder_1 == occluder_1
+
+    # Test a left occluder.
+    sideways_occluder_2 = create_occluder(
+        wall_material=TEST_MATERIAL_WALL,
+        pole_material=TEST_MATERIAL_POLE,
+        x_position=-2,
+        occluder_width=1,
+        last_step=100,
+        sideways_left=True
+    )
+
+    occluder_2 = create_occluder(
+        wall_material=TEST_MATERIAL_WALL,
+        pole_material=TEST_MATERIAL_POLE,
+        x_position=-2,
+        occluder_width=1,
+        last_step=100
+    )
+    make_occluder_sideways(
+        occluder_2[0],
+        occluder_2[1],
+        is_left=True
+    )
+
+    # Clear the occluder object IDs to prepare for the comparison.
+    for part in sideways_occluder_2 + occluder_2:
+        part['id'] = ''
+
+    assert sideways_occluder_2 == occluder_2

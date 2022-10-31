@@ -8,14 +8,14 @@ from generator import (
     SizeChoice,
     TypeChoice,
     definitions,
-    materials,
+    materials
 )
 from generator.definitions import (
     create_dataset,
     finalize_each_definition_choice,
     finalize_object_definition,
     finalize_object_materials_and_colors,
-    retrieve_complete_definition_list,
+    retrieve_complete_definition_list
 )
 
 

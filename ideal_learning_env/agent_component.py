@@ -5,16 +5,16 @@ from typing import Any, Dict, List, Union
 from generator.agents import (
     AGENT_ANIMATIONS,
     AGENT_MOVEMENT_ANIMATIONS,
-    AGENT_TYPES,
+    AGENT_TYPES
 )
 from ideal_learning_env.agent_service import (
     DEFAULT_TEMPLATE_AGENT_MOVEMENT,
-    AgentConfig,
+    AgentConfig
 )
 from ideal_learning_env.defs import find_bounds, return_list
 from ideal_learning_env.feature_creation_service import (
     FeatureCreationService,
-    FeatureTypes,
+    FeatureTypes
 )
 from ideal_learning_env.numerics import MinMaxInt
 

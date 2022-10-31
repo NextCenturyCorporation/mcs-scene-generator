@@ -15,26 +15,26 @@ from .agent_hypercubes import (
     AgentMultipleAgentsTrainingHypercubeFactory,
     AgentObjectPreferenceEvaluationHypercubeFactory,
     AgentObjectPreferenceTrainingHypercubeFactory,
-    AgentSingleObjectTrainingHypercubeFactory,
+    AgentSingleObjectTrainingHypercubeFactory
 )
 from .hypercubes import (
     Hypercube,
     HypercubeFactory,
+    get_skewed_bell_curve_for_room_size,
     initialize_goal,
     update_floor_and_walls,
     update_scene_objects,
-    update_scene_objects_tag_lists,
+    update_scene_objects_tag_lists
 )
 from .interactive_hypercubes import (
     InteractiveContainerEvaluation4HypercubeFactory,
-    InteractiveContainerEvaluationHypercubeFactory,
     InteractiveContainerTrainingHypercubeFactory,
     InteractiveHypercube,
     InteractiveObstacleEvaluationHypercubeFactory,
     InteractiveObstacleTrainingHypercubeFactory,
     InteractiveOccluderEvaluationHypercubeFactory,
     InteractiveOccluderTrainingHypercubeFactory,
-    InteractiveSingleSceneFactory,
+    InteractiveSingleSceneFactory
 )
 from .interactive_plans import InteractivePlan, ObjectLocationPlan, ObjectPlan
 from .intuitive_physics_hypercubes import (
@@ -44,20 +44,16 @@ from .intuitive_physics_hypercubes import (
     GravitySupportHypercube,
     GravitySupportTrainingHypercubeFactory,
     IntuitivePhysicsHypercube,
-    ObjectPermanenceEvaluation3HypercubeFactory,
     ObjectPermanenceHypercube,
     ObjectPermanenceHypercubeEval4,
-    ObjectPermanenceTraining3HypercubeFactory,
     ObjectPermanenceTraining4HypercubeFactory,
     ObjectVariations,
     ShapeConstancyEvaluationHypercubeFactory,
     ShapeConstancyHypercube,
     ShapeConstancyTrainingHypercubeFactory,
-    SpatioTemporalContinuityEvaluation3HypercubeFactory,
     SpatioTemporalContinuityHypercube,
     SpatioTemporalContinuityHypercubeEval4,
-    SpatioTemporalContinuityTraining3HypercubeFactory,
-    SpatioTemporalContinuityTraining4HypercubeFactory,
+    SpatioTemporalContinuityTraining4HypercubeFactory
 )
 from .object_data import ObjectData, ReceptacleData, TargetData
 from .scene_generator import SceneGenerator

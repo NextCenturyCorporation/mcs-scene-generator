@@ -4,7 +4,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from extremitypathfinder import plotting
 from extremitypathfinder.extremitypathfinder import (
-    PolygonEnvironment as Environment,
+    PolygonEnvironment as Environment
 )
 from shapely.geometry import LineString, Point, Polygon
 from shapely.ops import unary_union
@@ -15,7 +15,7 @@ from .geometry import (
     MAX_REACH_DISTANCE,
     MOVE_DISTANCE,
     PERFORMER_CAMERA_Y,
-    PERFORMER_HALF_WIDTH,
+    PERFORMER_HALF_WIDTH
 )
 
 plotting.EXPORT_SIZE_X = plotting.EXPORT_SIZE_Y

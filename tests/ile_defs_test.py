@@ -4,7 +4,7 @@ import pytest
 from machine_common_sense.config_manager import (
     FloorTexturesConfig,
     Vector2dInt,
-    Vector3d,
+    Vector3d
 )
 
 from generator import ObjectBounds, ObjectDefinition, geometry
@@ -13,7 +13,7 @@ from ideal_learning_env.defs import (
     ILEException,
     ILESharedConfiguration,
     find_bounds,
-    return_list,
+    return_list
 )
 
 

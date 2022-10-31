@@ -11,21 +11,23 @@ from typing import Any, Dict, List, Tuple
 sys.path.insert(1, '../pretty_json')
 from pretty_json import PrettyJsonEncoder, PrettyJsonNoIndent
 
+from .scene import Scene
 
-def _convert_non_serializable_data(scene: Dict[str, Any]) -> None:
+
+def _convert_non_serializable_data(scene: Scene) -> None:
     """Convert all non-JSON-serializable data from the given scene."""
     # Convert the boundingBox from an ObjectBounds into a serializable dict.
-    for instance in scene['objects']:
+    for instance in scene.objects:
         if 'boundsAtStep' in instance['debug']:
             del instance['debug']['boundsAtStep']
         for show in instance['shows']:
+            if not show.get('boundingBox'):
+                continue
             bb = show['boundingBox']
             bb = bb if isinstance(bb, dict) else vars(bb)
             box_xz = bb['box_xz']
             box_xz = [el if isinstance(el, dict) else vars(el)
                       for el in box_xz]
-            if not show['boundingBox']:
-                continue
             show['boundingBox'] = [{
                 'x': corner['x'],
                 'y': bb['min_y'],
@@ -44,22 +46,22 @@ def _json_no_indent(data: Dict[str, Any], prop_list: List[str]) -> None:
             data[prop] = PrettyJsonNoIndent(data[prop])
 
 
-def _strip_debug_data(scene: Dict[str, Any]) -> None:
+def _strip_debug_data(scene: Scene) -> None:
     """Remove internal debug data that should only be in debug files."""
-    scene.pop('debug', None)
-    for instance in scene['objects']:
+    scene.debug = None
+    for instance in scene.objects:
         _strip_debug_object_data(instance)
     for goal_key in ('answer', 'domainsInfo', 'objectsInfo', 'sceneInfo'):
-        scene['goal'].pop(goal_key, None)
-    if 'metadata' in scene['goal']:
+        scene.goal.pop(goal_key, None)
+    if 'metadata' in scene.goal:
         for target_key in ['target', 'target_1', 'target_2']:
-            if scene['goal']['metadata'].get(target_key, None):
-                scene['goal']['metadata'][target_key].pop('info', None)
+            if scene.goal['metadata'].get(target_key, None):
+                scene.goal['metadata'][target_key].pop('info', None)
 
 
-def _strip_debug_misleading_data(scene: Dict[str, Any]) -> None:
+def _strip_debug_misleading_data(scene: Scene) -> None:
     """Remove misleading internal debug data not needed in debug files."""
-    for instance in scene['objects']:
+    for instance in scene.objects:
         if 'movement' in instance['debug']:
             for movement_property in [
                 'moveExit', 'deepExit', 'tossExit',
@@ -104,30 +106,31 @@ def _truncate_floats_in_list(data: List[Any]) -> None:
             _truncate_floats_in_dict(data[i])
 
 
-def _ready_scene_for_writing(scene: Dict[str, Any]) -> None:
+def _ready_scene_for_writing(scene: Scene) -> None:
     _strip_debug_misleading_data(scene)
     _convert_non_serializable_data(scene)
-    _truncate_floats_in_dict(scene)
+    scene_dict = vars(scene)
+    _truncate_floats_in_dict(scene_dict)
 
     # Use PrettyJsonNoIndent on some of the lists and dicts in the
     # output scene because the indentation from the normal Python JSON
     # module spaces them out far too much.
-    _json_no_indent(scene['goal'], [
+    _json_no_indent(scene_dict['goal'], [
         'action_list', 'domain_list', 'type_list', 'task_list', 'info_list'
     ])
-    if 'metadata' in scene['goal']:
+    if 'metadata' in scene_dict['goal']:
         for target in ['target', 'target_1', 'target_2']:
-            if target in scene['goal']['metadata']:
-                _json_no_indent(scene['goal']['metadata'][target], [
+            if target in scene_dict['goal']['metadata']:
+                _json_no_indent(scene_dict['goal']['metadata'][target], [
                     'info', 'image'
                 ])
-    for instance in scene['objects']:
+    for instance in scene_dict['objects']:
         _json_no_indent(instance, ['materials', 'salientMaterials', 'states'])
         if 'debug' in instance:
             _json_no_indent(instance['debug'], 'info')
 
 
-def _write_scene_file(filename: str, scene: Dict[str, Any]) -> None:
+def _write_scene_file(filename: str, scene: Scene) -> None:
     # If the filename contains a directory, ensure that directory exists.
     path = Path(filename)
     path.parents[0].mkdir(parents=True, exist_ok=True)
@@ -135,7 +138,11 @@ def _write_scene_file(filename: str, scene: Dict[str, Any]) -> None:
     with open(filename, 'w') as out:
         # PrettyJsonEncoder doesn't work with json.dump so use json.dumps
         try:
-            out.write(json.dumps(scene, cls=PrettyJsonEncoder, indent=2))
+            out.write(
+                json.dumps(
+                    scene.to_dict(),
+                    cls=PrettyJsonEncoder,
+                    indent=2))
         except Exception as e:
             logging.error(scene, e)
             raise e from e
@@ -159,7 +166,7 @@ def find_next_filename(
 
 
 def save_scene_files(
-    scene: dict,
+    scene: Scene,
     scene_filename: str,
     no_scene_id: bool = False,
     no_debug_file: bool = False,
@@ -168,7 +175,7 @@ def save_scene_files(
     """Save the given scene as a normal JSON file and a debug JSON file."""
 
     # The debug scene filename has the scene ID for debugging.
-    scene_id = scene.get('goal', {}).get('sceneInfo', {}).get('id', [None])[0]
+    scene_id = scene.goal.get('sceneInfo', {}).get('id', [None])[0]
     debug_filename = (
         scene_filename if (no_scene_id or not scene_id) else
         f'{scene_filename}_{scene_id}'
@@ -176,7 +183,7 @@ def save_scene_files(
 
     # Ensure that the scene's 'name' property doesn't have a directory.
     scene_copy = copy.deepcopy(scene)
-    scene_copy['name'] = Path(scene_filename).name
+    scene_copy.name = Path(scene_filename).name
     _ready_scene_for_writing(scene_copy)
 
     # Save the scene as both normal and debug JSON files.

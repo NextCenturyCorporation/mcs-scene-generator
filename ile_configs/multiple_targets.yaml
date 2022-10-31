@@ -1,0 +1,18 @@
+# Add a Multi Retrieval goal with four identical soccer balls as the target
+# objects. The performer agent must find and pick up all targets to succeed.
+goal:
+    category: multi retrieval
+    targets:
+        - shape: soccer_ball
+          scale:
+              min: 1.0
+              max: 3.0
+          labels: target_1
+        - shape: soccer_ball
+          identical_to: target_1
+        - shape: soccer_ball
+          identical_to: target_1
+        - shape: soccer_ball
+          identical_to: target_1
+# Only the target can be a soccer ball.
+excluded_shapes: soccer_ball

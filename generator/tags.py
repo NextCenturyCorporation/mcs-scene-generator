@@ -6,13 +6,16 @@ ALL = 'all'
 ANY = 'any'
 
 GOAL_DICT = {
-    'TRAVERSAL': 'traversal',
     'RETRIEVAL': 'retrieval',
+    'MULTI_RETRIEVAL': 'multi retrieval',
+    # Deprecated
+    'TRAVERSAL': 'traversal',
     'TRANSFERRAL': 'transferral'
 }
 
 ROLE_DICT = {
     'AGENT': 'agent',
+    'BLOB': 'blob',
     'CONFUSOR': 'confusor',
     'CONTAINER': 'container',
     'CONTEXT': 'context',
@@ -22,6 +25,7 @@ ROLE_DICT = {
     'NON_TARGET': 'non target',
     'OBSTACLE': 'obstacle',
     'OCCLUDER': 'occluder',
+    'STATIC_OBJECT': 'static object',
     'STRUCTURAL': 'structural',
     'TARGET': 'target',
     'TOOL': 'tool',
@@ -36,6 +40,7 @@ SCENE_BOOL_TAGS_DICT = {
 
 SCENE_OPTIONAL_TAGS_DICT = {
     'AMBIGUOUS': 'ambiguous',
+    'ANGLE': 'angle',
     'CORNER': 'corner',
     'CORRECT_DOOR': 'correctDoor',
     'DIRECTION': 'direction',
@@ -105,19 +110,20 @@ SCENE = SimpleNamespace(
     SHAPE_CONSTANCY='shape constancy',
     SPATIO_TEMPORAL_CONTINUITY='spatio temporal continuity',
 
-    INTERACTIVE_OBJECT_PERMANENCE='interactive object permanence',
-    REORIENTATION='reorientation',
-    TOOL_USE='tool use',
-    SPATIAL_ELIMINATION='spatial elimination',
-
-    AGENTS='agents',
-
-    LAVA='lava',
+    AGENT_IDENTIFICATION='agent identification',
     HOLES='holes',
+    INTERACTIVE_OBJECT_PERMANENCE='interactive object permanence',
+    LAVA='lava',
+    MOVING_TARGET_PREDICTION='moving target prediction',
     RAMP='ramp',
-    SUPPORT_RELATIONS='support relations',
-
+    REORIENTATION='reorientation',
     SOLIDITY='solidity',
+    SPATIAL_ELIMINATION='spatial elimination',
+    SUPPORT_RELATIONS='support relations',
+    TOOL_USE='tool use',
+
+    # For passive agent tasks:
+    AGENTS='agents',
 
     **SCENE_BOOL_TAGS_DICT,
     **SCENE_OPTIONAL_TAGS_DICT,
@@ -220,7 +226,8 @@ CELLS = SimpleNamespace(
 
     OBJECT_PERMANENCE_SETUP=SimpleNamespace(
         EXIT='move across whole scene',
-        STOP='stop behind an occluder'
+        STOP='stop behind an occluder',
+        FALLS='falls behind an occluder'
     ),
     OBJECT_PERMANENCE_MOVEMENT=SimpleNamespace(
         LINEAR='linear movement constant depth',
@@ -370,21 +377,20 @@ ABBREV = SimpleNamespace(
     SHAPE_CONSTANCY='shap',
     SPATIO_TEMPORAL_CONTINUITY='stc',
 
+    AGENT_IDENTIFICATION='agident',
+    HOLES='holes',
     INTERACTIVE_CONTAINER='intcon',
+    INTERACTIVE_OBJECT_PERMANENCE='intobjp',
     INTERACTIVE_OBSTACLE='intobs',
     INTERACTIVE_OCCLUDER='intocc',
-
-    INTERACTIVE_OBJECT_PERMANENCE='intobjp',
-    REORIENTATION='reor',
-    TOOL_USE='tool',
-
-    RAMP='ramp',
-
-    SOLIDITY='solidity',
     LAVA='lava',
-    HOLES='holes',
+    MOVING_TARGET_PREDICTION='movtar',
+    RAMP='ramp',
+    REORIENTATION='reor',
+    SOLIDITY='solidity',
     SPATIAL_ELIMINATION='spateli',
     SUPPORT_RELATIONS='suprel',
+    TOOL_USE='tool'
 )
 
 
@@ -487,3 +493,29 @@ def role_to_tag(role: str) -> str:
 def tag_to_label(tag: str) -> str:
     """Return the spaced and lowercased label for the given camelCase tag."""
     return re.sub(r'(?<!^)(?=[A-Z])', ' ', tag).lower()
+
+
+def is_passive_agent_task(task: str) -> bool:
+    """Returns whether the given task is a passive agent task."""
+    return task in [
+        TYPES.AGENT_EVALUATION_EFFICIENT_IRRATIONAL,
+        TYPES.AGENT_EVALUATION_EFFICIENT_PATH,
+        TYPES.AGENT_EVALUATION_EFFICIENT_TIME,
+        TYPES.AGENT_EVALUATION_INACCESSIBLE_GOAL,
+        TYPES.AGENT_EVALUATION_INSTRUMENTAL_BLOCKING_BARRIERS,
+        TYPES.AGENT_EVALUATION_INSTRUMENTAL_INCONSEQUENTIAL_BARRIERS,
+        TYPES.AGENT_EVALUATION_INSTRUMENTAL_NO_BARRIERS,
+        TYPES.AGENT_EVALUATION_MULTIPLE_AGENTS,
+        TYPES.AGENT_EVALUATION_OBJECT_PREFERENCE
+    ]
+
+
+def is_passive_physics_task(task: str) -> bool:
+    """Returns whether the given task is a passive physics task."""
+    return task in [
+        SCENE.COLLISIONS,
+        SCENE.GRAVITY_SUPPORT,
+        SCENE.OBJECT_PERMANENCE,
+        SCENE.SHAPE_CONSTANCY,
+        SCENE.SPATIO_TEMPORAL_CONTINUITY
+    ]

@@ -10,10 +10,10 @@ from .definitions import (
     DefinitionDataset,
     ObjectDefinition,
     finalize_object_definition,
-    get_dataset,
+    get_dataset
 )
 from .intuitive_physics_objects import (
-    INTUITIVE_PHYSICS_OBJECT_CHOSEN_MATERIAL_LIST,
+    INTUITIVE_PHYSICS_OBJECT_CHOSEN_MATERIAL_LIST
 )
 
 _VISIBLE_SUPPORT = create_variable_definition_from_base(
@@ -189,99 +189,6 @@ _PYRAMID = create_variable_definition_from_base(
 )
 
 
-_RECTANGULAR_PRISM_THIN = create_variable_definition_from_base(
-    type='cube',
-    size_multiplier_list=[
-        Vector3d(x=0.5, y=0.5 * 0.55, z=0.5),
-        Vector3d(x=0.5, y=0.5 * 0.6, z=0.5),
-        Vector3d(x=0.5, y=0.5 * 0.65, z=0.5),
-        Vector3d(x=0.5, y=0.5 * 0.7, z=0.5),
-        Vector3d(x=0.5, y=0.5 * 0.75, z=0.5),
-        Vector3d(x=0.5, y=0.5 * 0.8, z=0.5),
-        Vector3d(x=0.5, y=0.5 * 0.85, z=0.5),
-        Vector3d(x=0.5, y=0.5 * 0.9, z=0.5),
-        Vector3d(x=0.5, y=0.5 * 0.95, z=0.5),
-        Vector3d(x=0.5, y=0.5 * 1, z=0.5),
-        Vector3d(x=0.6, y=0.5 * 0.65, z=0.6),
-        Vector3d(x=0.6, y=0.5 * 0.7, z=0.6),
-        Vector3d(x=0.6, y=0.5 * 0.75, z=0.6),
-        Vector3d(x=0.6, y=0.5 * 0.8, z=0.6),
-        Vector3d(x=0.6, y=0.5 * 0.85, z=0.6),
-        Vector3d(x=0.6, y=0.5 * 0.9, z=0.6),
-        Vector3d(x=0.6, y=0.5 * 0.95, z=0.6),
-        Vector3d(x=0.6, y=0.5 * 1, z=0.6),
-        Vector3d(x=0.7, y=0.5 * 0.75, z=0.7),
-        Vector3d(x=0.7, y=0.5 * 0.8, z=0.7),
-        Vector3d(x=0.7, y=0.5 * 0.85, z=0.7),
-        Vector3d(x=0.7, y=0.5 * 0.9, z=0.7),
-        Vector3d(x=0.7, y=0.5 * 0.95, z=0.7),
-        Vector3d(x=0.7, y=0.5 * 1, z=0.7),
-        Vector3d(x=0.8, y=0.5 * 0.85, z=0.8),
-        Vector3d(x=0.8, y=0.5 * 0.9, z=0.8),
-        Vector3d(x=0.8, y=0.5 * 0.95, z=0.8),
-        Vector3d(x=0.8, y=0.5 * 1, z=0.8),
-        Vector3d(x=0.9, y=0.5 * 0.95, z=0.9),
-        Vector3d(x=0.9, y=0.5 * 1, z=0.9)
-    ],
-    chosen_material_list=INTUITIVE_PHYSICS_OBJECT_CHOSEN_MATERIAL_LIST
-)
-_RECTANGULAR_PRISM_THIN.prettyName = 'rect_thin'
-
-
-_RECTANGULAR_PRISM_WIDE = create_variable_definition_from_base(
-    type='cube',
-    size_multiplier_list=[
-        Vector3d(x=0.5, y=0.5 * 0.25, z=0.5),
-        Vector3d(x=0.5, y=0.5 * 0.3, z=0.5),
-        Vector3d(x=0.5, y=0.5 * 0.35, z=0.5),
-        Vector3d(x=0.5, y=0.5 * 0.4, z=0.5),
-        Vector3d(x=0.5, y=0.5 * 0.45, z=0.5),
-        Vector3d(x=0.6, y=0.5 * 0.3, z=0.6),
-        Vector3d(x=0.6, y=0.5 * 0.35, z=0.6),
-        Vector3d(x=0.6, y=0.5 * 0.4, z=0.6),
-        Vector3d(x=0.6, y=0.5 * 0.45, z=0.6),
-        Vector3d(x=0.6, y=0.5 * 0.5, z=0.6),
-        Vector3d(x=0.6, y=0.5 * 0.55, z=0.6),
-        Vector3d(x=0.7, y=0.5 * 0.35, z=0.7),
-        Vector3d(x=0.7, y=0.5 * 0.4, z=0.7),
-        Vector3d(x=0.7, y=0.5 * 0.45, z=0.7),
-        Vector3d(x=0.7, y=0.5 * 0.5, z=0.7),
-        Vector3d(x=0.7, y=0.5 * 0.55, z=0.7),
-        Vector3d(x=0.7, y=0.5 * 0.6, z=0.7),
-        Vector3d(x=0.7, y=0.5 * 0.65, z=0.7),
-        Vector3d(x=0.8, y=0.5 * 0.4, z=0.8),
-        Vector3d(x=0.8, y=0.5 * 0.45, z=0.8),
-        Vector3d(x=0.8, y=0.5 * 0.5, z=0.8),
-        Vector3d(x=0.8, y=0.5 * 0.55, z=0.8),
-        Vector3d(x=0.8, y=0.5 * 0.6, z=0.8),
-        Vector3d(x=0.8, y=0.5 * 0.65, z=0.8),
-        Vector3d(x=0.8, y=0.5 * 0.7, z=0.8),
-        Vector3d(x=0.8, y=0.5 * 0.75, z=0.8),
-        Vector3d(x=0.9, y=0.5 * 0.45, z=0.9),
-        Vector3d(x=0.9, y=0.5 * 0.5, z=0.9),
-        Vector3d(x=0.9, y=0.5 * 0.55, z=0.9),
-        Vector3d(x=0.9, y=0.5 * 0.6, z=0.9),
-        Vector3d(x=0.9, y=0.5 * 0.65, z=0.9),
-        Vector3d(x=0.9, y=0.5 * 0.7, z=0.9),
-        Vector3d(x=0.9, y=0.5 * 0.75, z=0.9),
-        Vector3d(x=0.9, y=0.5 * 0.8, z=0.9),
-        Vector3d(x=0.9, y=0.5 * 0.85, z=0.9),
-        Vector3d(x=1, y=0.5 * 0.5, z=1),
-        Vector3d(x=1, y=0.5 * 0.55, z=1),
-        Vector3d(x=1, y=0.5 * 0.6, z=1),
-        Vector3d(x=1, y=0.5 * 0.65, z=1),
-        Vector3d(x=1, y=0.5 * 0.7, z=1),
-        Vector3d(x=1, y=0.5 * 0.75, z=1),
-        Vector3d(x=1, y=0.5 * 0.8, z=1),
-        Vector3d(x=1, y=0.5 * 0.85, z=1),
-        Vector3d(x=1, y=0.5 * 0.9, z=1),
-        Vector3d(x=1, y=0.5 * 0.95, z=1)
-    ],
-    chosen_material_list=INTUITIVE_PHYSICS_OBJECT_CHOSEN_MATERIAL_LIST
-)
-_RECTANGULAR_PRISM_WIDE.prettyName = 'rect_wide'
-
-
 _SQUARE_FRUSTUM = create_variable_definition_from_base(
     type='square_frustum',
     size_multiplier_list=[0.5, 0.6, 0.7, 0.8, 0.9, 1],
@@ -304,8 +211,6 @@ _SYMMETRIC_TARGET_LIST = [
     _CUBE,
     _CYLINDER,
     _PYRAMID,
-    _RECTANGULAR_PRISM_THIN,
-    _RECTANGULAR_PRISM_WIDE,
     _SQUARE_FRUSTUM
 ]
 

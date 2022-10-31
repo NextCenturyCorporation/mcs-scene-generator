@@ -6,7 +6,7 @@ from .geometry import (
     MAX_TRIES,
     MIN_RANDOM_INTERVAL,
     create_bounds,
-    random_real,
+    random_real
 )
 from .materials import MaterialTuple
 
@@ -22,16 +22,16 @@ OCCLUDER_BUFFER = 0.1
 OCCLUDER_BUFFER_MULTIPLE_EXIT = 0.4 + OCCLUDER_BUFFER
 OCCLUDER_BUFFER_EXIT_AND_STOP = 0.4 + OCCLUDER_BUFFER_MULTIPLE_EXIT
 # An occluder must have a maximum width to hide the current largest possible
-# intuitive physics object, measured diagonally, rounded up (1.3 in Eval 4).
+# intuitive physics object, measured diagonally, rounded up (1.4 in Eval 5).
 # Remember to add the OCCLUDER_BUFFER!
-OCCLUDER_MAX_SCALE_X = 1.3
+OCCLUDER_MAX_SCALE_X = 1.4
 OCCLUDER_MIN_SCALE_X = 0.4
 # Minimum separation between two adjacent occluders.
 OCCLUDER_SEPARATION_X = 0.5
 
 # The max X position so an occluder is seen within the camera's view.
 # ONLY INTENDED FOR USE IN INTUITIVE PHYSICS HYPERCUBES.
-OCCLUDER_MAX_X = 3
+OCCLUDER_MAX_X = 2.75
 
 # Each occluder will take up to 40 steps to move, rotate, and wait before it
 # can move again.
@@ -246,16 +246,16 @@ _OCCLUDER_INSTANCE_SIDEWAYS = [{
             "z": 0
         }
     }, {
-        "stepBegin": 7,
-        "stepEnd": 8,
+        "stepBegin": None,
+        "stepEnd": None,
         "vector": {
             "x": None,
             "y": 0,
             "z": 0
         }
     }, {
-        "stepBegin": 59,
-        "stepEnd": 60,
+        "stepBegin": None,
+        "stepEnd": None,
         "vector": {
             "x": None,
             "y": 0,
@@ -577,37 +577,44 @@ def create_occluder(
             rotate['repeat'] = True
             rotate['stepWait'] = rotate_interval
 
-    for part in [WALL, POLE]:
-        dimensions_x = occluder[part]['shows'][0]['scale']['x']
-        dimensions_y = occluder[part]['shows'][0]['scale']['y']
-        dimensions_z = occluder[part]['shows'][0]['scale']['z']
-        if part == POLE:
-            # Unity automatically doubles a cylinder's height.
-            dimensions_y *= 2
-            # The create_bounds function will adjust for the Y rotation but not
-            # the Z, so swap the X and Y dimensions if the pole is sideways.
-            if (
-                sideways_back or sideways_front or
-                sideways_left or sideways_right
-            ):
-                temp = dimensions_x
-                dimensions_x = dimensions_y
-                dimensions_y = temp
-        occluder[part]['shows'][0]['boundingBox'] = create_bounds(
-            dimensions={
-                'x': dimensions_x,
-                'y': dimensions_y,
-                'z': dimensions_z
-            },
-            offset={'x': 0, 'y': 0, 'z': 0},
-            position=occluder[part]['shows'][0]['position'],
-            rotation=occluder[part]['shows'][0]['rotation'],
-            standing_y=(dimensions_y / 2.0)
-        )
-        # The occluder's bounding box should occupy the entire vertical space.
-        occluder[part]['shows'][0]['boundingBox'].extend_bottom_to_ground()
-
+    is_sideways = (
+        sideways_back or sideways_front or sideways_left or sideways_right
+    )
+    _assign_occluder_bounds(occluder[WALL], is_sideways)
+    _assign_occluder_bounds(occluder[POLE], is_sideways, is_pole=True)
     return occluder
+
+
+def _assign_occluder_bounds(
+    occluder_part: Dict[str, Any],
+    is_sideways: bool,
+    is_pole: bool = False
+) -> None:
+    dimensions_x = occluder_part['shows'][0]['scale']['x']
+    dimensions_y = occluder_part['shows'][0]['scale']['y']
+    dimensions_z = occluder_part['shows'][0]['scale']['z']
+    if is_pole:
+        # Unity automatically doubles a cylinder's height.
+        dimensions_y *= 2
+        # The create_bounds function will adjust for the Y rotation but not
+        # the Z, so swap the X and Y dimensions if the pole is sideways.
+        if is_sideways:
+            temp = dimensions_x
+            dimensions_x = dimensions_y
+            dimensions_y = temp
+    occluder_part['shows'][0]['boundingBox'] = create_bounds(
+        dimensions={
+            'x': dimensions_x,
+            'y': dimensions_y,
+            'z': dimensions_z
+        },
+        offset={'x': 0, 'y': 0, 'z': 0},
+        position=occluder_part['shows'][0]['position'],
+        rotation=occluder_part['shows'][0]['rotation'],
+        standing_y=(dimensions_y / 2.0)
+    )
+    # The occluder's bounding box should occupy the entire vertical space.
+    occluder_part['shows'][0]['boundingBox'].extend_bottom_to_ground()
 
 
 def find_rotate_step_length(x_size: float) -> int:
@@ -676,3 +683,38 @@ def generate_occluder_position(
             return x_position
 
     return None
+
+
+def make_occluder_sideways(
+    wall: Dict[str, Any],
+    pole: Dict[str, Any],
+    is_left: bool,
+    room_x: int = DEFAULT_INTUITIVE_PHYSICS_ROOM_DIMENSIONS['x']
+) -> None:
+    """Changes the given occluder to its sideways orientation."""
+    # Reposition the occluder pole to the side.
+    pole['shows'][0]['position']['x'] = generate_sideways_pole_position_x(
+        wall['shows'][0]['position']['x'],
+        wall['shows'][0]['scale']['x'],
+        is_left,
+        room_x=room_x
+    )
+    pole['shows'][0]['position']['y'] = wall['shows'][0]['position']['y']
+    pole['shows'][0]['rotation']['z'] = 90
+    # Adjust the occluder pole scale and dimensions as needed.
+    pole['shows'][0]['scale']['y'] = round(
+        (room_x / 2.0) - abs(pole['shows'][0]['position']['x']),
+        3
+    )
+    pole['debug']['dimensions'] = copy.deepcopy(pole['shows'][0]['scale'])
+    # Update the occluder pole bounds.
+    _assign_occluder_bounds(pole, is_sideways=True, is_pole=True)
+    # Change the axis on which the occluder wall rotates.
+    for index, rotate in enumerate(wall['rotates']):
+        multiplier = -1 if index == 1 else 1
+        rotate['vector']['x'] = multiplier * abs(rotate['vector']['y'])
+        rotate['vector']['y'] = 0
+    # Change the axis on which the occluder pole moves.
+    for move in pole['moves']:
+        move['vector']['x'] = move['vector']['y']
+        move['vector']['y'] = 0

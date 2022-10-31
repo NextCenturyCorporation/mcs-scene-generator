@@ -1,0 +1,36 @@
+# Generate one interactive simulation-controlled agent that begins holding the
+# soccer ball retrieval target. The agent makes the target available for a
+# PickupObject action only after you use an InteractWithAgent action on it.
+shortcut_agent_with_target:
+    # The agent should not walk around the scene while waiting.
+    movement: False
+
+# Only the target can be a soccer ball.
+excluded_shapes: soccer_ball
+
+# Only generate medium or large rooms.
+room_dimensions:
+    x:
+        min: 10
+        max: 30
+    y: 3
+    z:
+        min: 10
+        max: 30
+
+# Generate a random number of pools of lava (each pool is 1x1 in size).
+lava:
+    - num:
+        min: 20
+        max: 200
+
+# Override the defaults to avoid randomly generating any other objects besides
+# the pools of lava and the target. Remove these lines if you want additional
+# randomly generated objects.
+keyword_objects:
+    - num: 0
+random_structural_objects:
+    - num: 0
+
+# Ensure pools of lava don't completely obstruct the path to the target.
+check_valid_path: True

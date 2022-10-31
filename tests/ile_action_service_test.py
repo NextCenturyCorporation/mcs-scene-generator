@@ -3,7 +3,7 @@ import pytest
 from ideal_learning_env.action_service import (
     ActionService,
     StepBeginEnd,
-    TeleportConfig,
+    TeleportConfig
 )
 from ideal_learning_env.defs import ILEException
 
@@ -83,6 +83,122 @@ def test_action_teleports_multiple_out_of_order():
     assert action == ['EndHabituation,xPosition=2,zPosition=-1,yRotation=270']
     action = al[2]
     assert action == ['EndHabituation,xPosition=-2,zPosition=1,yRotation=180']
+
+
+def test_action_teleports_look_at_center_facing_front():
+    goal = {}
+    teleports = [TeleportConfig(1, 0, -7.5, None, look_at_center=True)]
+    ActionService.add_teleports(goal, teleports, False)
+    assert len(goal['action_list']) == 1
+    cmd = goal['action_list'][0]
+    assert cmd == ['EndHabituation,xPosition=0,zPosition=-7.5,yRotation=0']
+
+    goal = {}
+    teleports = [TeleportConfig(1, 0.25, -7.5, None, look_at_center=True)]
+    ActionService.add_teleports(goal, teleports, False)
+    assert len(goal['action_list']) == 1
+    cmd = goal['action_list'][0]
+    assert cmd == ['EndHabituation,xPosition=0.25,zPosition=-7.5,yRotation=0']
+
+    goal = {}
+    teleports = [TeleportConfig(1, -0.25, -7.5, None, look_at_center=True)]
+    ActionService.add_teleports(goal, teleports, False)
+    assert len(goal['action_list']) == 1
+    cmd = goal['action_list'][0]
+    assert cmd == ['EndHabituation,xPosition=-0.25,zPosition=-7.5,yRotation=0']
+
+
+def test_action_teleports_look_at_center_facing_back():
+    goal = {}
+    teleports = [TeleportConfig(1, 0, 7.5, None, look_at_center=True)]
+    ActionService.add_teleports(goal, teleports, False)
+    assert len(goal['action_list']) == 1
+    cmd = goal['action_list'][0]
+    assert cmd == ['EndHabituation,xPosition=0,zPosition=7.5,yRotation=180']
+
+    goal = {}
+    teleports = [TeleportConfig(1, 0.25, 7.5, None, look_at_center=True)]
+    ActionService.add_teleports(goal, teleports, False)
+    assert len(goal['action_list']) == 1
+    cmd = goal['action_list'][0]
+    assert cmd == ['EndHabituation,xPosition=0.25,zPosition=7.5,yRotation=180']
+
+    goal = {}
+    teleports = [TeleportConfig(1, -0.25, 7.5, None, look_at_center=True)]
+    ActionService.add_teleports(goal, teleports, False)
+    assert len(goal['action_list']) == 1
+    cmd = goal['action_list'][0]
+    assert (
+        cmd == ['EndHabituation,xPosition=-0.25,zPosition=7.5,yRotation=180']
+    )
+
+
+def test_action_teleports_look_at_center_facing_left():
+    goal = {}
+    teleports = [TeleportConfig(1, 7.5, 0, None, look_at_center=True)]
+    ActionService.add_teleports(goal, teleports, False)
+    assert len(goal['action_list']) == 1
+    cmd = goal['action_list'][0]
+    assert cmd == ['EndHabituation,xPosition=7.5,zPosition=0,yRotation=270']
+
+    goal = {}
+    teleports = [TeleportConfig(1, 7.5, 0.25, None, look_at_center=True)]
+    ActionService.add_teleports(goal, teleports, False)
+    assert len(goal['action_list']) == 1
+    cmd = goal['action_list'][0]
+    assert cmd == ['EndHabituation,xPosition=7.5,zPosition=0.25,yRotation=270']
+
+    goal = {}
+    teleports = [TeleportConfig(1, 7.5, -0.25, None, look_at_center=True)]
+    ActionService.add_teleports(goal, teleports, False)
+    assert len(goal['action_list']) == 1
+    cmd = goal['action_list'][0]
+    assert (
+        cmd == ['EndHabituation,xPosition=7.5,zPosition=-0.25,yRotation=270']
+    )
+
+
+def test_action_teleports_look_at_center_facing_right():
+    goal = {}
+    teleports = [TeleportConfig(1, -7.5, 0, None, look_at_center=True)]
+    ActionService.add_teleports(goal, teleports, False)
+    assert len(goal['action_list']) == 1
+    cmd = goal['action_list'][0]
+    assert cmd == ['EndHabituation,xPosition=-7.5,zPosition=0,yRotation=90']
+
+    goal = {}
+    teleports = [TeleportConfig(1, -7.5, 0.25, None, look_at_center=True)]
+    ActionService.add_teleports(goal, teleports, False)
+    assert len(goal['action_list']) == 1
+    cmd = goal['action_list'][0]
+    assert cmd == ['EndHabituation,xPosition=-7.5,zPosition=0.25,yRotation=90']
+
+    goal = {}
+    teleports = [TeleportConfig(1, -7.5, -0.25, None, look_at_center=True)]
+    ActionService.add_teleports(goal, teleports, False)
+    assert len(goal['action_list']) == 1
+    cmd = goal['action_list'][0]
+    assert (
+        cmd == ['EndHabituation,xPosition=-7.5,zPosition=-0.25,yRotation=90']
+    )
+
+
+def test_action_teleports_look_at_center_rounds_to_tens():
+    goal = {}
+    teleports = [TeleportConfig(1, 2, 2, None, look_at_center=True)]
+    ActionService.add_teleports(goal, teleports, False)
+    assert len(goal['action_list']) == 1
+    cmd = goal['action_list'][0]
+    assert cmd == ['EndHabituation,xPosition=2,zPosition=2,yRotation=220']
+
+
+def test_action_teleports_look_at_center_ignores_rotation_y():
+    goal = {}
+    teleports = [TeleportConfig(1, 0, 7.5, 90, look_at_center=True)]
+    ActionService.add_teleports(goal, teleports, False)
+    assert len(goal['action_list']) == 1
+    cmd = goal['action_list'][0]
+    assert cmd == ['EndHabituation,xPosition=0,zPosition=7.5,yRotation=180']
 
 
 def test_action_circles_empty_array():

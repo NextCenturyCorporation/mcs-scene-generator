@@ -12,7 +12,7 @@ from generator.agents import (
     AGENT_TYPES,
     add_agent_action,
     add_agent_movement,
-    create_agent,
+    create_agent
 )
 from generator.geometry import MAX_TRIES
 from generator.scene import Scene
@@ -21,28 +21,28 @@ from ideal_learning_env.feature_creation_service import (
     BaseFeatureConfig,
     BaseObjectCreationService,
     FeatureCreationService,
-    FeatureTypes,
+    FeatureTypes
 )
 from ideal_learning_env.interactable_object_service import (
-    KeywordLocationConfig,
+    KeywordLocationConfig
 )
 from ideal_learning_env.object_services import (
     KeywordLocation,
     add_random_placement_tag,
-    reconcile_template,
+    reconcile_template
 )
 
 from .choosers import choose_position, choose_random
 from .defs import (
     ILEConfigurationException,
     RandomizableBool,
-    RandomizableString,
+    RandomizableString
 )
 from .numerics import (
     MinMaxInt,
     RandomizableInt,
     RandomizableVectorFloat3d,
-    VectorFloatConfig,
+    VectorFloatConfig
 )
 
 logger = logging.getLogger(__name__)

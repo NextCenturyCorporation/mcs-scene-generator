@@ -1,37 +1,10 @@
-# Can only use the Pass action through the whole scene.
-passive_scene: true
+# Setup the scene in exactly the same way as the "passive physics" eval scenes.
+# This automatically sets the performer agent's starting position and rotation,
+# room dimensions, floor friction, and a platform to adjust the camera height.
+passive_physics_scene: true
 
 # Max of 240 action steps in each passive "move across" scene.
 last_step: 240
-
-# Large room with a high ceiling and a slippery floor.
-room_dimensions:
-    x: 20
-    y: 8
-    z: 20
-passive_physics_floor: true
-
-# Specific starting position and rotation used in passive physics tasks.
-performer_start_position:
-    x: 0
-    y: 1.5
-    z: -4.5
-performer_start_rotation:
-    x: 0
-    y: 0
-
-# Platform underneath starting position to raise camera height.
-structural_platforms:
-    num: 1
-    position:
-        x: 0
-        y: 0
-        z: -4.5
-    rotation_y: 0
-    scale:
-        x: 0.5
-        y: 0.738
-        z: 0.5
 
 # Two moving-and-rotating occluding walls with semi-random width and position.
 structural_moving_occluders:
@@ -49,50 +22,68 @@ structural_moving_occluders:
       move_up_before_last_step: true
       reverse_direction: false
       rotation_y: 0
+      labels: occluder
 
-# Up to two throwers with random small objects at semi-random locations.
+# Two throwers with random small objects at semi-random locations.
 structural_throwers:
     - num: 2
-      wall: ['left', 'right']
-      position_wall:
-          min: 1.6
-          max: 4.4
-      height:
-          min: 0
-          max: 2
+
+      # Will position the thrower/object on either the left or the right with
+      # either a straight, angled, or tossed movement arc. Overrides the
+      # "wall", "position_wall", "height", "rotation_y", and "rotation_z"
+      # config options. See the ILE_API for information on the values used.
+      # In rare circumstances, objects may collide; you can avoid this by
+      # reducing the number of throwers to 1.
+      passive_physics_setup:
+          - roll_angled
+          - roll_straight
+          - toss_straight
+
+      # Will assign a throw force so the object will come to a stop offscreen.
+      stop_position:
+          offscreen: true
+
       # Choose randomly from shapes normally used in "move across" tasks.
       # Remove shapes from this list you don't want to generate.
       # Copy lines for shapes you want to generate more often than others.
       projectile_shape:
           - ball
+          - bobcat
           - bus_1
           - car_1
           - car_2
+          - car_3
+          - cart_2
           - cylinder
           - dog_on_wheels
-          - double_cone
+          - dog_on_wheels_2
           - duck_on_wheels
+          - duck_on_wheels_2
           - dumbbell_1
           - dumbbell_2
+          - jeep
           - racecar_red
+          - rollable_1
+          - rollable_2
+          - rollable_3
+          - rollable_4
+          - roller
+          - skateboard
           - sphere
+          - tank_1
+          - tank_2
           - tie_fighter
           - train_1
+          - train_2
           - trolley_1
           - truck_1
           - truck_2
+          - truck_3
+          - truck_4
           - tube_narrow
           - tube_wide
           - turtle_on_wheels
-      rotation_y:
-          - 0
-          - min: -15
-            max: 15
-      # Same chance to throw straight across (50%) or at an angle (50%).
-      rotation_z: [0, 0, 0, 5, 10, 15]
-      throw_force:
-          min: 8
-          max: 12
+
       throw_step:
           min: 41
           max: 80

@@ -11,25 +11,25 @@ from ideal_learning_env.agent_service import (
     AgentCreationService,
     AgentMovementConfig,
     AgentSettings,
-    get_default_agent_settings,
+    get_default_agent_settings
 )
 from ideal_learning_env.defs import ILEConfigurationException, ILEException
 from ideal_learning_env.interactable_object_service import (
-    KeywordLocationConfig,
+    KeywordLocationConfig
 )
 from ideal_learning_env.numerics import MinMaxFloat, VectorFloatConfig
 from ideal_learning_env.object_services import (
     KeywordLocation,
-    ObjectRepository,
+    ObjectRepository
 )
 from ideal_learning_env.structural_object_service import (
     StructuralPlatformConfig,
-    StructuralPlatformCreationService,
+    StructuralPlatformCreationService
 )
 from tests.ile_helper import (
     prior_scene,
     prior_scene_custom_size,
-    prior_scene_with_target,
+    prior_scene_with_target
 )
 
 
@@ -480,7 +480,7 @@ def test_agent_adjacent_to_object():
     x = agent['shows'][0]['position']['x']
     z = agent['shows'][0]['position']['z']
     dist = math.dist((x, z), (-1.03, 4.08))
-    assert dist < 0.5
+    assert dist < 0.9
 
 
 def test_agent_behind_object_from_performer():

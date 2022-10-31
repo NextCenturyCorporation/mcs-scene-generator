@@ -11,12 +11,12 @@ from .geometry import (
     MIN_OBJECTS_SEPARATION_DISTANCE,
     ObjectBounds,
     calc_obj_pos,
-    position_distance,
+    position_distance
 )
 from .specific_objects import (
     get_interactable_definition_dataset,
     get_pickupable_definition_dataset,
-    get_stack_target_definition_dataset,
+    get_stack_target_definition_dataset
 )
 
 # No target images in Eval 3.
@@ -55,9 +55,9 @@ def find_image_name(target: Dict[str, Any]) -> str:
 
 
 class InteractiveGoal(ABC):
-    def __init__(self, name: str, goal_template: Dict[str, Any]):
+    def __init__(self, name: str, hypercube_type: str):
         self._name = name
-        self._goal_template = goal_template
+        self._hypercube_type = hypercube_type
 
     @abstractmethod
     def choose_target_definition(self, target_number: int) -> ObjectDefinition:
@@ -126,43 +126,18 @@ class InteractiveGoal(ABC):
             )
         return object_location, bounds_list_copy
 
-    def get_goal_template(self) -> Dict[str, Any]:
-        """Return this goal's JSON data template."""
-        return self._goal_template
-
     def get_name(self) -> str:
         """Return this goal's name."""
         return self._name
 
+    def get_type(self) -> str:
+        """Return this goal's hypercube task type."""
+        return self._hypercube_type
+
 
 class RetrievalGoal(InteractiveGoal):
-    GOAL_TEMPLATE = {
-        'category': tags.tag_to_label(tags.SCENE.RETRIEVAL),
-        'domainsInfo': {
-            'objects': [],
-            'places': [],
-            'agents': []
-        },
-        'sceneInfo': {}
-    }
-
-    GOAL_TEMPLATE['sceneInfo'][tags.SCENE.PRIMARY] = (
-        tags.tag_to_label(tags.SCENE.INTERACTIVE)
-    )
-    GOAL_TEMPLATE['sceneInfo'][tags.SCENE.SECONDARY] = (
-        tags.tag_to_label(tags.SCENE.RETRIEVAL)
-    )
-    GOAL_TEMPLATE['sceneInfo'][tags.SCENE.TERTIARY] = (
-        tags.tag_to_label(tags.SCENE.RETRIEVAL)
-    )
-    GOAL_TEMPLATE['sceneInfo'][tags.SCENE.QUATERNARY] = (
-        tags.tag_to_label(tags.SCENE.ACTION_FULL)
-    )
-
     def __init__(self, hypercube_type: str):
-        goal_template = copy.deepcopy(RetrievalGoal.GOAL_TEMPLATE)
-        goal_template['sceneInfo'][tags.SCENE.TERTIARY] = hypercube_type
-        super().__init__(tags.SCENE.RETRIEVAL, goal_template)
+        super().__init__(tags.SCENE.RETRIEVAL, hypercube_type)
 
     # Override
     def choose_target_definition(self, target_number: int) -> ObjectDefinition:
@@ -210,37 +185,8 @@ class TransferralGoal(InteractiveGoal):
         NEXT_TO = 'next to'
         ON_TOP_OF = 'on top of'
 
-    GOAL_TEMPLATE = {
-        'category': tags.tag_to_label(tags.SCENE.TRANSFERRAL),
-        'domainsInfo': {
-            'objects': [
-                # TODO
-            ],
-            'places': [
-                # TODO
-            ],
-            'agents': []
-        },
-        'sceneInfo': {}
-    }
-
-    GOAL_TEMPLATE['sceneInfo'][tags.SCENE.PRIMARY] = (
-        tags.tag_to_label(tags.SCENE.INTERACTIVE)
-    )
-    GOAL_TEMPLATE['sceneInfo'][tags.SCENE.SECONDARY] = (
-        tags.tag_to_label(tags.SCENE.TRANSFERRAL)
-    )
-    GOAL_TEMPLATE['sceneInfo'][tags.SCENE.TERTIARY] = (
-        tags.tag_to_label(tags.SCENE.TRANSFERRAL)
-    )
-    GOAL_TEMPLATE['sceneInfo'][tags.SCENE.QUATERNARY] = (
-        tags.tag_to_label(tags.SCENE.ACTION_FULL)
-    )
-
     def __init__(self, hypercube_type: str):
-        goal_template = copy.deepcopy(TransferralGoal.GOAL_TEMPLATE)
-        goal_template['sceneInfo'][tags.SCENE.TERTIARY] = hypercube_type
-        super().__init__(tags.SCENE.TRANSFERRAL, goal_template)
+        super().__init__(tags.SCENE.TRANSFERRAL, hypercube_type)
 
     # Override
     def choose_target_definition(self, target_number: int) -> ObjectDefinition:
@@ -323,37 +269,8 @@ class TransferralGoal(InteractiveGoal):
 
 
 class TraversalGoal(InteractiveGoal):
-    GOAL_TEMPLATE = {
-        'category': tags.tag_to_label(tags.SCENE.TRAVERSAL),
-        'domainsInfo': {
-            'objects': [
-                # TODO
-            ],
-            'places': [
-                # TODO
-            ],
-            'agents': []
-        },
-        'sceneInfo': {}
-    }
-
-    GOAL_TEMPLATE['sceneInfo'][tags.SCENE.PRIMARY] = (
-        tags.tag_to_label(tags.SCENE.INTERACTIVE)
-    )
-    GOAL_TEMPLATE['sceneInfo'][tags.SCENE.SECONDARY] = (
-        tags.tag_to_label(tags.SCENE.TRAVERSAL)
-    )
-    GOAL_TEMPLATE['sceneInfo'][tags.SCENE.TERTIARY] = (
-        tags.tag_to_label(tags.SCENE.TRAVERSAL)
-    )
-    GOAL_TEMPLATE['sceneInfo'][tags.SCENE.QUATERNARY] = (
-        tags.tag_to_label(tags.SCENE.ACTION_FULL)
-    )
-
     def __init__(self, hypercube_type: str):
-        goal_template = copy.deepcopy(TraversalGoal.GOAL_TEMPLATE)
-        goal_template['sceneInfo'][tags.SCENE.TERTIARY] = hypercube_type
-        super().__init__(tags.SCENE.TRAVERSAL, goal_template)
+        super().__init__(tags.SCENE.TRAVERSAL, hypercube_type)
 
     # Override
     def choose_target_definition(self, target_number: int) -> ObjectDefinition:

@@ -29,7 +29,7 @@ AGENT_TEMPLATE = {
         'color': [],
         'info': []
     },
-    'mass': None,
+    'mass': 75,
     'agentSettings': {},
     'actions': [],
     'shows': [{
@@ -238,6 +238,15 @@ def add_agent_movement(
         "stepBegin": step_begin,
         "sequence": sequence
     }
+
+
+def get_default_idle_animation(agent: Dict[str, Any]) -> str:
+    """Returns the default idle animation for the given agent instance."""
+    if agent['type'].startswith('agent_female'):
+        return 'TPF_idle1'
+    if agent['type'].startswith('agent_male'):
+        return 'TPM_idle1'
+    return None
 
 
 AGENT_ANIMATIONS = [

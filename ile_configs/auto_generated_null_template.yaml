@@ -19,9 +19,11 @@ lava:
 num_random_agents: 0
 num_random_interactable_objects: null
 passive_physics_floor: False
+passive_physics_scene: False
 performer_look_at: null
 performer_start_position: null
 performer_start_rotation: null
+performer_starts_near: null
 placers:
     - num: 0
 random_structural_objects: null
@@ -34,6 +36,7 @@ shortcut_lava_room: False
 shortcut_lava_target_tool: False
 shortcut_start_on_platform: False
 shortcut_triple_door_choice: False
+side_wall_opposite_colors: False
 specific_agents: null
 specific_interactable_objects: null
 structural_droppers:
@@ -48,13 +51,17 @@ structural_ramps:
   num: 0
 structural_throwers:
   num: 0
+structural_turntables:
+    - num: 0
 structural_walls:
   num: 0
 swivels: null
 teleports: null
 tools:
     - num: 0
+trapezoidal_room: False
 wall_back_material: null
 wall_front_material: null
 wall_left_material: null
+wall_material: null
 wall_right_material: null

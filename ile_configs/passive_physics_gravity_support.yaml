@@ -1,37 +1,12 @@
-# Can only use the Pass action through the whole scene.
-passive_scene: true
+# Setup the scene in exactly the same way as the "passive physics" eval scenes.
+# This automatically sets the performer agent's starting position and rotation,
+# room dimensions, floor friction, and a platform to adjust the camera height.
+passive_physics_scene: true
 
 # Max of 100 action steps in each passive gravity scene.
 last_step: 100
 
-# Large room with a high ceiling and a slippery floor.
-room_dimensions:
-    x: 20
-    y: 8
-    z: 20
-passive_physics_floor: true
-
-# Specific starting position and rotation used in passive physics tasks.
-performer_start_position:
-    x: 0
-    y: 1.5
-    z: -4.5
-performer_start_rotation:
-    x: 0
-    y: 0
-
 structural_platforms:
-    # Platform underneath starting position to raise camera height.
-    - num: 1
-      position:
-          x: 0
-          y: 0
-          z: -4.5
-      rotation_y: 0
-      scale:
-          x: 0.5
-          y: 0.738
-          z: 0.5
     # One platform with a semi-random height at a semi-random location,
     # possibly partially or fully underneath the placed object.
     - num: 1
@@ -62,7 +37,8 @@ placers:
       activation_step:
           min: 1
           max: 20
-      end_height: 2.0
+      # Match where the placer drops its object with the left support platform.
+      end_height_relative_object_label: block_support
       # Position this placer above the left support platform.
       position_relative:
           label: block_support

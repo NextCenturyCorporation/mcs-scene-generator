@@ -1,0 +1,51 @@
+# Generate a platform (labeled "platforms") and a ramp (labeled "ramps").
+structural_platforms:
+    num: 1
+    attached_ramps: 1
+    lips:
+        front: true
+        back: true
+        left: true
+        right: true
+
+# Generate a random container (labeled "keywords_containers").
+keyword_objects:
+    - keyword: containers
+      num: 1
+
+# Retrieval goal using a soccer ball as the target object (labeled "target").
+goal:
+    category: retrieval
+    target:
+        shape: soccer_ball
+        scale: 1.0
+        # Target is either hidden inside the container (33%), on top of the
+        # platform (33%), or in a random location (33%). Remove "in" and the
+        # "container_label" if you remove the container. Remove "on_top" and
+        # the "relative_object_label" if you remove the platform and ramp.
+        keyword_location:
+            keyword:
+                - in
+                - on_top
+                - random
+            container_label: keywords_containers
+            relative_object_label: platforms
+
+# Only the target can be a soccer ball.
+excluded_shapes: soccer_ball
+
+# Starts at the configured distance away from either the ramp, container, or
+# target. Update configurations as desired. If you want to start facing the
+# object, use the "performer_look_at" config. Otherwise, facing is random.
+performer_starts_near:
+    label:
+        - ramps
+        - keywords_containers
+        - target
+    distance: 0.5
+
+# Override the defaults to avoid randomly generating any other objects besides
+# the platform, ramp, container, and target. Remove these lines if you want
+# additional randomly generated structural objects.
+random_structural_objects:
+    - num: 0

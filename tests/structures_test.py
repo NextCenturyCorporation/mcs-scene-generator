@@ -5,7 +5,7 @@ from generator import (
     ALL_LARGE_BLOCK_TOOLS,
     MaterialTuple,
     ObjectBounds,
-    structures,
+    structures
 )
 
 
@@ -1177,9 +1177,9 @@ def test_create_guide_rail():
     show = rail['shows'][0]
     pos = show['position']
     scale = show['scale']
-    assert pos == {'x': 1, 'y': 0.1, 'z': 2}
+    assert pos == {'x': 1, 'y': 0.15, 'z': 2}
     assert show['rotation'] == {'x': 0, 'y': 90, 'z': 0}
-    assert scale == {'x': 0.2, 'y': 0.2, 'z': 4}
+    assert scale == {'x': 0.2, 'y': 0.3, 'z': 4}
     assert rail['materials'] == [mat[0]]
 
 
@@ -1196,9 +1196,9 @@ def test_create_guilde_rail_around():
     show = rail1['shows'][0]
     pos = show['position']
     scale = show['scale']
-    assert pos == {'x': 4.2, 'y': 0.1, 'z': 1}
+    assert pos == {'x': 4.2, 'y': 0.15, 'z': 1}
     assert show['rotation'] == {'x': 0, 'y': 180, 'z': 0}
-    assert scale == {'x': 0.2, 'y': 0.2, 'z': 3}
+    assert scale == {'x': 0.2, 'y': 0.3, 'z': 3}
 
     assert rail2['id'].startswith('guide_rail')
     assert rail2['type'] == 'cube'
@@ -1207,9 +1207,9 @@ def test_create_guilde_rail_around():
     show = rail2['shows'][0]
     pos = show['position']
     scale = show['scale']
-    assert pos == {'x': 1.8, 'y': 0.1, 'z': 1}
+    assert pos == {'x': 1.8, 'y': 0.15, 'z': 1}
     assert show['rotation'] == {'x': 0, 'y': 180, 'z': 0}
-    assert scale == {'x': 0.2, 'y': 0.2, 'z': 3}
+    assert scale == {'x': 0.2, 'y': 0.3, 'z': 3}
     assert rail1['materials'] == rail2['materials'] == [mat[0]]
 
 
@@ -1256,3 +1256,61 @@ def test_create_tool():
     )
     assert tool_bounds.max_y == 0.3
     assert tool_bounds.min_y == 0
+
+
+def test_create_turntable():
+    turntable_type = 'rotating_cog'
+    mat = MaterialTuple("test_material", ["brown", "blue"])
+
+    turntable = structures.create_turntable(
+        position_x=1,
+        position_z=3,
+        position_y_modifier=0,
+        rotation_y=0,
+        radius=0.5,
+        height=1,
+        step_begin=2,
+        step_end=12,
+        movement_rotation=15,
+        material_tuple=mat
+    )[0]
+
+    assert turntable['id'].startswith('turntable_')
+    assert turntable['type'] == turntable_type
+    assert turntable.get('kinematic', True)
+    assert turntable.get('structure', True)
+    assert not turntable.get('moveable')
+    assert not turntable.get('pickupable')
+    assert turntable.get('materials', mat)
+    assert turntable['debug']['color'] == ["brown", "blue"]
+    assert turntable['debug']['info'] == [
+        'brown', 'blue', 'turntable', 'brown turntable', 'blue turntable',
+        'brown blue turntable'
+    ]
+
+    assert len(turntable['shows']) == 1
+    assert turntable['shows'][0]['stepBegin'] == 0
+    assert turntable['shows'][0]['position'] == {
+        'x': 1, 'y': 0.5, 'z': 3}
+    assert turntable['shows'][0]['rotation'] == {'x': 0, 'y': 0, 'z': 0}
+    assert turntable['shows'][0]['scale'] == {'x': 1.0, 'y': 50.0, 'z': 1.0}
+    turntable_bounds = turntable['shows'][0]['boundingBox']
+    assert vars(turntable_bounds.box_xz[0]) == pytest.approx(
+        {'x': 1.5, 'y': 0.0, 'z': 3.5}
+    )
+    assert vars(turntable_bounds.box_xz[1]) == pytest.approx(
+        {'x': 1.5, 'y': 0.0, 'z': 2.5}
+    )
+    assert vars(turntable_bounds.box_xz[2]) == pytest.approx(
+        {'x': 0.5, 'y': 0.0, 'z': 2.5}
+    )
+    assert vars(turntable_bounds.box_xz[3]) == pytest.approx(
+        {'x': 0.5, 'y': 0.0, 'z': 3.5}
+    )
+    assert turntable_bounds.min_y == 0.0
+    assert turntable_bounds.max_y == 1.0
+
+    assert len(turntable['rotates']) == 1
+    assert turntable['rotates'][0]['stepBegin'] == 2
+    assert turntable['rotates'][0]['stepEnd'] == 12
+    assert turntable['rotates'][0]['vector'] == {'x': 0, 'y': 15, 'z': 0}

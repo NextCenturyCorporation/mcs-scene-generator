@@ -14,7 +14,7 @@ from ideal_learning_env import (
     choose_position,
     choose_random,
     choose_rotation,
-    choose_scale,
+    choose_scale
 )
 from ideal_learning_env.choosers import choose_shape_material
 from ideal_learning_env.defs import ILEException
@@ -190,6 +190,49 @@ def test_choose_position_within_bounds():
     assert isinstance(result, Vector3d)
     assert result.x == 1
     assert 0 <= result.y <= 3.75
+    assert result.z in [-2, 0, 2]
+
+
+def test_choose_position_within_bounds_placer_obj():
+    position = VectorFloatConfig(
+        [-4, -2.5, 0, 2.5, 4],
+        9,
+        MinMaxFloat(-5, 5))
+    room_dimensions = VectorFloatConfig(5, 10, 5)
+    bounds = 0.5
+    result = choose_position(
+        position=position,
+        object_x=bounds,
+        object_z=bounds,
+        room_x=room_dimensions.x,
+        room_y=room_dimensions.y,
+        room_z=room_dimensions.z,
+        is_placer_obj=True
+    )
+
+    assert isinstance(result, Vector3d)
+    assert result.x in [-2.5, 0, 2.5]
+    assert result.y == 9
+    assert -2.75 <= result.z <= 2.75
+
+    room_dimensions = VectorFloatConfig(3, 4, 5)
+    position = VectorFloatConfig(
+        1,
+        MinMaxFloat(0, 5),
+        [-5, -2, 0, 2, 5])
+    result = choose_position(
+        position=position,
+        object_x=bounds,
+        object_z=bounds,
+        room_x=room_dimensions.x,
+        room_y=room_dimensions.y,
+        room_z=room_dimensions.z,
+        is_placer_obj=True
+    )
+
+    assert isinstance(result, Vector3d)
+    assert result.x == 1
+    assert 0 <= result.y <= 5
     assert result.z in [-2, 0, 2]
 
 
@@ -417,7 +460,7 @@ def test_choose_scale_soccer_ball():
 
 
 def test_choose_shape_material_both_none():
-    expected_shape = 'car_1'
+    expected_shape = "car_1"
     expected_material = ("AI2-THOR/Materials/Wood/WhiteWood", ["white"])
     base_objects.FULL_TYPE_LIST = [expected_shape]
     func = base_objects._TYPES_TO_DETAILS[expected_shape].definition_function
@@ -432,13 +475,13 @@ def test_choose_shape_material_both_none():
 
 
 def test_choose_shape_material_material_none_non_restricted():
-    shape, mat = choose_shape_material('soccer_ball', None)
-    assert shape == 'soccer_ball'
+    shape, mat = choose_shape_material("soccer_ball", None)
+    assert shape == "soccer_ball"
     assert mat is None
 
 
 def test_choose_shape_material_material_none_restricted():
-    shape_input = 'sphere'
+    shape_input = "sphere"
     restrictions = base_objects.get_material_restriction_strings(shape_input)
     shape, mat = choose_shape_material(shape_input, None)
     assert shape == shape_input
@@ -481,7 +524,15 @@ def test_choose_shape_material_neither_none_restricted():
     shape, mat = choose_shape_material(shape_input, mat_input)
     assert shape == "sofa_1"
     assert mat.material == "AI2-THOR/Materials/Fabrics/Sofa1_Brown"
-    assert mat.color == ['brown']
+    assert mat.color == ["brown"]
+
+
+def test_choose_shape_material_neither_none_restricted_category():
+    shape_input = "sofa_1"
+    mat_input = "SOFA_1_MATERIALS"
+    shape, mat = choose_shape_material(shape_input, mat_input)
+    assert shape == "sofa_1"
+    assert mat.material.startswith("AI2-THOR/Materials/Fabrics/Sofa1_")
 
 
 def test_choose_shape_material_neither_none_restricted_material_list():
@@ -502,7 +553,16 @@ def test_choose_shape_material_neither_none_non_restricted():
     shape, mat = choose_shape_material(shape_input, mat_input)
     assert shape == "sphere"
     assert mat.material == "AI2-THOR/Materials/Fabrics/Carpet2"
-    assert mat.color == ['brown']
+    assert mat.color == ["brown"]
+
+
+def test_choose_shape_material_neither_none_non_restricted_category():
+    shape_input = "sphere"
+    mat_input = "RUBBER_MATERIALS"
+    shape, mat = choose_shape_material(shape_input, mat_input)
+    assert shape == "sphere"
+    assert mat.material.startswith("AI2-THOR/Materials/Plastics/")
+    assert mat.material.endswith("Rubber")
 
 
 def test_choose_shape_material_neither_none_non_restricted_material_list():
@@ -514,7 +574,7 @@ def test_choose_shape_material_neither_none_non_restricted_material_list():
     shape, mat = choose_shape_material(shape_input, mat_input)
     assert shape == "sphere"
     assert mat.material in mat_input
-    assert mat.color[0] in ['brown', "black"]
+    assert mat.color[0] in ["brown", "black"]
 
 
 def test_choose_shape_material_neither_none_invalid():
@@ -525,7 +585,7 @@ def test_choose_shape_material_neither_none_invalid():
 
 
 def test_choose_shape_material_both_none_with_prohibited():
-    expected_shape = 'car_1'
+    expected_shape = "car_1"
     expected_material = MaterialTuple(
         "AI2-THOR/Materials/Wood/WhiteWood",
         ["white"]
@@ -543,8 +603,19 @@ def test_choose_shape_material_both_none_with_prohibited():
     assert mat == expected_material
 
 
+def test_choose_shape_material_category_with_prohibited():
+    shape_input = "sphere"
+    mat_input = "WOOD_MATERIALS"
+    prohibited = "AI2-THOR/Materials/Wood/BlackWood"
+    shape, mat = choose_shape_material(shape_input, mat_input, prohibited)
+    assert shape == shape_input
+    assert mat is not None
+    assert mat.material != prohibited
+    assert "black" not in mat.color
+
+
 def test_choose_shape_material_material_none_restricted_with_prohibited():
-    shape_input = 'sphere'
+    shape_input = "sphere"
     restrictions = base_objects.get_material_restriction_strings(shape_input)
     prohibited = "AI2-THOR/Materials/Wood/WhiteWood"
     assert prohibited in restrictions
@@ -596,3 +667,27 @@ def test_choose_shape_material_neither_none_non_restricted_with_prohibited():
     assert shape == "sphere"
     assert mat.material == "AI2-THOR/Materials/Fabrics/Carpet2"
     assert mat.color == ["brown"]
+
+
+def test_choose_shape_material_prohibited_colors():
+    shape_input = "sphere"
+    mat_input = [
+        "AI2-THOR/Materials/Wood/BlackWood",
+        "AI2-THOR/Materials/Wood/WoodGrain_Brown",
+        "AI2-THOR/Materials/Wood/WoodGrain_Tan"
+    ]
+    prohibited = "AI2-THOR/Materials/Wood/WoodGrain_Tan"
+    shape, mat = choose_shape_material(shape_input, mat_input, prohibited)
+    assert shape == "sphere"
+    assert mat.material == "AI2-THOR/Materials/Wood/BlackWood"
+    assert mat.color == ["black"]
+
+
+def test_choose_shape_material_category_prohibited_colors():
+    shape_input = "sphere"
+    mat_input = "WOOD_MATERIALS"
+    prohibited = "AI2-THOR/Materials/Wood/WoodGrain_Tan"
+    shape, mat = choose_shape_material(shape_input, mat_input, prohibited)
+    assert shape == "sphere"
+    assert mat.material != prohibited
+    assert "brown" not in mat.color

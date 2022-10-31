@@ -12,9 +12,11 @@ from ideal_learning_env import (
     KeywordLocationConfig,
     ObjectRepository,
     VectorFloatConfig,
+    VectorIntConfig
 )
 from ideal_learning_env.interactable_object_service import (
     InteractableObjectCreationService,
+    TargetCreationService
 )
 from ideal_learning_env.object_services import DEBUG_FINAL_POSITION_KEY
 
@@ -809,6 +811,7 @@ def test_interactable_object_service_create_keyword_location_on():
     chest_config = InteractableObjectConfig(
         material='AI2-THOR/Materials/Plastics/WhitePlastic',
         position=VectorFloatConfig(-2, 0, -2),
+        rotation=VectorIntConfig(0, 0, 0),
         scale=1,
         shape='chest_3',
         labels="chest_label"
@@ -831,7 +834,7 @@ def test_interactable_object_service_create_keyword_location_on():
         scene=scene, reconciled=reconciled, source_template=config)
     assert instance['type'] == 'crayon_blue'
     assert -2.23 < instance['shows'][0]['position']['x'] < -1.77
-    assert -2.23 < instance['shows'][0]['position']['z'] < -1.77
+    assert -2.26 < instance['shows'][0]['position']['z'] < -1.74
     assert instance['shows'][0]['position']['y'] == 0.265
     assert instance['shows'][0]['scale'] == {'x': 1, 'y': 1, 'z': 1}
 
@@ -862,8 +865,42 @@ def test_interactable_object_service_create_keyword_location_on_center():
         scene=scene, reconciled=reconciled, source_template=config)
     assert instance['type'] == 'crayon_blue'
     assert instance['shows'][0]['position']['x'] == pytest.approx(-2)
-    assert instance['shows'][0]['position']['z'] == -2
+    assert instance['shows'][0]['position']['z'] == pytest.approx(-2)
     assert instance['shows'][0]['position']['y'] == 0.265
+    assert instance['shows'][0]['scale'] == {'x': 1, 'y': 1, 'z': 1}
+
+
+def test_interactable_object_service_create_keyword_location_relative_to_center():  # noqa: E501
+    table_config = InteractableObjectConfig(
+        material='AI2-THOR/Materials/Plastics/WhitePlastic',
+        position=VectorFloatConfig(x=-1, y=0, z=-1),
+        rotation=VectorFloatConfig(x=0, y=90, z=0),
+        scale=1,
+        shape='table_1',
+        labels="table_label"
+    )
+    srv = InteractableObjectCreationService()
+    scene = prior_scene()
+    srv.add_to_scene(scene, table_config, [])
+    klc = KeywordLocationConfig(
+        KeywordLocation.ON_OBJECT_CENTERED,
+        relative_object_label="table_label",
+        position_relative_to_start=VectorFloatConfig(x=0, y=None, z=1))
+
+    config = InteractableObjectConfig(
+        material='Custom/Materials/WhiteWoodMCS',
+        keyword_location=klc,
+        scale=1,
+        shape='bowl_3'
+    )
+    srv = InteractableObjectCreationService()
+    reconciled = srv.reconcile(scene, config)
+    instance = srv.create_feature_from_specific_values(
+        scene=scene, reconciled=reconciled, source_template=config)
+    assert instance['type'] == 'bowl_3'
+    assert instance['shows'][0]['position']['x'] == pytest.approx(-1.7275)
+    assert instance['shows'][0]['position']['z'] == pytest.approx(-1)
+    assert instance['shows'][0]['position']['y'] == 0.885
     assert instance['shows'][0]['scale'] == {'x': 1, 'y': 1, 'z': 1}
 
 
@@ -927,3 +964,25 @@ def test_interactable_object_service_create_keyword_location_opposite_z():
     assert instance['shows'][0]['position']['y'] == 0
     assert instance['shows'][0]['position']['z'] == -2
     assert instance['shows'][0]['scale'] == {'x': 1, 'y': 1, 'z': 1}
+
+
+def test_target_creation_service():
+    config = InteractableObjectConfig(
+        labels='test_label',
+        position=VectorFloatConfig(1, 0, 2),
+        rotation=VectorFloatConfig(0, 90, 0),
+        scale=3,
+        shape='soccer_ball'
+    )
+    service = TargetCreationService()
+    scene = prior_scene()
+    instances, _ = service.add_to_scene(
+        scene=scene, source_template=config, bounds=[])
+    instance = instances[0]
+    assert instance['type'] == 'soccer_ball'
+    assert instance['materials'] == []
+    assert instance['shows'][0]['position'] == {'x': 1, 'y': 0.33, 'z': 2}
+    assert instance['shows'][0]['rotation'] == {'x': 0, 'y': 90, 'z': 0}
+    assert instance['shows'][0]['scale'] == {'x': 3, 'y': 3, 'z': 3}
+    assert ObjectRepository.get_instance().has_label('target')
+    assert ObjectRepository.get_instance().has_label('test_label')

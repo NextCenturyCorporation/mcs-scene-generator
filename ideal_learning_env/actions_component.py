@@ -21,6 +21,8 @@ class ActionRestrictionsComponent(ILEComponent):
     performer agent should be restricted to only use the `"Pass"` action.
     If true, ILE will raise an exception if last_step is not set or either
     `circles`, `freezes`, `swivels` or `teleports` has any entries.
+    Redundant if the `passive_physics_scene` config option is `true`.
+    Default: `false`
     """
 
     circles: List[Union[int, MinMaxInt, List[Union[int, MinMaxInt]]]] = None
@@ -198,7 +200,7 @@ class ActionRestrictionsComponent(ILEComponent):
             teleports,
             total_steps
         )
-        passive = self.get_passive_scene()
+        passive = self.get_passive_scene() or scene.intuitive_physics
         if passive:
             goal['category'] = tags.tag_to_label(
                 tags.SCENE.INTUITIVE_PHYSICS)
@@ -258,17 +260,13 @@ class ActionRestrictionsComponent(ILEComponent):
                         "at least one of 'begin' or 'end' fields.")
         if teleports:
             for t in teleports:
-                if (t.position_x and not t.position_z) or (
-                        t.position_z and not t.position_x):
+                if (
+                    (t.position_x is not None and t.position_z is None) or
+                    (t.position_x is None and t.position_z is not None)
+                ):
                     raise ILEConfigurationException(
                         "Error with action restriction "
                         "configuration.  'teleport' entries with a "
                         "'position_x' or 'position_z' must also have the "
                         "other."
                     )
-                if not (t.rotation_y or (t.position_x and t.position_z)):
-                    raise ILEConfigurationException(
-                        "Error with action restriction "
-                        "configuration.  'teleport' entries must have either "
-                        "'rotation_y' field or both 'position_x' and "
-                        "'position_z' fields.")

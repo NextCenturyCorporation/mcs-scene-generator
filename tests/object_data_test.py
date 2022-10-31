@@ -4,7 +4,7 @@ from hypercube import (
     ObjectLocationPlan,
     ObjectPlan,
     ReceptacleData,
-    TargetData,
+    TargetData
 )
 from hypercube.object_data import identify_larger_definition
 

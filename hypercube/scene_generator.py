@@ -2,7 +2,6 @@
 
 import argparse
 import copy
-import json
 import logging
 import os
 import os.path
@@ -11,39 +10,19 @@ from typing import Any, Dict
 
 from machine_common_sense.logging_config import LoggingConfig
 
-from generator import materials, tags
+from generator import Scene, materials, tags
 from generator.scene_saver import find_next_filename, save_scene_files
 
-OUTPUT_TEMPLATE_JSON = """
-{
-  "name": "",
-  "version": "2",
-  "ceilingMaterial": "AI2-THOR/Materials/Walls/Drywall",
-  "floorMaterial": "AI2-THOR/Materials/Fabrics/CarpetWhite 3",
-  "wallMaterial": "AI2-THOR/Materials/Walls/DrywallBeige",
-  "performerStart": {
-    "position": {
-      "x": 0,
-      "y": 0,
-      "z": 0
-    },
-    "rotation": {
-      "x": 0,
-      "y": 0,
-      "z": 0
+STARTER_SCENE = Scene(
+    version=2,
+    ceiling_material="AI2-THOR/Materials/Walls/Drywall",
+    floor_material="AI2-THOR/Materials/Fabrics/CarpetWhite 3",
+    wall_material="AI2-THOR/Materials/Walls/DrywallBeige",
+    debug={
+        "floorColors": ["white"],
+        "wallColors": ["white"]
     }
-  },
-  "objects": [],
-  "goal": {},
-  "debug": {
-      "floorColors": ["white"],
-      "wallColors": ["white"]
-  }
-}
-"""
-
-
-OUTPUT_TEMPLATE = json.loads(OUTPUT_TEMPLATE_JSON)
+)
 
 
 class SceneGenerator():
@@ -52,9 +31,9 @@ class SceneGenerator():
     def __init__(self, hypercube_list) -> None:
         self.hypercube_list = hypercube_list
 
-    def generate_body_template(self) -> Dict[str, Any]:
-        global OUTPUT_TEMPLATE
-        body = copy.deepcopy(OUTPUT_TEMPLATE)
+    def generate_starter_scene(self) -> Dict[str, Any]:
+        global STARTER_SCENE
+        starter_scene = copy.deepcopy(STARTER_SCENE)
         excluded = self.excluded_materials
         ceiling_material_choice = self._get_material(
             materials.CEILING_MATERIALS)
@@ -62,14 +41,14 @@ class SceneGenerator():
         wall_material_choice = self._get_material(
             materials.ROOM_WALL_MATERIALS, excluded)
         excluded += wall_material_choice[0]
-        body['ceilingMaterial'] = ceiling_material_choice[0]
-        body['wallMaterial'] = wall_material_choice[0]
-        body['debug']['wallColors'] = wall_material_choice[1]
+        starter_scene.ceiling_material = ceiling_material_choice[0]
+        starter_scene.wall_material = wall_material_choice[0]
+        starter_scene.debug['wallColors'] = wall_material_choice[1]
         floor_material_choice = self._get_material(
             materials.FLOOR_MATERIALS, excluded)
-        body['floorMaterial'] = floor_material_choice[0]
-        body['debug']['floorColors'] = floor_material_choice[1]
-        return body
+        starter_scene.floor_material = floor_material_choice[0]
+        starter_scene.debug['floorColors'] = floor_material_choice[1]
+        return starter_scene
 
     def _get_material(self, materials, excluded_materials=None):
         if excluded_materials is None:
@@ -106,7 +85,7 @@ class SceneGenerator():
         # Generate all of the needed hypercubes.
         hypercubes = hypercube_factory.build(
             total,
-            self.generate_body_template,
+            self.generate_starter_scene,
             role_to_type,
             stop_on_error,
             sort_hypercube
@@ -136,10 +115,10 @@ class SceneGenerator():
                     '02'
                 )
 
-                scene['debug']['hypercubeNumber'] = hypercube_index
-                scene['debug']['sceneNumber'] = scene_index
-                scene['debug']['evaluation'] = eval_name
-                scene['debug']['training'] = hypercube_factory.training
+                scene.debug['hypercubeNumber'] = hypercube_index
+                scene.debug['sceneNumber'] = scene_index
+                scene.debug['evaluation'] = eval_name
+                scene.debug['training'] = hypercube_factory.training
 
                 save_scene_files(
                     scene,
@@ -165,7 +144,7 @@ class SceneGenerator():
             '-t',
             '--type',
             required=True,
-            choices=[item.name for item in self.hypercube_list],
+            choices=list(sorted([item.name for item in self.hypercube_list])),
             help='Type of hypercubes to generate')
         parser.add_argument(
             '-c',

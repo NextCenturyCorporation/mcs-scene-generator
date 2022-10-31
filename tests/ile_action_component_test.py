@@ -1059,6 +1059,36 @@ def test_action_restriction_teleport():
             assert len(inner) == 0
 
 
+def test_action_restriction_teleport_look_at_center_facing_forward():
+    component = ActionRestrictionsComponent({
+        'teleports': [{
+            'step': 1,
+            'position_x': 0,
+            'position_z': -4.5,
+            'look_at_center': True
+        }]
+    })
+    scene = component.update_ile_scene(prior_scene())
+    assert scene.goal['action_list'][0] == [
+        'EndHabituation,xPosition=0,zPosition=-4.5,yRotation=0'
+    ]
+
+
+def test_action_restriction_teleport_look_at_center_facing_back():
+    component = ActionRestrictionsComponent({
+        'teleports': [{
+            'step': 1,
+            'position_x': 0,
+            'position_z': 4.5,
+            'look_at_center': True
+        }]
+    })
+    scene = component.update_ile_scene(prior_scene())
+    assert scene.goal['action_list'][0] == [
+        'EndHabituation,xPosition=0,zPosition=4.5,yRotation=180'
+    ]
+
+
 def test_action_restriction_teleport_choice():
     component = ActionRestrictionsComponent({
         'teleports': [[{

@@ -2,7 +2,7 @@ import copy
 
 from machine_common_sense.config_manager import Vector3d
 
-from generator import ObjectBounds
+from generator import ObjectBounds, Scene
 from generator.scene_saver import (
     _convert_non_serializable_data,
     _strip_debug_data,
@@ -10,7 +10,7 @@ from generator.scene_saver import (
     _strip_debug_object_data,
     _truncate_floats_in_dict,
     _truncate_floats_in_list,
-    find_next_filename,
+    find_next_filename
 )
 
 
@@ -24,8 +24,6 @@ def create_test_object():
             'materialCategory': ['wood'],
             'dimensions': {'x': 13, 'z': 42},
             'offset': {'x': 13, 'z': 42},
-            'closedDimensions': {'x': 13, 'z': 42},
-            'closedOffset': {'x': 13, 'z': 42},
             'enclosedAreas': [{}],
             'openAreas': [{}],
             'movement': {},
@@ -95,7 +93,7 @@ def test_find_next_filename():
 
 
 def test_convert_non_serializable_data():
-    scene = {'objects': [create_test_object()]}
+    scene = Scene(objects=[create_test_object()])
     expected_object = create_test_object()
     expected_object['shows'][0]['boundingBox'] = [
         {'x': 2, 'y': 0, 'z': 3},
@@ -109,17 +107,17 @@ def test_convert_non_serializable_data():
     ]
     del expected_object['debug']['boundsAtStep']
     _convert_non_serializable_data(scene)
-    assert scene == {'objects': [expected_object]}
+    assert scene == Scene(objects=[expected_object])
 
 
 def test_strip_debug_data():
-    scene = {
-        'debug': {
+    scene = Scene(
+        debug={
             'floorColors': ['grey'],
             'wallColors': ['blue']
         },
-        'objects': [create_test_object()],
-        'goal': {
+        objects=[create_test_object()],
+        goal={
             'category': 'test',
             'domainsInfo': {
                 'domainsTag': True
@@ -137,16 +135,17 @@ def test_strip_debug_data():
                 }
             }
         }
-    }
-    expected = {
-        'objects': [{
+    )
+    expected = Scene(
+        debug=None,
+        objects=[{
             'id': 'thing1',
             'type': 'thing_1',
             'shows': [{
                 'stepBegin': 0
             }]
         }],
-        'goal': {
+        goal={
             'category': 'test',
             'metadata': {
                 'target': {
@@ -154,7 +153,7 @@ def test_strip_debug_data():
                 }
             }
         }
-    }
+    )
     _strip_debug_data(scene)
     assert scene == expected
 
@@ -220,7 +219,7 @@ def test_strip_debug_misleading_data():
             'key': 'value'
         }
     }
-    _strip_debug_misleading_data({'objects': [obj]})
+    _strip_debug_misleading_data(Scene(objects=[obj]))
     assert obj == expected
 
 

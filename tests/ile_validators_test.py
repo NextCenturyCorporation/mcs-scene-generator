@@ -16,7 +16,7 @@ from ideal_learning_env import (
     ValidateOr,
     ValidateSpecific,
     VectorFloatConfig,
-    VectorIntConfig,
+    VectorIntConfig
 )
 
 

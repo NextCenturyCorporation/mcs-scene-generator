@@ -11,7 +11,7 @@ from .definitions import (
     DefinitionDataset,
     ImmutableObjectDefinition,
     ObjectDefinition,
-    get_dataset,
+    get_dataset
 )
 from .structures import DOOR_TEMPLATE
 
@@ -79,8 +79,35 @@ _DOG_ON_WHEELS = create_variable_definition_from_base(
 )
 
 
+_DOG_ON_WHEELS_2 = create_variable_definition_from_base(
+    type='dog_on_wheels_2',
+    size_multiplier_list=[0.4, 0.6, 0.8, 1],
+    chosen_material_list=[ChosenMaterial.BLOCK_WOOD, ChosenMaterial.WOOD]
+)
+
+
 _DUCK_ON_WHEELS = create_variable_definition_from_base(
     type='duck_on_wheels',
+    size_multiplier_list=[1, 1.5, 2, 2.5],
+    chosen_material_list=[ChosenMaterial.BLOCK_WOOD, ChosenMaterial.WOOD]
+)
+
+
+_DUCK_ON_WHEELS_2 = create_variable_definition_from_base(
+    type='duck_on_wheels_2',
+    size_multiplier_list=[1, 1.5, 2, 2.5],
+    chosen_material_list=[ChosenMaterial.BLOCK_WOOD, ChosenMaterial.WOOD]
+)
+
+
+_SKATEBOARD = create_variable_definition_from_base(
+    type='skateboard',
+    size_multiplier_list=[1]
+)
+
+
+_TOY_BOBCAT = create_variable_definition_from_base(
+    type='bobcat',
     size_multiplier_list=[1, 1.5, 2, 2.5],
     chosen_material_list=[ChosenMaterial.BLOCK_WOOD, ChosenMaterial.WOOD]
 )
@@ -100,6 +127,27 @@ _TOY_CAR_2 = create_variable_definition_from_base(
 )
 
 
+_TOY_CAR_3 = create_variable_definition_from_base(
+    type='car_3',
+    size_multiplier_list=[1, 1.5, 2, 2.5],
+    chosen_material_list=[ChosenMaterial.BLOCK_WOOD, ChosenMaterial.WOOD]
+)
+
+
+_TOY_JEEP = create_variable_definition_from_base(
+    type='jeep',
+    size_multiplier_list=[1, 1.5, 2, 2.5],
+    chosen_material_list=[ChosenMaterial.BLOCK_WOOD, ChosenMaterial.WOOD]
+)
+
+
+_TOY_ROLLER = create_variable_definition_from_base(
+    type='roller',
+    size_multiplier_list=[1, 1.5, 2, 2.5],
+    chosen_material_list=[ChosenMaterial.BLOCK_WOOD, ChosenMaterial.WOOD]
+)
+
+
 _TOY_RACECAR = create_variable_definition_from_base(
     type='racecar_red',
     size_multiplier_list=[1, 1.5, 2, 2.5],
@@ -114,8 +162,29 @@ _TOY_SEDAN = create_variable_definition_from_base(
 )
 
 
-_TOY_TRAIN = create_variable_definition_from_base(
+_TOY_TANK_1 = create_variable_definition_from_base(
+    type='tank_1',
+    size_multiplier_list=[1, 1.5, 2],
+    chosen_material_list=[ChosenMaterial.BLOCK_WOOD, ChosenMaterial.WOOD]
+)
+
+
+_TOY_TANK_2 = create_variable_definition_from_base(
+    type='tank_2',
+    size_multiplier_list=[1, 1.5, 2],
+    chosen_material_list=[ChosenMaterial.BLOCK_WOOD, ChosenMaterial.WOOD]
+)
+
+
+_TOY_TRAIN_1 = create_variable_definition_from_base(
     type='train_1',
+    size_multiplier_list=[1, 1.5, 2, 2.5],
+    chosen_material_list=[ChosenMaterial.BLOCK_WOOD, ChosenMaterial.WOOD]
+)
+
+
+_TOY_TRAIN_2 = create_variable_definition_from_base(
+    type='train_2',
     size_multiplier_list=[1, 1.5, 2, 2.5],
     chosen_material_list=[ChosenMaterial.BLOCK_WOOD, ChosenMaterial.WOOD]
 )
@@ -138,6 +207,20 @@ _TOY_TRUCK_1 = create_variable_definition_from_base(
 _TOY_TRUCK_2 = create_variable_definition_from_base(
     type='truck_2',
     size_multiplier_list=[1, 1.5, 2, 2.5],
+    chosen_material_list=[ChosenMaterial.BLOCK_WOOD, ChosenMaterial.WOOD]
+)
+
+
+_TOY_TRUCK_3 = create_variable_definition_from_base(
+    type='truck_3',
+    size_multiplier_list=[0.5, 0.75, 1, 1.25],
+    chosen_material_list=[ChosenMaterial.BLOCK_WOOD, ChosenMaterial.WOOD]
+)
+
+
+_TOY_TRUCK_4 = create_variable_definition_from_base(
+    type='truck_4',
+    size_multiplier_list=[0.5, 0.75, 1, 1.25],
     chosen_material_list=[ChosenMaterial.BLOCK_WOOD, ChosenMaterial.WOOD]
 )
 
@@ -265,6 +348,27 @@ _PLATE = ObjectDefinition(
 )
 
 
+_ANTIQUE_ARMCHAIR_1 = create_variable_definition_from_base(
+    type='antique_armchair_1',
+    size_multiplier_list=[2]
+)
+_ANTIQUE_CHAIR_1 = create_variable_definition_from_base(
+    type='antique_chair_1',
+    size_multiplier_list=[1],
+    chosen_material_list=[ChosenMaterial.WOOD]
+)
+_ANTIQUE_SOFA_1 = create_variable_definition_from_base(
+    type='antique_sofa_1',
+    size_multiplier_list=[1],
+    chosen_material_list=[ChosenMaterial.WOOD]
+)
+_ANTIQUE_TABLE_1 = create_variable_definition_from_base(
+    type='antique_table_1',
+    size_multiplier_list=[1],
+    chosen_material_list=[ChosenMaterial.WOOD]
+)
+
+
 _BED_1_OCCLUDER = create_variable_definition_from_base(
     type='bed_1',
     size_multiplier_list=[1],
@@ -302,6 +406,34 @@ _BED_5_OBSTACLE = create_variable_definition_from_base(
 
 _BED_6_OBSTACLE = create_variable_definition_from_base(
     type='bed_6',
+    size_multiplier_list=[1],
+    chosen_material_list=[ChosenMaterial.WOOD]
+)
+
+
+_BED_7_OCCLUDER = create_variable_definition_from_base(
+    type='bed_7',
+    size_multiplier_list=[1],
+    chosen_material_list=[ChosenMaterial.WOOD]
+)
+
+
+_BED_8_OCCLUDER = create_variable_definition_from_base(
+    type='bed_8',
+    size_multiplier_list=[1],
+    chosen_material_list=[ChosenMaterial.WOOD]
+)
+
+
+_BED_9_OCCLUDER = create_variable_definition_from_base(
+    type='bed_9',
+    size_multiplier_list=[1],
+    chosen_material_list=[ChosenMaterial.WOOD]
+)
+
+
+_BED_10_OCCLUDER = create_variable_definition_from_base(
+    type='bed_10',
     size_multiplier_list=[1],
     chosen_material_list=[ChosenMaterial.WOOD]
 )
@@ -552,6 +684,68 @@ _CHAIR_8 = create_variable_definition_from_base(
 )
 
 
+_CHAIR_9 = create_variable_definition_from_base(
+    type='chair_9',
+    size_multiplier_list=[1],
+    chosen_material_list=[
+        ChosenMaterial.METAL,
+        ChosenMaterial.PLASTIC,
+        ChosenMaterial.WOOD
+    ]
+)
+
+
+_CHAIR_10 = create_variable_definition_from_base(
+    type='chair_10',
+    size_multiplier_list=[1],
+    chosen_material_list=[
+        ChosenMaterial.METAL,
+        ChosenMaterial.PLASTIC,
+        ChosenMaterial.WOOD
+    ]
+)
+
+
+_CHAIR_11 = create_variable_definition_from_base(
+    type='chair_11',
+    size_multiplier_list=[1],
+    chosen_material_list=[
+        ChosenMaterial.METAL,
+        ChosenMaterial.PLASTIC,
+        ChosenMaterial.WOOD
+    ]
+)
+
+
+_CHAIR_12_PLASTIC = create_variable_definition_from_base(
+    type='chair_12',
+    size_multiplier_list=[1],
+    chosen_material_list=[ChosenMaterial.PLASTIC]
+)
+
+
+_CHAIR_13 = create_variable_definition_from_base(
+    type='chair_13',
+    size_multiplier_list=[1],
+    chosen_material_list=[
+        ChosenMaterial.METAL,
+        ChosenMaterial.PLASTIC,
+        ChosenMaterial.WOOD
+    ]
+)
+
+
+_CHAIR_14 = create_variable_definition_from_base(
+    type='chair_14',
+    size_multiplier_list=[1],
+    chosen_material_list=[
+        ChosenMaterial.METAL,
+        ChosenMaterial.PLASTIC,
+        ChosenMaterial.WOOD
+    ]
+)
+
+
 _BLOCK_BLANK_CUBE_NOT_PICKUPABLE = create_variable_definition_from_base(
     type='block_blank_wood_cube',
     attributes_overrides=['moveable'],
@@ -569,6 +763,34 @@ _BLOCK_BLANK_CYLINDER_NOT_PICKUPABLE = create_variable_definition_from_base(
 _CRIB = create_variable_definition_from_base(
     type='crib',
     size_multiplier_list=[1],
+    chosen_material_list=[ChosenMaterial.WOOD]
+)
+
+
+_DESK_1 = create_variable_definition_from_base(
+    type='desk_1',
+    size_multiplier_list=[1, Vector3d(x=1.5, y=1, z=1)],
+    chosen_material_list=[ChosenMaterial.WOOD]
+)
+
+
+_DESK_2 = create_variable_definition_from_base(
+    type='desk_2',
+    size_multiplier_list=[1, Vector3d(x=1.5, y=1, z=1)],
+    chosen_material_list=[ChosenMaterial.WOOD]
+)
+
+
+_DESK_3 = create_variable_definition_from_base(
+    type='desk_3',
+    size_multiplier_list=[1, Vector3d(x=1.5, y=1, z=1)],
+    chosen_material_list=[ChosenMaterial.WOOD]
+)
+
+
+_DESK_4 = create_variable_definition_from_base(
+    type='desk_4',
+    size_multiplier_list=[1, Vector3d(x=1.5, y=1, z=1)],
     chosen_material_list=[ChosenMaterial.WOOD]
 )
 
@@ -825,6 +1047,110 @@ _TABLE_16_CIRCLE = create_variable_definition_from_base(
 )
 
 
+_TABLE_17_RECT = create_variable_definition_from_base(
+    type='table_17',
+    size_multiplier_list=[
+        0.75,
+        Vector3d(x=1, y=0.75, z=1),
+        1,
+        Vector3d(x=1.25, y=1, z=1.25),
+        1.25,
+        Vector3d(x=1, y=1.25, z=1)
+    ],
+    chosen_material_list=[
+        ChosenMaterial.METAL,
+        ChosenMaterial.PLASTIC,
+        ChosenMaterial.WOOD
+    ]
+)
+
+
+_TABLE_18_RECT = create_variable_definition_from_base(
+    type='table_18',
+    size_multiplier_list=[
+        0.75,
+        Vector3d(x=1, y=0.75, z=1),
+        1,
+        Vector3d(x=1.25, y=1, z=1.25),
+        1.25,
+        Vector3d(x=1, y=1.25, z=1)
+    ],
+    chosen_material_list=[
+        ChosenMaterial.METAL,
+        ChosenMaterial.PLASTIC,
+        ChosenMaterial.WOOD
+    ]
+)
+
+
+_TABLE_19_RECT = create_variable_definition_from_base(
+    type='table_19',
+    size_multiplier_list=[
+        0.75,
+        Vector3d(x=1, y=0.75, z=1),
+        1,
+        Vector3d(x=1.25, y=1, z=1.25),
+        1.25,
+        Vector3d(x=1, y=1.25, z=1)
+    ],
+    chosen_material_list=[
+        ChosenMaterial.METAL,
+        ChosenMaterial.PLASTIC,
+        ChosenMaterial.WOOD
+    ]
+)
+
+
+_TABLE_20_CIRCLE = create_variable_definition_from_base(
+    type='table_20',
+    size_multiplier_list=[
+        0.75,
+        Vector3d(x=1, y=0.75, z=1),
+        1,
+        Vector3d(x=1.25, y=1, z=1.25),
+        1.25,
+        Vector3d(x=1, y=1.25, z=1)
+    ],
+    chosen_material_list=[
+        ChosenMaterial.METAL,
+        ChosenMaterial.PLASTIC,
+        ChosenMaterial.WOOD
+    ]
+)
+
+
+_TABLE_26_SQUARE = create_variable_definition_from_base(
+    type='table_26',
+    size_multiplier_list=[
+        0.75,
+        Vector3d(x=1, y=0.75, z=1),
+        1,
+        Vector3d(x=1.25, y=1, z=1.25),
+        1.25,
+        Vector3d(x=1, y=1.25, z=1)
+    ],
+    chosen_material_list=[
+        ChosenMaterial.METAL,
+        ChosenMaterial.PLASTIC,
+        ChosenMaterial.WOOD
+    ]
+)
+
+
+_TABLE_27_CIRCLE_PLASTIC = create_variable_definition_from_base(
+    type='table_27',
+    size_multiplier_list=[
+        0.75,
+        Vector3d(x=1, y=0.75, z=1),
+        1,
+        Vector3d(x=1.25, y=1, z=1.25),
+        1.25,
+        Vector3d(x=1, y=1.25, z=1)
+    ],
+    chosen_material_list=[ChosenMaterial.PLASTIC]
+)
+
+
 _TV = create_variable_definition_from_base(
     type='tv_2',
     size_multiplier_list=[0.5, 1, 1.5, 2]
@@ -951,6 +1277,18 @@ _SOFA_7 = create_variable_definition_from_base(
 )
 
 
+_SOFA_8 = create_variable_definition_from_base(
+    type='sofa_8',
+    size_multiplier_list=[1]
+)
+
+
+_SOFA_9 = create_variable_definition_from_base(
+    type='sofa_9',
+    size_multiplier_list=[1]
+)
+
+
 _SOFA_CHAIR_BABY_SCALED = ObjectDefinition(
     chooseTypeList=[
         create_variable_definition_from_base(
@@ -1029,6 +1367,34 @@ _SOFA_CHAIR_7 = create_variable_definition_from_base(
 )
 
 
+_SOFA_CHAIR_8 = create_variable_definition_from_base(
+    type='sofa_chair_8',
+    size_multiplier_list=[1]
+)
+
+
+_SOFA_CHAIR_9 = create_variable_definition_from_base(
+    type='sofa_chair_9',
+    size_multiplier_list=[1]
+)
+
+
+_BARREL_1 = create_variable_definition_from_base(
+    type='barrel_1',
+    # Big enough to fit a soccer ball inside
+    size_multiplier_list=[0.6],
+    chosen_material_list=[ChosenMaterial.WOOD]
+)
+
+
+_BARREL_2 = create_variable_definition_from_base(
+    type='barrel_2',
+    # Big enough to fit a soccer ball inside
+    size_multiplier_list=[0.6],
+    chosen_material_list=[ChosenMaterial.WOOD]
+)
+
+
 _CASE_1_SUITCASE = create_variable_definition_from_base(
     type='case_1',
     size_multiplier_list=[
@@ -1062,6 +1428,38 @@ _CASE_3 = create_variable_definition_from_base(
         2, 2.25, 2.5
     ],
     chosen_material_list=[ChosenMaterial.METAL, ChosenMaterial.PLASTIC]
+)
+
+
+_CASE_4 = create_variable_definition_from_base(
+    type='case_4',
+    # Big enough to fit a soccer ball inside
+    size_multiplier_list=[0.25, 0.5],
+    chosen_material_list=[ChosenMaterial.METAL, ChosenMaterial.PLASTIC]
+)
+
+
+_CASE_5 = create_variable_definition_from_base(
+    type='case_5',
+    # Big enough to fit a soccer ball inside
+    size_multiplier_list=[0.45, 0.9],
+    chosen_material_list=[ChosenMaterial.METAL, ChosenMaterial.PLASTIC]
+)
+
+
+_CRATE_1 = create_variable_definition_from_base(
+    type='crate_1',
+    # Big enough to fit a soccer ball inside
+    size_multiplier_list=[0.4, 0.6],
+    chosen_material_list=[ChosenMaterial.WOOD]
+)
+
+
+_CRATE_2 = create_variable_definition_from_base(
+    type='crate_2',
+    # Big enough to fit a soccer ball inside
+    size_multiplier_list=[0.6],
+    chosen_material_list=[ChosenMaterial.WOOD]
 )
 
 
@@ -1209,6 +1607,22 @@ _CHEST_9_TRAPEZOID_LID = create_variable_definition_from_base(
 )
 
 
+_MILITARY_CASE_1 = create_variable_definition_from_base(
+    type='military_case_1',
+    # Big enough to fit a soccer ball inside
+    size_multiplier_list=[0.45],
+    chosen_material_list=[ChosenMaterial.METAL, ChosenMaterial.PLASTIC]
+)
+
+
+_MILITARY_CASE_2 = create_variable_definition_from_base(
+    type='military_case_2',
+    # Big enough to fit a soccer ball inside
+    size_multiplier_list=[0.9],
+    chosen_material_list=[ChosenMaterial.METAL, ChosenMaterial.PLASTIC]
+)
+
+
 _TOOLBOX_1 = create_variable_definition_from_base(
     type='toolbox_1',
     size_multiplier_list=[
@@ -1229,6 +1643,22 @@ _TOOLBOX_2 = create_variable_definition_from_base(
         # Big enough to fit a soccer ball inside
         1, 1.2, 1.4
     ],
+    chosen_material_list=[ChosenMaterial.METAL, ChosenMaterial.PLASTIC]
+)
+
+
+_TOOLBOX_3 = create_variable_definition_from_base(
+    type='toolbox_3',
+    # Big enough to fit a soccer ball inside
+    size_multiplier_list=[3, 4.5],
+    chosen_material_list=[ChosenMaterial.METAL, ChosenMaterial.PLASTIC]
+)
+
+
+_TOOLBOX_4 = create_variable_definition_from_base(
+    type='toolbox_4',
+    # Big enough to fit a soccer ball inside
+    size_multiplier_list=[7, 10.5],
     chosen_material_list=[ChosenMaterial.METAL, ChosenMaterial.PLASTIC]
 )
 
@@ -1387,15 +1817,27 @@ _PICKUPABLE_MISC = [
 ]
 _PICKUPABLE_TOYS = [
     _DOG_ON_WHEELS,
+    _DOG_ON_WHEELS_2,
     _DUCK_ON_WHEELS,
+    _DUCK_ON_WHEELS_2,
+    _SKATEBOARD,
+    _TOY_BOBCAT,
     _TOY_BUS,
     _TOY_CAR_2,
+    _TOY_CAR_3,
+    _TOY_JEEP,
     _TOY_RACECAR,
+    _TOY_ROLLER,
     _TOY_SEDAN,
-    _TOY_TRAIN,
+    _TOY_TANK_1,
+    _TOY_TANK_2,
+    _TOY_TRAIN_1,
+    _TOY_TRAIN_2,
     _TOY_TROLLEY,
     _TOY_TRUCK_1,
     _TOY_TRUCK_2,
+    _TOY_TRUCK_3,
+    _TOY_TRUCK_4,
     _TURTLE_ON_WHEELS
 ]
 
@@ -1413,31 +1855,56 @@ _PICKUPABLES = [
 
 
 _NOT_PICKUPABLES = [
-    # Arbitrary division: shelves
-    [
-        _BOOKCASE,
-        _BOOKCASE_SIDELESS,
-        _SHELF_1_CUBBY,
-        _SHELF_2_TABLE_SQUARE,
-        _SHELF_2_TABLE_RECT
-    ],
+    # Arbitrary division: antique furniture
+    [_ANTIQUE_ARMCHAIR_1, _ANTIQUE_CHAIR_1, _ANTIQUE_SOFA_1, _ANTIQUE_TABLE_1],
+    # Arbitrary division: bed occluders
+    [_BED_1_OCCLUDER, _BED_2_OCCLUDER, _BED_3_OCCLUDER, _BED_4_OCCLUDER],
+    # Arbitrary division: bed obstacles
+    [_BED_5_OBSTACLE, _BED_5_OBSTACLE],
+    # Arbitrary division: shelf occluders
+    [_BOOKCASE, _BOOKCASE_SIDELESS],
+    # Arbitrary division: shelf obstacles
+    [_SHELF_1_CUBBY, _SHELF_2_TABLE_SQUARE, _SHELF_2_TABLE_RECT],
     # Arbitrary division: chairs
     [_CHAIR_1, _CHAIR_2_STOOL_CIRCLE, _CHAIR_3_STOOL_RECT, _CHAIR_4_OFFICE],
+    [_CHAIR_5, _CHAIR_6, _CHAIR_7, _CHAIR_8],
     # Arbitrary division: sofas
-    [_SOFA_1, _SOFA_2, _SOFA_3, _SOFA_BABY_SCALED],
+    [
+        _SOFA_1,
+        _SOFA_2,
+        _SOFA_3,
+        _SOFA_4,
+        _SOFA_5,
+        _SOFA_6,
+        _SOFA_7,
+        _SOFA_BABY_SCALED
+    ],
     # Arbitrary division: sofa chairs
-    [_SOFA_CHAIR_1, _SOFA_CHAIR_2, _SOFA_CHAIR_3, _SOFA_CHAIR_BABY_SCALED],
+    [
+        _SOFA_CHAIR_1,
+        _SOFA_CHAIR_2,
+        _SOFA_CHAIR_3,
+        _SOFA_CHAIR_4,
+        _SOFA_CHAIR_5,
+        _SOFA_CHAIR_6,
+        _SOFA_CHAIR_7,
+        _SOFA_CHAIR_BABY_SCALED
+    ],
     # Arbitrary division: rectangular obstacle tables
     [
         _TABLE_1_RECT_ACCESSIBLE,
         _TABLE_7_RECT_ACCESSIBLE,
-        _TABLE_8_RECT_ACCESSIBLE
+        _TABLE_8_RECT_ACCESSIBLE,
+        _TABLE_14_SMALL_RECT,
+        _TABLE_15_RECT
     ],
     # Arbitrary division: (semi)circular obstacle tables
     [
         _TABLE_2_CIRCLE_ACCESSIBLE,
         _TABLE_3_CIRCLE_ACCESSIBLE,
-        _TABLE_4_SEMICIRCLE_ACCESSIBLE
+        _TABLE_4_SEMICIRCLE_ACCESSIBLE,
+        _TABLE_13_SMALL_CIRCLE,
+        _TABLE_16_CIRCLE
     ],
     # Arbitrary division: occluder tables
     [_TABLE_5_RECT_ACCESSIBLE, _TABLE_11_T_LEGS, _TABLE_12_X_LEGS],
@@ -1450,38 +1917,48 @@ _NOT_PICKUPABLES = [
         _CRIB,
         _TV
     ],
-    # Eval 4 novel objects
-    [_BED_1_OCCLUDER, _BED_2_OCCLUDER, _BED_3_OCCLUDER, _BED_4_OCCLUDER],
-    [_BED_5_OBSTACLE, _BED_5_OBSTACLE],
-    [_CHAIR_5, _CHAIR_6, _CHAIR_7, _CHAIR_8],
-    [_SOFA_4, _SOFA_5, _SOFA_6, _SOFA_7],
-    [_SOFA_CHAIR_4, _SOFA_CHAIR_5, _SOFA_CHAIR_6, _SOFA_CHAIR_7],
+    # Eval 5 novel objects
+    [_BED_7_OCCLUDER, _BED_8_OCCLUDER, _BED_9_OCCLUDER, _BED_10_OCCLUDER],
+    [_CHAIR_9, _CHAIR_10, _CHAIR_11, _CHAIR_12_PLASTIC, _CHAIR_13, _CHAIR_14],
+    [_DESK_1, _DESK_2, _DESK_3, _DESK_4],
+    [_SOFA_8, _SOFA_9, _SOFA_CHAIR_8, _SOFA_CHAIR_9],
     [
-        _TABLE_13_SMALL_CIRCLE,
-        _TABLE_14_SMALL_RECT,
-        _TABLE_15_RECT,
-        _TABLE_16_CIRCLE
+        _TABLE_17_RECT,
+        _TABLE_18_RECT,
+        _TABLE_19_RECT,
+        _TABLE_20_CIRCLE,
+        _TABLE_26_SQUARE,
+        _TABLE_27_CIRCLE_PLASTIC
     ],
     # Don't use containers here as possible occluders or context objects
 ]
 
 
-_CONTAINERS_OPENABLE = [
-    _CASE_1_SUITCASE,
-    _CASE_3,
+_CONTAINERS_CHESTS = [
     _CHEST_1_CUBOID,
     _CHEST_2_SEMICYLINDER,
     _CHEST_3_CUBOID,
-    _CHEST_8_SEMICYLINDER,
-    # Eval 4 novel containers
-    _CASE_2,
     _CHEST_4_ROUNDED_LID,
     _CHEST_5_ROUNDED_LID,
     _CHEST_6_TRAPEZOID_LID,
     _CHEST_7_PIRATE_TREASURE,
-    _CHEST_9_TRAPEZOID_LID,
-    _TOOLBOX_1,
-    _TOOLBOX_2
+    _CHEST_8_SEMICYLINDER,
+    _CHEST_9_TRAPEZOID_LID
+]
+_CONTAINERS_OPENABLE = [
+    [_CASE_1_SUITCASE, _CASE_2, _CASE_3],
+    [_TOOLBOX_1, _TOOLBOX_2],
+    # Twice as likely to randomly choose one of the chests.
+    _CONTAINERS_CHESTS,
+    _CONTAINERS_CHESTS,
+    # Eval 5 novel containers
+    [_BARREL_1, _BARREL_2],
+    [_CASE_4, _CASE_5],
+    [_CRATE_1, _CRATE_2],
+    # TODO
+    # [_CRATE_1, _CRATE_2, _CRATE_3, _CRATE_4],
+    [_MILITARY_CASE_1, _MILITARY_CASE_2],
+    [_TOOLBOX_3, _TOOLBOX_4]
 ]
 
 
@@ -1589,7 +2066,10 @@ _CONTAINERS_OPEN_TOPPED = [
 
 _CONTAINERS = [
     # Same chance openable versus open-topped.
-    _CONTAINERS_OPENABLE,
+    [
+        definition for definition_list in _CONTAINERS_OPENABLE
+        for definition in definition_list
+    ],
     [
         definition for definition_list in _CONTAINERS_OPEN_TOPPED
         for definition in definition_list
@@ -1710,7 +2190,7 @@ def get_container_openable_definition_dataset(
     """Returns an immutable dataset of all openable/closable container
     definitions."""
     return get_dataset(
-        [_get('CONTAINERS_OPENABLE')],
+        _get('CONTAINERS_OPENABLE'),
         'CONTAINERS_OPENABLE',
         unshuffled=unshuffled
     )

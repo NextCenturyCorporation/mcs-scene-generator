@@ -1,0 +1,62 @@
+# Add a Multi Retrieval goal with two identical soccer balls as the target
+# objects. The performer agent must find and pick up all targets to succeed.
+goal:
+    category: multi retrieval
+    targets:
+        - shape: soccer_ball
+          scale:
+              min: 1.0
+              max: 3.0
+          position:
+              - x:
+                  min: -1.5
+                  max: -2.5
+                z:
+                  min: 1.5
+                  max: 2.5
+              - x:
+                  min: 1.5
+                  max: 2.5
+                z:
+                  min: 1.5
+                  max: 2.5
+          labels: target_1
+        - num:
+              min: 1
+              max: 2
+          shape: soccer_ball
+          identical_to: target_1
+          keyword_location:
+              keyword: adjacent
+              relative_object_label: target_1
+
+# Use a specific room size for this task.
+room_dimensions:
+    x: 8
+    y: 8
+    z: 12
+
+# Generate a platform bisecting the room.
+shortcut_bisecting_platform: True
+
+specific_interactable_objects:
+    - shape: soccer_ball
+      identical_to: target_1
+      labels: non_target_1
+      keyword_location:
+          keyword: opposite_x
+          relative_object_label: target_1
+    - num_targets_minus: 2
+      shape: soccer_ball
+      identical_to: target_1
+      keyword_location:
+          keyword: adjacent
+          relative_object_label: non_target_1
+
+# Override the defaults to avoid randomly generating any other objects besides
+# the platform and the targets. Remove these lines if you want additional
+# randomly generated objects.
+keyword_objects:
+    - num: 0
+random_structural_objects:
+    - num: 0

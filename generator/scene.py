@@ -1,12 +1,12 @@
 from dataclasses import asdict, dataclass, field
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 from machine_common_sense.config_manager import (
     FloorTexturesConfig,
     PerformerStart,
     PhysicsConfig,
     RoomMaterials,
-    Vector3d,
+    Vector3d
 )
 
 from generator.geometry import DEFAULT_ROOM_DIMENSIONS
@@ -64,7 +64,7 @@ class Scene:
     room_dimensions: Vector3d = None
     room_materials: RoomMaterials = None
     screenshot: bool = False  # developer use only; for the image generator
-    version: int = None
+    version: int = 2
     wall_material: str = None
     wall_properties: PhysicsConfig = None
 
@@ -100,17 +100,21 @@ class Scene:
     def set_performer_start_rotation(self, y: int):
         self.performer_start.rotation = Vector3d(x=0, y=y, z=0)
 
-    def get_target_object(self):
-        tgt = None
+    def get_targets(self) -> List[Dict[str, Any]]:
+        """Returns the list of all targets for this scene's goal, or an empty
+        list if this scene has no goal or targets."""
+        targets = []
         goal = self.goal or {}
         metadata = goal.get('metadata', {})
-        tar = metadata.get('target', {})
-        targetId = tar.get('id', {})
-        for o in self.objects or []:
-            if o.get('id', '') == targetId:
-                tgt = o
-                break
-        return tgt
+        target = metadata.get('target', {})
+        targets_info = [target] if target else metadata.get('targets', [])
+        for target_info in targets_info:
+            target_id = target_info.get('id', {})
+            for instance in (self.objects or []):
+                if instance.get('id', '') == target_id:
+                    targets.append(instance)
+                    break
+        return targets
 
 # TODO MCS-1234
 # Wanted to use Pydantic, but need MCS to use it and release it first.

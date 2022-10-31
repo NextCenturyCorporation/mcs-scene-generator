@@ -17,7 +17,7 @@ from ideal_learning_env.object_services import (
     InstanceDefinitionLocationTuple,
     ObjectRepository,
     RelativePositionConfig,
-    reconcile_template,
+    reconcile_template
 )
 
 from .choosers import choose_random
@@ -25,7 +25,7 @@ from .defs import (
     ILEConfigurationException,
     ILEDelayException,
     ILEException,
-    return_list,
+    return_list
 )
 
 logger = logging.getLogger(__name__)
@@ -49,6 +49,9 @@ class FeatureTypes(Enum):
     TOOLS = auto()
     INTERACTABLE = auto()
     AGENT = auto()
+    TURNTABLES = auto()
+    # Should be the same as the TARGET_LABEL
+    TARGET = auto()
 
 
 @dataclass
@@ -241,10 +244,24 @@ class BaseObjectCreationService(ABC):
 
 
 def save_to_object_repository(
-    obj: Dict[str, Any],
+    obj_or_idl: Union[Dict[str, Any], InstanceDefinitionLocationTuple],
     structural_type: FeatureTypes,
     labels: List[str]
 ) -> None:
+    """Saves the given object instance (or IDL) to the ObjectRepository under
+    the given labels, using the given feature type as an additional label."""
+    if isinstance(obj_or_idl, InstanceDefinitionLocationTuple):
+        idl = obj_or_idl
+        obj = idl.instance
+    else:
+        obj = obj_or_idl
+        loc = {
+            'position': copy.deepcopy(obj['shows'][0]['position']),
+            'rotation': copy.deepcopy(obj['shows'][0]['rotation']),
+            'boundingBox': copy.deepcopy(obj['shows'][0]['boundingBox']),
+        }
+        idl = InstanceDefinitionLocationTuple(obj, None, loc)
+
     # debug labels are labels going into the debug key.
     # We use the debug key because we need to generate the labels before we
     # are sure they object will be added to the scene.
@@ -257,15 +274,8 @@ def save_to_object_repository(
         )
         if structural_type.name.lower() not in labels_list:
             labels_list.append(structural_type.name.lower())
-    show = obj['shows'][0]
-    location = {
-        'position': copy.deepcopy(show['position']),
-        'rotation': copy.deepcopy(show['rotation']),
-        'boundingBox': copy.deepcopy(show['boundingBox']),
-    }
     obj_repo = ObjectRepository.get_instance()
-    obj_tuple = InstanceDefinitionLocationTuple(obj, None, location)
-    obj_repo.add_to_labeled_objects(obj_tuple, labels=labels_list)
+    obj_repo.add_to_labeled_objects(idl, labels=labels_list)
 
 
 def validate_all_locations_and_update_bounds(

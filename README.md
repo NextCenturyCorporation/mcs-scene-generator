@@ -13,9 +13,11 @@
 
 ## Overview
 
-The ILE ("Ideal/Interactive Learning Environment") Scene Generator is used to generate training scenes for MCS Eval 5 and beyond. The intent of the ILE is to allow teams to train on concepts core to common sense reasoning, like physics, occlusion, navigation, localization, agency, and more. Test scenes will be comprised of combinations of these concepts, and the simulation environment (or the "world") is the same for both training (via the ILE) and testing. Please note the ILE does not rely on the hypercube designs that the MSC evaluation team uses to generate its test scenes.
+The ILE ("Interactive Learning Environment") Scene Generator is used to generate training scenes for MCS Eval 5 and beyond. The intent of the ILE is to allow teams to train on concepts core to common sense reasoning, like physics, occlusion, navigation, localization, agency, and more. Test scenes will be comprised of combinations of these concepts, and the simulation environment (or the "world") is the same for both training (via the ILE) and testing. Please note the ILE does not rely on the hypercube designs that the MSC evaluation team uses to generate its test scenes.
 
 The ILE runs using a YAML config file to set scene options. To see all config file properties, please review the [ILE_API.md](./ILE_API.md) documentation.
+
+Please note that we consider our "passive" tasks to be a subset of our "interactive" tasks. Therefore the Interactive Learning Environment is also built to support generating training scenes for passive tasks as well.
 
 The ILE outputs JSON files in the [MCS scene format](https://nextcenturycorporation.github.io/MCS/schema.html) to be run with the [machine_common_sense](https://github.com/NextCenturyCorporation/MCS) python library and corresponding Unity build.
 
@@ -47,6 +49,12 @@ You may need to install `testresources`:
 sudo apt install python3-testresources
 ```
 
+### Install Pre-Commit
+
+```
+pre-commit install
+```
+
 ## Usage
 
 ### Running
@@ -70,6 +78,46 @@ python ile.py -c ile_config.yaml -n 10 -p scene
 ```
 
 ### Latest Release Notes
+
+#### Release 1.5
+
+Changelog:
+- Major changes to how all passive physics scenes are made, so they fully align with the evaluation data:
+    - Replaced the `passive_physics_floor: true` config option with `passive_physics_scene: true`, which automatically assigns the `room_dimensions`, `performer_start_position`, and other properties for the scene. Please see the ILE API for more information.
+    - Added the `passive_physics_setup` config property for the `structural_throwers` option, which sets the thrower's position and rotation to values used in our passive physics evaluation scenes. Possible choices include `"roll_angled"`, `"roll_straight"`, and `"toss_straight"`.
+    - Added the `passive_physics_throw_force: true` and `passive_physics_collision_force: true` config properties for the `structural_throwers` option, which sets the thrower's `throw_force` to a value used in our passive physics evaluation scenes. We recommend against directly configuring `throw_force` for all passive physics scenes moving forward.
+    - Added the `stop_position` confg property for the `structural_throwers` option, which sets the thrower's `throw_force` based on movement data we have recorded for use in our passive physics evaluation scenes. Possible choices include setting specific `x` and `z` values, setting `offscreen: true`, or setting `behind` with an object label to make the thrown object come to a stop behind a specific object (an occluder).
+    - Updated all of the passive physics ILE example config files, and added `passive_physics_move_behind.yaml`.
+    - Internally, the ILE Scene Generator now sets the `"intuitive_physics": true` tag in all passive physics JSON scene files, which instructs our Unity environment to automatically configure the room to preset specificiations. This tag is used in all of our passive physics evaluation scenes.
+- Updated `goal` so that `"multi retrieval"` (used in number comparison and arithmetic tasks) and `"passive"` (used in seeing-leads-to-knowing tasks) are valid options for the `category`. Also added `targets` as a valid `goal` property for Multi-Retrieval goals. Please see our [Python API](https://nextcenturycorporation.github.io/MCS/api.html#machine_common_sense.GoalCategory) for more information on goals.
+- Added the `performer_starts_near` config option to ensure the performer agent always starts a specific distance away from a specific object (including containers, occluders, platforms, ramps, the target, etc.).
+- Added the `structural_turntables` config option to generate scenes containing rotating turntables (a.k.a. cogs).
+- Added the `position_relative_to_start` config property for the `on_center` `keyword_location` to position objects on top of turntables and other furniture.
+- Added the `adjacent_performer` `keyword_location` to position objects adjacent to the performer agent.
+- Added the `along_wall` `keyword_location` to position objects adjacent to a specific exterior room wall.
+- Added the `empty_placer` config property to the `placers` option to generate scenes containing empty placers (that do not hold any objects).
+- Added the `end_height_relative_object_label` config property to the `placers` option so placers can dynamically adjust their drop height based on another object's height. Updated the passive physics gravity support example ILE config file to use this property so it more closely aligns with the corresponding evaluation task.
+- Added the `distance_between_performer_and_tool` config property to the `shortcut_lava_target_tool` option for setting a specific distance between the performer agent's starting position and the tool.
+- Added the `left_lava_width` and `right_lava_width` config properties to the `shortcut_lava_target_tool` option.
+- Added the `has_long_blocking_wall` config property to the `shortcut_bisecting_platform` option.
+- Added the `num_targets_minus` config property for generating a number of interactable objects based on the number of targets (especially useful for Multi-Retrieval tasks).
+- Added the `side_wall_opposite_colors` and `wall_material` config options for setting textures on exterior room walls.
+- Added the `trapezoidal_room` config option for generating scenes in trapezoidal rooms.
+- Added the `labels`, `position`, and `rotation` config properties to the `keyword_objects` option.
+- Added the `look_at_center` config property to the `teleports` option.
+- Improved error messages.
+- Fixed minor bugs with placers.
+- Added new example ILE config files:
+    - Basic usage and core common sense concepts:
+        - `multiple_targets`
+        - `starts_near_object`
+        - `turntable`
+    - New evaluation tasks:
+        - `holes_with_agent`
+        - `interactive_number_comparison`
+        - `interactive_spatial_reorientation`
+        - `lava_with_agent`
+        - `ramps_with_agent`
 
 #### Release 1.4
 
@@ -168,9 +216,11 @@ List of example ILE configuration files for basic use cases:
 - [empty_room.yaml](./ile_configs/empty_room.yaml) Generates scenes with no objects by overriding the default random generation behavior.
 - [forced_choice.yaml](./ile_configs/forced_choice.yaml) Generates scenes with the performer agent positioned on top of a tall platform bisecting the room and a randomly positioned soccer ball retrieval target.
 - [last_step.yaml](./ile_configs/last_step.yaml) Generates scenes with an action/step limit ("last step") scaled relative to the room's random dimensions.
+- [multiple_targets.yaml](./ile_configs/multiple_targets.yaml) Generates scenes with four soccer ball multi retrieval targets.
 - [specific_object.yaml](./ile_configs/specific_object.yaml) Generates scenes with a consistently sized and colored blue toy car object.
 - [starts_frozen.yaml](./ile_configs/starts_frozen.yaml) Generates scenes in which the performer agent begins frozen for the first 5 to 100 steps.
 - [starts_look_rotate_only.yaml](./ile_configs/starts_look_rotate_only.yaml) Generates scenes in which the performer agent begins able to only use the Look and Rotate actions for the first 5 to 100 steps.
+- [starts_near_object.yaml](./ile_configs/starts_near_object.yaml) Generates scenes in which the performer agent begins at a specific distance from an object (either a ramp, a random container, or a soccer ball retrieval target).
 - [target_soccer_ball.yaml](./ile_configs/target_soccer_ball.yaml) Generates scenes with a soccer ball retrieval target.
 - [two_kidnappings.yaml](./ile_configs/two_kidnappings.yaml) Generates scenes in which the performer agent is kidnapped on steps 501 and 550.
 
@@ -189,6 +239,7 @@ See the list of the Core Domains in our [MCS BAA Table doc](./docs/MCS_BAA_TABLE
 | O6 | [droppers.yaml](./ile_configs/droppers.yaml), [placers.yaml](./ile_configs/placers.yaml) |
 | O8 | [throwers.yaml](./ile_configs/throwers.yaml) |
 | A5 | [agents.yaml](./ile_configs/agents.yaml) |
+| TODO | [turntable.yaml](./ile_configs/turntable.yaml) |
 
 List of example ILE configuration files helpful for learning core common sense concepts:
 
@@ -200,9 +251,10 @@ List of example ILE configuration files helpful for learning core common sense c
 - [navigation_3d.yaml](./ile_configs/navigation_3d.yaml) Generates scenes with holes, walls, lava, and platforms with ramps, as well as a randomly positioned soccer ball retrieval target.
 - [occlusion_by_furniture.yaml](./ile_configs/occlusion_by_furniture.yaml) Generates scenes with many large objects and a soccer ball retrieval target either hidden behind an object or visible in front of an object.
 - [occlusion_by_structure.yaml](./ile_configs/occlusion_by_structure.yaml) Generates scenes with many large structures and a soccer ball retrieval target either hidden behind a structure or visible in front of a structure.
-- [placers.yaml](./ile_configs/placers.yaml) Generates scenes with many placers and a soccer ball retrieval target held by one such device.
+- [placers.yaml](./ile_configs/placers.yaml) Generates scenes with many placers (some placers will be empty) and a soccer ball retrieval target held by one such device.
 - [room_of_many_colors.yaml](./ile_configs/room_of_many_colors.yaml) Generates scenes with randomly colored outer room walls and areas of floor, as well as a soccer ball retrieval target.
 - [throwers.yaml](./ile_configs/throwers.yaml) Generates scenes with many throwers and a soccer ball retrieval target held by one such device.
+- [turntable.yaml](./ile_configs/throwers.yaml) Generates scenes with a turntable (cog), a container, and a soccer ball retrieval target; sometimes the soccer ball and/or the container are on top of the turntable; sometimes the soccer ball is hidden inside of the container; the turntable rotates either 90, 180, 270, or 360 degrees.
 
 #### Scenes for Specific Evaluation Tasks
 
@@ -216,7 +268,7 @@ Eval 3.X Tasks:
 | Gravity Support (Passive) | O6, P1 | [passive_physics_gravity_support.yaml](./ile_configs/passive_physics_gravity_support.yaml) |
 | Obstacles (Interactive) | P1 | [occlusion_by_furniture.yaml](./ile_configs/occlusion_by_furniture.yaml) |
 | Occluders (Interactive) | O1, P1, P4 | [occlusion_by_furniture.yaml](./ile_configs/occlusion_by_furniture.yaml) |
-| Passive Object Permanence | O1, O4 | [passive_physics_fall_down.yaml](./ile_configs/passive_physics_fall_down.yaml), [passive_physics_move_across.yaml](./ile_configs/passive_physics_move_across.yaml) |
+| Passive Object Permanence | O1, O4 | [passive_physics_fall_down.yaml](./ile_configs/passive_physics_fall_down.yaml), [passive_physics_move_across.yaml](./ile_configs/passive_physics_move_across.yaml), [passive_physics_move_behind.yaml](./ile_configs/passive_physics_move_behind.yaml) |
 | Shape Constancy (Passive) | O1, O4 | [passive_physics_fall_down.yaml](./ile_configs/passive_physics_fall_down.yaml) |
 | Spatio-Temporal Continuity (Passive) | O1, O4 | [passive_physics_move_across.yaml](./ile_configs/passive_physics_move_across.yaml) |
 
@@ -226,7 +278,6 @@ Eval 4 Tasks:
 | --- | --- | --- |
 | Collisions (Passive) | O1, O2, O3 | [passive_physics_collisions.yaml](./ile_configs/passive_physics_collisions.yaml) |
 | Interactive Object Permanence | O4 | [interactive_object_permanence.yaml](./ile_configs/interactive_object_permanence.yaml) |
-| Spatial Reorientation (Interactive) | P2, P3 | TODO |
 
 Eval 5 Tasks:
 
@@ -234,9 +285,9 @@ Eval 5 Tasks:
 | --- | --- | --- |
 | Agent Identification (Interactive) | A5 | [interactive_agent_identification.yaml](./ile_configs/interactive_agent_identification.yaml) |
 | Moving Target Prediction (Interactive) | O8 | [interactive_moving_target_prediction.yaml](./ile_configs/interactive_moving_target_prediction.yaml) |
-| Navigation: Holes (Interactive) | P7 | [holes.yaml](./ile_configs/holes.yaml) |
-| Navigation: Lava (Interactive) | P7 | [lava.yaml](./ile_configs/lava.yaml) |
-| Navigation: Ramps (Interactive) | P6 | [ramps.yaml](./ile_configs/ramps.yaml) |
+| Navigation: Holes (Interactive) | P7 | [holes.yaml](./ile_configs/holes.yaml), [holes_with_agent.yaml](./ile_configs/holes_with_agent.yaml) |
+| Navigation: Lava (Interactive) | P7 | [lava.yaml](./ile_configs/lava.yaml) [lava_with_agent.yaml](./ile_configs/lava_with_agent.yaml) |
+| Navigation: Ramps (Interactive) | P6 | [ramps.yaml](./ile_configs/ramps.yaml) [ramps_with_agent.yaml](./ile_configs/ramps_with_agent.yaml) |
 | Solidity (Interactive) | O3 | [interactive_solidity.yaml](./ile_configs/interactive_solidity.yaml) |
 | Spatial Elimination (Interactive) | P4 | [interactive_spatial_elimination.yaml](./ile_configs/interactive_spatial_elimination.yaml) |
 | Support Relations (Interactive) | O6 | [interactive_support_relations.yaml](./ile_configs/interactive_support_relations.yaml) |
@@ -245,6 +296,7 @@ Eval 5 Tasks:
 List of example ILE configuration files for generating scenes similar to specific evaluation tasks:
 
 - [holes.yaml](./ile_configs/holes.yaml) Generates scenes with many holes and a randomly positioned soccer ball retrieval target.
+- [holes_with_agent.yaml](./ile_configs/holes_with_agent.yaml) Generates scenes with many holes and a randomly positioned agent holding a soccer ball retrieval target.
 - [interactive_agent_identification.yaml](./ile_configs/interactive_agent_identification.yaml) Generates scenes similar to the interactive agent indentification eval tasks: start on a platform bisecting the room; an agent on one side of the platform; a static object on the other side of the room; must walk up to the agent and request for it to produce the target.
 - [interactive_moving_target_prediction.yaml](./ile_configs/interactive_moving_target_prediction.yaml) Generates scenes similar to the interactive moving target prediction eval tasks: start on a platform; lava extending across both sides of the room; must first rotate in a 360 degree circle; then a thrower rolls a soccer ball from one end of the room toward the other; must predict the speed and trajectory of the soccer ball in order to intercept it efficiently.
 - [interactive_object_permanence.yaml](./ile_configs/interactive_object_permanence.yaml) Generates scenes similar to the interactive object permanence eval tasks: start on a platform bisecting the room; an L-occluder on each side; and a thrower that tosses the soccer ball into the room.
@@ -252,12 +304,30 @@ List of example ILE configuration files for generating scenes similar to specifi
 - [interactive_spatial_elimination.yaml](./ile_configs/interactive_spatial_elimination.yaml) Generates scenes similar to the interactive spatial elimination eval tasks: start on a platform bisecting the room; an occlusing wall on each side; and a soccer ball either in front of or behind an occluding wall.
 - [interactive_support_relations.yaml](./ile_configs/interactive_support_relations.yaml) Generates scenes similar to the interactive support relations eval tasks: start on a platform bisecting the room; placers holding a container with the soccer ball descend from the ceiling; a door occluder descends from the ceiling; the placers release the container so it and the soccer ball land either fully, partially, or not on the platform.
 - [lava.yaml](./ile_configs/lava.yaml) Generates scenes with many pools of lava and a randomly positioned soccer ball retrieval target.
+- [lava_with_agent.yaml](./ile_configs/lava_with_agent.yaml) Generates scenes with many pools of lava and a randomly positioned agent with a soccer ball retrieval target.
 - [passive_physics_collisions.yaml](./ile_configs/passive_physics_collisions.yaml) Generates scenes similar to passive physics collisions eval tasks: same view; similarly sized and positioned moving-and-rotating occluders; multiple objects, possibly colliding; only able to use Pass actions.
 - [passive_physics_gravity_support.yaml](./ile_configs/passive_physics_gravity_support.yaml) Generates scenes similar to passive physics gravity support eval tasks: same view; one similarly sized and positioned platform; one placer lowering an object into the scene, possibly above the platform, and then releasing it; only able to use Pass actions.
 - [passive_physics_fall_down.yaml](./ile_configs/passive_physics_fall_down.yaml) Generates scenes similar to passive physics eval tasks with objects falling down: same view; similarly sized and positioned moving-and-rotating occluders; multiple objects falling into the scene; only able to use Pass actions.
 - [passive_physics_move_across.yaml](./ile_configs/passive_physics_move_across.yaml) Generates scenes similar to passive physics eval tasks with objects moving across: same view; similarly sized and positioned moving-and-rotating occluders; multiple objects moving across the scene; only able to use Pass actions.
+- [passive_physics_move_behind.yaml](./ile_configs/passive_physics_move_behind.yaml) Generates scenes similar to passive physics eval tasks with objects moving and stopping behind occluders: same view; similarly sized and positioned moving-and-rotating occluder; one object moving across the scene; only able to use Pass actions.
 - [ramps.yaml](./ile_configs/ramps.yaml) Generates scenes with ramps leading up to platforms and a soccer ball retrieval target either on top of the platform or on the floor adjacent to the platform.
+- [ramps_with_agent.yaml](./ile_configs/ramps_with_agent.yaml) Generates scenes with ramps leading up to platforms and an agent with a soccer ball retrieval target.
 - [tools.yaml](./ile_configs/tools.yaml) Generates scenes with a large moveable block tool and a soccer ball retrieval target completely surrounded by lava.
+
+Eval 6 Tasks:
+
+| Eval 6 Task | MCS Core Domains | Example Config Files |
+| --- | --- | --- |
+| Navigation: Holes (Interactive) | P7 | See the Eval 5 Tasks above |
+| Navigation: Lava (Interactive) | P7 | See the Eval 5 Tasks above |
+| Navigation: Ramps (Interactive) | P6 | See the Eval 5 Tasks above |
+| Number Comparison (Interactive) | TODO | [interactive_number_comparison.yaml](./ile_configs/interactive_number_comparison.yaml) |
+| Spatial Reorientation (Interactive) | P2, P3 | [interactive_spatial_reorientation.yaml](./ile_configs/interactive_spatial_reorientation.yaml) |
+
+List of example ILE configuration files for generating scenes similar to specific evaluation tasks:
+
+- [interactive_number_comparison.yaml](./ile_configs/interactive_number_comparison.yaml) Generates scenes similar to the interactive number comparison eval tasks: start on a platform bisecting the room; one or more soccer ball multi-retrieval targets on one side; fewer soccer balls on the other side.
+- [interactive_spatial_reorientation.yaml](./ile_configs/interactive_spatial_reorientation.yaml) Generates scenes similar to the interactive spatial reorientation eval tasks: start on a platform bisecting the room; identical bins on either side of the room; a placer drops a soccer ball retrieval target into one bin; the performer agent is kidnapped and sometimes teleported to the other side of the room; sometimes one room wall is a different color, and/or the room is trapezoidal.
 
 ## Scene Validation
 

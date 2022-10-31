@@ -1,0 +1,90 @@
+# Retrieval goal using a soccer ball as the target object.
+goal:
+    category: retrieval
+    target:
+        shape: soccer_ball
+        scale: 1.0
+
+# Only the target can be a soccer ball.
+excluded_shapes: soccer_ball
+
+# Use a specific room size for this task.
+room_dimensions:
+    x: 12
+    y: 6
+    z: 16
+
+# Choose the wall material from a color palette with bright, distinct colors.
+# All four exterior room walls will be the same color.
+wall_material: OPPOSITE_MATERIALS
+
+# Sometimes one of the exterior room walls will be the opposite color instead.
+side_wall_opposite_colors: [true, false]
+
+# Sometimes the room will be trapezoidal.
+trapezoidal_room: [true, false]
+
+# Generate a platform bisecting the room.
+shortcut_bisecting_platform:
+    has_long_blocking_wall: true
+
+# Generate a random bin on each side of the room.
+keyword_objects:
+    - keyword: bins
+      num: 1
+      labels: bin_1
+      position:
+          - x:
+              min: 1.5
+              max: 3.0
+            z: 0
+          - x:
+              min: -3.0
+              max: -1.5
+            z: 0
+specific_interactable_objects:
+    - num: 1
+      labels: bin_2
+      identical_to: bin_1
+      keyword_location:
+          keyword: opposite_x
+          relative_object_label: bin_1
+
+# Generate a placer the puts the target into one of the bins.
+placers:
+    - num: 1
+      placed_object_labels: target
+      activation_step: 37
+      end_height: 0.5
+      position_relative:
+          label: [bin_1, bin_2]
+          use_x: true
+          use_z: true
+
+# Forced rotation at the beginning of the scene.
+circles: [1]
+
+# Can only use Pass actions between the forced rotation and the kidnapping.
+freezes:
+    - begin: 1
+      end: 54
+
+# Kidnapping on step 90. May or may not be moved to the opposite side of the
+# center platform. Will be moved slightly to either the left or right. Will
+# always be facing the center of the room after the kidnapping.
+teleports:
+    - step: 90
+      position_x:
+          min: -0.25
+          max: 0.25
+      position_z:
+          - min: -7.75
+            max: -7.25
+          - min: 7.25
+            max: 7.75
+      look_at_center: true
+
+# Override the defaults to avoid randomly generating any other objects besides
+# the platform, bins, placer, and target.
+random_structural_objects:
+    - num: 0

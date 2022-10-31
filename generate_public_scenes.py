@@ -6,7 +6,7 @@ from hypercube import (
     SceneGenerator,
     agent_hypercubes,
     interactive_hypercubes,
-    intuitive_physics_hypercubes,
+    intuitive_physics_hypercubes
 )
 
 HYPERCUBE_LIST = (

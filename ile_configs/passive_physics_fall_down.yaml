@@ -1,37 +1,10 @@
-# Can only use the Pass action through the whole scene.
-passive_scene: true
+# Setup the scene in exactly the same way as the "passive physics" eval scenes.
+# This automatically sets the performer agent's starting position and rotation,
+# room dimensions, floor friction, and a platform to adjust the camera height.
+passive_physics_scene: true
 
 # Max of 160 action steps in each "fall down" scene.
 last_step: 160
-
-# Large room with a high ceiling and a slippery floor.
-room_dimensions:
-    x: 20
-    y: 8
-    z: 20
-passive_physics_floor: true
-
-# Specific starting position and rotation used in passive physics tasks.
-performer_start_position:
-    x: 0
-    y: 1.5
-    z: -4.5
-performer_start_rotation:
-    x: 0
-    y: 0
-
-# Platform underneath starting position to raise camera height.
-structural_platforms:
-    num: 1
-    position:
-        x: 0
-        y: 0
-        z: -4.5
-    rotation_y: 0
-    scale:
-        x: 0.5
-        y: 0.738
-        z: 0.5
 
 # Two moving-and-rotating occluding walls with semi-random width and position.
 structural_moving_occluders:
@@ -39,8 +12,8 @@ structural_moving_occluders:
       occluder_height: 1.8
       occluder_thickness: 0.1
       occluder_width:
-          min: 0.5
-          max: 2
+          min: 1.0
+          max: 2.0
       origin: 'left'
       position_x:
           min: -2.0
@@ -54,8 +27,8 @@ structural_moving_occluders:
       occluder_height: 1.8
       occluder_thickness: 0.1
       occluder_width:
-          min: 0.5
-          max: 2
+          min: 1.0
+          max: 2.0
       origin: 'right'
       position_x:
           min: 1.0
@@ -85,27 +58,43 @@ structural_droppers:
       # Copy lines for shapes you want to generate more often than others.
       projectile_shape:
           - ball
+          - bobcat
           - bus_1
           - car_1
           - car_2
+          - car_3
+          - cart_2
           - circle_frustum
           - cone
           - cube
           - cylinder
           - dog_on_wheels
-          - double_cone
+          - dog_on_wheels_2
           - duck_on_wheels
+          - duck_on_wheels_2
           - dumbbell_1
           - dumbbell_2
+          - jeep
           - pyramid
           - racecar_red
+          - rollable_1
+          - rollable_2
+          - rollable_3
+          - rollable_4
+          - roller
+          - skateboard
           - sphere
           - square_frustum
+          - tank_1
+          - tank_2
           - tie_fighter
           - train_1
+          - train_2
           - trolley_1
           - truck_1
           - truck_2
+          - truck_3
+          - truck_4
           - tube_narrow
           - tube_wide
           - turtle_on_wheels
@@ -126,27 +115,43 @@ structural_droppers:
       # Copy lines for shapes you want to generate more often than others.
       projectile_shape:
           - ball
+          - bobcat
           - bus_1
           - car_1
           - car_2
+          - car_3
+          - cart_2
           - circle_frustum
           - cone
           - cube
           - cylinder
           - dog_on_wheels
-          - double_cone
+          - dog_on_wheels_2
           - duck_on_wheels
+          - duck_on_wheels_2
           - dumbbell_1
           - dumbbell_2
+          - jeep
           - pyramid
           - racecar_red
+          - rollable_1
+          - rollable_2
+          - rollable_3
+          - rollable_4
+          - roller
+          - skateboard
           - sphere
           - square_frustum
+          - tank_1
+          - tank_2
           - tie_fighter
           - train_1
+          - train_2
           - trolley_1
           - truck_1
           - truck_2
+          - truck_3
+          - truck_4
           - tube_narrow
           - tube_wide
           - turtle_on_wheels

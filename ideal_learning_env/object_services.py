@@ -10,7 +10,7 @@ from typing import (
     NamedTuple,
     Tuple,
     TypeVar,
-    Union,
+    Union
 )
 
 from machine_common_sense.config_manager import PerformerStart, Vector3d
@@ -21,13 +21,14 @@ from generator import (
     base_objects,
     containers,
     geometry,
-    instances,
+    instances
 )
 from ideal_learning_env.choosers import choose_random
 from ideal_learning_env.defs import (
+    ILEConfigurationException,
     ILEDelayException,
     ILEException,
-    return_list,
+    return_list
 )
 
 from .numerics import MinMaxFloat, VectorFloatConfig
@@ -131,6 +132,7 @@ class ObjectRepository():
 
 class KeywordLocation():
     ADJACENT_TO_OBJECT = "adjacent"
+    ADJACENT_TO_PERFORMER = "adjacent_performer"
     BACK_OF_PERFORMER = "back"
     BEHIND_OBJECT_FROM_PERFORMER = "behind"
     BETWEEN_PERFORMER_OBJECT = "between"
@@ -144,6 +146,23 @@ class KeywordLocation():
     ASSOCIATED_WITH_AGENT = "associated_with_agent"
     OPPOSITE_X = "opposite_x"
     OPPOSITE_Z = "opposite_z"
+    ALONG_WALL = "along_wall"
+
+    ADJACENT_TO_PERFORMER_FRONT = "front"
+    ADJACENT_TO_PERFORMER_BACK = "back"
+    ADJACENT_TO_PERFORMER_LEFT = "left"
+    ADJACENT_TO_PERFORMER_RIGHT = "right"
+    ADJACENT_TO_PERFORMER_IN_REACH = "in_reach"
+    ADJACENT_TO_PERFORMER_OUT_OF_REACH = "out_of_reach"
+
+    ADJACENT_TO_PERFORMER_DIRECTION_DEFAULT = [
+        ADJACENT_TO_PERFORMER_FRONT,
+        ADJACENT_TO_PERFORMER_BACK,
+        ADJACENT_TO_PERFORMER_LEFT,
+        ADJACENT_TO_PERFORMER_RIGHT]
+
+    ADJACENT_TO_PERFORMER_DISTANCE_DEFAULT = [
+        ADJACENT_TO_PERFORMER_IN_REACH]
 
     @staticmethod
     def get_keyword_location_object_tuple(
@@ -184,7 +203,11 @@ class KeywordLocation():
             raise ILEDelayException(
                 f'{instance["type"]} cannot find relative object label '
                 f'"{label}" for '
-                f'keyword location "{keyword_location.keyword}"')
+                f'keyword location "{keyword_location.keyword}". '
+                f'The relative object label or corresponding '
+                f'keyword could be misspelled, invalid, '
+                f'or does not exist'
+            )
         agent_idl = obj_repo.get_one_from_labeled_objects(label=label)
         agent = agent_idl.instance
         if not agent['id'].startswith('agent'):
@@ -217,6 +240,7 @@ class KeywordLocation():
         locations. Successful containment locations will return None."""
         con_tag = keyword_location.container_label
         obj_tag = keyword_location.relative_object_label
+        pos_rel_start = keyword_location.position_relative_to_start
         obj_repo = ObjectRepository.get_instance()
 
         # TODO MCS-815 or MCS-1236
@@ -237,12 +261,47 @@ class KeywordLocation():
                 performer_start, instance, room_dimensions=room_dimensions)
             return KeywordLocation._move_instance_or_raise_error(
                 instance, location, keyword)
+        if keyword == KeywordLocation.ADJACENT_TO_PERFORMER:
+            distance_label = keyword_location.distance or random.choice(
+                KeywordLocation.ADJACENT_TO_PERFORMER_DISTANCE_DEFAULT)
+            direction = keyword_location.direction or random.choice(
+                KeywordLocation.ADJACENT_TO_PERFORMER_DIRECTION_DEFAULT)
+            dir_rot = (0 if direction == KeywordLocation.ADJACENT_TO_PERFORMER_FRONT else  # noqa
+                       90 if direction == KeywordLocation.ADJACENT_TO_PERFORMER_RIGHT else  # noqa
+                       180 if direction == KeywordLocation.ADJACENT_TO_PERFORMER_BACK else  # noqa
+                       270 if direction == KeywordLocation.ADJACENT_TO_PERFORMER_LEFT else  # noqa
+                       0)
+            dist = (random.uniform(0.25, 0.9) if
+                    distance_label ==
+                    KeywordLocation.ADJACENT_TO_PERFORMER_IN_REACH else
+                    random.uniform(1.1, 1.2))
+
+            location = geometry.get_location_adjacent_to_performer(
+                performer_start, instance, room_dimensions=room_dimensions,
+                distance=dist, direction_rotation=dir_rot)
+            return KeywordLocation._move_instance_or_raise_error(
+                instance, location, keyword)
+        if keyword == KeywordLocation.ALONG_WALL:
+            wall = obj_tag or [
+                geometry.FRONT_WALL_LABEL,
+                geometry.BACK_WALL_LABEL,
+                geometry.LEFT_WALL_LABEL,
+                geometry.RIGHT_WALL_LABEL]
+            wall = wall if isinstance(wall, list) else [wall]
+            wall = random.choice(wall)
+            location = geometry.get_location_along_wall(
+                performer_start, wall, instance, room_dimensions)
+            return KeywordLocation._move_instance_or_raise_error(
+                instance, location, keyword)
 
         if keyword != KeywordLocation.IN_CONTAINER:
             if not obj_tag or not obj_repo.has_label(obj_tag):
                 raise ILEDelayException(
                     f'{instance["type"]} cannot find relative object label '
-                    f'"{obj_tag}" for keyword location "{keyword}"'
+                    f'"{obj_tag}" for keyword location "{keyword}". '
+                    f'The relative object label or corresponding '
+                    f'keyword could be misspelled, invalid, '
+                    f'or does not exist'
                 )
 
             idl = obj_repo.get_one_from_labeled_objects(obj_tag)
@@ -310,13 +369,27 @@ class KeywordLocation():
             all_idls = obj_repo.get_all_from_labeled_objects(obj_tag)
             random.shuffle(all_idls)
             attempts = 0
+            if (keyword == KeywordLocation.ON_OBJECT_CENTERED and
+                    pos_rel_start is not None):
+
+                pos_rel_start.x = (
+                    pos_rel_start.x if pos_rel_start.x is not None else 0)  # noqa: E501
+                pos_rel_start.z = (
+                    pos_rel_start.z if pos_rel_start.z is not None else 0)  # noqa: E501
+
+                if (pos_rel_start.x < -1.0 or pos_rel_start.x > 1.0 or
+                        pos_rel_start.z < -1.0 or pos_rel_start.z > 1.0):
+                    raise ILEConfigurationException(
+                        "position_relative_to_start x and z values must "
+                        "be within the range of -1.0 and 1.0.")
             for idl in all_idls:
                 try:
                     location = geometry.generate_location_on_object(
                         instance,
                         relative_instance, performer_start,
                         bounds, room_dimensions=room_dimensions,
-                        center=(keyword == KeywordLocation.ON_OBJECT_CENTERED))
+                        center=(keyword == KeywordLocation.ON_OBJECT_CENTERED),
+                        position_relative_to_start=pos_rel_start)
                     relative_instance = idl.instance
                     relative_defn = idl.definition
                     rel_object_location = idl.location
@@ -339,7 +412,10 @@ class KeywordLocation():
             raise ILEDelayException(
                 f'{instance["type"]} cannot find container object label '
                 f'"{con_tag}" for '
-                f'keyword location "{keyword}"'
+                f'keyword location "{keyword}". '
+                f'The container object label or corresponding '
+                f'keyword could be misspelled, invalid, '
+                f'or does not exist'
             )
 
         idl = obj_repo.get_one_from_labeled_objects(con_tag)

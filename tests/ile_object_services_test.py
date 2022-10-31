@@ -4,7 +4,7 @@ from ideal_learning_env import (
     ILEException,
     InstanceDefinitionLocationTuple,
     MaterialRestrictions,
-    ObjectRepository,
+    ObjectRepository
 )
 
 

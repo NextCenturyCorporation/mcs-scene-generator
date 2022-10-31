@@ -16,6 +16,7 @@ from ideal_learning_env.structural_object_service import (
     FloorAreaConfig,
     FloorMaterialConfig,
     OccludingWallType,
+    PassivePhysicsSetup,
     StructuralDoorConfig,
     StructuralDropperConfig,
     StructuralLOccluderConfig,
@@ -25,16 +26,16 @@ from ideal_learning_env.structural_object_service import (
     StructuralPlatformConfig,
     StructuralRampConfig,
     StructuralThrowerConfig,
+    StructuralTurntableConfig,
     StructuralWallConfig,
     ToolConfig,
-    WallSide,
+    WallSide
 )
 
 from .choosers import choose_counts, choose_random
 from .components import ILEComponent
 from .decorators import ile_config_setter
-from .defs import ILEDelayException, find_bounds, return_list
-from .goal_services import TARGET_LABEL
+from .defs import TARGET_LABEL, ILEDelayException, find_bounds, return_list
 from .interactable_object_service import KeywordLocationConfig
 from .numerics import MinMaxInt
 from .object_services import ObjectRepository
@@ -588,6 +589,63 @@ class SpecificStructuralObjectsComponent(ILEComponent):
     ```
     """
 
+    structural_turntables: Union[StructuralTurntableConfig,
+                                 List[StructuralTurntableConfig]] = 0
+    """
+    ([StructuralTurntableConfig](#StructuralTurntableConfig), or list
+    of [StructuralTurntableConfig](#StructuralTurntableConfig) dict) --
+    Groups of structural turntable configurations and how many should be
+    generated from the given options.
+    Default: 0
+
+
+    Simple Example:
+    ```
+    structural_turntables:
+        - num: 0
+    ```
+
+    Advanced Example:
+    ```
+    structural_turntables:
+        - num:
+            min: 1
+            max: 3
+        - num: 1
+          position:
+            x: [1,2]
+            y: 0
+            z:
+              min: -3
+              max: 3
+          turntable_height: 0.5
+          turntable_radius: 1
+          turntable_movement:
+            step_begin: 1
+            step_end: 10
+            rotation_y: 20
+          material: PLASTIC_MATERIALS
+        - num: [1, 3]
+          position:
+            x: [4, 5]
+            y: 0
+            z:
+              min: -5
+              max: -4
+          turntable_height:
+            min: .5
+            max: 2
+          turntable_radius: [.75, 1.25]
+          turntable_movement:
+            step_begin: 1
+            step_end: 20
+            rotation_y: 10
+          material: AI2-THOR/Materials/Metals/BrushedAluminum_Blue
+
+
+    ```
+    """
+
     tools: Union[ToolConfig, List[ToolConfig]] = 0
     """
     ([ToolConfig](#ToolConfig), or list of [ToolConfig](#ToolConfig) dict) --
@@ -701,10 +759,17 @@ class SpecificStructuralObjectsComponent(ILEComponent):
         options=THROWER_SHAPES
     ))
     @ile_config_setter(validator=ValidateOptions(
-        props=['wall'],
+        props=['passive_physics_setup'],
         options=(
-            WallSide.LEFT, WallSide.RIGHT, WallSide.FRONT, WallSide.BACK
+            PassivePhysicsSetup.RANDOM,
+            PassivePhysicsSetup.ROLL_ANGLED,
+            PassivePhysicsSetup.ROLL_STRAIGHT,
+            PassivePhysicsSetup.TOSS_STRAIGHT
         )
+    ))
+    @ile_config_setter(validator=ValidateOptions(
+        props=['wall'],
+        options=(WallSide.LEFT, WallSide.RIGHT, WallSide.FRONT, WallSide.BACK)
     ))
     def set_structural_throwers(self, data: Any) -> None:
         self.structural_throwers = data
@@ -772,6 +837,19 @@ class SpecificStructuralObjectsComponent(ILEComponent):
     def set_structural_occluding_walls(self, data: Any) -> None:
         self.structural_occluding_walls = data
 
+    # cogs have the same material restrictions as doors
+    @ile_config_setter(validator=ValidateOptions(
+        props=['material'],
+        options=(DOOR_MATERIAL_RESTRICTIONS +
+                 ["METAL_MATERIALS", "PLASTIC_MATERIALS", "WOOD_MATERIALS"]
+                 )
+    ))
+    @ile_config_setter(validator=ValidateNumber(
+        props=['turntable_radius', 'turntable_height'],
+        min_value=0, null_ok=True))
+    def set_structural_turntables(self, data: Any) -> None:
+        self.structural_turntables = data
+
     @ile_config_setter(validator=ValidateNumber(props=['num'], min_value=0))
     @ile_config_setter(validator=ValidateNumber(
         props=['activation_step'], min_value=0,
@@ -832,6 +910,7 @@ class SpecificStructuralObjectsComponent(ILEComponent):
             (FeatureTypes.OCCLUDING_WALLS, self.structural_occluding_walls),
             (FeatureTypes.PLACERS, self.placers),
             (FeatureTypes.DOORS, self.doors),
+            (FeatureTypes.TURNTABLES, self.structural_turntables),
             (FeatureTypes.TOOLS, self.tools)
         ]
 
@@ -870,6 +949,29 @@ class SpecificStructuralObjectsComponent(ILEComponent):
         return [str(err) for _, _, err in self._delayed_templates]
 
 
+NON_STRUCTURAL_TYPES = [
+    FeatureTypes.AGENT,
+    FeatureTypes.INTERACTABLE,
+    FeatureTypes.PARTITION_FLOOR,
+    FeatureTypes.TARGET
+]
+ALL_STRUCTURAL_TYPES = [
+    item.name.lower() for item in FeatureTypes
+    if item not in NON_STRUCTURAL_TYPES
+]
+STRUCTURAL_TYPES_NEEDING_TARGET = [FeatureTypes.OCCLUDING_WALLS]
+ALL_STRUCTURAL_TYPES_NO_TARGET = [
+    item.name.lower() for item in FeatureTypes if item not in
+    (STRUCTURAL_TYPES_NEEDING_TARGET + NON_STRUCTURAL_TYPES)
+]
+# TODO MCS-1206 Include tools here for now, but move them to the default
+#      keyword_objects setting in the future since they're not structures.
+DEFAULT_VALUE = [RandomStructuralObjectConfig(
+    ALL_STRUCTURAL_TYPES_NO_TARGET,
+    MinMaxInt(2, 4)
+)]
+
+
 class RandomStructuralObjectsComponent(ILEComponent):
     """Adds random structural objects to an ILE scene.  Users can specify an
     exact number or a range.  When a range is specified, each generated scene
@@ -903,6 +1005,7 @@ class RandomStructuralObjectsComponent(ILEComponent):
           - ramps
           - throwers
           - tools
+          - turntables
           - walls
         num:
           min: 2
@@ -930,6 +1033,7 @@ class RandomStructuralObjectsComponent(ILEComponent):
           - ramps
           - throwers
           - tools
+          - turntables
           - walls
         num:
             min: 0
@@ -941,25 +1045,6 @@ class RandomStructuralObjectsComponent(ILEComponent):
     ```
     """
 
-    ALL_STRUCTURAL_TYPES = [
-        item.name.lower() for item in FeatureTypes if item not in [
-            FeatureTypes.AGENT, FeatureTypes.INTERACTABLE,
-            FeatureTypes.PARTITION_FLOOR]]
-    ALL_STRUCTURAL_TYPES_NO_TARGET = [
-        item.name.lower() for item in FeatureTypes
-        # The following FeatureTypes need a target object:
-        if item not in [FeatureTypes.OCCLUDING_WALLS,
-                        FeatureTypes.INTERACTABLE,
-                        FeatureTypes.AGENT,
-                        FeatureTypes.PARTITION_FLOOR]
-    ]
-    # TODO MCS-1206 Include tools here for now, but move them to the default
-    #      keyword_objects setting in the future since they're not structures.
-    DEFAULT_VALUE = [RandomStructuralObjectConfig(
-        ALL_STRUCTURAL_TYPES_NO_TARGET,
-        MinMaxInt(2, 4)
-    )]
-
     def __init__(self, data: Dict[str, Any]):
         super().__init__(data)
 
@@ -970,17 +1055,17 @@ class RandomStructuralObjectsComponent(ILEComponent):
         bounds = find_bounds(scene)
         templates = return_list(
             self.random_structural_objects,
-            self.DEFAULT_VALUE
+            DEFAULT_VALUE
         )
-        using_default = (templates == self.DEFAULT_VALUE)
+        using_default = (templates == DEFAULT_VALUE)
 
         logger.trace(f'Choosing random structural objects: {templates}')
 
         # List all the valid types for randomly generated structural objects.
         target_exists = ObjectRepository.get_instance().has_label(TARGET_LABEL)
         all_types = (
-            self.ALL_STRUCTURAL_TYPES if target_exists
-            else self.ALL_STRUCTURAL_TYPES_NO_TARGET
+            ALL_STRUCTURAL_TYPES if target_exists
+            else ALL_STRUCTURAL_TYPES_NO_TARGET
         )
 
         for template, num in choose_counts(templates):
@@ -1044,6 +1129,8 @@ class RandomStructuralObjectsComponent(ILEComponent):
                 labels=template.labels,
                 projectile_labels=relative_object_label
             )
+        if structural_type == FeatureTypes.TURNTABLES:
+            return StructuralTurntableConfig(labels=template.labels)
         if structural_type == FeatureTypes.TOOLS:
             return ToolConfig(labels=template.labels)
         if structural_type == FeatureTypes.WALLS:

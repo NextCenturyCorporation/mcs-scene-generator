@@ -11,8 +11,8 @@ setuptools.setup(
     maintainer='Next Century, a wholly owned subsidiary of CACI',
     maintainer_email='mcs-ta2@machinecommonsense.com',
     url='https://github.com/NextCenturyCorporation/mcs-scene-generator/',
-    description=('Machine Common Sense Ideal Learning Environment and '
-                 'Scene Generator'),
+    description=('Machine Common Sense Interactive Learning Environment and '
+                 'Hypercube Scene Generators'),
     long_description=long_description,
     long_description_content_type='text/markdown',
     classifiers=[
@@ -24,7 +24,7 @@ setuptools.setup(
     python_requires=">=3.8",
     packages=setuptools.find_packages(),
     install_requires=[
-        'machine-common-sense>=0.5.5',
+        'machine-common-sense>=0.6.1',
         'pyyaml>=5.3.1',
         'shapely>=1.7.0'
     ],

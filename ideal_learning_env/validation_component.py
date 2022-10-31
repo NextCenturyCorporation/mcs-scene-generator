@@ -14,7 +14,7 @@ from .structural_object_service import (
     LABEL_BIDIRECTIONAL_RAMP,
     LABEL_CONNECTED_TO_RAMP,
     LABEL_PLATFORM,
-    LABEL_RAMP,
+    LABEL_RAMP
 )
 
 logger = logging.getLogger(__name__)
@@ -35,7 +35,9 @@ class ValidPathComponent(ILEComponent):
     scene. It also considers moving up and/or down ramps that are attached to
     platforms (via the `attached_ramps` option in `structural_platforms`), as
     well as across those platforms. Pathfinding is otherwise only done in two
-    dimensions. This check is skipped if false. Default: False
+    dimensions. This check is skipped if false. Please note that this feature
+    is not currently supported for scenes containing multiple targets.
+    Default: False
 
     Simple Example:
     ```
@@ -74,7 +76,7 @@ class ValidPathComponent(ILEComponent):
 
     def _no_target_found(self, scene) -> bool:
         # Target placement may be delayed
-        return scene.get_target_object() is None
+        return len(scene.get_targets()) == 0
 
     def _performer_not_within_room(self, scene) -> bool:
         # shortcut_start_on_platform triggers a delayed action, placing
@@ -110,7 +112,7 @@ class ValidPathComponent(ILEComponent):
 
     def _find_valid_path(self, scene):
         if self.check_valid_path:
-            logger.info('  Running path validation check...')
+            logger.info('Running path validation check...')
 
             environ = PlottingEnvironment(
                 "./plots/") if self._debug_plot else PolygonEnvironment()
@@ -125,7 +127,15 @@ class ValidPathComponent(ILEComponent):
                 raise ILEException(
                     "Performer start position is not within bounds.")
 
-            tgt = scene.get_target_object()
+            # TODO This won't work in scenes with multiple targets.
+            targets = scene.get_targets()
+            if len(targets) > 1:
+                raise ILEException(
+                    f'The check_valid_path config option does not currently '
+                    f'support scenes containing multiple targets (found '
+                    f'{len(targets)} total targets)'
+                )
+            tgt = targets[0] if targets else None
             start, end = self._compute_start_end(scene, tgt)
             boundary = self._compute_boundary(scene)
 
@@ -382,6 +392,9 @@ class ValidPathComponent(ILEComponent):
             ])
 
     def is_object_path_blocking(self, obj, tgt):
+        if tgt.get('associatedWithAgent') == obj['id']:
+            return False
+
         show = obj['shows'][0]
         bb = show['boundingBox']
         # Don't add the target

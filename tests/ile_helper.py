@@ -2,12 +2,13 @@ from os import getuid
 
 from machine_common_sense.config_manager import Vector3d
 
-from generator import ObjectBounds, base_objects
-from generator.scene import Scene
-from ideal_learning_env.goal_services import TARGET_LABEL
+from generator import ObjectBounds, Scene
+from generator.base_objects import create_soccer_ball
+from generator.instances import instantiate_object
+from ideal_learning_env.defs import TARGET_LABEL
 from ideal_learning_env.object_services import (
     InstanceDefinitionLocationTuple,
-    ObjectRepository,
+    ObjectRepository
 )
 
 
@@ -34,6 +35,18 @@ def prior_scene_custom(size_x=10, size_z=10, start_x=0, start_z=0):
     scene = Scene()
     scene.set_performer_start_position(start_x, 0, start_z)
     scene.set_room_dimensions(size_x, 3, size_z)
+    return scene
+
+
+def prior_passive_scene(last_step: int = None):
+    scene = Scene()
+    scene.intuitive_physics = True
+    scene.version = 3
+    scene.set_performer_start_position(0, 0, -4.5)
+    scene.set_performer_start_rotation(0)
+    scene.set_room_dimensions(20, 10, 20)
+    if last_step:
+        scene.goal['last_step'] = last_step
     return scene
 
 
@@ -90,11 +103,34 @@ def prior_scene_with_target(
     scene.goal = goal
     ObjectRepository.get_instance().clear()
     if add_to_repo:
-        target_defn = base_objects.create_soccer_ball()
+        target_defn = create_soccer_ball()
         target_loc = target_object['shows'][0]
         t = InstanceDefinitionLocationTuple(
             target_object, target_defn, target_loc)
         ObjectRepository.get_instance().add_to_labeled_objects(t, TARGET_LABEL)
+    return scene
+
+
+def prior_scene_with_targets():
+    scene = prior_scene()
+    target_1 = instantiate_object(
+        create_soccer_ball(),
+        {'position': {'x': 1, 'y': 0.11, 'z': 2}}
+    )
+    target_2 = instantiate_object(
+        create_soccer_ball(),
+        {'position': {'x': 3, 'y': 0.11, 'z': 4}}
+    )
+    scene.objects = [target_1, target_2]
+    scene.goal = {
+        'category': 'multi retrieval',
+        'metadata': {
+            'targets': [
+                {'id': target_1['id']},
+                {'id': target_2['id']}
+            ]
+        }
+    }
     return scene
 
 
@@ -103,9 +139,10 @@ def prior_scene_with_wall(
     size_z: int = 10,
     start_x: float = 0,
     start_z: float = 0,
-    target: bool = False
+    target: bool = False,
+    passive: bool = False
 ) -> Scene:
-    scene = (
+    scene = prior_passive_scene() if passive else (
         prior_scene_with_target(size_x, size_z, start_x, start_z) if target
         else prior_scene_custom(size_x, size_z, start_x, start_z)
     )

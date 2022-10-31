@@ -8,7 +8,7 @@ from shapely import affinity
 
 from .base_objects import (
     ALL_LARGE_BLOCK_TOOLS,
-    LARGE_BLOCK_TOOLS_TO_DIMENSIONS,
+    LARGE_BLOCK_TOOLS_TO_DIMENSIONS
 )
 from .geometry import PERFORMER_HEIGHT, ObjectBounds, create_bounds
 from .materials import MaterialTuple
@@ -207,6 +207,47 @@ RAMP_TEMPLATE = {
     }]
 }
 
+TURNTABLE_TEMPLATE = {
+    'id': 'turntable_',
+    'type': 'rotating_cog',
+    'debug': {
+        'color': [],
+        'info': []
+    },
+    'mass': 100,
+    'materials': [],
+    'kinematic': True,
+    'structure': True,
+    'shows': [{
+        'stepBegin': 0,
+        'position': {
+            'x': 0,
+            'y': 0,
+            'z': 0
+        },
+        'rotation': {
+            'x': 0,
+            'y': 0,
+            'z': 0
+        },
+        'scale': {
+            'x': 1,
+            'y': 1,
+            'z': 1
+        }
+    }]
+}
+
+TURNTABLE_MOVEMENT_TEMPLATE = {
+    'stepBegin': 0,
+    'stepEnd': 0,
+    'vector': {
+        'x': 0,
+        'y': 0,
+        'z': 0
+    }
+}
+
 DOOR_TEMPLATE = {
     'id': 'door_',
     'type': 'door_4',
@@ -266,7 +307,7 @@ TOOL_TEMPLATE = {
     }]
 }
 
-GUIDE_RAIL_DEFAULT_POSITION_Y = 0.1
+GUIDE_RAIL_DEFAULT_POSITION_Y = 0.15
 GUIDE_RAIL_TEMPLATE = {
     'id': 'guide_rail_',
     'type': 'cube',
@@ -292,7 +333,7 @@ GUIDE_RAIL_TEMPLATE = {
         },
         'scale': {
             'x': 0.2,
-            'y': 0.2,
+            'y': 0.3,
             'z': 1  # Set to necessary length
         }
     }]
@@ -742,6 +783,60 @@ def create_door_occluder(room_dimensions: Vector3d,
     right_door = doors_objs[8]
     return (doors_objs, int(door_end_drop_step),
             center_door, left_door, right_door)
+
+
+def create_turntable(
+    position_x: float,
+    position_z: float,
+    position_y_modifier: float,
+    rotation_y: float,
+    radius: float,
+    height: float,
+    step_begin: int,
+    step_end: int,
+    movement_rotation: float,
+    material_tuple: MaterialTuple,
+    bounds: ObjectBounds = None
+) -> Dict[str, Any]:
+    """Create and return an instance of a turntable."""
+    # Need to reconcile issues with y-scale value since the
+    # default cog base object is very thin.
+    y_scale_multiplier = 50.0
+
+    turntable = copy.deepcopy(TURNTABLE_TEMPLATE)
+    turntable['shows'][0]['position'] = {
+        'x': position_x,
+        'y': position_y_modifier + height / 2.0,
+        'z': position_z
+    }
+    turntable['shows'][0]['rotation'] = {
+        'x': 0,
+        'y': rotation_y,
+        'z': 0
+    }
+    turntable['shows'][0]['scale'] = {
+        'x': radius * 2.0,
+        'y': height * y_scale_multiplier,
+        'z': radius * 2.0
+    }
+
+    turntable['rotates'] = [copy.deepcopy(TURNTABLE_MOVEMENT_TEMPLATE)]
+    turntable['rotates'][0]['stepBegin'] = step_begin
+    turntable['rotates'][0]['stepEnd'] = step_end
+    turntable['rotates'][0]['vector']['y'] = movement_rotation
+
+    # Use height instead of y-scale for override
+    return finalize_structural_object(
+        [turntable],
+        material_tuple,
+        ['turntable'],
+        bounds,
+        override_scale={
+            'x': turntable['shows'][0]['scale']['x'],
+            'y': height,
+            'z': turntable['shows'][0]['scale']['z']
+        }
+    )
 
 
 def _get_door_wall_objects(

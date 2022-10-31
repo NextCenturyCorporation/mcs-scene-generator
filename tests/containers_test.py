@@ -9,14 +9,14 @@ from generator import (
     definitions,
     geometry,
     instances,
-    specific_objects,
+    specific_objects
 )
 from generator.containers import (
     can_contain,
     can_contain_both,
     can_enclose,
     put_object_in_container,
-    put_objects_in_container,
+    put_objects_in_container
 )
 
 DEFAULT_CONTAINER = definitions.finalize_object_definition(ObjectDefinition(
@@ -33,6 +33,7 @@ DEFAULT_CONTAINER = definitions.finalize_object_definition(ObjectDefinition(
 
 
 PICKUPABLE_OBJECTS_WITHOUT_CONTAINMENTS = [
+    'dog_on_wheels_2',
     'duck_on_wheels', 'chair_1', 'chair_2', 'table_1', 'table_3', 'shelf_1'
 ]
 

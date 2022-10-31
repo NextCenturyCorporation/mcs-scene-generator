@@ -3,7 +3,7 @@ from .base_objects import (
     FULL_TYPE_LIST,
     ObjectBaseSize,
     ObjectInteractableArea,
-    ObjectSidewaysSize,
+    ObjectSidewaysSize
 )
 from .containers import Orientation
 from .definitions import (
@@ -13,7 +13,7 @@ from .definitions import (
     MaterialChoice,
     ObjectDefinition,
     SizeChoice,
-    TypeChoice,
+    TypeChoice
 )
 from .exceptions import SceneException
 from .geometry import MAX_TRIES, ObjectBounds
@@ -21,7 +21,7 @@ from .interactive_goals import (
     InteractiveGoal,
     RetrievalGoal,
     TransferralGoal,
-    TraversalGoal,
+    TraversalGoal
 )
 from .materials import MaterialTuple
-from .scene import Scene
+from .scene import PartitionFloor, Scene, get_step_limit_from_dimensions

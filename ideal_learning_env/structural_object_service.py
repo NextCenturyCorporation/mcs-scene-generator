@@ -24,19 +24,34 @@ from generator import (
     mechanisms,
     occluders,
     specific_objects,
-    structures,
+    structures
 )
 from generator.base_objects import LARGE_BLOCK_TOOLS_TO_DIMENSIONS
+from generator.intuitive_physics_util import (
+    COLLISION_SPEEDS,
+    MAX_TARGET_Z,
+    MAX_TARGET_Z_STRAIGHT_ACROSS,
+    MIN_TARGET_Z,
+    NON_COLLISION_ANGLED_SPEEDS,
+    NON_COLLISION_SPEEDS,
+    TOSS_SPEEDS,
+    find_off_screen_position_diagonal_away,
+    find_off_screen_position_diagonal_toward,
+    find_position_behind_occluder_diagonal_away,
+    find_position_behind_occluder_diagonal_toward,
+    retrieve_off_screen_position_x,
+    retrieve_off_screen_position_y
+)
+from generator.movements import BASE_MOVE_LIST, TOSS_MOVE_LIST
 from generator.scene import PartitionFloor, Scene
 from ideal_learning_env.global_settings_component import (
     ROOM_MIN_XZ,
-    ROOM_MIN_Y,
+    ROOM_MIN_Y
 )
-from ideal_learning_env.goal_services import TARGET_LABEL
 from ideal_learning_env.interactable_object_service import (
     InteractableObjectConfig,
     InteractableObjectCreationService,
-    KeywordLocationConfig,
+    KeywordLocationConfig
 )
 from ideal_learning_env.object_services import (
     DEBUG_FINAL_POSITION_KEY,
@@ -45,7 +60,7 @@ from ideal_learning_env.object_services import (
     ObjectDefinition,
     ObjectRepository,
     RelativePositionConfig,
-    add_random_placement_tag,
+    add_random_placement_tag
 )
 
 from .choosers import (
@@ -55,9 +70,15 @@ from .choosers import (
     choose_position,
     choose_random,
     choose_rotation,
-    choose_shape_material,
+    choose_shape_material
 )
-from .defs import ILEException, find_bounds
+from .defs import (
+    TARGET_LABEL,
+    ILEConfigurationException,
+    ILEDelayException,
+    ILEException,
+    find_bounds
+)
 from .feature_creation_service import (
     BaseFeatureConfig,
     BaseObjectCreationService,
@@ -65,13 +86,13 @@ from .feature_creation_service import (
     FeatureTypes,
     log_feature_template,
     position_relative_to,
-    validate_all_locations_and_update_bounds,
+    validate_all_locations_and_update_bounds
 )
 from .numerics import (
     MinMaxFloat,
     MinMaxInt,
     VectorFloatConfig,
-    VectorIntConfig,
+    VectorIntConfig
 )
 
 logger = logging.getLogger(__name__)
@@ -125,6 +146,11 @@ ATTACHED_RAMP_MAX_WIDTH = 1.5
 ATTACHED_RAMP_MAX_LENGTH = 3
 ATTACHED_RAMP_MIN_LENGTH = .5
 TOP_PLATFORM_POSITION_MIN = 0.3
+
+DEFAULT_TURNTABLE_MIN_RADIUS = 0.5
+DEFAULT_TURNTABLE_MAX_RADIUS = 1.5
+
+DEFAULT_TURNTABLE_HEIGHT = 0.1
 
 # These are arbitrary but they need to be high enough that a ramp can get up
 # the top platform without being greater than 45 degress.
@@ -200,6 +226,13 @@ THROWER_SHAPES_TO_SCALES = _retrieve_scaled_shapes_from_datasets({
     **intuitive_physics_objects.MOVE_ACROSS_TYPES_TO_SIZES
 })
 THROWER_SHAPES = sorted(list(THROWER_SHAPES_TO_SCALES.keys()))
+
+
+class PassivePhysicsSetup(str, Enum):
+    RANDOM = "random"
+    ROLL_ANGLED = "roll_angled"
+    ROLL_STRAIGHT = "roll_straight"
+    TOSS_STRAIGHT = "toss_straight"
 
 
 class WallSide(str, Enum):
@@ -479,13 +512,16 @@ class StructuralDropperCreationService(
             'is_round': ('ball' in self.target.definition.shape)
         }
         logger.trace(f'Creating dropper:\nINPUT = {args}')
-        new_obj = [
-            mechanisms.create_dropping_device(
-                **args)
-        ]
+        new_obj = [mechanisms.create_dropping_device(**args)]
         self.dropper = new_obj[0]
         if not self.target_exists:
             new_obj.append(self.target.instance)
+
+        # In passive physics scenes, change the dropper's position to just
+        # outside the camera's viewport (instead of attached to the ceiling).
+        if scene.intuitive_physics:
+            position_y = retrieve_off_screen_position_y(reconciled.position_z)
+            self.dropper['shows'][0]['position']['y'] = round(position_y, 4)
 
         add_random_placement_tag(new_obj, source_template)
         return new_obj
@@ -529,29 +565,34 @@ class StructuralDropperCreationService(
         self._do_post_add(scene, reconciled_template)
 
     def _do_post_add(self, scene, reconciled):
+        target = self.target
+
         args = {
-            'instance': self.target.instance,
+            'instance': target.instance,
             'dropping_device': self.dropper,
             'dropping_step': reconciled.drop_step
         }
         logger.trace(f'Positioning dropper object:\nINPUT = {args}')
         mechanisms.drop_object(**args)
-        self.target.instance['debug']['positionedBy'] = 'mechanism'
-        self.target.instance['debug'][DEBUG_FINAL_POSITION_KEY] = True
+        target.instance['debug']['positionedBy'] = 'mechanism'
+        target.instance['debug'][DEBUG_FINAL_POSITION_KEY] = True
+
+        # Override other properties for a passive physics scene (if needed).
+        if scene.intuitive_physics:
+            # Only show the target on the step that it's dropped.
+            target.instance['shows'][0]['stepBegin'] = reconciled.drop_step
+            # Don't show the dropper at all.
+            self.dropper['shows'][0]['stepBegin'] = -1
 
         if not self.target_exists:
-            log_feature_template(
-                'dropper object',
-                'id',
-                self.target.instance['id']
-            )
+            log_feature_template('dropper object', 'id', target.instance['id'])
         else:
             for i in range(len(scene.objects)):
-                if scene.objects[i]['id'] == self.target.instance['id']:
-                    scene.objects[i] = self.target.instance
+                if scene.objects[i]['id'] == target.instance['id']:
+                    scene.objects[i] = target.instance
 
         object_repo = ObjectRepository.get_instance()
-        object_repo.add_to_labeled_objects(self.target, self._target_labels)
+        object_repo.add_to_labeled_objects(target, self._target_labels)
 
 
 class StructuralThrowerCreationService(
@@ -591,23 +632,71 @@ class StructuralThrowerCreationService(
             WallSide.BACK: 270}
         projectile_dimensions = vars(self.target.definition.dimensions)
         max_scale = max(projectile_dimensions['x'], projectile_dimensions['z'])
-        wall = reconciled.wall
-        if wall in [WallSide.FRONT, WallSide.BACK]:
+
+        # If passive_physics_setup is set, then override all default and
+        # configured options with values used in passive physics scenes.
+        if reconciled.passive_physics_setup:
+            reconciled.wall = random.choice([WallSide.LEFT, WallSide.RIGHT])
+            reconciled.rotation_z = 0
+            choices = [reconciled.passive_physics_setup]
+            if reconciled.passive_physics_setup == PassivePhysicsSetup.RANDOM:
+                choices = [
+                    PassivePhysicsSetup.ROLL_ANGLED,
+                    PassivePhysicsSetup.ROLL_STRAIGHT,
+                    PassivePhysicsSetup.TOSS_STRAIGHT
+                ]
+            choice = random.choice(choices)
+            # Normal movement
+            if choice == PassivePhysicsSetup.ROLL_STRAIGHT:
+                reconciled.height = 0
+                reconciled.rotation_y = 0
+                reconciled.position_wall = random.uniform(
+                    MIN_TARGET_Z,
+                    MAX_TARGET_Z_STRAIGHT_ACROSS
+                )
+            # Tossed movement
+            if choice == PassivePhysicsSetup.TOSS_STRAIGHT:
+                reconciled.height = 1
+                reconciled.rotation_y = 0
+                reconciled.position_wall = random.uniform(
+                    MIN_TARGET_Z,
+                    MAX_TARGET_Z_STRAIGHT_ACROSS
+                )
+            # Angled movement
+            if choice == PassivePhysicsSetup.ROLL_ANGLED:
+                reconciled.height = 0
+                rotation_choices = [-20, 20]
+                if reconciled.wall == WallSide.LEFT:
+                    rotation_choices = [20, -20]
+                reconciled.rotation_y = random.choice(rotation_choices)
+                # Back-to-front
+                if reconciled.rotation_y == rotation_choices[0]:
+                    reconciled.position_wall = MAX_TARGET_Z
+                # Front-to-back
+                if reconciled.rotation_y == rotation_choices[1]:
+                    reconciled.position_wall = MIN_TARGET_Z
+
+        if reconciled.wall in [WallSide.FRONT, WallSide.BACK]:
             pos_x = reconciled.position_wall
-            pos_z = (room_dim.z - max_scale) / \
-                2.0 if wall == WallSide.FRONT else -(
-                room_dim.z - max_scale) / 2.0
-        if wall in [WallSide.LEFT, WallSide.RIGHT]:
+            pos_z = ((room_dim.z - max_scale) / 2.0) * (
+                1 if reconciled.wall == WallSide.FRONT else -1
+            )
+        if reconciled.wall in [WallSide.LEFT, WallSide.RIGHT]:
             pos_z = reconciled.position_wall
-            pos_x = -(room_dim.x - max_scale) / \
-                2.0 if wall == WallSide.LEFT else (
-                    room_dim.x - max_scale) / 2.0
+            pos_x = ((room_dim.x - max_scale) / 2.0) * (
+                -1 if reconciled.wall == WallSide.LEFT else 1
+            )
+            # In passive physics scenes, change the thrower's position to just
+            # outside the camera's viewport (instead of attached to the wall).
+            if scene.intuitive_physics:
+                pos_x = round(retrieve_off_screen_position_x(pos_z), 4)
+                pos_x *= (-1 if reconciled.wall == WallSide.LEFT else 1)
 
         args = {
             'position_x': pos_x,
             'position_y': reconciled.height,
             'position_z': pos_z,
-            'rotation_y': wall_rot[wall] + reconciled.rotation_y,
+            'rotation_y': wall_rot[reconciled.wall] + reconciled.rotation_y,
             'rotation_z': reconciled.rotation_z,
             'object_dimensions': projectile_dimensions,
             'object_rotation_y': self.target.definition.rotation.y,
@@ -684,44 +773,295 @@ class StructuralThrowerCreationService(
         super()._on_valid_instances(scene, reconciled_template, new_obj)
         self._do_post_add(scene, reconciled_template)
 
-    def _do_post_add(self, scene, reconciled):
-        thrower = self.thrower
-        force = reconciled.throw_force
+    def __use_stop_position_config(self, scene, reconciled) -> float:
+        if reconciled.height not in [0, 1]:
+            raise ILEConfigurationException(
+                f'The ILE does not have "stop_position" movement data for the '
+                f'configured thrower height ({reconciled.height}). Please '
+                f'use one of the following thrower heights: 0, 1'
+            )
+
+        thrower_x = round(self.thrower['shows'][0]['position']['x'], 4)
+        thrower_y = round(self.thrower['shows'][0]['position']['y'], 4)
+        thrower_z = round(self.thrower['shows'][0]['position']['z'], 4)
+        thrower_angle = self.thrower['shows'][0]['rotation']['y']
+
+        is_left_to_right = (thrower_x < 0)
+        if thrower_angle in [0, 180]:
+            is_straight = True
+            is_back_to_front = False
+            throw_angle = 0
+        elif is_left_to_right:
+            is_straight = False
+            is_back_to_front = (thrower_angle > 0)
+            throw_angle = thrower_angle - 0
+        else:
+            is_straight = False
+            is_back_to_front = (thrower_angle < 180)
+            throw_angle = thrower_angle - 180
+
+        # Base case: use X/Z config
+        stop_x = reconciled.stop_position.x
+        stop_z = reconciled.stop_position.z
+
+        # If "offscreen" is set, calculate the offscreen X/Z position.
+        if scene.intuitive_physics and reconciled.stop_position.offscreen:
+            if is_straight:
+                stop_x = retrieve_off_screen_position_x(thrower_z)
+                stop_x = stop_x * (1 if is_left_to_right else -1)
+                stop_z = thrower_z
+            else:
+                if is_back_to_front:
+                    func = find_off_screen_position_diagonal_toward
+                    # This shouldn't happen if passive_physics_setup is set.
+                    on_error = (
+                        "Try moving the thrower further back, away from the " +
+                        "performer agent's starting position."
+                    )
+                else:
+                    func = find_off_screen_position_diagonal_away
+                    # This shouldn't happen if passive_physics_setup is set.
+                    on_error = (
+                        "Try moving the thrower closer to the performer " +
+                        "agent's starting position, and/or decrease its " +
+                        "angle to 20 or less."
+                    )
+                stop_x, stop_z = func(thrower_x, thrower_z, abs(throw_angle))
+                if not stop_x or not stop_z:
+                    raise ILEException(
+                        f'A thrower configured with a "stop_position" of '
+                        f'"offscreen" ({thrower_x=}, {thrower_y=}, '
+                        f'{thrower_z=}, {throw_angle=}) cannot find a valid '
+                        f'X/Z stop position ({stop_x=}, {stop_z=}). {on_error}'
+                    )
+
+        # If "behind" is set, calculate the X/Z position behind the occluder.
+        if scene.intuitive_physics and reconciled.stop_position.behind:
+            object_repo = ObjectRepository.get_instance()
+            label = reconciled.stop_position.behind
+            if not object_repo.has_label(label):
+                raise ILEDelayException(
+                    f'Cannot find object label {label} to identify thrower '
+                    f'"stop_position" for "behind" configuration.'
+                )
+            idl = object_repo.get_one_from_labeled_objects(label)
+            occluder_x = idl.instance['shows'][0]['position']['x']
+            occluder_z = idl.instance['shows'][0]['position']['z']
+            if is_back_to_front:
+                func = find_position_behind_occluder_diagonal_toward
+            else:
+                func = find_position_behind_occluder_diagonal_away
+            stop_x, stop_z = func(
+                occluder_x,
+                occluder_z,
+                thrower_x,
+                thrower_z,
+                abs(throw_angle)
+            )
+            logger.debug(
+                f'Found stop position behind occluder {label}: '
+                f'{stop_x=}, {stop_z=}'
+            )
+            if not stop_x or not stop_z:
+                raise ILEException(
+                    f'A thrower configured with a "stop_position" of '
+                    f'"behind" ({thrower_x=}, {thrower_y=}, {thrower_z=}, '
+                    f'{throw_angle=}, {occluder_x=}, {occluder_z=}) cannot '
+                    f'find a valid X/Z stop position ({stop_x=}, {stop_z=}). '
+                    f'Try adjusting the position or angle of the thrower, '
+                    f'and/or the position of occluder {label}.'
+                )
+
+        # Validation for the X/Z if neither "offscreen" nor "behind".
+        if stop_x is None or stop_z is None:
+            raise ILEConfigurationException(
+                f'A thrower configured with "stop_position" must have both X '
+                f'and Z, but at least one was null: {stop_x=} {stop_z=}'
+            )
+
+        # Find the required distance the object must travel.
+        required_distance = math.dist([thrower_x, thrower_z], [stop_x, stop_z])
+        required_distance = round(required_distance, 2)
+
+        # Ensure the throw angle is valid. The X/Z values from "offscreen" or
+        # "behind" (in passive physics scenes) should always be valid.
+        x_distance = round(thrower_x - stop_x, 2)
+        required_angle = 90 - math.degrees(math.asin(
+            math.radians(x_distance) / math.radians(required_distance)
+        )) - 180
+        if not math.isclose(abs(required_angle), abs(throw_angle), abs_tol=5):
+            raise ILEException(
+                f'A thrower configured with "stop_position" ({thrower_x=}, '
+                f'{thrower_y=}, {thrower_z=}, {thrower_angle=}, {stop_x=}, '
+                f'{stop_z=}) does not have a valid angle; throw angle must be '
+                f'{abs(required_angle)} but was {abs(throw_angle)}'
+            )
+
+        # Retrieve all the available movement data, which records how far an
+        # object is expected to travel under a specific force.
+        moves = TOSS_MOVE_LIST if reconciled.height == 1 else BASE_MOVE_LIST
+        valid_moves = []
+        all_distances = []
+        for move in moves:
+            # Compare the distance the object will travel before it stops
+            # (using the current movement) to the required distance.
+            distance_by_step = move['xDistanceByStep']
+            move_distance = distance_by_step[-1] - distance_by_step[0]
+            all_distances.append(round(move_distance, 1))
+            # For offscreen stop positions, the required distance is simply a
+            # minimum distance (the object can roll as far as it wants to!).
+            if scene.intuitive_physics and reconciled.stop_position.offscreen:
+                if (move_distance + 0.1) >= required_distance:
+                    valid_moves.append(move)
+            else:
+                if math.isclose(
+                    move_distance,
+                    required_distance,
+                    rel_tol=0.1,
+                    abs_tol=0.1
+                ):
+                    valid_moves.append(move)
+
+        # We don't have every possible move distance pre-recorded (just what is
+        # needed in passive physics scenes), since that would take up a lot of
+        # development time, so just raise an error in most cases.
+        if not valid_moves:
+            # In passive physics scenes, where the thrown object starts off-
+            # screen, if we need the object to stop behind an occluder, try
+            # moving the object back a little bit, so the required distance
+            # matches one of our available distances, and the object will still
+            # be offscreen anyway.
+            if scene.intuitive_physics and reconciled.stop_position.behind:
+                hypotenuse = min([
+                    round(distance - required_distance, 4)
+                    for distance in all_distances
+                ])
+                angle_1 = abs(throw_angle)
+                angle_2 = 90 - angle_1
+                distance_z = hypotenuse * math.sin(math.radians(angle_1))
+                distance_x = hypotenuse * math.sin(math.radians(angle_2))
+                distance_x *= (-1 if is_left_to_right else 1)
+                thrower_position = self.thrower['shows'][0]['position']
+                thrower_position['x'] += distance_x
+                thrower_position['z'] += distance_z
+                return self.__use_stop_position_config(scene, reconciled)
+            move_type = 'tossed' if reconciled.height == 1 else 'non-tossed'
+            raise ILEConfigurationException(
+                f'The ILE does not have "stop_position" movement data for the '
+                f'required throw distance ({thrower_x=}, {thrower_y=}, '
+                f'{thrower_z=}, {throw_angle=}, {stop_x=}, {stop_z=}, '
+                f'{required_distance=}). Please ensure the total distance is '
+                f'approximately equal to one of the following {move_type} '
+                f'movement values: {sorted(set(all_distances))}'
+            )
+
+        # These forces are all non-impulse.
+        reconciled.impulse = False
+
+        # Choose a random force from the valid movements.
+        chosen_move = random.choice(valid_moves)
+
+        # Some movements have a Y force, in addition to the X force.
+        return chosen_move['forceX'], chosen_move.get('forceY', 0)
+
+    def __use_throw_force_config(self, scene, reconciled) -> float:
+        force_x = reconciled.throw_force
+        force_y = 0
+
+        # Apply the throw_force_multiplier (if any) based on the room size.
         if reconciled.throw_force_multiplier:
-            force = reconciled.throw_force_multiplier
+            force_x = reconciled.throw_force_multiplier
             room_size = scene.room_dimensions
             on_side_wall = reconciled.wall in [WallSide.LEFT, WallSide.RIGHT]
-            force *= room_size.x if on_side_wall else room_size.z
-        elif force is None:
-            force = choose_random(
+            force_x *= room_size.x if on_side_wall else room_size.z
+
+        # Use the correct default throw force (if needed).
+        elif force_x is None:
+            force_x = choose_random(
                 DEFAULT_THROW_FORCE_IMPULSE if reconciled.impulse else
                 DEFAULT_THROW_FORCE_NON_IMPULSE
             )
-        force *= self.target.definition.mass
+
+        # Override the throw_force for a passive physics scene (if needed).
+        if reconciled.passive_physics_throw_force:
+            forces = NON_COLLISION_SPEEDS
+            if reconciled.rotation_z:
+                forces = NON_COLLISION_ANGLED_SPEEDS
+            force_x = random.choice(forces)
+            # Add a Y force for "toss" movement if the object is in the air.
+            if reconciled.height == 1:
+                force_y = random.choice(TOSS_SPEEDS)
+            reconciled.impulse = False
+        if reconciled.passive_physics_collision_force:
+            forces = COLLISION_SPEEDS
+            force_x = random.choice(forces)
+            reconciled.impulse = False
+
+        return force_x, force_y
+
+    def _do_post_add(self, scene, reconciled):
+        target = self.target
+        if reconciled.stop_position:
+            try:
+                force_x, force_y = self.__use_stop_position_config(
+                    scene,
+                    reconciled
+                )
+            except Exception as exception:
+                # If something goes wrong, ensure the corresponding objects
+                # do not remain in the scene (they will be remade).
+                scene.objects = [
+                    instance for instance in scene.objects
+                    if instance['id'] not in
+                    [target.instance['id'], self.thrower['id']]
+                ]
+                raise exception
+        else:
+            force_x, force_y = self.__use_throw_force_config(scene, reconciled)
+
+        # Override other properties for a passive physics scene (if needed).
+        if scene.intuitive_physics:
+            # Only show the target on the step that it's thrown.
+            target.instance['shows'][0]['stepBegin'] = reconciled.throw_step
+            # Don't show the thrower at all.
+            self.thrower['shows'][0]['stepBegin'] = -1
+
+        # Make sure we multiply the force by the target's mass!
+        force_x *= target.definition.mass
+        force_y *= target.definition.mass
+
+        # Update the target to be thrown.
         args = {
-            'instance': self.target.instance,
-            'throwing_device': thrower,
-            'throwing_force': force,
+            'instance': target.instance,
+            'throwing_device': self.thrower,
+            'throwing_force': force_x,
             'throwing_step': reconciled.throw_step,
             'impulse': reconciled.impulse
         }
         logger.trace(f'Positioning thrower object:\nINPUT = {args}')
-        self.target.instance['debug']['positionedBy'] = 'mechanism'
-        self.target.instance['debug'][DEBUG_FINAL_POSITION_KEY] = True
+        target.instance['debug']['positionedBy'] = 'mechanism'
+        target.instance['debug'][DEBUG_FINAL_POSITION_KEY] = True
         mechanisms.throw_object(**args)
+
+        # Update the thrown object's Y force if needed.
+        target.instance['forces'][0]['vector']['y'] = force_y
+
+        # If the thrown object should start on the ground, make sure it isn't
+        # centered in the thrower instead.
+        if reconciled.height == 0:
+            starting_y = target.definition.positionY
+            target.instance['shows'][0]['position']['y'] = starting_y
+
+        # Make sure the target exists in the scene.
         if not self.target_exists:
-            log_feature_template(
-                'thrower object',
-                'id',
-                self.target.instance['id']
-            )
+            log_feature_template('thrower object', 'id', target.instance['id'])
         else:
             for i in range(len(scene.objects)):
-                if scene.objects[i]['id'] == self.target.instance['id']:
-                    scene.objects[i] = self.target.instance
+                if scene.objects[i]['id'] == target.instance['id']:
+                    scene.objects[i] = target.instance
 
         object_repo = ObjectRepository.get_instance()
-        object_repo.add_to_labeled_objects(self.target, self._target_labels)
+        object_repo.add_to_labeled_objects(target, self._target_labels)
 
 
 class StructuralMovingOccluderCreationService(
@@ -1112,6 +1452,11 @@ class StructuralPlacersCreationService(
             source_template: StructuralPlacerConfig):
         """Creates a placer from the given template with
         specific values."""
+
+        self._restriction_validation(
+            source_template
+        )
+
         room_dim = scene.room_dimensions
 
         idl = self.object_idl
@@ -1142,8 +1487,15 @@ class StructuralPlacersCreationService(
         mechanisms.place_object(**args)
 
         objs = []
-        if idl.instance not in scene.objects:
+        if idl.instance not in scene.objects \
+            and not (source_template.empty_placer
+                     if source_template is not None else False):
             objs.append(idl.instance)
+
+        # Create single placers when empty_placer is true
+        if source_template.empty_placer if source_template \
+                is not None else False:
+            defn.placerOffsetX = [0]
 
         for index, placer_offset_x in enumerate(defn.placerOffsetX or [0]):
             # Adjust the placer offset based on the object's Y rotation.
@@ -1185,6 +1537,22 @@ class StructuralPlacersCreationService(
             objs.append(placer)
 
         return objs
+
+    def _restriction_validation(
+            self, template):
+        if template is not None:
+            if (template.placed_object_labels or
+                    template.placed_object_material or
+                    template.placed_object_position or
+                    template.placed_object_rotation or
+                    template.placed_object_scale or
+                    template.placed_object_shape is not None) \
+                    and template.empty_placer is True:
+                raise ILEConfigurationException(
+                    "Error with placer "
+                    "configuration. When 'placer_empty'=True "
+                    "then placed_object_* must NOT be included in "
+                    "the configuration.")
 
     def _handle_dependent_defaults(
             self, scene: Scene, reconciled: StructuralPlacerConfig,
@@ -1237,7 +1605,8 @@ class StructuralPlacersCreationService(
             defn.dimensions.z,
             room_dim.x,
             room_dim.y,
-            room_dim.z
+            room_dim.z,
+            True
         )
 
         # If needed, adjust this placer's position relative to another object.
@@ -1259,6 +1628,27 @@ class StructuralPlacersCreationService(
 
         # Save the projectile labels from the source template.
         self._target_labels = source_template.placed_object_labels
+
+        # Set the placer end_height based on a end_height_object_label,
+        # if that is specified
+        if reconciled.end_height_relative_object_label:
+            # This may need to be revisited/incorporated into
+            # position_relative_to() if there will be cases where the x/z
+            # set above won't match the y position set here, due to multiple
+            # objects in a scene with the same relative object label.
+            end_height_obj_label = reconciled.end_height_relative_object_label
+            obj_repo = ObjectRepository.get_instance()
+            if not obj_repo.has_label(end_height_obj_label):
+                raise ILEDelayException(
+                    f'Cannot find end height relative object label '
+                    f'"{end_height_obj_label}" to position a new placer'
+                )
+            else:
+                end_height_obj = obj_repo.get_one_from_labeled_objects(
+                    label=end_height_obj_label)
+                obj_inst = end_height_obj.instance
+                new_end_height = obj_inst['shows'][0]['scale']['y']
+                reconciled.end_height = new_end_height
 
         return reconciled
 
@@ -1355,6 +1745,83 @@ class StructuralDoorsCreationService(
             MinMaxInt(ROOM_MIN_Y, room_dim.y)
             if reconciled.wall_scale_y is None else
             reconciled.wall_scale_y)
+        return reconciled
+
+
+class StructuralTurntableCreationService(
+        BaseObjectCreationService):
+
+    def __init__(self):
+        self._type = FeatureTypes.TURNTABLES
+        self._default_template = DEFAULT_TEMPLATE_TURNTABLE
+
+    def create_feature_from_specific_values(
+            self, scene: Scene, reconciled: StructuralTurntableConfig,
+            source_template: StructuralTurntableConfig):
+        """Creates a turntable from the given template with
+        specific values."""
+        args = {
+            'position_x': reconciled.position.x,
+            'position_y_modifier': reconciled.position.y,
+            'position_z': reconciled.position.z,
+            'rotation_y': reconciled.rotation_y,
+            'material_tuple':
+                choose_material_tuple_from_material(reconciled.material),
+            'radius': reconciled.turntable_radius,
+            'height': reconciled.turntable_height,
+            'step_begin': reconciled.turntable_movement.step_begin,
+            'step_end': reconciled.turntable_movement.step_end,
+            'movement_rotation': reconciled.turntable_movement.rotation_y
+        }
+
+        logger.trace(f'Creating turntable:\nINPUT = {args}')
+
+        turntable = structures.create_turntable(**args)
+        turntable = turntable[0]
+        _post_instance(
+            scene,
+            turntable,
+            reconciled,
+            source_template,
+            self._get_type())
+        return turntable
+
+    def _handle_dependent_defaults(
+            self, scene: Scene, reconciled: StructuralTurntableConfig,
+            source_template: StructuralTurntableConfig
+    ) -> StructuralTurntableConfig:
+
+        room_dim = scene.room_dimensions
+        def_dim = geometry.DEFAULT_ROOM_DIMENSIONS
+        room_width = room_dim.x or def_dim['x']
+        room_length = room_dim.z or def_dim['z']
+        reconciled = _handle_position_material_defaults(scene, reconciled)
+
+        reconciled.position.x = choose_random(
+            MinMaxFloat(-room_width / 2.0, room_width / 2.0)
+            if reconciled.position.x is None else reconciled.position.x
+        )
+
+        reconciled.position.z = choose_random(
+            MinMaxFloat(-room_length / 2.0, room_length / 2.0)
+            if reconciled.position.z is None else reconciled.position.z
+        )
+
+        reconciled.turntable_movement.rotation_y = (
+            random.choice([5, -5])
+            if reconciled.turntable_movement.rotation_y is None else
+            reconciled.turntable_movement.rotation_y)
+
+        reconciled.turntable_movement.step_begin = choose_random(
+            MinMaxInt(0, 10)
+            if reconciled.turntable_movement.step_begin is None else
+            reconciled.turntable_movement.step_begin)
+
+        reconciled.turntable_movement.step_end = choose_random(
+            MinMaxInt(11, 72)
+            if reconciled.turntable_movement.step_end is None else
+            reconciled.turntable_movement.step_end)
+
         return reconciled
 
 
@@ -1656,7 +2123,7 @@ class StructuralDropperConfig(BaseFeatureConfig):
     material or material type.
     - `projectile_scale` (float, or list of floats, or
     [MinMaxFloat](#MinMaxFloat) dict, or list of MinMaxFloat dicts): Scale of
-    the projectile.  Default is a value between 0.2 and 2.
+    the projectile. Default is based on the shape.
     - `projectile_shape` (string, or list of strings): The shape or type of
     the projectile.
     """
@@ -1679,6 +2146,32 @@ class StructuralDropperConfig(BaseFeatureConfig):
 
 
 @dataclass
+class StopPositionConfig():
+    """
+    Set a stop position for a thrown object. Works best with non-spherical,
+    non-cylindrical shapes, like toys with wheels.
+
+    - `x` (float, or list of floats, or [MinMaxFloat](#MinMaxFloat)
+    dict, or list of MinMaxFloat dicts): The stop X position. Must also
+    configure `z`. Default: null
+    - `z` (float, or list of floats, or [MinMaxFloat](#MinMaxFloat)
+    dict, or list of MinMaxFloat dicts): The stop Z position. Must also
+    configure `x`. Default: null
+    - `behind` (str, or list of strs): The label for an existing object behind
+    which this object should stop. Only works if `passive_physics_scene` is
+    `true`. Overrides the `x` and `z` options. Useful for stopping objects
+    behind occluders. Default: null
+    - `offscreen` (bool, or list of bools): Sets the stop position offscreen,
+    out of view of the performer agent. Only works if `passive_physics_scene`
+    is `true`. Overrides the `x` and `z` options. Default: `false`
+    """
+    x: Union[float, MinMaxFloat, List[Union[float, MinMaxFloat]]] = None
+    z: Union[float, MinMaxFloat, List[Union[float, MinMaxFloat]]] = None
+    behind: Union[str, List[str]] = None
+    offscreen: Union[bool, List[bool]] = None
+
+
+@dataclass
 class StructuralThrowerConfig(BaseFeatureConfig):
     """
     Defines details of a structural dropper and its thrown projectile.
@@ -1694,6 +2187,27 @@ class StructuralThrowerConfig(BaseFeatureConfig):
     Default: true
     - `labels` (string, or list of strings): A label or labels to be assigned
     to this object. Always automatically assigned "throwers"
+    - `passive_physics_collision_force` (bool, or list of bools): Automatically
+    set the `throw_force` to a speed normally used in a passive physics
+    collision scene. If set, overrides the `throw_force`. Default: false
+    - `passive_physics_setup` (string, or list of strings): Automatically set
+    the `wall`, `position_wall`, `rotation_y, `rotation_z`, and `height` to
+    values normally used in passive physics non-collision scenes. If set, this
+    will override other config options (see below). Possible settings:
+    `"random"`, `"roll_angled"`, `"roll_straight"`, `"toss_straight"`.
+    Default: null
+      - `wall: ['left', 'right']`
+      - If `"roll_angled"`: a `height` of `0` and a `rotation_y` of either
+        `-20` or `20`
+      - If `"roll_straight"`: a `height` of `0` and a `rotation_y` of `0`
+      - If `"toss_straight"`: a `height` of `1` and a `rotation_y` of `0`
+      - If `"roll_angled"`: a `position_wall` of `1.6` if `rotation_y` is `-20`
+       or `5.6` if `rotation_y` is `20`
+      - If `"roll_straight"` or `"toss_straight"`: a `position_wall` between
+        `1.6` and `4.4`
+    - `passive_physics_throw_force` (bool, or list of bools): Automatically set
+    the `throw_force` to a speed normally used in passive physics non-collision
+    scene. If set, overrides the `throw_force`. Default: false
     - `position_relative` ([RelativePositionConfig](#RelativePositionConfig)
     dict, or list of RelativePositionConfig dicts): Configuration options for
     positioning this object relative to another object, rather than using
@@ -1715,7 +2229,7 @@ class StructuralThrowerConfig(BaseFeatureConfig):
     material or material type.
     - `projectile_scale` (float, or list of floats, or
     [MinMaxFloat](#MinMaxFloat) dict, or list of MinMaxFloat dicts): Scale of
-    the projectile.  Default is a value between 0.2 and 2.
+    the projectile. Default is based on the shape.
     - `projectile_shape` (string, or list of strings): The shape or type of
     the projectile.
     - `rotation_y` (float, or list of floats, or
@@ -1728,6 +2242,9 @@ class StructuralThrowerConfig(BaseFeatureConfig):
     [MinMaxFloat](#MinMaxFloat) dict, or list of MinMaxFloat dicts): The angle
     in which the thrower will be rotated to point upwards.  This value should
     be between 0 and 15. Default: random value between 0 and 15.
+    - `stop_position` ([StopPositionConfig](#StopPositionConfig) dict, or list
+    of StopPositionConfig dicts): Sets a stop position for the thrown object.
+    If set, overrides all other "throw force" options.
     - `throw_force` (float, or list of floats, or
     [MinMaxFloat](#MinMaxFloat) dict, or list of MinMaxFloat dicts): Force of
     the throw put on the projectile.  This value will be multiplied by the
@@ -1773,6 +2290,10 @@ class StructuralThrowerConfig(BaseFeatureConfig):
     throw_force_multiplier: Union[
         float, MinMaxFloat, List[Union[float, MinMaxFloat]]
     ] = None
+    passive_physics_collision_force: Union[bool, List[bool]] = False
+    passive_physics_setup: Union[str, List[str]] = None
+    passive_physics_throw_force: Union[bool, List[bool]] = False
+    stop_position: Union[StopPositionConfig, List[StopPositionConfig]] = None
 
 
 @dataclass
@@ -1949,8 +2470,13 @@ class StructuralPlacerConfig(BaseFeatureConfig):
     its held object. This number must be a step after the end of the placer's
     downward movement. Default: At the end of the placer's downward movement
     - `end_height`: (float, or list of floats, or [MinMaxFloat](#MinMaxFloat)
-    dict): Height at which the placer should release its held object. Default:
-    0 (so the held object is in contact with the floor)
+    dict): Height at which the placer should release its held object.
+    Alternatively, one can use the `end_height_relative_object_label`.
+    Default: 0 (so the held object is in contact with the floor)
+    - `end_height_relative_object_label` (string): Label used to match
+    the bottom of the object held by the placer to the height of another
+    (for example, the support platform in gravity scenes). This will override
+    `end_height` if both are set.
     - `labels` (string, or list of strings): A label or labels to be assigned
     to this object. Always automatically assigned "placers"
     - `placed_object_labels` (string, or list of strings): A label for an
@@ -1982,12 +2508,16 @@ class StructuralPlacerConfig(BaseFeatureConfig):
     `position_x` or `position_z`. If configuring this as a list, then all
     listed options will be applied to each scene in the listed order, with
     later options overriding earlier options if necessary. Default: not used
+    - `empty_placer` (bool, or list of bools): If True, "The placer will not
+    hold/drop an object. Cannot be used in combination with any of the
+    placed_object_* config options. Default: False
     """
 
     num: Union[int, MinMaxInt, List[Union[int, MinMaxInt]]] = 0
     activation_step: Union[int, MinMaxInt, List[Union[int, MinMaxInt]]] = None
     end_height: Union[float, MinMaxFloat,
                       List[Union[float, MinMaxFloat]]] = None
+    end_height_relative_object_label: str = None
     placed_object_position: Union[VectorFloatConfig,
                                   List[VectorFloatConfig]] = None
     placed_object_scale: Union[float, MinMaxFloat,
@@ -2006,6 +2536,7 @@ class StructuralPlacerConfig(BaseFeatureConfig):
         RelativePositionConfig,
         List[RelativePositionConfig]
     ] = None
+    empty_placer: Union[bool, List[bool]] = False
 
 
 @dataclass
@@ -2041,6 +2572,67 @@ class StructuralDoorConfig(PositionableStructuralObjectsConfig):
                         List[Union[float, MinMaxFloat]]] = None
     wall_scale_y: Union[float, MinMaxFloat,
                         List[Union[float, MinMaxFloat]]] = None
+
+
+@dataclass
+class StructuralObjectMovementConfig():
+    """
+    Represents what movements the structural object will make. Currently
+    only used for configuring turntables.
+
+    - `step_begin` (int, or list of ints, or [MinMaxInt](#MinMaxInt) dict):
+    The step at which this movement should start. Default will be a
+    value between 0 and 10.
+    - `step_end` (int, or list of ints, or [MinMaxInt](#MinMaxInt) dict):
+    The step at which this movement should end. Default will be a value
+    between 11 and 72.
+    - `rotation_y` (float, or list of floats, or [MinMaxFloat](#MinMaxFloat)
+    dict, or list of MinMaxFloat dicts): The amount that the structure
+    will rotate each step. Default is randomly either 5 or -5.
+    """
+
+    step_begin: Union[int, MinMaxInt, List[Union[int, MinMaxInt]]] = None
+    step_end: Union[int, MinMaxInt, List[Union[int, MinMaxInt]]] = None
+    rotation_y: Union[float, MinMaxFloat,
+                      List[Union[float, MinMaxFloat]]] = None
+
+
+@dataclass
+class StructuralTurntableConfig(PositionableStructuralObjectsConfig):
+    """
+    Defines details of a structural turntable (also sometimes referred to
+    as a rotating cog).
+
+    - `num` (int, or list of ints, or [MinMaxInt](#MinMaxInt) dict, or list of
+    MinMaxInt dicts): Number of structures to be created with these parameters
+    - `labels` (string, or list of strings): A label or labels to be assigned
+    to this object. Always automatically assigned "turntables"
+    - `material` (string, or list of strings): The structure's material or
+    material type. Default: "Custom/Materials/GreyWoodMCS"
+    - `position` ([VectorFloatConfig](#VectorFloatConfig) dict, or list of
+    VectorFloatConfig dicts): The structure's position in the scene
+    - `rotation_y` (float, or list of floats, or [MinMaxFloat](#MinMaxFloat)
+    dict, or list of MinMaxFloat dicts): The structure's rotation in the scene.
+    Default is 0.
+    - `turntable_height` (float, or list of floats, or
+    [MinMaxFloat](#MinMaxFloat) dict, or list of MinMaxFloat dicts): Height
+    of the turntable/its y-axis scale. Default is 0.1.
+    - `turntable_radius` (float, or list of floats, or
+    [MinMaxFloat](#MinMaxFloat) dict, or list of MinMaxFloat dicts): Radius
+    of the turntable. Will be used to scale the turntable in both x and z
+    directions. Default is a value between 0.5 and 1.5.
+    - `turntable_movement`
+    ([StructuralObjectMovementConfig](#StructuralObjectMovementConfig))
+    or list of
+    ([StructuralObjectMovementConfig](#StructuralObjectMovementConfig)):
+    The config for turntable movement.
+    """
+    turntable_height: Union[float, MinMaxFloat,
+                            List[Union[float, MinMaxFloat]]] = None
+    turntable_radius: Union[float, MinMaxFloat,
+                            List[Union[float, MinMaxFloat]]] = None
+    turntable_movement: Union[StructuralObjectMovementConfig,
+                              List[StructuralObjectMovementConfig]] = None
 
 
 # TODO MCS-1206 Move into the interactable object component
@@ -2099,13 +2691,17 @@ DEFAULT_TEMPLATE_THROWER = StructuralThrowerConfig(
         WallSide.LEFT.value,
         WallSide.RIGHT.value],
     impulse=True,
+    passive_physics_collision_force=False,
+    passive_physics_setup=None,
+    passive_physics_throw_force=False,
     throw_step=MinMaxInt(5, 10),
     throw_force=None,
     throw_force_multiplier=None,
     rotation_y=[0, MinMaxInt(-45, 45)],
     rotation_z=[0, MinMaxInt(0, 15)],
     projectile_shape=THROWER_SHAPES,
-    position_relative=None
+    position_relative=None,
+    stop_position=None
 )
 DEFAULT_THROW_FORCE_IMPULSE = MinMaxInt(5, 20)
 DEFAULT_THROW_FORCE_NON_IMPULSE = MinMaxInt(500, 2000)
@@ -2188,7 +2784,8 @@ DEFAULT_TEMPLATE_PLACER = StructuralPlacerConfig(
     activation_step=MinMaxInt(0, 10),
     deactivation_step=None,
     end_height=0,
-    position_relative=None
+    position_relative=None,
+    empty_placer=False
 )
 
 DOOR_MATERIAL_RESTRICTIONS = [mat[0] for mat in (materials.METAL_MATERIALS +
@@ -2202,6 +2799,21 @@ DEFAULT_TEMPLATE_DOOR = StructuralDoorConfig(
     wall_material=materials.WALL_MATERIALS,
     wall_scale_x=None, wall_scale_y=None)
 
+DEFAULT_TEMPLATE_STRUCT_OBJ_MOVEMENT = StructuralObjectMovementConfig(
+    step_begin=MinMaxInt(0, 10), step_end=MinMaxInt(11, 72),
+    rotation_y=[-5, 5]
+)
+DEFAULT_TEMPLATE_TURNTABLE = StructuralTurntableConfig(
+    num=0, position=VectorFloatConfig(x=None, y=0, z=None),
+    rotation_y=0,
+    material="Custom/Materials/GreyWoodMCS",
+    turntable_height=DEFAULT_TURNTABLE_HEIGHT,
+    turntable_radius=MinMaxFloat(
+        DEFAULT_TURNTABLE_MIN_RADIUS,
+        DEFAULT_TURNTABLE_MAX_RADIUS
+    ),
+    turntable_movement=DEFAULT_TEMPLATE_STRUCT_OBJ_MOVEMENT
+)
 DEFAULT_TEMPLATE_TOOL = ToolConfig(
     num=0, position=VectorFloatConfig(None, 0, None),
     rotation_y=MinMaxInt(0, 359),
@@ -2226,7 +2838,7 @@ def _post_instance(scene, new_obj, template, source_template, type):
             [type.lower()] + (extra_labels))
     if plat_under or getattr(
             template, 'attached_ramps', None):
-        if(new_obj and new_obj["debug"]["labels"] is not None):
+        if (new_obj and new_obj["debug"]["labels"] is not None):
             new_obj["debug"]["labels"].append(LABEL_CONNECTED_TO_RAMP)
         else:
             new_obj["debug"]["labels"] = [LABEL_CONNECTED_TO_RAMP]
@@ -2481,8 +3093,8 @@ def _add_platform_below(scene, obj, rotation_point, top_template):
         labels_to_use = list()
         labels_to_use.append(LABEL_CONNECTED_TO_RAMP)
 
-        if(top_template.labels is not None):
-            if(isinstance(top_template.labels, str)):
+        if (top_template.labels is not None):
+            if (isinstance(top_template.labels, str)):
                 labels_to_use.append(top_template.labels)
             else:
                 labels_to_use.extend(top_template.labels)
@@ -2842,7 +3454,7 @@ def _reconcile_material(material_choice, default_material_lists):
             material = choose_material_tuple_from_material(material_choice)
     else:
         material = default_material_lists
-        while(isinstance(material, list)):
+        while (isinstance(material, list)):
             material = random.choice(material)
 
     if isinstance(material, MaterialTuple):
@@ -3053,7 +3665,8 @@ for feature_type, creation_service in [
     (FeatureTypes.RAMPS, StructuralRampCreationService),
     (FeatureTypes.THROWERS, StructuralThrowerCreationService),
     (FeatureTypes.WALLS, StructuralWallCreationService),
-    (FeatureTypes.TOOLS, StructuralToolsCreationService)
+    (FeatureTypes.TOOLS, StructuralToolsCreationService),
+    (FeatureTypes.TURNTABLES, StructuralTurntableCreationService)
 ]:
     FeatureCreationService.register_creation_service(
         feature_type, creation_service)

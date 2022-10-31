@@ -5,7 +5,7 @@ from generator import materials
 from generator.base_objects import (
     ALL_LARGE_BLOCK_TOOLS,
     create_soccer_ball,
-    create_specific_definition_from_base,
+    create_specific_definition_from_base
 )
 from generator.geometry import ORIGIN_LOCATION
 from generator.instances import instantiate_object
@@ -13,11 +13,11 @@ from ideal_learning_env.defs import ILEException
 from ideal_learning_env.numerics import (
     MinMaxFloat,
     MinMaxInt,
-    VectorFloatConfig,
+    VectorFloatConfig
 )
 from ideal_learning_env.object_services import (
     InstanceDefinitionLocationTuple,
-    ObjectRepository,
+    ObjectRepository
 )
 from ideal_learning_env.structural_object_service import (
     DEFAULT_MOVING_OCCLUDER_HEIGHT_MAX,
@@ -47,6 +47,7 @@ from ideal_learning_env.structural_object_service import (
     StructuralLOccluderCreationService,
     StructuralMovingOccluderConfig,
     StructuralMovingOccluderCreationService,
+    StructuralObjectMovementConfig,
     StructuralPlacerConfig,
     StructuralPlacersCreationService,
     StructuralPlatformConfig,
@@ -57,16 +58,18 @@ from ideal_learning_env.structural_object_service import (
     StructuralThrowerConfig,
     StructuralThrowerCreationService,
     StructuralToolsCreationService,
+    StructuralTurntableConfig,
+    StructuralTurntableCreationService,
     StructuralWallConfig,
     StructuralWallCreationService,
     ToolConfig,
     WallSide,
-    is_wall_too_close,
+    is_wall_too_close
 )
 from tests.ile_helper import (
     prior_scene,
     prior_scene_custom_start,
-    prior_scene_with_target,
+    prior_scene_with_target
 )
 
 
@@ -818,6 +821,52 @@ def test_placer_creation_reconcile():
     assert r2.placed_object_shape == 'soccer_ball'
     assert 90 <= r2.activation_step <= 100
     assert r2.end_height in [5, 6]
+
+    support_platform_instance = {
+        'id': 'test_platform',
+        'shows': [{
+            'position': {'x': 2, 'y': 0.35, 'z': 4},
+            'rotation': {'x': 0, 'y': 0, 'z': 0},
+            'scale': {'x': 1, 'y': 0.70, 'z': 0.1}
+        }]
+    }
+    supp_plat = InstanceDefinitionLocationTuple(
+        support_platform_instance, None, None)
+    tmp3 = StructuralPlacerConfig(
+        1, placed_object_rotation=MinMaxInt(230, 260),
+        placed_object_position=VectorFloatConfig(3, 0, [2, 3]),
+        placed_object_scale=4, placed_object_shape='soccer_ball',
+        activation_step=MinMaxInt(90, 100), end_height=[5, 6],
+        end_height_relative_object_label='supp_plat'
+    )
+    ObjectRepository.get_instance().add_to_labeled_objects(
+        supp_plat,
+        'supp_plat'
+    )
+    srv = StructuralPlacersCreationService()
+    r3: StructuralPlacerConfig = srv.reconcile(scene, tmp3)
+    assert r3.num == 1
+    assert r3.placed_object_position.x == 3
+    assert r3.placed_object_position.y == 0
+    assert r3.placed_object_position.z in [2, 3]
+    assert r3.placed_object_shape in PLACER_SHAPES
+    assert 0 <= r3.activation_step <= 100
+    assert r3.end_height == .7
+    # Test empty_placer config
+
+    tmp4 = StructuralPlacerConfig(
+        [2, 3], placed_object_rotation=MinMaxInt(230, 260),
+        placed_object_position=VectorFloatConfig(3, 0, [2, 3]),
+        placed_object_scale=4, placed_object_shape='soccer_ball',
+        activation_step=MinMaxInt(90, 100), end_height=[5, 6],
+        empty_placer=True
+    )
+    srv = StructuralPlacersCreationService()
+    r4: StructuralPlacerConfig = srv.reconcile(scene, tmp4)
+
+    assert r4.num in [2, 3]
+    assert r4.end_height in [5, 6]
+    assert r4.empty_placer is True
 
 
 def test_platform_creation_reconcile():
@@ -1911,3 +1960,78 @@ def test_tool_create():
     assert pos == {'x': 1.1, 'y': 0.15, 'z': 1.3}
     assert rot == {'x': 0, 'y': 34, 'z': 0}
     assert scale == {'x': 1, 'y': 1, 'z': 1}
+
+
+def test_turntable_creation_reconcile():
+    scene = prior_scene()
+    rd = scene.room_dimensions
+    srv = StructuralTurntableCreationService()
+    tmp = StructuralTurntableConfig(1)
+    r1: StructuralTurntableConfig = srv.reconcile(scene, tmp)
+    assert r1.num == 1
+    assert -rd.x / 2.0 <= r1.position.x <= rd.x / 2.0
+    assert -rd.z / 2.0 <= r1.position.z <= rd.z / 2.0
+    assert r1.position.y == 0
+    assert r1.rotation_y == 0
+    assert r1.material is not None
+    assert r1.labels is None
+    assert r1.turntable_height == 0.1
+    assert 0.5 <= r1.turntable_radius < 1.5
+    assert r1.turntable_movement is not None
+    assert 0 <= r1.turntable_movement.step_begin <= 10
+    assert 11 <= r1.turntable_movement.step_end <= 72
+    assert r1.turntable_movement.rotation_y in [5, -5]
+
+    tmp2 = StructuralTurntableConfig(
+        [2, 3], position=VectorFloatConfig(1, 0, 1),
+        turntable_height=[0.5, 1], turntable_radius=[1, 1.5],
+        rotation_y=2,
+        material="AI2-THOR/Materials/Plastics/BlackPlastic",
+        turntable_movement=StructuralObjectMovementConfig(
+            step_begin=1, step_end=12, rotation_y=8
+        )
+    )
+    srv = StructuralTurntableCreationService()
+    r2: StructuralTurntableConfig = srv.reconcile(scene, tmp2)
+
+    assert r2.num in [2, 3]
+    assert r2.position.x == 1
+    assert r2.position.y == 0
+    assert r2.position.z == 1
+    assert r2.rotation_y == 2
+    assert r2.turntable_height in [0.5, 1]
+    assert r2.turntable_radius in [1, 1.5]
+    assert r2.material == "AI2-THOR/Materials/Plastics/BlackPlastic"
+    assert r2.turntable_movement is not None
+    assert r2.turntable_movement.step_begin == 1
+    assert r2.turntable_movement.step_end == 12
+    assert r2.turntable_movement.rotation_y == 8
+
+
+def test_turntable_create():
+    temp = StructuralTurntableConfig(
+        position=VectorFloatConfig(1.1, 0, 1.3),
+        turntable_height=0.4, turntable_radius=2,
+        rotation_y=2,
+        material="AI2-THOR/Materials/Plastics/BlackPlastic",
+        turntable_movement=StructuralObjectMovementConfig(
+            step_begin=5, step_end=15, rotation_y=15
+        )
+    )
+    turntable = StructuralTurntableCreationService(
+    ).create_feature_from_specific_values(prior_scene(), temp, None)
+
+    assert turntable
+    assert turntable['id'].startswith('turntable_')
+    assert turntable['type'] == 'rotating_cog'
+    show = turntable['shows'][0]
+    pos = show['position']
+    rot = show['rotation']
+    scale = show['scale']
+    assert pos == {'x': 1.1, 'y': 0.2, 'z': 1.3}
+    assert rot == {'x': 0, 'y': 2, 'z': 0}
+    assert scale == {'x': 4, 'y': 20, 'z': 4}
+    movement = turntable['rotates'][0]
+    assert movement['stepBegin'] == 5
+    assert movement['stepEnd'] == 15
+    assert movement['vector'] == {'x': 0, 'y': 15, 'z': 0}

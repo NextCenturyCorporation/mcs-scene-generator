@@ -4,7 +4,7 @@ from generator.agents import AGENT_TYPES
 from generator.scene import Scene
 from ideal_learning_env.agent_component import (
     RandomAgentComponent,
-    SpecificAgentComponent,
+    SpecificAgentComponent
 )
 from ideal_learning_env.defs import ILEException
 from ideal_learning_env.object_services import ObjectRepository

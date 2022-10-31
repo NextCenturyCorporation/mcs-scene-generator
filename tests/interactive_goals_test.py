@@ -304,7 +304,7 @@ def test_TransferralGoal_ensure_pickup_action():
     """
     for _ in range(util.MAX_TRIES):
         goal_obj = TransferralGoal()
-        body: Dict[str, Any] = OUTPUT_TEMPLATE
+        body: Dict[str, Any] = STARTER_SCENE_JSON
         try:
             goal_obj.update_body(body, True)
         except PathfindingException:
@@ -331,7 +331,7 @@ def test_TransferralGoal_navigate_near_objects():
     """
     for _ in range(util.MAX_TRIES):
         goal_obj = TransferralGoal()
-        body: Dict[str, Any] = OUTPUT_TEMPLATE
+        body: Dict[str, Any] = STARTER_SCENE_JSON
         try:
             goal_obj.update_body(body, True)
         except PathfindingException:

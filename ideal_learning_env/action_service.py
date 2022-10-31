@@ -2,6 +2,9 @@ import logging
 from dataclasses import dataclass
 from typing import List, Union
 
+from machine_common_sense.config_manager import Vector3d
+
+from generator import geometry
 from ideal_learning_env.defs import ILEConfigurationException, ILEException
 from ideal_learning_env.numerics import MinMaxFloat, MinMaxInt
 
@@ -36,6 +39,10 @@ class TeleportConfig():
     - `step` (int, or list of ints, or [MinMaxInt](#MinMaxInt) dict, or list of
     MinMaxInt dicts): The step when the performer agent is teleported.
     This field is required for teleport action restrictions.
+    - `look_at_center` (bool): Dynamically set the teleport `rotation_y` using
+    the `position_x` and `position_z` so the performer agent is facing the
+    center of the room. Requires both `position_x` and `position_z` to be set.
+    Overrides `rotation_y` if it is also set. Default: false
     - `position_x` (float, or list of floats, or [MinMaxFloat](#MinMaxFloat)
     dict, or list of MinMaxFloat dicts):
     Position in X direction where the performer agent
@@ -59,6 +66,7 @@ class TeleportConfig():
                       List[Union[float, MinMaxFloat]]] = None
     rotation_y: Union[float, MinMaxFloat,
                       List[Union[float, MinMaxFloat]]] = None
+    look_at_center: bool = False
 
 
 class ActionService():
@@ -132,7 +140,10 @@ class ActionService():
 
     @staticmethod
     def add_teleports(
-            goal: dict, teleports: List[TeleportConfig], passive: bool):
+        goal: dict,
+        teleports: List[TeleportConfig],
+        passive: bool
+    ):
         """adds teleport actions to the goal portion of the scene where a
         performer will be teleported to a new position and/or rotation. All
         random choices in any TeleportConfig instances should be determined
@@ -140,11 +151,24 @@ class ActionService():
         goal['action_list'] = goal.get('action_list', [])
         al = goal['action_list']
         for t in teleports:
+            rotation_y = t.rotation_y
+            # See TeleportConfig docs for information and assumptions.
+            if t.look_at_center:
+                if t.position_x is not None and t.position_z is not None:
+                    # If we ever need to set the rotation_x in the future,
+                    # we'll need to identify the performer's Y position.
+                    _, rotation_y = geometry.calculate_rotations(
+                        Vector3d(x=t.position_x, y=0, z=t.position_z),
+                        Vector3d(x=0, y=0, z=0)
+                    )
             step = t.step
             cmd = "EndHabituation"
-            cmd += f",xPosition={t.position_x}" if t.position_x else ""
-            cmd += f",zPosition={t.position_z}" if t.position_z else ""
-            cmd += f",yRotation={t.rotation_y}" if t.rotation_y else ""
+            if t.position_x is not None:
+                cmd += f",xPosition={t.position_x}"
+            if t.position_z is not None:
+                cmd += f",zPosition={t.position_z}"
+            if rotation_y is not None:
+                cmd += f",yRotation={rotation_y}"
             length = len(al)
             if step > length:
                 al += ([[]] * (step - length))

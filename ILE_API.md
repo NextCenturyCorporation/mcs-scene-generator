@@ -129,6 +129,8 @@ position can be specified.
 - `agent_position` ([VectorFloatConfig](#VectorFloatConfig) or list of
 [VectorFloatConfig](#VectorFloatConfig)): Determines the position of the
 agent.  Default: Random
+- `movement` (bool, or list of bools): Whether the agent should move
+around. Default: true
 - `movement_bounds` (list of [VectorFloatConfig](#VectorFloatConfig))
 points to generate a polygon that bounds the agents random movement.
 If the polygon has an area of 0, no movement will occur.  Polygons with
@@ -143,6 +145,8 @@ On default, a blocking wall is on that platform, forcing the performer
 to choose a side to drop off of the platform, but this can be disabled.
 - `has_blocking_wall` (bool): Enables the blocking wall so that the
 performer has to stop and choose a side of the room. Default: True
+- `has_long_blocking_wall` (bool): Enables the long blocking wall used in
+Spatial Reorientation tasks. Overrides `has_blocking_wall`. Default: False
 
 #### FloorAreaConfig
 
@@ -176,13 +180,37 @@ list of MinMaxInt dicts): Z position of the area.
 
 #### GoalConfig
 
-A dict with str `category` and optional `target`, `target_1`, and
-`target_2` properties that represents the goal and target object(s) in each
-scene. The `target*` properties are only needed if required for the
-specific category of goal. Each `target*` property is either an
-InteractableObjectConfig dict or list of InteractableObjectConfig dicts.
-For each list, one dict will be randomly chosen within the list in each
-new scene.  All goal target objects will be assigned the 'target' label.
+A dict with str `category` and optional `target` or `targets` properties
+that correspond to the goal and target object(s) in each scene.
+
+The goal `category` for interactive scenes is either `"retrieval"` (for
+one target) or `"multi retrieval"` (for multiple targets). If the
+`category` is not set, it will default to `"retrieval"` if `target` is set
+or `"multi retrieval"` if `targets` is set.
+
+The goal `category` for passive scenes is either `"intuitive physics"`
+(for passive physics scenes), `"agents"` (for NYU passive agent scenes), or
+`"passive"` (for all other passive scenes). Please see
+`passive_physics_scene` for making passive physics scenes. Please do not
+use the ILE Scene Generator for making NYU passive agent scenes.
+
+See the MCS Python API for more information about the goal categories:
+
+https://nextcenturycorporation.github.io/MCS/api.html#machine_common_sense.GoalCategory
+
+The `target` property is only needed for `"retrieval"` scenes, and the
+`targets` property is only needed for `"multi retrieval"` scenes.
+The `target` property is either an InteractableObjectConfig dict or a list
+of InteractableObjectConfig dicts. For a list, one dict will be randomly
+chosen within the list in each new scene. The `targets` property is a list
+of InteractableObjectConfig dicts, and ALL the dicts will be used as
+targets in each new scene. All goal target objects will be assigned the
+'target' label. The `num` property will only be used with multiple
+`targets`.
+
+Please note that the `"traversal"` and `"transferral"` goal categories,
+along with the `target_1` and `target_2` properties, are no longer
+supported.
 
 Example:
 ```
@@ -203,6 +231,11 @@ following optional properties:
 of objects with this template to generate in each scene. For a list or a
 MinMaxInt, a new number will be randomly chosen for each scene.
 Default: `1`
+- `num_targets_minus` (int, or list of ints, or [MinMaxInt](#MinMaxInt)
+dict): Overrides the `num` option. Count the total number of targets,
+subtract `num_targets_minus` from the count, and generate that many
+objects. For example, in a scene with 5 targets, a `num_targets_minus` of
+1 would generate 4 objects. Default: null
 - `dimensions` ([VectorFloatConfig](#VectorFloatConfig) dict, int,
 [MinMaxInt](#MinMaxInt), or a list of any of those types): Sets the overal
 dimensions of the object in meters.  This field will override scale.
@@ -227,8 +260,8 @@ object is not lockable, this field has no affect.
 - `material` (string, or list of strings): The material (color/texture) to
 use on this object in each scene. For a list, a new material will be
 randomly chosen for each scene. Default: random
-- `not_material` (string): The material (color/texture)
-to NOT use on this object in each scene. Default: none
+- `not_material` (string): Do not use this material, or any other materials
+that share the same colors as this material, on this object. Default: none
 - `position` ([VectorFloatConfig](#VectorFloatConfig) dict, or list of
 VectorFloatConfig dicts): The position of this object in each scene. For a
 list, a new position will be randomly chosen for each scene.
@@ -314,6 +347,13 @@ properties:
 be one of the following:
     - `adjacent` - The object will be placed next to another object.  The
     other object must be referenced by the 'relative_object_label' field.
+    - `adjacent_performer` - The object will be placed next to the
+    performer.  The object can be placed in 'front', 'back', left, or
+    'right' of the performer using the 'direction'.  The object
+    can also be specified to be 'in_reach' or 'out_of_reach' via the
+    'distance'.  By default, the object will be placed in a random
+    direction, but 'in_reach'.
+    other object must be referenced by the 'relative_object_label' field.
     If multiple objects have this label, one will be randomly chosen.
     - `back` - The object will be placed in the 180 degree arc behind the
     performer's start position.
@@ -366,13 +406,24 @@ be one of the following:
     - `random` - The object will be positioned in a random location, as if
     it did not have a keyword location.
     - `associated_with_agent` - This object will be held by an agent
-    referenced by the  'relative_object_label' field.
+    referenced by the 'relative_object_label' field.
+    - `along_wall` - This object will be placed along a wall
+    referenced by the 'relative_object_label' field.  The wall labels are
+    'front_wall', 'back_wall', 'left_wall, and 'right_wall'.  If no wall is
+    provided, a wall will be chosen at random.
 - `container_label` (string, or list of strings): The label of a container
 object that already exists in your configuration. Only required by some
 keyword locations.
 - `relative_object_label` (string, or list of strings): The label of a
 second object that already exists in your configuration. Only required by
 some keyword locations.
+- `position_relative_to_start` (VectorFloatConfig, or list of
+VectorFloatConfigs): Currently only supported with the `on_center` keyword:
+How much to translate object from the center position of the relative
+object along the x and z axis. This works like a percentage, represented
+as x/z values that range from -1.0 to 1.0 (with both of those values being
+furthest from the center in either direction). Note that this assumes the
+relative object has a rectangular boundary.
 
 #### KeywordObjectsConfig
 
@@ -419,7 +470,26 @@ MinMaxInt dicts): The number of this object the user wants to create.
 - `keyword_location`: ([KeywordLocationConfig](#KeywordLocationConfig)):
 One of the keyword locations for this object or set of objects. Any choices
 in `keyword_location` are made for each object inside the group, not the
-group as a whole.
+group as a whole. Overrides any configured `position` and `rotation`.
+- `labels` (string, or list of strings): labels to associate with this
+object.  Components can use this label to reference this object or a group
+of objects.  Labels do not need to be unique and when objects share a
+labels, components have options to randomly choose one or choose all.  See
+specific label options for details.
+- `position` ([VectorFloatConfig](#VectorFloatConfig) dict, or list of
+VectorFloatConfig dicts): The position of these objects in each scene. If
+given a list, a position will be randomly chosen for each object and each
+scene. Is overridden by the `keyword_location`. Default: random
+- `position_relative` ([RelativePositionConfig](#RelativePositionConfig)
+dict, or list of RelativePositionConfig dicts): Configuration options for
+positioning this object relative to another object, rather than using
+`position`. If configuring this as a list, then all listed options will be
+applied to each scene in the listed order, with later options overriding
+earlier options if necessary. Default: not used
+- `rotation` ([VectorIntConfig](#VectorIntConfig) dict, or list of
+VectorIntConfig dicts): The rotation of these objects in each scene. If
+given a list, a rotation will be randomly chosen for each object and each
+scene. Is overridden by the `keyword_location`. Default: random
 
 #### LavaTargetToolConfig
 
@@ -435,8 +505,11 @@ exists, the guide rails will extend to the target.  This option cannot be
 used with `tool_rotation`. Default: False
 - `island_size` (int, or list of ints, or [MinMaxInt](#MinMaxInt) dict,
 or list of MinMaxInt dicts): The width and lenght of the island inside the
-lava.  Must produce value from 1 to 3.
+lava.  Must produce value from 1 to 5.
 Default: Random based on room size
+- `left_lava_width` (int, or list of ints, or [MinMaxInt](#MinMaxInt):
+The number of tiles of lava left of the island.  Must produce value
+between 2 and 6. Default: Random based on room size and island size
 - `random_performer_position` (bool, or list of bools): If True, the
 performer will be randomly placed in the room. They will not be placed in
 the lava or the island   Default: False
@@ -447,9 +520,20 @@ positioned on the island surrounded by lava. Default: False
 The number of tiles of lava behind of the island.  Must produce value
 between 2 and 6. Default: Random based on room size, island size, and
 other lava widths.
+- `right_lava_width` (int, or list of ints, or [MinMaxInt](#MinMaxInt):
+The number of tiles right of the island.  Must produce value
+between 2 and 6. Default: Random based on room size and island size
+- `random_performer_position` (bool, or list of bools): If True, the
+performer will be randomly placed in the room. They will not be placed in
+the lava or the island   Default: False
 - `tool_rotation` (int, or list of ints, or [MinMaxInt](#MinMaxInt):
-Angle that too should be rotated out of alignment with target.
+Angle that tool should be rotated out of alignment with target.
 This option cannot be used with `guide_rails`.  Default: 0
+- `distance_between_performer_and_tool` (float, or list of floats,
+or [MinMaxFloat](#MinMaxFloat): The distance away the performer is from the
+tool at start. The performer will be at random point around a rectangular
+perimeter surrounding the tool. This option cannot be used with
+`random_performer_position`.  Default: None
 
 #### MinMaxFloat
 
@@ -473,6 +557,21 @@ Example:
 ```
 min: 1
 max: 10
+```
+
+#### PerformerStartsNearConfig
+
+Defines details of performer_starts_near which places the performer near an
+object of a given label at a specified distance away.
+- `label` (string or list of strings):
+Label of the object the performer will be placed near.  Default: None
+- `distance` (float or list of floats):
+Distance the performer will be from the object.  Default: 0.1
+
+Example:
+```
+label: container
+distance: 0.1
 ```
 
 #### RandomStructuralObjectConfig
@@ -563,6 +662,25 @@ of MinMaxInt dicts):
 The step where the performer agent ends being frozen and can resume
 using actions besides `"Pass"`.  Therefore, this is an exclusive limit.
 
+#### StopPositionConfig
+
+Set a stop position for a thrown object. Works best with non-spherical,
+non-cylindrical shapes, like toys with wheels.
+
+- `x` (float, or list of floats, or [MinMaxFloat](#MinMaxFloat)
+dict, or list of MinMaxFloat dicts): The stop X position. Must also
+configure `z`. Default: null
+- `z` (float, or list of floats, or [MinMaxFloat](#MinMaxFloat)
+dict, or list of MinMaxFloat dicts): The stop Z position. Must also
+configure `x`. Default: null
+- `behind` (str, or list of strs): The label for an existing object behind
+which this object should stop. Only works if `passive_physics_scene` is
+`true`. Overrides the `x` and `z` options. Useful for stopping objects
+behind occluders. Default: null
+- `offscreen` (bool, or list of bools): Sets the stop position offscreen,
+out of view of the performer agent. Only works if `passive_physics_scene`
+is `true`. Overrides the `x` and `z` options. Default: `false`
+
 #### StructuralDoorConfig
 
 Defines details of a structural door that can be opened and closed.
@@ -625,7 +743,7 @@ locations or are used by other droppers/placers/throwers.
 material or material type.
 - `projectile_scale` (float, or list of floats, or
 [MinMaxFloat](#MinMaxFloat) dict, or list of MinMaxFloat dicts): Scale of
-the projectile.  Default is a value between 0.2 and 2.
+the projectile. Default is based on the shape.
 - `projectile_shape` (string, or list of strings): The shape or type of
 the projectile.
 
@@ -714,6 +832,21 @@ only used if any `origin` is set to `top`.  Default is 0 to 359.
 - `wall_material` (string, or list of strings): Material of the occluder
 wall (cube)
 
+#### StructuralObjectMovementConfig
+
+Represents what movements the structural object will make. Currently
+only used for configuring turntables.
+
+- `step_begin` (int, or list of ints, or [MinMaxInt](#MinMaxInt) dict):
+The step at which this movement should start. Default will be a
+value between 0 and 10.
+- `step_end` (int, or list of ints, or [MinMaxInt](#MinMaxInt) dict):
+The step at which this movement should end. Default will be a value
+between 11 and 72.
+- `rotation_y` (float, or list of floats, or [MinMaxFloat](#MinMaxFloat)
+dict, or list of MinMaxFloat dicts): The amount that the structure
+will rotate each step. Default is randomly either 5 or -5.
+
 #### StructuralOccludingWallConfig
 
 - `num` (int, or list of ints, or [MinMaxInt](#MinMaxInt) dict, or list of
@@ -760,8 +893,13 @@ dict, or list of MinMaxInt dicts): Step on which the placer should release
 its held object. This number must be a step after the end of the placer's
 downward movement. Default: At the end of the placer's downward movement
 - `end_height`: (float, or list of floats, or [MinMaxFloat](#MinMaxFloat)
-dict): Height at which the placer should release its held object. Default:
-0 (so the held object is in contact with the floor)
+dict): Height at which the placer should release its held object.
+Alternatively, one can use the `end_height_relative_object_label`.
+Default: 0 (so the held object is in contact with the floor)
+- `end_height_relative_object_label` (string): Label used to match
+the bottom of the object held by the placer to the height of another
+(for example, the support platform in gravity scenes). This will override
+`end_height` if both are set.
 - `labels` (string, or list of strings): A label or labels to be assigned
 to this object. Always automatically assigned "placers"
 - `placed_object_labels` (string, or list of strings): A label for an
@@ -793,6 +931,9 @@ positioning this object relative to another object, rather than using
 `position_x` or `position_z`. If configuring this as a list, then all
 listed options will be applied to each scene in the listed order, with
 later options overriding earlier options if necessary. Default: not used
+- `empty_placer` (bool, or list of bools): If True, "The placer will not
+hold/drop an object. Cannot be used in combination with any of the
+placed_object_* config options. Default: False
 
 #### StructuralPlatformConfig
 
@@ -889,6 +1030,27 @@ default `throw_force` is different for impulse and non-impulse force modes.
 Default: true
 - `labels` (string, or list of strings): A label or labels to be assigned
 to this object. Always automatically assigned "throwers"
+- `passive_physics_collision_force` (bool, or list of bools): Automatically
+set the `throw_force` to a speed normally used in a passive physics
+collision scene. If set, overrides the `throw_force`. Default: false
+- `passive_physics_setup` (string, or list of strings): Automatically set
+the `wall`, `position_wall`, `rotation_y, `rotation_z`, and `height` to
+values normally used in passive physics non-collision scenes. If set, this
+will override other config options (see below). Possible settings:
+`"random"`, `"roll_angled"`, `"roll_straight"`, `"toss_straight"`.
+Default: null
+  - `wall: ['left', 'right']`
+  - If `"roll_angled"`: a `height` of `0` and a `rotation_y` of either
+    `-20` or `20`
+  - If `"roll_straight"`: a `height` of `0` and a `rotation_y` of `0`
+  - If `"toss_straight"`: a `height` of `1` and a `rotation_y` of `0`
+  - If `"roll_angled"`: a `position_wall` of `1.6` if `rotation_y` is `-20`
+   or `5.6` if `rotation_y` is `20`
+  - If `"roll_straight"` or `"toss_straight"`: a `position_wall` between
+    `1.6` and `4.4`
+- `passive_physics_throw_force` (bool, or list of bools): Automatically set
+the `throw_force` to a speed normally used in passive physics non-collision
+scene. If set, overrides the `throw_force`. Default: false
 - `position_relative` ([RelativePositionConfig](#RelativePositionConfig)
 dict, or list of RelativePositionConfig dicts): Configuration options for
 positioning this object relative to another object, rather than using
@@ -910,7 +1072,7 @@ locations or are used by other droppers/placers/throwers.
 material or material type.
 - `projectile_scale` (float, or list of floats, or
 [MinMaxFloat](#MinMaxFloat) dict, or list of MinMaxFloat dicts): Scale of
-the projectile.  Default is a value between 0.2 and 2.
+the projectile. Default is based on the shape.
 - `projectile_shape` (string, or list of strings): The shape or type of
 the projectile.
 - `rotation_y` (float, or list of floats, or
@@ -923,6 +1085,9 @@ This value should be between -45 and 45. Default: random value between
 [MinMaxFloat](#MinMaxFloat) dict, or list of MinMaxFloat dicts): The angle
 in which the thrower will be rotated to point upwards.  This value should
 be between 0 and 15. Default: random value between 0 and 15.
+- `stop_position` ([StopPositionConfig](#StopPositionConfig) dict, or list
+of StopPositionConfig dicts): Sets a stop position for the thrown object.
+If set, overrides all other "throw force" options.
 - `throw_force` (float, or list of floats, or
 [MinMaxFloat](#MinMaxFloat) dict, or list of MinMaxFloat dicts): Force of
 the throw put on the projectile.  This value will be multiplied by the
@@ -940,6 +1105,35 @@ may cause unexpected behavior, so we recommend using values of 5 or more in
 your custom config files.
 - `wall` (string, or list of strings): Which wall the thrower should be
 placed on.  Options are: left, right, front, back.
+
+#### StructuralTurntableConfig
+
+Defines details of a structural turntable (also sometimes referred to
+as a rotating cog).
+
+- `num` (int, or list of ints, or [MinMaxInt](#MinMaxInt) dict, or list of
+MinMaxInt dicts): Number of structures to be created with these parameters
+- `labels` (string, or list of strings): A label or labels to be assigned
+to this object. Always automatically assigned "turntables"
+- `material` (string, or list of strings): The structure's material or
+material type. Default: "Custom/Materials/GreyWoodMCS"
+- `position` ([VectorFloatConfig](#VectorFloatConfig) dict, or list of
+VectorFloatConfig dicts): The structure's position in the scene
+- `rotation_y` (float, or list of floats, or [MinMaxFloat](#MinMaxFloat)
+dict, or list of MinMaxFloat dicts): The structure's rotation in the scene.
+Default is 0.
+- `turntable_height` (float, or list of floats, or
+[MinMaxFloat](#MinMaxFloat) dict, or list of MinMaxFloat dicts): Height
+of the turntable/its y-axis scale. Default is 0.1.
+- `turntable_radius` (float, or list of floats, or
+[MinMaxFloat](#MinMaxFloat) dict, or list of MinMaxFloat dicts): Radius
+of the turntable. Will be used to scale the turntable in both x and z
+directions. Default is a value between 0.5 and 1.5.
+- `turntable_movement`
+([StructuralObjectMovementConfig](#StructuralObjectMovementConfig))
+or list of
+([StructuralObjectMovementConfig](#StructuralObjectMovementConfig)):
+The config for turntable movement.
 
 #### StructuralWallConfig
 
@@ -966,6 +1160,10 @@ Contains data to describe when and where a teleport occurs.
 - `step` (int, or list of ints, or [MinMaxInt](#MinMaxInt) dict, or list of
 MinMaxInt dicts): The step when the performer agent is teleported.
 This field is required for teleport action restrictions.
+- `look_at_center` (bool): Dynamically set the teleport `rotation_y` using
+the `position_x` and `position_z` so the performer agent is facing the
+center of the room. Requires both `position_x` and `position_z` to be set.
+Overrides `rotation_y` if it is also set. Default: false
 - `position_x` (float, or list of floats, or [MinMaxFloat](#MinMaxFloat)
 dict, or list of MinMaxFloat dicts):
 Position in X direction where the performer agent
@@ -1145,7 +1343,9 @@ enough to be pushed. The check considers all holes and areas of lava in the
 scene. It also considers moving up and/or down ramps that are attached to
 platforms (via the `attached_ramps` option in `structural_platforms`), as
 well as across those platforms. Pathfinding is otherwise only done in two
-dimensions. This check is skipped if false. Default: False
+dimensions. This check is skipped if false. Please note that this feature
+is not currently supported for scenes containing multiple targets.
+Default: False
 
 Simple Example:
 ```
@@ -1533,6 +1733,8 @@ num_random_interactable_objects:
 
 #### passive_physics_floor
 
+**Deprecated.** Please use `passive_physics_scene: true`
+
 (bool): Lowers the friction of the floor (making it more "slippery").
 Used in passive physics evaluation scenes. Default: False
 
@@ -1546,12 +1748,31 @@ Advanced Example:
 passive_physics_floor: True
 ```
 
+#### passive_physics_scene
+
+(bool): Setup each scene in exactly the same way as the "passive physics"
+scenes used in the MCS evaluations, including the camera position, room
+dimensions, floor friction, and restrictions on only "Pass" actions.
+Default: False
+
+Simple Example:
+```
+passive_physics_scene: False
+```
+
+Advanced Example:
+```
+passive_physics_scene: True
+```
+
 #### passive_scene
 
 (bool): Determine if scene should be considered passive and the
 performer agent should be restricted to only use the `"Pass"` action.
 If true, ILE will raise an exception if last_step is not set or either
 `circles`, `freezes`, `swivels` or `teleports` has any entries.
+Redundant if the `passive_physics_scene` config option is `true`.
+Default: `false`
 
 #### performer_look_at
 
@@ -1573,7 +1794,8 @@ performer_look_at: [target, agent]
 #### performer_start_position
 
 ([VectorFloatConfig](#VectorFloatConfig) dict, or list of VectorFloatConfig
-dicts): The starting position of the performer agent, or a list of
+dicts or [KeywordLocationConfig](#KeywordLocationConfig)): The starting
+position of the performer agent, or a list of
 positions, from which one is chosen at random for each scene. The
 (optional) `y` is used to position on top of structural objects like
 platforms. Valid parameters are constrained by room dimensions.
@@ -1588,7 +1810,10 @@ valid x parameters would be '3.25, MinMaxFloat(-3.25, 3.25), and
 [-3.25, 0, 3.25].' For `y` start and room dimensions, the min y position
 must always be greater than 0 and the max must always be less than or equal
 to room dimension y - 1.25.' This ensures the performer does not clip
-into the ceiling. Default: random within the room
+into the ceiling. Alternatively, the performer start can be a
+[KeywordLocationConfig](#KeywordLocationConfig).  Performer only supports
+the following keyword locations: `along_wall`
+Default: random within the room
 
 Simple Example:
 ```
@@ -1631,6 +1856,28 @@ performer_start_rotation:
         - 90
         - 180
         - 270
+```
+
+#### performer_starts_near
+
+([PerformerStartsNearConfig](#PerformerStartsNearConfig) dict, or list
+of PerformerStartsNearConfig dicts:
+Dictates if the starting position of the performer will be near an
+object of a given `label` at a specified `distance` away.
+Use in combination with `performer_look_at` to look at the object at start.
+Overrides `performer_start_position`.
+Default: Use `performer_start_position`
+
+Simple Example:
+```
+performer_starts_near: null
+```
+
+Advanced Example:
+```
+performer_starts_near:
+    label: container
+    distance: 0.1
 ```
 
 #### placers
@@ -1697,6 +1944,7 @@ random_structural_objects:
       - ramps
       - throwers
       - tools
+      - turntables
       - walls
     num:
       min: 2
@@ -1724,6 +1972,7 @@ random_structural_objects:
       - ramps
       - throwers
       - tools
+      - turntables
       - walls
     num:
         min: 0
@@ -1867,9 +2116,13 @@ shortcut_lava_room: True
 (bool or [LavaTargetToolConfig](#LavaTargetToolConfig)):
 Creates a room with a goal object on an island surrounded by lava.
 There will also be a block tool to facilitate acquiring the goal object.
-One dimension of the room must be 13 or greater.  The other dimension must
-be 7 or greater.  By default, the target is a soccer ball with scale
-between 1 and 3. The tool is a pushable tool object with a length equal
+One dimension of the room must be 13 or greater. The other dimension must
+be 7 or greater. The max width across for front + island_size + rear is 9.
+The min width across for front + island_size + rear is 5. Lava can be
+asymmetric but the same restrictions of width min: 5 and max: 9 apply for
+left + island_size + right as well.
+By default, the target is a soccer ball with scale between 1 and 3.
+The tool is a pushable tool object with a length equal
 to the span from the front of the lava over the island to the back of the
 lava.  It will have a width of either 0.5, 0.75, 1.0. Default: False
 
@@ -1886,6 +2139,10 @@ shortcut_lava_target_tool:
     max: 3
   front_lava_width: 2
   rear_lava_width: [2, 3]
+  left_lava_width: 2
+  right_lava_width:
+    min: 2
+    max: 4
   guide_rails: [True, False]
 ```
 
@@ -1930,6 +2187,22 @@ shortcut_triple_door_choice:
   add_lips: True
   add_freeze: [True, False]
   restrict_open_doors: True
+```
+
+#### side_wall_opposite_colors
+
+(bool, or list of bools): Makes three of the room's walls the same color,
+and the other wall (either the left or the right) an opposite color.
+Overrides all the `wall_*_material` config options. Default: False
+
+Simple Example:
+```
+side_wall_opposite_colors: False
+```
+
+Advanced Example:
+```
+side_wall_opposite_colors: True
 ```
 
 #### specific_agents
@@ -2267,6 +2540,61 @@ structural_throwers:
   projectile_scale: 0.85
 ```
 
+#### structural_turntables
+
+([StructuralTurntableConfig](#StructuralTurntableConfig), or list
+of [StructuralTurntableConfig](#StructuralTurntableConfig) dict) --
+Groups of structural turntable configurations and how many should be
+generated from the given options.
+Default: 0
+
+
+Simple Example:
+```
+structural_turntables:
+    - num: 0
+```
+
+Advanced Example:
+```
+structural_turntables:
+    - num:
+        min: 1
+        max: 3
+    - num: 1
+      position:
+        x: [1,2]
+        y: 0
+        z:
+          min: -3
+          max: 3
+      turntable_height: 0.5
+      turntable_radius: 1
+      turntable_movement:
+        step_begin: 1
+        step_end: 10
+        rotation_y: 20
+      material: PLASTIC_MATERIALS
+    - num: [1, 3]
+      position:
+        x: [4, 5]
+        y: 0
+        z:
+          min: -5
+          max: -4
+      turntable_height:
+        min: .5
+        max: 2
+      turntable_radius: [.75, 1.25]
+      turntable_movement:
+        step_begin: 1
+        step_end: 20
+        rotation_y: 10
+      material: AI2-THOR/Materials/Metals/BrushedAluminum_Blue
+
+
+```
+
 #### structural_walls
 
 ([StructuralWallConfig](#StructuralWallConfig) dict, or list of
@@ -2400,6 +2728,22 @@ tools:
 
 ```
 
+#### trapezoidal_room
+
+(bool, or list of bools): Makes the room trapezoidal, so the left and right
+walls will be angled inward. Currently only supported for room_dimensions
+of X=12 and Z=16. Default: False
+
+Simple Example:
+```
+trapezoidal_room: False
+```
+
+Advanced Example:
+```
+trapezoidal_room: True
+```
+
 #### wall_back_material
 
 (string, or list of strings): The material for the back wall, or list of
@@ -2443,6 +2787,22 @@ wall_left_material: null
 Advanced Example:
 ```
 wall_left_material: "Custom/Materials/GreyDrywallMCS"
+```
+
+#### wall_material
+
+(string, or list of strings): The material for all room walls, or list of
+materials, from which one is chosen for each scene. Is overridden by the
+individual `wall_*_material` config options. Default: ROOM_WALL_MATERIALS
+
+Simple Example:
+```
+wall_material: null
+```
+
+Advanced Example:
+```
+wall_material: "Custom/Materials/GreyDrywallMCS"
 ```
 
 #### wall_right_material

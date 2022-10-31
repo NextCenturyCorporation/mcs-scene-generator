@@ -7,7 +7,7 @@ from generator import (
     DefinitionDataset,
     ObjectDefinition,
     base_objects,
-    specific_objects,
+    specific_objects
 )
 from generator.definitions import (
     create_dataset,
@@ -15,7 +15,7 @@ from generator.definitions import (
     get_similar_definition,
     is_similar_except_in_color,
     is_similar_except_in_shape,
-    is_similar_except_in_size,
+    is_similar_except_in_size
 )
 
 DATASET = specific_objects.get_interactable_definition_dataset(unshuffled=True)
@@ -32,8 +32,9 @@ DEFINITIONS = DATASET.definitions(unshuffled=True)
 
 # TODO MCS-1012 Add new shapes/textures that are similar to these objects.
 SIMILARITY_EXCEPTIONS = [
-    'sofa_4', 'sofa_5', 'sofa_6', 'sofa_7',
-    'sofa_chair_4', 'sofa_chair_5', 'sofa_chair_6', 'sofa_chair_7'
+    'sofa_4', 'sofa_5', 'sofa_6', 'sofa_7', 'sofa_8', 'sofa_9',
+    'sofa_chair_4', 'sofa_chair_5', 'sofa_chair_6', 'sofa_chair_7',
+    'sofa_chair_8', 'sofa_chair_9', 'skateboard', 'antique_armchair_1'
 ]
 
 

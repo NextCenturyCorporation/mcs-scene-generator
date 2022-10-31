@@ -3,6 +3,8 @@ import logging
 import random
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
+from machine_common_sense.config_manager import PerformerStart, Vector3d
+
 from generator import (
     MAX_TRIES,
     DefinitionDataset,
@@ -10,22 +12,23 @@ from generator import (
     ObjectBounds,
     ObjectDefinition,
     RetrievalGoal,
+    Scene,
     SceneException,
     base_objects,
     containers,
     definitions,
     geometry,
+    get_step_limit_from_dimensions,
     instances,
     specific_objects,
-    tags,
+    tags
 )
-from generator.scene import get_step_limit_from_dimensions
 
 from .hypercubes import (
     Hypercube,
     HypercubeFactory,
     update_floor_and_walls,
-    update_scene_objects,
+    update_scene_objects
 )
 from .interactive_plans import (
     InteractivePlan,
@@ -34,28 +37,23 @@ from .interactive_plans import (
     create_container_hypercube_plan_list,
     create_eval_4_container_hypercube_plan_list,
     create_obstacle_hypercube_plan_list,
-    create_occluder_hypercube_plan_list,
+    create_occluder_hypercube_plan_list
 )
 from .object_data import (
     ObjectData,
     ReceptacleData,
     TargetData,
-    identify_larger_definition,
+    identify_larger_definition
 )
 
 logger = logging.getLogger(__name__)
 
-ROOM_DIMENSIONS = geometry.DEFAULT_ROOM_DIMENSIONS
-# Add or subtract the performer width to ensure it can move behind any object.
-ROOM_X_MIN = -(ROOM_DIMENSIONS['x'] / 2.0) + geometry.PERFORMER_WIDTH
-ROOM_Z_MIN = -(ROOM_DIMENSIONS['x'] / 2.0) + geometry.PERFORMER_WIDTH
-ROOM_X_MAX = (ROOM_DIMENSIONS['x'] / 2.0) - geometry.PERFORMER_WIDTH
-ROOM_Z_MAX = (ROOM_DIMENSIONS['x'] / 2.0) - geometry.PERFORMER_WIDTH
-
+ROOM_SIZE_X = list(range(10, 16))
+ROOM_SIZE_Y = list(range(3, 6))
+ROOM_SIZE_Z = list(range(10, 16))
 
 SMALL_CONTEXT_OBJECT_CHOICES = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
 SMALL_CONTEXT_OBJECT_WEIGHTS = [5, 5, 10, 10, 12.5, 15, 12.5, 10, 10, 5, 5]
-
 
 WALL_CHOICES = [0, 1, 2, 3]
 WALL_WEIGHTS = [40, 30, 20, 10]
@@ -77,7 +75,7 @@ class InteractiveHypercube(Hypercube):
 
     def __init__(
         self,
-        body_template: Dict[str, Any],
+        starter_scene: Scene,
         goal: InteractiveGoal,
         role_to_type: Dict[str, str],
         plan_name: str,
@@ -93,8 +91,8 @@ class InteractiveHypercube(Hypercube):
 
         super().__init__(
             goal.get_name() + ((' ' + plan_name) if plan_name else ''),
-            body_template,
-            goal.get_goal_template(),
+            starter_scene,
+            goal.get_type(),
             training=training
         )
 
@@ -197,9 +195,9 @@ class InteractiveHypercube(Hypercube):
     # Override
     def _create_scenes(
         self,
-        body_template: Dict[str, Any],
+        starter_scene: Scene,
         goal_template: Dict[str, Any]
-    ) -> List[Dict[str, Any]]:
+    ) -> List[Scene]:
 
         tries = 0
         while True:
@@ -211,7 +209,7 @@ class InteractiveHypercube(Hypercube):
                 # Reset the half-finished scenes, all of their objects, and
                 # their other properties on each try.
                 scenes = [
-                    copy.deepcopy(body_template) for _
+                    copy.deepcopy(starter_scene) for _
                     in range(len(self._plan_list))
                 ]
                 for object_data_list in self._data.values():
@@ -225,8 +223,12 @@ class InteractiveHypercube(Hypercube):
                 # Save the targets used in the hypercube that are not defined
                 # by the plan, if the goal has multiple targets.
                 self._common_target_list = []
+                # Save the randomized room dimensions in the hypercube.
+                self._room_dimensions = self._generate_room_dimensions()
                 # Save the performer's start location in the hypercube.
-                self._performer_start = self._generate_performer_start()
+                self._performer_start = self._generate_performer_start(
+                    self._room_dimensions
+                )
                 # Save the small context objects used in the hypercube.
                 self._small_context_object_list = []
 
@@ -242,7 +244,7 @@ class InteractiveHypercube(Hypercube):
                     f'\n\n{self.get_name()} initialize scenes is done\n ')
 
                 scenes = update_floor_and_walls(
-                    body_template,
+                    starter_scene,
                     self._data,
                     retrieve_template_list,
                     scenes
@@ -262,10 +264,15 @@ class InteractiveHypercube(Hypercube):
         return scenes
 
     # Override
-    def _get_training_scenes(self) -> List[Dict[str, Any]]:
+    def _get_slices(self) -> List[str]:
+        # This hypercube handles setting its slice tags elsewhere.
+        return []
+
+    # Override
+    def _get_training_scenes(self) -> List[Scene]:
         return [
             scene for scene in self._scenes
-            if not scene['debug']['evaluationOnly']
+            if not scene.debug['evaluationOnly']
         ]
 
     def _assign_confusor_obstacle_occluder_location(
@@ -862,20 +869,18 @@ class InteractiveHypercube(Hypercube):
         """Choose and return an obstacle or occluder definition for the given
         target object from the given definition list."""
 
-        obstacle_occluder_definition_list = (
-            geometry.retrieve_obstacle_occluder_definition_list(
-                target_definition,
-                definition_dataset,
-                is_occluder
-            )
+        output = geometry.retrieve_obstacle_occluder_definition_list(
+            target_definition,
+            definition_dataset,
+            is_occluder
         )
-        if not obstacle_occluder_definition_list:
+        if not output:
             raise SceneException(
                 f'{self.get_name()} cannot find '
                 f'{"occluder" if is_occluder else "obstacle"} '
                 f'size={definition_dataset.size()} '
                 f'target={target_definition}')
-        definition, angle = random.choice(obstacle_occluder_definition_list)
+        definition, angle = output
         # Note that this rotation must be also modified with the final
         # performer start Y.
         definition.rotation.y += angle
@@ -991,10 +996,33 @@ class InteractiveHypercube(Hypercube):
             sideways_definition.sideways = None
             target_definition_list.append(sideways_definition)
 
-        # If needed, find an enclosable container that can hold both the
-        # target and the confusor together.
-        if target_data.containerize_with(confusor_data):
-            for definition in definition_dataset.definitions():
+        # Get the groups from the dataset so we can randomize them correctly.
+        definition_groups = definition_dataset.groups()
+        group_indexes = list(range(len(definition_groups)))
+        inner_indexes = [
+            list(range(len(definition_selections)))
+            for definition_selections in definition_groups
+        ]
+
+        while any([len(indexes) for indexes in inner_indexes]):
+            # Choose a random group, then choose a random list in that group.
+            group_index = random.choice(group_indexes)
+            inner_index = random.choice(inner_indexes[group_index])
+            # Remove the chosen inner index from its list.
+            inner_indexes[group_index] = [
+                i for i in inner_indexes[group_index] if i != inner_index
+            ]
+            # If there are no more defs available for a group, remove it.
+            if not len(inner_indexes[group_index]):
+                group_indexes = [i for i in group_indexes if i != group_index]
+            # Choose a random material for the chosen definition.
+            definition = random.choice(
+                definition_groups[group_index][inner_index]
+            )
+
+            # If needed, find an enclosable container that can hold both the
+            # target and the confusor together.
+            if target_data.containerize_with(confusor_data):
                 for target_definition in target_definition_list:
                     valid_containment = containers.can_contain_both(
                         definition,
@@ -1013,18 +1041,17 @@ class InteractiveHypercube(Hypercube):
                         container_definition = definition
                         break
 
-        # Else, find an enclosable container that can hold either the target
-        # or confusor individually.
-        else:
-            confusor_definition_or_none = (
-                confusor_definition if confusor_data and
-                confusor_data.is_inside() else None
-            )
+            # Else, find an enclosable container that can hold either the
+            # target or confusor individually.
+            else:
+                confusor_definition_or_none = (
+                    confusor_definition if confusor_data and
+                    confusor_data.is_inside() else None
+                )
 
-            if not target_data.is_inside():
-                target_definition_list = [None]
+                if not target_data.is_inside():
+                    target_definition_list = [None]
 
-            for definition in definition_dataset.definitions():
                 for target_definition in target_definition_list:
                     valid_containment = containers.can_contain(
                         definition,
@@ -1048,6 +1075,9 @@ class InteractiveHypercube(Hypercube):
                             )
                         container_definition = definition
                         break
+
+            if container_definition:
+                break
 
         if not container_definition:
             raise SceneException(
@@ -1114,7 +1144,7 @@ class InteractiveHypercube(Hypercube):
                     performer_start,
                     existing_bounds_list,
                     is_target=True,
-                    room_dimensions=ROOM_DIMENSIONS
+                    room_dimensions=self._room_dimensions
                 )
                 if goal.validate_target_location(
                     i,
@@ -1168,7 +1198,9 @@ class InteractiveHypercube(Hypercube):
                     break
             location_front = None
             location_back = None
-            self._performer_start = self._generate_performer_start()
+            self._performer_start = self._generate_performer_start(
+                self._room_dimensions
+            )
 
         if not location_front or not location_back:
             raise SceneException(
@@ -1202,7 +1234,7 @@ class InteractiveHypercube(Hypercube):
             behind=behind,
             obstruct=obstruct,
             unreachable=unreachable,
-            room_dimensions=ROOM_DIMENSIONS
+            room_dimensions=self._room_dimensions
         )
 
         if not location_close:
@@ -1245,7 +1277,7 @@ class InteractiveHypercube(Hypercube):
                 performer_start['position'],
                 bounds_list_copy,
                 object_definition,
-                room_dimensions=ROOM_DIMENSIONS
+                room_dimensions=self._room_dimensions
             )
             if not geometry.are_adjacent(
                 existing_location,
@@ -1262,17 +1294,26 @@ class InteractiveHypercube(Hypercube):
 
         return location_far
 
-    def _generate_performer_start(self) -> Dict[str, Dict[str, float]]:
-        """Generate and return the performer's start location dict."""
+    def _generate_performer_start(
+        self,
+        room_dimensions: Dict[str, float]
+    ) -> Dict[str, Dict[str, float]]:
+        """Generate and return the performer's starting location dict."""
+        # Add or subtract the performer width from the room dimensions to
+        # ensure the performer agent can move behind any object.
+        room_x_min = -(room_dimensions['x'] / 2.0) + geometry.PERFORMER_WIDTH
+        room_z_min = -(room_dimensions['z'] / 2.0) + geometry.PERFORMER_WIDTH
+        room_x_max = (room_dimensions['x'] / 2.0) - geometry.PERFORMER_WIDTH
+        room_z_max = (room_dimensions['z'] / 2.0) - geometry.PERFORMER_WIDTH
         return {
             'position': {
                 'x': round(
-                    random.uniform(ROOM_X_MIN, ROOM_X_MAX),
+                    random.uniform(room_x_min, room_x_max),
                     geometry.POSITION_DIGITS
                 ),
                 'y': 0,
                 'z': round(
-                    random.uniform(ROOM_Z_MIN, ROOM_Z_MAX),
+                    random.uniform(room_z_min, room_z_max),
                     geometry.POSITION_DIGITS
                 )
             },
@@ -1302,7 +1343,7 @@ class InteractiveHypercube(Hypercube):
                 performer_start,
                 bounds_list,
                 is_target=(target_choice is not None),
-                room_dimensions=ROOM_DIMENSIONS
+                room_dimensions=self._room_dimensions
             )
             if location_random:
                 # If generating a location for the target object...
@@ -1378,6 +1419,14 @@ class InteractiveHypercube(Hypercube):
 
         return location_random
 
+    def _generate_room_dimensions(self) -> Dict[str, Dict[str, float]]:
+        """Generate and return the room's randomized dimensions dict."""
+        return {
+            'x': random.choice(ROOM_SIZE_X),
+            'y': random.choice(ROOM_SIZE_Y),
+            'z': random.choice(ROOM_SIZE_Z)
+        }
+
     def _identify_front(
         self,
         goal: InteractiveGoal,
@@ -1395,7 +1444,7 @@ class InteractiveHypercube(Hypercube):
                 performer_start,
                 definition,
                 rotation_func=rotation_func,
-                room_dimensions=ROOM_DIMENSIONS
+                room_dimensions=self._room_dimensions
             )
             # If we've found a valid location...
             if location_front:
@@ -1429,7 +1478,7 @@ class InteractiveHypercube(Hypercube):
                 performer_start,
                 definition,
                 rotation_func,
-                room_dimensions=ROOM_DIMENSIONS
+                room_dimensions=self._room_dimensions
             )
             # If we've found a valid location...
             if location_back:
@@ -1470,7 +1519,7 @@ class InteractiveHypercube(Hypercube):
                     definition,
                     self._performer_start,
                     self._bounds_list,
-                    room_dimensions=ROOM_DIMENSIONS
+                    room_dimensions=self._room_dimensions
                 )
                 successful = True
                 if successful:
@@ -1672,7 +1721,7 @@ class InteractiveHypercube(Hypercube):
                     performer_start['position'],
                     bounds_list,
                     receptacle_definition,
-                    room_dimensions=ROOM_DIMENSIONS
+                    room_dimensions=self._room_dimensions
                 )
                 if location:
                     receptacle_instance = instances.instantiate_object(
@@ -1702,28 +1751,44 @@ class InteractiveHypercube(Hypercube):
 
     def _update_scene_at_index(
         self,
-        scene: Dict[str, Any],
+        scene: Scene,
         scene_index: int,
         goal_template: Dict[str, Any]
     ) -> None:
         """Update the given scene with its metadata like all of its objects."""
         scene_plan = self._plan_list[scene_index]
-        scene['performerStart'] = self._performer_start
-        scene['debug']['evaluationOnly'] = any([
+        scene.room_dimensions = Vector3d(
+            x=self._room_dimensions['x'],
+            y=self._room_dimensions['y'],
+            z=self._room_dimensions['z']
+        )
+        scene.performer_start = PerformerStart(
+            position=Vector3d(
+                x=self._performer_start['position']['x'],
+                y=self._performer_start['position']['y'],
+                z=self._performer_start['position']['z']
+            ),
+            rotation=Vector3d(
+                x=self._performer_start['rotation']['x'],
+                y=self._performer_start['rotation']['y'],
+                z=self._performer_start['rotation']['z']
+            )
+        )
+        scene.debug['evaluationOnly'] = any([
             object_plan.untrained
             for object_plan_list in scene_plan.object_plans().values()
             for object_plan in object_plan_list
         ])
 
-        scene['goal'] = copy.deepcopy(goal_template)
-        scene['goal'] = self._goal.update_goal_template(
-            scene['goal'],
+        scene.goal = copy.deepcopy(goal_template)
+        scene.goal = self._goal.update_goal_template(
+            scene.goal,
             [self._target_data.instance_list[scene_index]]
         )
 
-        scene['goal']['last_step'] = get_step_limit_from_dimensions(
-            scene.get('roomDimensions', {}).get('x'),
-            scene.get('roomDimensions', {}).get('z')
+        scene.goal['last_step'] = get_step_limit_from_dimensions(
+            scene.room_dimensions.x,
+            scene.room_dimensions.z
         )
 
         role_to_object_list = {}
@@ -1753,13 +1818,13 @@ class InteractiveHypercube(Hypercube):
         ]
         update_scene_objects(scene, role_to_object_list)
 
-        scene['goal']['sceneInfo'][tags.SCENE.ID] = [
+        scene.goal['sceneInfo'][tags.SCENE.ID] = [
             scene_plan.scene_id.upper()
         ]
-        scene['goal']['sceneInfo'][tags.SCENE.SLICES] = []
+        scene.goal['sceneInfo'][tags.SCENE.SLICES] = []
         for tag, value in scene_plan.slice_tags.items():
-            scene['goal']['sceneInfo'][tag] = value
-            scene['goal']['sceneInfo'][tags.SCENE.SLICES].append(
+            scene.goal['sceneInfo'][tag] = value
+            scene.goal['sceneInfo'][tags.SCENE.SLICES].append(
                 tags.tag_to_label(tag) + ' ' + str(value)
             )
 
@@ -1772,19 +1837,15 @@ class InteractiveSingleSceneFactory(HypercubeFactory):
         )
         self.goal = goal
 
-    def _build(
-        self,
-        body_template: Dict[str, Any],
-        role_to_type: Dict[str, str]
-    ) -> Hypercube:
+    def _build(self, starter_scene: Scene) -> Hypercube:
         target_object_plan = ObjectPlan(
             ObjectLocationPlan.RANDOM,
             definition=base_objects.create_soccer_ball()
         )
         return InteractiveHypercube(
-            body_template,
+            starter_scene,
             self.goal,
-            role_to_type,
+            self.role_to_type,
             '',
             [InteractivePlan('', {}, target_object_plan)],
             training=self.training
@@ -1800,15 +1861,11 @@ class InteractiveContainerTrainingHypercubeFactory(HypercubeFactory):
         )
         self.goal = goal
 
-    def _build(
-        self,
-        body_template: Dict[str, Any],
-        role_to_type: Dict[str, str]
-    ) -> Hypercube:
+    def _build(self, starter_scene: Scene) -> Hypercube:
         return InteractiveHypercube(
-            body_template,
+            starter_scene,
             self.goal,
-            role_to_type,
+            self.role_to_type,
             'container',
             create_container_hypercube_plan_list(),
             training=self.training
@@ -1824,15 +1881,11 @@ class InteractiveObstacleTrainingHypercubeFactory(HypercubeFactory):
         )
         self.goal = goal
 
-    def _build(
-        self,
-        body_template: Dict[str, Any],
-        role_to_type: Dict[str, str]
-    ) -> Hypercube:
+    def _build(self, starter_scene: Scene) -> Hypercube:
         return InteractiveHypercube(
-            body_template,
+            starter_scene,
             self.goal,
-            role_to_type,
+            self.role_to_type,
             'obstacle',
             create_obstacle_hypercube_plan_list(),
             training=self.training
@@ -1848,41 +1901,13 @@ class InteractiveOccluderTrainingHypercubeFactory(HypercubeFactory):
         )
         self.goal = goal
 
-    def _build(
-        self,
-        body_template: Dict[str, Any],
-        role_to_type: Dict[str, str]
-    ) -> Hypercube:
+    def _build(self, starter_scene: Scene) -> Hypercube:
         return InteractiveHypercube(
-            body_template,
+            starter_scene,
             self.goal,
-            role_to_type,
+            self.role_to_type,
             'occluder',
             create_occluder_hypercube_plan_list(),
-            training=self.training
-        )
-
-
-class InteractiveContainerEvaluationHypercubeFactory(HypercubeFactory):
-    def __init__(self, goal: InteractiveGoal) -> None:
-        super().__init__(
-            'Container' + goal.get_name().replace(' ', '').capitalize() +
-            'Evaluation',
-            training=False
-        )
-        self.goal = goal
-
-    def _build(
-        self,
-        body_template: Dict[str, Any],
-        role_to_type: Dict[str, str]
-    ) -> Hypercube:
-        return InteractiveHypercube(
-            body_template,
-            self.goal,
-            role_to_type,
-            'container',
-            create_container_hypercube_plan_list(),
             training=self.training
         )
 
@@ -1890,21 +1915,16 @@ class InteractiveContainerEvaluationHypercubeFactory(HypercubeFactory):
 class InteractiveContainerEvaluation4HypercubeFactory(HypercubeFactory):
     def __init__(self, goal: InteractiveGoal) -> None:
         super().__init__(
-            'Container' + goal.get_name().replace(' ', '').capitalize() +
-            'Evaluation4',
+            'Container' + goal.get_name().replace(' ', '').capitalize(),
             training=False
         )
         self.goal = goal
 
-    def _build(
-        self,
-        body_template: Dict[str, Any],
-        role_to_type: Dict[str, str]
-    ) -> Hypercube:
+    def _build(self, starter_scene: Scene) -> Hypercube:
         return InteractiveHypercube(
-            body_template,
+            starter_scene,
             self.goal,
-            role_to_type,
+            self.role_to_type,
             'container',
             create_eval_4_container_hypercube_plan_list(),
             training=self.training
@@ -1914,21 +1934,16 @@ class InteractiveContainerEvaluation4HypercubeFactory(HypercubeFactory):
 class InteractiveObstacleEvaluationHypercubeFactory(HypercubeFactory):
     def __init__(self, goal: InteractiveGoal) -> None:
         super().__init__(
-            'Obstacle' + goal.get_name().replace(' ', '').capitalize() +
-            'Evaluation',
+            'Obstacle' + goal.get_name().replace(' ', '').capitalize(),
             training=False
         )
         self.goal = goal
 
-    def _build(
-        self,
-        body_template: Dict[str, Any],
-        role_to_type: Dict[str, str]
-    ) -> Hypercube:
+    def _build(self, starter_scene: Scene) -> Hypercube:
         return InteractiveHypercube(
-            body_template,
+            starter_scene,
             self.goal,
-            role_to_type,
+            self.role_to_type,
             'obstacle',
             create_obstacle_hypercube_plan_list(),
             training=self.training
@@ -1938,21 +1953,16 @@ class InteractiveObstacleEvaluationHypercubeFactory(HypercubeFactory):
 class InteractiveOccluderEvaluationHypercubeFactory(HypercubeFactory):
     def __init__(self, goal: InteractiveGoal) -> None:
         super().__init__(
-            'Occluder' + goal.get_name().replace(' ', '').capitalize() +
-            'Evaluation',
+            'Occluder' + goal.get_name().replace(' ', '').capitalize(),
             training=False
         )
         self.goal = goal
 
-    def _build(
-        self,
-        body_template: Dict[str, Any],
-        role_to_type: Dict[str, str]
-    ) -> Hypercube:
+    def _build(self, starter_scene: Scene) -> Hypercube:
         return InteractiveHypercube(
-            body_template,
+            starter_scene,
             self.goal,
-            role_to_type,
+            self.role_to_type,
             'occluder',
             create_occluder_hypercube_plan_list(),
             training=self.training
@@ -1968,7 +1978,6 @@ INTERACTIVE_TRAINING_HYPERCUBE_LIST = [
 
 
 INTERACTIVE_EVALUATION_HYPERCUBE_LIST = [
-    InteractiveContainerEvaluationHypercubeFactory(RetrievalGoal('container')),
     InteractiveObstacleEvaluationHypercubeFactory(RetrievalGoal('obstacle')),
     InteractiveOccluderEvaluationHypercubeFactory(RetrievalGoal('occluder')),
     InteractiveContainerEvaluation4HypercubeFactory(RetrievalGoal('container'))
