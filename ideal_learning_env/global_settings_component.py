@@ -35,7 +35,7 @@ from .defs import (
     find_bounds
 )
 from .goal_services import GoalConfig, GoalServices
-from .numerics import VectorFloatConfig, VectorIntConfig
+from .numerics import RandomizableFloat, VectorFloatConfig, VectorIntConfig
 from .object_services import KeywordLocation, ObjectRepository
 from .validators import ValidateNoNullProp, ValidateNumber, ValidateOptions
 
@@ -120,7 +120,7 @@ class PerformerStartsNearConfig():
     ```
     """
     label: Union[str, List[str]] = None
-    distance: Union[float, List[float]] = 0.1
+    distance: RandomizableFloat = 0.1
 
 
 class GlobalSettingsComponent(ILEComponent):
@@ -626,7 +626,9 @@ class GlobalSettingsComponent(ILEComponent):
         if self.performer_starts_near:
             random_perf_starts_near = self.get_performer_distance()
             self._delayed_position_label = random_perf_starts_near.label
-            self._delayed_position_distance = random_perf_starts_near.distance
+            self._delayed_position_distance = choose_random(
+                random_perf_starts_near.distance
+            )
             self._set_position_by_distance(scene)
         else:
             start_pos = self.get_performer_start_position(
