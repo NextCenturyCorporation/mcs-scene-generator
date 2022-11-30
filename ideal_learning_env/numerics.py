@@ -4,7 +4,7 @@ from typing import List, Union
 
 from machine_common_sense.config_manager import Vector3d
 
-from .defs import ConverterClass, choose_random
+from .defs import ConverterClass, choose_random, return_list
 
 
 class MinMax(ConverterClass):
@@ -122,6 +122,46 @@ class VectorIntConfig(ConverterClass):
             y=choose_random(self.y, int),
             z=choose_random(self.z, int)
         )
+
+
+def retrieve_all_choices(choices: Union[int, float, List, MinMax]) -> List:
+    """Returns the list of all choices for the given int, float, list, or
+    MinMax configuration. Rounds all floats in expanded MinMaxFloats to one
+    decimal place."""
+    if isinstance(choices, list):
+        outputs = []
+        for choice in choices:
+            outputs.extend(retrieve_all_choices(choice))
+        return sorted(list(set(outputs)))
+    if isinstance(choices, MinMaxInt):
+        return list(range(choices.min, choices.max + 1))
+    if isinstance(choices, MinMaxFloat):
+        return [
+            round(value / 10.0, 1) for value in
+            list(range(round(choices.min * 10), round(choices.max * 10) + 1))
+        ]
+    return [choices]
+
+
+def retrieve_all_vectors(
+    vectors: List[Union[VectorIntConfig, VectorFloatConfig]]
+) -> List[Vector3d]:
+    """Returns the list of all possible vectors for the given vector
+    configurations. Rounds all floats in expanded MinMaxFloats to one decimal
+    place."""
+    outputs = []
+    for vector in return_list(vectors):
+        x_choices = retrieve_all_choices(vector.x)
+        y_choices = retrieve_all_choices(vector.y)
+        z_choices = retrieve_all_choices(vector.z)
+        for x_choice in x_choices:
+            for y_choice in y_choices:
+                for z_choice in z_choices:
+                    outputs.append((x_choice, y_choice, z_choice))
+    return sorted(
+        [Vector3d(x=x, y=y, z=z) for x, y, z in set(outputs)],
+        key=lambda x: list(vars(x).items())
+    )
 
 
 RandomizableVectorFloat3d = Union[VectorFloatConfig, List[VectorFloatConfig]]

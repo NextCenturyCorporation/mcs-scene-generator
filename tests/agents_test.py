@@ -1,7 +1,12 @@
 import pytest
 from machine_common_sense.config_manager import Vector3d
 
-from generator.agents import add_agent_action, create_agent, create_blob
+from generator.agents import (
+    add_agent_action,
+    add_agent_pointing,
+    create_agent,
+    create_blob
+)
 from generator.exceptions import SceneException
 from generator.materials import MaterialTuple
 from ideal_learning_env.agent_service import AgentSettings
@@ -72,6 +77,74 @@ def test_add_agent_action_fail():
     add_agent_action(agent, "wave", 4, 6, True)
     with pytest.raises(SceneException):
         add_agent_action(agent, "dance", 4)
+
+
+def test_add_agent_pointing():
+    settings = vars(AgentSettings(chest=2, chestMaterial=4))
+    agent = create_agent(
+        type='test_type',
+        position_x=1,
+        position_z=2,
+        rotation_y=45,
+        settings=settings,
+        position_y_modifier=1.5)
+    assert agent['actions'] == []
+    add_agent_pointing(agent, 1)
+    assert len(agent['actions']) == 2
+    assert agent['actions'][0]['id'] == 'Point_start_index_finger'
+    assert agent['actions'][0]['stepBegin'] == 1
+    assert agent['actions'][0]['stepEnd'] == 8
+    assert not agent['actions'][0].get('isLoopAnimation')
+    assert agent['actions'][1]['id'] == 'Point_hold_index_finger'
+    assert agent['actions'][1]['stepBegin'] == 8
+    assert agent['actions'][1]['isLoopAnimation'] is True
+    assert agent['actions'][1].get('stepEnd') is None
+
+    settings = vars(AgentSettings(chest=2, chestMaterial=4))
+    agent = create_agent(
+        type='test_type',
+        position_x=1,
+        position_z=2,
+        rotation_y=45,
+        settings=settings,
+        position_y_modifier=1.5)
+    agent['actions'] = [{
+        'id': 'wave',
+        'stepBegin': 5,
+        'stepEnd': 15
+    }]
+    add_agent_pointing(agent, 21)
+    assert len(agent['actions']) == 3
+    assert agent['actions'][0]['id'] == 'wave'
+    assert agent['actions'][0]['stepBegin'] == 5
+    assert agent['actions'][0]['stepEnd'] == 15
+    assert not agent['actions'][0].get('isLoopAnimation')
+    assert agent['actions'][1]['id'] == 'Point_start_index_finger'
+    assert agent['actions'][1]['stepBegin'] == 21
+    assert agent['actions'][1]['stepEnd'] == 28
+    assert not agent['actions'][1].get('isLoopAnimation')
+    assert agent['actions'][2]['id'] == 'Point_hold_index_finger'
+    assert agent['actions'][2]['stepBegin'] == 28
+    assert agent['actions'][2]['isLoopAnimation'] is True
+    assert agent['actions'][2].get('stepEnd') is None
+
+
+def test_add_agent_pointing_fail():
+    settings = vars(AgentSettings(chest=2, chestMaterial=4))
+    agent = create_agent(
+        type='test_type',
+        position_x=1,
+        position_z=2,
+        rotation_y=45,
+        settings=settings,
+        position_y_modifier=1.5)
+    agent['actions'] = [{
+        'id': 'wave',
+        'stepBegin': 5,
+        'stepEnd': 15
+    }]
+    with pytest.raises(SceneException):
+        add_agent_pointing(agent, 1)
 
 
 def test_create_blob_simple():

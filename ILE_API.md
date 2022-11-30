@@ -36,39 +36,46 @@ animation should loop or end when finished.  Default: False
 
 #### AgentConfig
 
-Represents the template for a specific object (with one or more possible
+Represents the template for a specific agent (with one or more possible
 variations) that will be added to each scene. Each template can have the
 following optional properties:
-- `num` (int, or list of ints, or [MinMaxInt](#MinMaxInt) dict): The number
-of agents with this template to generate in each scene. For a list or a
-MinMaxInt, a new number will be randomly chosen for each scene.
-Default: `1`
-- `actions` ([AgentActionConfig](#AgentActionConfig)) or list of
-([AgentActionConfig](#AgentActionConfig)): The config for agent actions
-or animations.  Enties in a list are NOT choices.  Each entry will be kept
-and any randomness will be reconciled inside the entry.
-- `movement` ([AgentMovementConfig](#AgentMovementConfig)) or list of
-([AgentMovementConfig](#AgentMovementConfig)): The config for agent
-movement.
-- `agent_settings` ([AgentSettings](#AgentSettings) or list of
-[AgentSettings](#AgentSettings)): The settings that describe how an agent
-will look. Default: random
+- `num` (int, or [MinMaxInt](#MinMaxInt) dict, or list of ints and/or
+MinMaxInt dicts): The number of agents with this template to generate in
+each scene. For a list or a MinMaxInt, a new number will be randomly chosen
+for each scene. Default: `1`
+- `actions` ([AgentActionConfig](#AgentActionConfig)) dict, or list of
+AgentActionConfig dicts): Configures the agent's actions (a.k.a.
+animations). If configured as a list, each action will be applied, and any
+randomness will be reconciled within each array element for each scene.
+Default: idle
+- `agent_settings` ([AgentSettings](#AgentSettings) dict, or list of
+AgentSettings dicts): Configures the agent's appearance. Default: random
+- `keyword_location` ([KeywordLocationConfig](#KeywordLocationConfig)
+dict): A keyword location for this agent.
+- `movement` (bool, or [AgentMovementConfig](#AgentMovementConfig)) dict,
+or list of bools and/or AgentMovementConfig dicts): Configures this agent
+to move (walk/run) around the room. If `true`, the agent will be assigned
+a random movement pattern for each scene. If configured as a list, one
+option will be randomly chosen for each scene. Default: none
+- `pointing` ([AgentPointingConfig](#AgentPointingConfig) dict, or list of
+AgentPointingConfig dicts): Configures this agent to start pointing on a
+specific step. The pointing lasts indefinitely. This cancels out any other
+actions or movement. Use `pointing.object_label` to point at a specific
+object. Use `pointing.walk_distance` to turn around and walk toward the
+object before pointing at it. If configured as a list, one option will be
+randomly chosen for each scene. Default: none
 - `position` ([VectorFloatConfig](#VectorFloatConfig) dict, or list of
-VectorFloatConfig dicts): The position of this object in each scene. For a
-list, a new position will be randomly chosen for each scene.
-Default: random
-- `rotation_y` (int, or list of ints, or [MinMaxInt](#MinMaxInt) dict):
-The rotation of this object in each scene. For a
-list, a new rotation will be randomly chosen for each scene.
-Default: random
-- `type`: (string or list of strings) string to indicate the model of
-agent to use.  Options are: agent_female_01, agent_female_02,
-agent_female_04, agent_male_02, agent_male_03, agent_male_04.
-Default: random
-- `keyword_location`: ([KeywordLocationConfig](#KeywordLocationConfig)):
-One of the keyword locations for this agent or set of agents. Any choices
-in `keyword_location` are made for each object inside the group, not the
-group as a whole.
+VectorFloatConfig dicts): The position of this agent in each scene. If
+configured as a list, a new position will be randomly chosen for each
+scene. Default: random
+- `rotation_y` (int, or [MinMaxInt](#MinMaxInt) dict, or list of ints
+and/or MinMaxInt dicts): The rotation of this agent in each scene. If
+configured as a list, a new rotation will be randomly chosen for each
+scene. Default: random
+- `type` (string, or list of strings) The model ("type") of the agent.
+Please see the list in our [schema doc](
+https://nextcenturycorporation.github.io/MCS/schema.html#agents) for all
+available options. Default: random
 
 Example:
 ```
@@ -93,49 +100,91 @@ actions:
 #### AgentMovementConfig
 
 Represents what movements the agent is to perform.  If the
-'points' field is set, the 'bounds' and 'num_points' fields will
+`points` field is set, the `bounds` and `num_points` fields will
 be ignored.
-- `animation` (str or list of str): Determines animation that
-should occur while movement is happening.
-Default: 'TPM_walk' or 'TPM_run'
+- `animation` (str, or list of str): The animation that will be shown while
+the agent moves. Default: 'TPM_walk' or 'TPM_run'
+- `bounds` (list of [VectorFloatConfig](#VectorFloatConfig) dicts): A set
+of points that create a polygon, inside of which the movement `points` will
+be chosen randomly. If `bounds` has fewer than 3 points, then the entire
+room is used as the bounds. This option is ignored if `points` is
+configured. Default: Entire room
+- `num_points` (int, or [MinMaxInt](#MinMaxInt) dict, or list of ints
+and/or MinMaxInt dicts): The number of random movement points to generate
+inside of the `bounds`. This option is ignored if `points` is set.
+Default: between 2 and 10, inclusive.
+- `points` (list of [VectorFloatConfig](#VectorFloatConfig)): The list of
+points to which the agent should move. If set, `points` takes precedence
+over `bounds` and `num_points`. Default: Use `bounds`
+- `repeat` (bool or list of bool): Whether the agent's movement pattern
+should loop indefinitely (`true`) or end when finished (`false`).
+Default: random
 - `step_begin` (int, or list of ints, or [MinMaxInt](#MinMaxInt) dict):
-The step at which this movement should start.
-- `points` (list of [VectorFloatConfig](#VectorFloatConfig)): List of
-points the agent should move to.  If this value is set, it will take
-precedence over 'bounds' and 'num_points'.  Default: Use bounds
-- `bounds` (list of [VectorFloatConfig](#VectorFloatConfig)): A set of
-points that create a polygon in which points will be generated inside.
-If there are less than 3 points, the entire room will be used.  This
-option will be ignored if 'points' is set.
-Default: Entire room
-- `num_points` (int, or list of ints, or [MinMaxInt](#MinMaxInt) dict):
-The number of points to generate inside the bounds.  Only valid if points
-is not used.  Default: random between 2 and 10 inclusive.
-- `repeat` (bool or list of bool): Determines whether the
-set of movements should loop or end when finished.
-Default: Random
+The step at which this movement should start. Required.
+
+#### AgentPointingConfig
+
+Represents the agent pointing.
+- `object_label` (string, or list of strings): The label of the object in
+the scene at which to point. Default: The agent points in whatever
+direction it's facing (based on its `rotation_y` setting).
+The step in which the pointing should start. Default: 1
+- `step_begin` (int, or [MinMaxInt](#MinMaxInt) dict, or list of ints
+and/or MinMaxInt dicts): The step on which the pointing should start.
+The agent will idle up to this step. If `walk_distance` is set, then the
+movement will begin on this step, and the pointing will happen immediately
+after the movement. Default: 1
+`walk_distance` (float, or [MinMaxFloat](#MinMaxFloat) dict, or list of
+floats and/or MinMaxFloat dict): If set, adjusts the agent's starting
+position (which can still be set normally using the `position` option) by
+the configured distance in the direction away from the object corresponding
+to `object_label`; the agent will then turn around, walk two times the
+configured distance, and then point at the object. Will override
+`step_begin` to be after the movement ends. Use the `step_begin` option to
+configure when the movement should begin. Default: no movement
 
 #### AgentSettings
 
-Describes the appearance of the agent.  Detailed information can be
-found in the MCS schema documentation.  All values Default to a random
-value in the full range of that value.
+Describes the appearance of the agent. Each property defaults to a
+random valid setting. Please see the sections in our [schema doc](
+https://nextcenturycorporation.github.io/MCS/schema.html#agent-settings)
+for the available options.
+- `chest` (int, or list of ints)
+- `chestMaterial` (int, or list of ints)
+- `eyes` (int, or list of ints)
+- `feet` (int, or list of ints)
+- `feetMaterial` (int, or list of ints)
+- `glasses` (int, or list of ints)
+- `hair` (int, or list of ints)
+- `hairMaterial` (int, or list of ints)
+- `hatMaterial` (int, or list of ints)
+- `hideHair` (bool, or list of bools)
+- `isElder` (bool, or list of bools)
+- `jacket` (int, or list of ints)
+- `jacketMaterial` (int, or list of ints)
+- `legs` (int, or list of ints)
+- `legsMaterial` (int, or list of ints)
+- `showBeard` (bool, or list of bools)
+- `showGlasses` (bool, or list of bools)
+- `showJacket` (bool, or list of bools)
+- `showTie` (bool, or list of bools)
+- `skin` (int, or list of ints)
+- `tie` (int, or list of ints)
+- `tieMaterial` (int, or list of ints)
 
 #### AgentTargetConfig
 
-Defines details of the shortcut_agent_with_target shortcut.  This shortcut
-creates a room with an agent holding a target soccer ball.  The agent's
-position can be specified.
-- `agent_position` ([VectorFloatConfig](#VectorFloatConfig) or list of
-[VectorFloatConfig](#VectorFloatConfig)): Determines the position of the
-agent.  Default: Random
-- `movement` (bool, or list of bools): Whether the agent should move
-around. Default: true
-- `movement_bounds` (list of [VectorFloatConfig](#VectorFloatConfig))
-points to generate a polygon that bounds the agents random movement.
-If the polygon has an area of 0, no movement will occur.  Polygons with
-only 1 or 2 points will have an area of 0 and therefore will have no
-movement.  Default: entire room
+Defines all the configurable options for
+[shortcut_agent_with_target](#shortcut_agent_with_target).
+- `agent` ([AgentConfig](#AgentConfig) dict, or list of AgentConfig dicts):
+Configures the settings for the agent.
+- `agent_position` ([VectorFloatConfig](#VectorFloatConfig) dict, or list
+[VectorFloatConfig](#VectorFloatConfig) dicts): Deprecated. Please use
+`agent.position`
+- `movement` (bool, or list of bools): Deprecated. Please use
+`agent.movement`
+- `movement_bounds` (list of [VectorFloatConfig](#VectorFloatConfig)
+dicts): Deprecated. Please use `agent.bounds`
 
 #### BisectingPlatformConfig
 
@@ -147,6 +196,14 @@ to choose a side to drop off of the platform, but this can be disabled.
 performer has to stop and choose a side of the room. Default: True
 - `has_long_blocking_wall` (bool): Enables the long blocking wall used in
 Spatial Reorientation tasks. Overrides `has_blocking_wall`. Default: False
+- `is_short` (bool): Makes the platform short (a Y scale of 0.5 rather
+than 1). Default: False
+- `is_thin` (bool): Makes the platform thin (an X scale of 0.5 rather
+than 1). Default: False
+- `other_platforms` ([StructuralPlatformConfig](#StructuralPlatformConfig)
+dict, or list of StructuralPlatformConfig dicts): Configurations to
+generate other platforms that may intersect with the bisecting platform.
+Default: None
 
 #### FloorAreaConfig
 
@@ -222,6 +279,36 @@ target:
       max: 3.0
 ```
 
+#### ImitationTaskConfig
+
+Defines details of the shortcut_imitation_task shortcut.
+- `trigger_order` (string, or list of strings): The combination the three
+containers must be openend in order to make the target appear. Oriented
+by facing the front of the containers. Must be one of the following.
+For opening 2 containers: left_middle, left_right, middle_left,
+middle_right, right_middle, right_left. For opening 1 container:
+left, middle, right.
+Default: random
+- `containers_on_right_side` (bool, or list of bools): Whether the
+containers should be to the right or left of the performer.
+Default: random
+- `kidnap_option`: (string, or list of strings): Dictates
+what teleports in the scene after the agent performs its imitation sequence
+to and the performer is kidnapped. Options are:
+1) agent_only: The imitation agent teleports away from the
+containers but in view. Nothing else is teleported.
+2) containers: The containers are teleported but still in view. The
+containers are still aligned with their start rotation. The imitation agent
+is teleported away from the containers but in view.
+3) containers_rotate: The containers are teleported but still in view. The
+containers are rotated 90 degrees to be perpendicular to how they started.
+The imitation agent is teleported away from the containers but in view.
+4) performer: The performer is teleported to a random part of the room
+but looks at the center of the room where the containers still are.
+The imitation agent is teleported away from the containers but in view.
+
+Default: random
+
 #### InteractableObjectConfig
 
 Represents the template for a specific object (with one or more possible
@@ -237,9 +324,10 @@ subtract `num_targets_minus` from the count, and generate that many
 objects. For example, in a scene with 5 targets, a `num_targets_minus` of
 1 would generate 4 objects. Default: null
 - `dimensions` ([VectorFloatConfig](#VectorFloatConfig) dict, int,
-[MinMaxInt](#MinMaxInt), or a list of any of those types): Sets the overal
-dimensions of the object in meters.  This field will override scale.
-Default: Use scale.
+[MinMaxInt](#MinMaxInt), or a list of any of those types): Sets the
+dimensions of the object in meters. Overrides `scale`. If only one
+dimension is configured, then the same scale will be used for the other two
+dimensions. Default: Use scale.
 - `identical_to` (str): Used to match to another object with
 the specified label, so that this definition can share that object's
 exact shape, scale, and material. Overrides `identical_except_color`
@@ -257,6 +345,20 @@ specific label options for details.
 - `locked` (bool or list of bools): If true and the resulting object is
 lockable, like a container or door, the object will be locked.  If the
 object is not lockable, this field has no affect.
+- `separate_lid` (int, or list of ints, or [MinMaxInt](#MinMaxInt) dict):
+Only applies to objects with a 'separate_container' shape.
+If a negative number or None the container will not have a sepearate lid.
+If 0 the container will have a separate lid already attatched at the
+start of the scene. If greater than 0 the container's separate lid will
+be placed by a placer. The number given will be the step the placer starts
+its placement. 15 steps later the lid will be attached to the object.
+Note that if the container has any `moves` configured, the placer and
+separate lid will automatically calculate the x,z position of the container
+until the step it starts it decent. So ensure the container is not moving
+from the step the placer begins its decent to when the lid attachment
+occurs 15 steps later, otherwise the placer will place the lid where
+the container was at the step it started its decent while the container
+moves away from that position.
 - `material` (string, or list of strings): The material (color/texture) to
 use on this object in each scene. For a list, a new material will be
 randomly chosen for each scene. Default: random
@@ -345,8 +447,10 @@ Describes an object's keyword location. Can have the following
 properties:
 - `keyword` (string, or list of strings): The keyword location, which can
 be one of the following:
-    - `adjacent` - The object will be placed next to another object.  The
-    other object must be referenced by the 'relative_object_label' field.
+    - `adjacent` - The object will be placed near another object. The other
+    object must be referenced by the 'relative_object_label' field, and the
+    distance away from the relative object must be set by the
+    `adjacent_distance` field.
     - `adjacent_performer` - The object will be placed next to the
     performer.  The object can be placed in 'front', 'back', left, or
     'right' of the performer using the 'direction'.  The object
@@ -395,14 +499,16 @@ be one of the following:
     label, one will be randomly chosen.
     - `opposite_x` - The object will be placed in the exact same location
     as the object referenced by `relative_object_label` except that its x
-    location will be on the opposite side of the room.  There is no
-    adjustments to find a valid location if another object already exists
-    in location specified by this keyword.
+    location will be on the opposite side of the room. Its rotation will
+    also be mirrored, though it can be adjusted using the `rotation`
+    property within this keyword location option. There are no adjustments
+    to find a valid location if another object already exists in the final
+    location.
     - `opposite_z` - The object will be placed in the exact same location
     as the object referenced by `relative_object_label` except that its z
-    location will be on the opposite side of the room.  There is no
+    location will be on the opposite side of the room.  There are no
     adjustments to find a valid location if another object already exists
-    in location specified by this keyword.
+    in final location.
     - `random` - The object will be positioned in a random location, as if
     it did not have a keyword location.
     - `associated_with_agent` - This object will be held by an agent
@@ -411,6 +517,11 @@ be one of the following:
     referenced by the 'relative_object_label' field.  The wall labels are
     'front_wall', 'back_wall', 'left_wall, and 'right_wall'.  If no wall is
     provided, a wall will be chosen at random.
+- `adjacent_distance` (VectorFloatConfig, or list of VectorFloatConfigs):
+The X/Z distance in global coordinates between this object's position and
+the relative object's position. Only usable with the `adjacent` `keyword`.
+By default, this object will be positioned 0.1 away from the relative
+object in a random, valid direction.
 - `container_label` (string, or list of strings): The label of a container
 object that already exists in your configuration. Only required by some
 keyword locations.
@@ -498,18 +609,22 @@ creates a room with a target object on an island surrounded by lava. There
 will also be a block tool to facilitate acquiring the goal object.
 - `front_lava_width` (int, or list of ints, or [MinMaxInt](#MinMaxInt):
 The number of tiles of lava in front of the island.  Must produce value
-between 2 and 6. Default: Random based on room size and island size
+between 2 and 6 for rectangular tools, 1 to 3 for hooked tools.
+Default: Random based on room size and island size
 - `guide_rails` (bool, or list of bools): If True, guide rails will be
 generated to guide the tool in the direction it is oriented.  If a target
 exists, the guide rails will extend to the target.  This option cannot be
 used with `tool_rotation`. Default: False
 - `island_size` (int, or list of ints, or [MinMaxInt](#MinMaxInt) dict,
-or list of MinMaxInt dicts): The width and lenght of the island inside the
-lava.  Must produce value from 1 to 5.
+or list of MinMaxInt dicts): The width and length of the island inside the
+lava.  Must produce value from 1 to 5 for rectangular tools, 1 to 3
+for hooked tools.
 Default: Random based on room size
 - `left_lava_width` (int, or list of ints, or [MinMaxInt](#MinMaxInt):
 The number of tiles of lava left of the island.  Must produce value
-between 2 and 6. Default: Random based on room size and island size
+between 2 and 6 for rectangular tools, but will be ignored for hooked
+tools, since the lava should extend to the wall in that case.
+Default: Random based on room size and island size
 - `random_performer_position` (bool, or list of bools): If True, the
 performer will be randomly placed in the room. They will not be placed in
 the lava or the island   Default: False
@@ -518,11 +633,13 @@ target object will be positioned randomly in the room, rather than being
 positioned on the island surrounded by lava. Default: False
 - `rear_lava_width` (int, or list of ints, or [MinMaxInt](#MinMaxInt):
 The number of tiles of lava behind of the island.  Must produce value
-between 2 and 6. Default: Random based on room size, island size, and
-other lava widths.
+between 2 and 6 for rectangular tools, 1 to 3 for hooked tools.
+Default: Random based on room size, island size, and other lava widths.
 - `right_lava_width` (int, or list of ints, or [MinMaxInt](#MinMaxInt):
 The number of tiles right of the island.  Must produce value
-between 2 and 6. Default: Random based on room size and island size
+between 2 and 6 for rectangular tools, but will be ignored for hooked
+tools, since the lava should extend to the wall in that case.
+Default: Random based on room size and island size
 - `random_performer_position` (bool, or list of bools): If True, the
 performer will be randomly placed in the room. They will not be placed in
 the lava or the island   Default: False
@@ -534,6 +651,12 @@ or [MinMaxFloat](#MinMaxFloat): The distance away the performer is from the
 tool at start. The performer will be at random point around a rectangular
 perimeter surrounding the tool. This option cannot be used with
 `random_performer_position`.  Default: None
+- `tool_type` (str, or list of strs): The type of tool to generate, either
+`rectangular` or `hooked`. Note that if `hooked` tools are chosen and lava
+widths are not specified, the room will default to having an island size
+of 1, with lava extending all the way to the walls in both the left and
+right directions. The front and rear lava in the default hooked tool case
+will each have a size of 1. Default: `rectangular`
 
 #### MinMaxFloat
 
@@ -902,8 +1025,13 @@ the bottom of the object held by the placer to the height of another
 `end_height` if both are set.
 - `labels` (string, or list of strings): A label or labels to be assigned
 to this object. Always automatically assigned "placers"
+- `placed_object_above` (string, or list of strings): A label for an
+existing object in your configuration whose X/Z position will be used for
+this placer's (and the placed object's) starting position. Overrides
+`placed_object_position`. Please use `end_height_relative_object_label` if
+you need to set the held object's ending Y position.
 - `placed_object_labels` (string, or list of strings): A label for an
-existing object in your configuration that will be used as this device's
+existing object in your configuration that will be used as this placer's
 placed object, or new label(s) to associate with a new placed object.
 Other configuration options may use this label to reference this object or
 a group of objects. Labels are not unique, and when multiple objects share
@@ -931,9 +1059,22 @@ positioning this object relative to another object, rather than using
 `position_x` or `position_z`. If configuring this as a list, then all
 listed options will be applied to each scene in the listed order, with
 later options overriding earlier options if necessary. Default: not used
-- `empty_placer` (bool, or list of bools): If True, "The placer will not
+- `empty_placer` (bool, or list of bools): If True, the placer will not
 hold/drop an object. Cannot be used in combination with any of the
 placed_object_* config options. Default: False
+- `pickup_object` (bool): If True, a placer will be
+generated to pickup an object. Default: False
+- `move_object` (bool): If True, a placer will be
+generated to pickup an object. Default: False
+- `move_object_end_position`: ([VectorFloatConfig](#VectorFloatConfig)
+dict, or list of VectorFloatConfig dicts): The placed object's end
+position after being moved by a placer
+- `move_object_y`: The placer will raise the object by this value
+    during the move object event.
+    Default: 0
+- `move_object_z`: The placer will move the object along the z-axis,
+    slide along the x-axis and move back.
+    Default: 1.5
 
 #### StructuralPlatformConfig
 
@@ -1180,6 +1321,16 @@ Rotation in Y direction where the performer agent
 is teleported.  This field is required for teleport action
 restrictions if `position_x` and `position_z` are not both set.
 
+#### ToolChoiceConfig
+
+Defines details of the shortcut_tool_choice shortcut.  This shortcut
+creates a room with bisecting platform, with two identical lava islands on
+either side. The performer has to choose the side with the tool that can be
+used to obtain the target.
+- `improbable_option` (str, or list of strs): Determines the tool (if any)
+that will be placed on the side where it is not possible to obtain the ball
+without stepping in lava. Possible values: 'no_tool', 'too_short'.
+
 #### ToolConfig
 
 Defines details of a tool object.
@@ -1251,6 +1402,26 @@ wall with doors.  If None or less than 1, the wall will start in position.
 Default: None
 - `wall_material` (string, or list of strings): The material or material
 type for the wall.
+
+#### TurntablesAgentNonAgentConfig
+
+Defines all of the configurable options for
+[turntables_with_agent_and_non_agent]
+(#turntables_with_agent_and_non_agent).
+- `agent_label` (string): The label for an existing agent on top of one of
+the turntables. The turntable underneath this agent will NOT rotate.
+- `non_agent_label` (string): The label for an existing non-agent object on
+top of one of the turntables. The turntable underneath this object will
+rotate so the object faces one of the objects corresponding to the
+`direction_labels`. The turntable may rotate either clockwise or
+counter-clockwise, but always in 5-degree-per-step increments. The rotation
+will begin after the agent's movement, unless the agent's movement begins
+after step 45, in which case the rotation will begin on step 1.
+- `turntable_labels` (list of strings): The labels for all turntables to be
+affected.
+- `direction_labels` (list of strings): One or more labels for the objects
+in the scene toward which the non-agent object may face. If multiple labels
+are configured, then one object is randomly chosen for each scene.
 
 #### VectorFloatConfig
 
@@ -1999,6 +2170,22 @@ Advanced Example:
 restrict_open_doors: True
 ```
 
+#### restrict_open_objects
+
+(bool): If there are multiple openable objects in a scene, including
+containers and doors, only allow for one to ever be opened.
+Default: False
+
+Simple Example:
+```
+restrict_open_objects: False
+```
+
+Advanced Example:
+```
+restrict_open_objects: True
+```
+
 #### room_dimensions
 
 ([VectorIntConfig](#VectorIntConfig) dict, or list of VectorIntConfig
@@ -2045,9 +2232,19 @@ room_shape: square
 
 #### shortcut_agent_with_target
 
-(bool or [AgentTargetConfig](#AgentTargetConfig)):
-Creates a room with an agent holding a target soccer ball.  The agent's
-position can be specified.
+(bool, or [AgentTargetConfig](#AgentTargetConfig) dict, or list of bools
+and/or AgentTargetConfig dicts): Each scene will have an agent carrying a
+target object; you will need to use the InteractWithAgent action on the
+agent to request it to produce the target object, so you can then use the
+PickupObject action to pick up the target object.
+
+Will use a target already configured via the `goal` option, or, if no
+target object is configured, will automatically set a retrieval goal,
+generate a soccer ball, and assign it as the retrieval target object.
+
+If `true`, will randomize all of the agent configuration options.
+
+Default: false
 
 Simple Example:
 ```
@@ -2057,21 +2254,22 @@ shortcut_agent_with_target: False
 Advanced Example:
 ```
 shortcut_agent_with_target:
-  agent_position:
-    x:
-      min: 1
-      max: 3
-    y: 0
-    z: [2, 3]
-  movement_bounds:
-    - x: 0
-      z: 2
-    - x: 2
-      z: 0
-    - x: 0
-      z: -2
-    - x: -2
-      z: 0
+  agent:
+    position:
+      x:
+        min: 1
+        max: 3
+      y: 0
+      z: [2, 3]
+    bounds:
+      - x: 0
+        z: 2
+      - x: 2
+        z: 0
+      - x: 0
+        z: -2
+      - x: -2
+        z: 0
 ```
 
 #### shortcut_bisecting_platform
@@ -2096,6 +2294,34 @@ shortcut_bisecting_platform:
     has_blocking_wall: False
 ```
 
+#### shortcut_imitation_task
+
+(bool or [ImitationTaskConfig](#ImitationTaskConfig)):
+Creates a room with an imitation task.
+The performer watches an agent open containers in a specific order. Then
+the performer is kidnaped. After the kidnaping either the performer
+is not moved and the containers are not moved, the containers are moved
+and possibly rotated by 90 degrees but the performer does not move, or
+the performer is moved but the containers stay the same. In all
+cases the agent is moved away from the containers but still nearby to
+be seen after the kidnap.
+The room is always rectangular.
+The short dimension is either 8, 9, 10 and the long is 16, 18, 20.
+The room height is always 3.
+
+Simple Example:
+```
+shortcut_imitation_task: False
+```
+
+Advanced Example:
+```
+shortcut_imitation_task:
+  trigger_order: [left_right, middle_left, right_middle]
+  containers_on_right_side: True
+  kidnap_options: containers_rotate
+```
+
 #### shortcut_lava_room
 
 (bool): Creates a room with lava on either side of the performer. The
@@ -2117,14 +2343,21 @@ shortcut_lava_room: True
 Creates a room with a goal object on an island surrounded by lava.
 There will also be a block tool to facilitate acquiring the goal object.
 One dimension of the room must be 13 or greater. The other dimension must
-be 7 or greater. The max width across for front + island_size + rear is 9.
-The min width across for front + island_size + rear is 5. Lava can be
-asymmetric but the same restrictions of width min: 5 and max: 9 apply for
-left + island_size + right as well.
-By default, the target is a soccer ball with scale between 1 and 3.
-The tool is a pushable tool object with a length equal
-to the span from the front of the lava over the island to the back of the
-lava.  It will have a width of either 0.5, 0.75, 1.0. Default: False
+be 7 or greater. Rectangular block tools are used on default, and for
+these, the max width across for front + island_size + rear is 9. The min
+width across for front + island_size + rear is 5. Lava can be asymmetric
+but the same restrictions of width min: 5 and max: 9 apply for left +
+island_size + right as well. By default, the target is a soccer ball
+with scale between 1 and 3.
+
+For hooked tools, different min/max rules apply. See
+LavaTargetToolConfig for details.
+
+The tool is a pushable/pullable tool object with a length equal
+to or greater than the span from the front of the lava over the island to
+the back of the lava. It will have a width of either 0.5, 0.75, 1.0.
+
+Default: False
 
 Simple Example:
 ```
@@ -2161,6 +2394,30 @@ shortcut_start_on_platform: False
 Advanced Example:
 ```
 shortcut_start_on_platform: True
+```
+
+#### shortcut_tool_choice
+
+(bool, ToolChoiceConfig): Creates a room with a bisecting platform, with
+two mirrored lava islands containing targets and a different tool option
+(one valid tool that can be used to obtain the target, and one incorrect
+option). If True, the default behavior will be that the performer starts
+on one end, having to eventually pick a side, and they cannot get back
+to the other side. This overrides the `performer_start_position` and
+`performer_start_rotation`, if configured. Note that this shortcut
+requires a minimum x-axis room size of 20.
+
+Default: False
+
+Simple Example:
+```
+shortcut_tool_choice: False
+```
+
+Advanced Example:
+```
+shortcut_tool_choice:
+    improbable_choice: 'no_tool'
 ```
 
 #### shortcut_triple_door_choice
@@ -2742,6 +2999,26 @@ trapezoidal_room: False
 Advanced Example:
 ```
 trapezoidal_room: True
+```
+
+#### turntables_with_agent_and_non_agent
+
+([TurntablesAgentNonAgentConfig](#TurntablesAgentNonAgentConfig) dict):
+Useful for the Spatial Reference task. Rotates a turntable underneath
+a non-agent object so it faces another object in the scene.
+
+Simple Example:
+```
+turntables_with_agent_and_non_agent: null
+```
+
+Advanced Example:
+```
+turntables_with_agent_and_non_agent:
+  agent_label: my_agent
+  non_agent_label: my_rotating_object
+  turntable_labels: [my_turntable_1, my_turntable_2]
+  direction_labels: [my_static_object_1, my_static_object_2]
 ```
 
 #### wall_back_material

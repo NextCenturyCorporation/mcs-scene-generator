@@ -23,6 +23,7 @@ scene_aliases = {
     "partition_floor": "partitionFloor",
     "performer_start": "performerStart",
     "restrict_open_doors": "restrictOpenDoors",
+    "restrict_open_objects": "restrictOpenObjects",
     "room_dimensions": "roomDimensions",
     "room_materials": "roomMaterials",
     "wall_material": "wallMaterial",
@@ -61,6 +62,7 @@ class Scene:
     partition_floor: PartitionFloor = None
     performer_start: PerformerStart = None
     restrict_open_doors: bool = None
+    restrict_open_objects: bool = None
     room_dimensions: Vector3d = None
     room_materials: RoomMaterials = None
     screenshot: bool = False  # developer use only; for the image generator
@@ -97,8 +99,8 @@ class Scene:
         z = z if z is not None else self.performer_start.position.z
         self.performer_start.position = Vector3d(x=x, y=y, z=z)
 
-    def set_performer_start_rotation(self, y: int):
-        self.performer_start.rotation = Vector3d(x=0, y=y, z=0)
+    def set_performer_start_rotation(self, x: int, y: int):
+        self.performer_start.rotation = Vector3d(x=x, y=y, z=0)
 
     def get_targets(self) -> List[Dict[str, Any]]:
         """Returns the list of all targets for this scene's goal, or an empty
@@ -115,6 +117,11 @@ class Scene:
                     targets.append(instance)
                     break
         return targets
+
+    def get_object_by_id(self, object_id: str) -> Optional[Dict[str, Any]]:
+        """Returns the object in this scene with the given ID, or None if such
+        an object does not currently exist."""
+        return next(filter(lambda x: x['id'] == object_id, self.objects), None)
 
 # TODO MCS-1234
 # Wanted to use Pydantic, but need MCS to use it and release it first.

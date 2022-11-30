@@ -183,6 +183,47 @@ def test_find_bounds():
     assert find_bounds(scene) == [bounds_4, bounds_3, bounds_1, bounds_2]
 
 
+def test_find_bounds_ignore_id():
+    bounds_1 = ObjectBounds(box_xz=[
+        Vector3d(x=1, y=0, z=1),
+        Vector3d(x=2, y=0, z=1),
+        Vector3d(x=2, y=0, z=2),
+        Vector3d(x=1, y=0, z=2)
+    ], max_y=1, min_y=0)
+    bounds_2 = ObjectBounds(box_xz=[
+        Vector3d(x=-1, y=0, z=-1),
+        Vector3d(x=-2, y=0, z=-1),
+        Vector3d(x=-2, y=0, z=-2),
+        Vector3d(x=-1, y=0, z=-2)
+    ], max_y=1, min_y=0)
+
+    # Case 1: 1 object, ignore 0
+    scene = Scene(objects=[
+        {'id': 'id_1', 'shows': [{'boundingBox': bounds_1}]}
+    ])
+    assert find_bounds(scene, ignore_ids='absent_id') == [bounds_1]
+
+    # Case 2: 1 object, ignore 1
+    scene = Scene(objects=[
+        {'id': 'id_1', 'shows': [{'boundingBox': bounds_1}]}
+    ])
+    assert find_bounds(scene, ignore_ids='id_1') == []
+
+    # Case 3: 2 objects, ignore 1
+    scene = Scene(objects=[
+        {'id': 'id_1', 'shows': [{'boundingBox': bounds_1}]},
+        {'id': 'id_2', 'shows': [{'boundingBox': bounds_2}]}
+    ])
+    assert find_bounds(scene, ignore_ids='id_1') == [bounds_2]
+
+    # Case 4: 2 objects, ignore 2
+    scene = Scene(objects=[
+        {'id': 'id_1', 'shows': [{'boundingBox': bounds_1}]},
+        {'id': 'id_2', 'shows': [{'boundingBox': bounds_2}]}
+    ])
+    assert find_bounds(scene, ignore_ids=['id_1', 'id_2']) == []
+
+
 def test_return_list():
     assert return_list(None) == []
     assert return_list(None, [1234]) == [1234]

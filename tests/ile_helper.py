@@ -43,7 +43,7 @@ def prior_passive_scene(last_step: int = None):
     scene.intuitive_physics = True
     scene.version = 3
     scene.set_performer_start_position(0, 0, -4.5)
-    scene.set_performer_start_rotation(0)
+    scene.set_performer_start_rotation(0, 0)
     scene.set_room_dimensions(20, 10, 20)
     if last_step:
         scene.goal['last_step'] = last_step
@@ -149,6 +149,7 @@ def prior_scene_with_wall(
     instance = {
         'id': 'occluding_wall',
         'type': 'cube',
+        'debug': {},
         'mass': 100,
         'materials': ['Custom/MCS/Grey'],
         'shows': [{

@@ -1,0 +1,24 @@
+# Use medium sized rooms - note that the shortcut_tool_choice
+# requires a minimum x-axis size of 20.
+room_dimensions:
+    x: 20
+    y: 3
+    z:
+        min: 13
+        max: 20
+
+# Create a room with a bisecting platform, and two choices of lava islands
+# on either side with soccer balls in the middle. Only one side will have a
+# tool that is able to obtain the soccer ball, and only this side will have a
+# "target" soccer ball. The other side will have a non-target soccer ball,
+# and may have a too short tool or no tool.
+shortcut_tool_choice:
+    improbable_option: ['no_tool', 'too_short']
+
+# Override the defaults to avoid randomly generating any other objects besides
+# tool(s), the target, and lava. Remove these lines if you want additional
+# randomly generated objects.
+random_structural_objects:
+    - num: 0
+keyword_objects:
+    - num: 0

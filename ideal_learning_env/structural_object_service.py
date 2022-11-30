@@ -6,6 +6,7 @@ import math
 import random
 from dataclasses import dataclass
 from enum import Enum
+from itertools import combinations
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 import shapely
@@ -50,13 +51,13 @@ from ideal_learning_env.global_settings_component import (
 )
 from ideal_learning_env.interactable_object_service import (
     InteractableObjectConfig,
-    InteractableObjectCreationService,
-    KeywordLocationConfig
+    InteractableObjectCreationService
 )
 from ideal_learning_env.object_services import (
     DEBUG_FINAL_POSITION_KEY,
     InstanceDefinitionLocationTuple,
     KeywordLocation,
+    KeywordLocationConfig,
     ObjectDefinition,
     ObjectRepository,
     RelativePositionConfig,
@@ -77,6 +78,8 @@ from .defs import (
     ILEConfigurationException,
     ILEDelayException,
     ILEException,
+    RandomizableBool,
+    RandomizableString,
     find_bounds
 )
 from .feature_creation_service import (
@@ -91,8 +94,12 @@ from .feature_creation_service import (
 from .numerics import (
     MinMaxFloat,
     MinMaxInt,
+    RandomizableFloat,
+    RandomizableInt,
+    RandomizableVectorFloat3d,
     VectorFloatConfig,
-    VectorIntConfig
+    VectorIntConfig,
+    retrieve_all_vectors
 )
 
 logger = logging.getLogger(__name__)
@@ -169,6 +176,64 @@ LABEL_PLATFORM = "platforms"
 LABEL_RAMP = "ramps"
 LABEL_BIDIRECTIONAL_RAMP = "bidirectional"
 LABEL_CONNECTED_TO_RAMP = "connected_to_ramp"
+
+
+def _check_for_collisions(
+    scene: Scene,
+    definition: ObjectDefinition,
+    positions: RandomizableVectorFloat3d,
+    rotations: RandomizableVectorFloat3d,
+    bounds_list: List[ObjectBounds]
+) -> List[Tuple[Vector3d, Vector3d]]:
+    """Checks all possible combinations of the given positions and rotations
+    for collisions with the given bounds list using the given object defintion,
+    and returns the list of all valid combinations as (position, rotation)
+    tuples. If either positions or rotations is null/empty, substitutes the
+    vector (0, 0, 0). If both positions and rotations are null/empty, returns
+    no valid locations."""
+    if not positions and not rotations:
+        return []
+    valid_locations = []
+    all_positions = retrieve_all_vectors(
+        positions or [VectorFloatConfig(0, 0, 0)]
+    )
+    all_rotations = retrieve_all_vectors(
+        rotations or [VectorIntConfig(0, 0, 0)]
+    )
+    for position in all_positions:
+        for rotation in all_rotations:
+            bounds = geometry.create_bounds(
+                vars(definition.dimensions),
+                vars(definition.offset),
+                vars(position),
+                vars(rotation),
+                definition.positionY
+            )
+            if geometry.validate_location_rect(
+                bounds,
+                vars(scene.performer_start.position),
+                bounds_list,
+                vars(scene.room_dimensions)
+            ):
+                valid_locations.append((position, rotation))
+    return valid_locations
+
+
+def _retrieve_object_height_at_step(
+    scene: Scene,
+    instance: Dict[str, Any],
+    step: int
+) -> float:
+    """Returns the height of the given object at the given step, including the
+    object's separate lid, if it has one, and is attached by that step."""
+    height = instance['debug']['dimensions']['y']
+    lid_id = instance['debug'].get('lidId')
+    if lid_id:
+        lid = scene.get_object_by_id(lid_id)
+        lid_data = lid['lidAttachment']
+        if lid_data['stepBegin'] <= step:
+            height += lid['debug']['dimensions']['y']
+    return height
 
 
 def _retrieve_scaled_shapes_from_datasets(
@@ -1341,8 +1406,13 @@ class StructuralOccludingWallsCreationService(
         if (template.keyword_location is not None):
             # setup keyword location
             idl = KeywordLocation.get_keyword_location_object_tuple(
-                template.keyword_location, defn, scene.performer_start,
-                self.bounds, room_dim)
+                template.keyword_location,
+                source_template.keyword_location,
+                defn,
+                scene.performer_start,
+                self.bounds,
+                room_dim
+            )
             idl.instance['id'] = f"{template.type}-{idl.instance['id']}"
             result = _modify_for_hole(
                 template.type, idl.instance, self.target_dim)
@@ -1452,9 +1522,27 @@ class StructuralPlacersCreationService(
             source_template: StructuralPlacerConfig):
         """Creates a placer from the given template with
         specific values."""
+        try:
+            return self._create_feature_from_specific_values_helper(
+                scene,
+                reconciled,
+                source_template
+            )
+        except Exception as e:
+            if self.object_idl:
+                placed_object = self.object_idl.instance
+                placed_object['debug']['positionedBy'] = None
+                placed_object['debug'][DEBUG_FINAL_POSITION_KEY] = None
+            raise e
+
+    def _create_feature_from_specific_values_helper(
+            self, scene: Scene, reconciled: StructuralPlacerConfig,
+            source_template: StructuralPlacerConfig):
+        """Creates a placer from the given template with
+        specific values."""
 
         self._restriction_validation(
-            source_template
+            source_template, scene
         )
 
         room_dim = scene.room_dimensions
@@ -1470,7 +1558,13 @@ class StructuralPlacersCreationService(
         idl.instance['debug']['positionedBy'] = 'mechanism'
         idl.instance['debug'][DEBUG_FINAL_POSITION_KEY] = True
 
-        start_height = reconciled.placed_object_position.y or room_dim.y
+        start_height = reconciled.placed_object_position.y
+        if (start_height - idl.instance['debug']['positionY']) <= 0:
+            if reconciled.pickup_object or reconciled.move_object:
+                start_height = 0
+            else:
+                start_height = room_dim.y
+
         max_height = room_dim.y
         last_step = scene.goal.get("last_step")
         instance = idl.instance
@@ -1480,11 +1574,64 @@ class StructuralPlacersCreationService(
             'instance': instance,
             'activation_step': reconciled.activation_step,
             'start_height': start_height,
-            'end_height': reconciled.end_height,
+            'end_height': reconciled.end_height if not reconciled.pickup_object
+            else max_height,
             'deactivation_step': reconciled.deactivation_step
         }
+
+        args_move_object = {
+            'instance': instance,
+            'activation_step': reconciled.activation_step,
+            'start_height': start_height,
+            'end_height': max_height,
+            'deactivation_step': reconciled.deactivation_step,
+            'move_object_end_position': reconciled.move_object_end_position,
+            'move_object_y': reconciled.move_object_y,
+            'move_object_z': reconciled.move_object_z,
+        }
+
         logger.trace(f'Positioning placer object:\nINPUT = {args}')
-        mechanisms.place_object(**args)
+        if reconciled.pickup_object:
+            mechanisms.pickup_object(**args)
+        elif reconciled.move_object:
+            # Add the movement to the object.
+            mechanisms.move_object(**args_move_object)
+
+            # If the object is a container with a separate lid, and the lid is
+            # attached after the container is moved, reposition the lid and its
+            # placer to the new position.
+            lid_id = instance['debug'].get('lidId')
+            lid = scene.get_object_by_id(lid_id)
+            lid_placer_id = instance['debug'].get('lidPlacerId')
+            lid_placer = scene.get_object_by_id(lid_placer_id)
+            if lid and lid_placer:
+                object_move_begin = reconciled.activation_step
+                object_move_end = instance['moves'][-1]['stepEnd']
+                lid_placer_move_begin = lid_placer['moves'][0]['stepBegin']
+                lid_placer_move_end = lid_placer['moves'][-1]['stepEnd']
+                if (
+                    lid_placer_move_begin <= object_move_end and
+                    lid_placer_move_end >= object_move_begin
+                ):
+                    raise ILEException(
+                        f'Placer is configured to move a container with a '
+                        f'separate lid (ID={instance["id"]}) between steps '
+                        f'{object_move_begin} and {object_move_end}, but that '
+                        f'would overlap with the placer attaching the lid '
+                        f'between steps {lid_placer_move_begin} and '
+                        f'{lid_placer_move_end}. Please adjust this placer\'s '
+                        f'"activation_step", or the container\'s '
+                        f'"separate_lid" configuration.'
+                    )
+                if lid_placer_move_begin > object_move_end:
+                    new_x = reconciled.move_object_end_position.x
+                    new_z = reconciled.move_object_end_position.z
+                    lid['shows'][0]['position']['x'] = new_x
+                    lid['shows'][0]['position']['z'] = new_z
+                    lid_placer['shows'][0]['position']['x'] = new_x
+                    lid_placer['shows'][0]['position']['z'] = new_z
+        else:
+            mechanisms.place_object(**args)
 
         objs = []
         if idl.instance not in scene.objects \
@@ -1496,12 +1643,20 @@ class StructuralPlacersCreationService(
         if source_template.empty_placer if source_template \
                 is not None else False:
             defn.placerOffsetX = [0]
+            defn.placerOffsetZ = [0]
 
-        for index, placer_offset_x in enumerate(defn.placerOffsetX or [0]):
+        placer_offset_list = defn.placerOffsetX
+        use_x_offset = True
+        if not placer_offset_list or placer_offset_list == [0]:
+            # The separate_container has a Z placer offset rather than an X.
+            placer_offset_list = defn.placerOffsetZ
+            use_x_offset = False
+
+        for index, placer_offset in enumerate(placer_offset_list or [0]):
             # Adjust the placer offset based on the object's Y rotation.
             offset_line = shapely.geometry.LineString([
                 [0, 0],
-                [placer_offset_x, 0]
+                [placer_offset, 0] if use_x_offset else [0, placer_offset]
             ])
             offset_line = shapely.affinity.rotate(
                 offset_line,
@@ -1516,7 +1671,15 @@ class StructuralPlacersCreationService(
             # Create the new placer and add it to the scene.
             args = {
                 'placed_object_position': position,
-                'placed_object_dimensions': instance['debug']['dimensions'],
+                'placed_object_dimensions': {
+                    'x': instance['debug']['dimensions']['x'],
+                    'y': _retrieve_object_height_at_step(
+                        scene,
+                        instance,
+                        reconciled.activation_step
+                    ),
+                    'z': instance['debug']['dimensions']['z']
+                },
                 'placed_object_offset_y': instance['debug']['positionY'],
                 'activation_step': reconciled.activation_step,
                 'end_height': reconciled.end_height,
@@ -1524,7 +1687,13 @@ class StructuralPlacersCreationService(
                 'id_modifier': None,
                 'last_step': last_step,
                 'placed_object_placer_offset_y': defn.placerOffsetY[index],
-                'deactivation_step': reconciled.deactivation_step
+                'deactivation_step': reconciled.deactivation_step,
+                'is_pickup_obj': reconciled.pickup_object,
+                'is_move_obj': reconciled.move_object,
+                'move_object_end_position':
+                reconciled.move_object_end_position,
+                'move_object_y': reconciled.move_object_y,
+                'move_object_z': reconciled.move_object_z,
             }
             logger.trace(f'Creating placer:\nINPUT = {args}')
             placer = mechanisms.create_placer(**args)
@@ -1539,9 +1708,11 @@ class StructuralPlacersCreationService(
         return objs
 
     def _restriction_validation(
-            self, template):
+            self, template, scene):
+
         if template is not None:
-            if (template.placed_object_labels or
+            if (template.placed_object_above or
+                    template.placed_object_labels or
                     template.placed_object_material or
                     template.placed_object_position or
                     template.placed_object_rotation or
@@ -1553,11 +1724,39 @@ class StructuralPlacersCreationService(
                     "configuration. When 'placer_empty'=True "
                     "then placed_object_* must NOT be included in "
                     "the configuration.")
+            if template.move_object and \
+                    template.move_object_end_position is None:
+                raise ILEConfigurationException(
+                    "Error with placer "
+                    "configuration. When 'move_object'=True "
+                    "then move_object_end_position is required in "
+                    "the configuration.")
+            if template.move_object and template.move_object_y is not None:
+                scene_obj_y = []
+                combo_y_list = list()
+                for obj in scene.objects:
+                    scene_obj_y.append(obj['debug']['dimensions']['y'])
+                combo_y_list = list(combinations(scene_obj_y, 2))
+                for item_y in combo_y_list:
+                    total = 0
+                    for ele in range(0, len(item_y)):
+                        total += (item_y[ele] *
+                                  mechanisms.MOVE_OBJ_OFFSET) if ele == 0 \
+                            else item_y[ele]
+                    if total >= scene.room_dimensions.y:
+                        raise ILEConfigurationException(
+                            "Error with move_object configuration. The height "
+                            "of the objects and ceiling height may not not "
+                            "allow enough clearance to move one object over "
+                            "another. Adjust the scale of the object or the "
+                            "room dimention(y).")
+            # TODO: Add collision detection along the object's entire path
 
     def _handle_dependent_defaults(
             self, scene: Scene, reconciled: StructuralPlacerConfig,
             source_template
     ) -> StructuralPlacerConfig:
+        obj_repo = ObjectRepository.get_instance()
         labels = (source_template.placed_object_labels if source_template is
                   not None else None)
         self.labels = labels
@@ -1566,6 +1765,11 @@ class StructuralPlacersCreationService(
         if labels:
             self.object_idl = _get_existing_held_object_idl(labels)
 
+        if self.object_idl:
+            logger.trace(
+                f'Using existing object for placer: '
+                f'{self.object_idl.instance["id"]}'
+            )
         if not self.object_idl:
             # Choose a shape now, so we can set the default scale accordingly.
             shape, material = choose_shape_material(
@@ -1595,19 +1799,121 @@ class StructuralPlacersCreationService(
             defn = getattr(srv, 'defn', None)
             self.object_idl = InstanceDefinitionLocationTuple(
                 instance, defn, None)
+            logger.trace(
+                f'Creating new object for placer: '
+                f'{self.object_idl.instance["id"]}'
+            )
 
-        defn = defn or self.object_idl.definition
-        reconciled.placed_object_rotation = choose_rotation(
-            VectorIntConfig(0, reconciled.placed_object_rotation, 0)).y
-        reconciled.placed_object_position = choose_position(
-            reconciled.placed_object_position,
-            defn.dimensions.x,
-            defn.dimensions.z,
-            room_dim.x,
-            room_dim.y,
-            room_dim.z,
-            True
+        if reconciled.placed_object_above:
+            # Position the held object above another object in the scene.
+            if not obj_repo.has_label(reconciled.placed_object_above):
+                raise ILEDelayException(
+                    f'Cannot find the configured placed_object_above label '
+                    f'"{reconciled.placed_object_above}" to position a new '
+                    f'placer.'
+                )
+            above_object = obj_repo.get_one_from_labeled_objects(
+                label=reconciled.placed_object_above
+            ).instance
+            above_position = above_object['shows'][0]['position']
+            reconciled.placed_object_position = Vector3d(
+                x=above_position['x'],
+                y=above_position['y'],
+                z=above_position['z']
+            )
+
+        # Retrieve the bounds for all objects in the scene, but ignore the held
+        # object's current bounds, because they will change. Used below.
+        bounds_list = find_bounds(
+            scene,
+            ignore_ids=[self.object_idl.instance['id']]
         )
+
+        # If this placer picks up or moves its object, check for collisions
+        # with the object's starting position (assuming it is configured),
+        # since it will begin on the ground.
+        if source_template.placed_object_position and (
+            reconciled.pickup_object or reconciled.move_object
+        ):
+            # Convert the configured Y rotations into rotation vectors.
+            config_rotations = source_template.placed_object_rotation or []
+            if not isinstance(config_rotations, list):
+                config_rotations = [config_rotations]
+            rotation_vectors = [
+                VectorIntConfig(0, rotation_y, 0)
+                for rotation_y in config_rotations
+            ]
+            valid_start_locations = _check_for_collisions(
+                scene,
+                self.object_idl.definition,
+                source_template.placed_object_position,
+                rotation_vectors,
+                bounds_list
+            )
+            if not valid_start_locations:
+                data = [vars(position) for position in (
+                    source_template.placed_object_position if
+                    isinstance(source_template.placed_object_position, list)
+                    else [source_template.placed_object_position]
+                )]
+                raise ILEException(
+                    f'Placer with configured placed_object_position='
+                    f'{data} pickup up or moving object with '
+                    f'id={self.object_idl.instance["id"]} would collide '
+                    f'with an existing object in the scene.'
+                )
+            # Randomly choose from one of the valid options.
+            position, rotation = random.choice(valid_start_locations)
+            reconciled.placed_object_position = position
+            reconciled.placed_object_rotation = rotation.y
+        else:
+            # Otherwise choose position and rotation the normal way.
+            reconciled.placed_object_rotation = choose_rotation(
+                VectorIntConfig(0, reconciled.placed_object_rotation, 0)).y
+            reconciled.placed_object_position = choose_position(
+                reconciled.placed_object_position,
+                self.object_idl.definition.dimensions.x,
+                self.object_idl.definition.dimensions.z,
+                room_dim.x,
+                room_dim.y,
+                room_dim.z,
+                True
+            )
+
+        # If this placer moves its object, check for collisions with the
+        # object's ending position.
+        if source_template.move_object_end_position:
+            rotation = self.object_idl.instance['shows'][0]['rotation']
+            # Include the object's new starting position.
+            start_bounds = geometry.create_bounds(
+                self.object_idl.instance['debug']['dimensions'],
+                self.object_idl.instance['debug']['offset'],
+                vars(reconciled.placed_object_position),
+                rotation,
+                self.object_idl.instance['debug']['positionY']
+            )
+            valid_end_locations = _check_for_collisions(
+                scene,
+                self.object_idl.definition,
+                source_template.move_object_end_position,
+                VectorIntConfig(rotation['x'], rotation['y'], rotation['z']),
+                bounds_list + [start_bounds]
+            )
+            if not valid_end_locations:
+                data = [vars(position) for position in (
+                    source_template.move_object_end_position if
+                    isinstance(source_template.move_object_end_position, list)
+                    else [source_template.move_object_end_position]
+                )]
+                raise ILEException(
+                    f'Placer with configured move_object_end_position='
+                    f'{data} moving object with '
+                    f'id={self.object_idl.instance["id"]} would collide '
+                    f'with an existing object in the scene.'
+                )
+            # Randomly choose from one of the valid options.
+            position, _ = random.choice(valid_end_locations)
+            reconciled.move_object_end_position = position
 
         # If needed, adjust this placer's position relative to another object.
         if source_template.position_relative:
@@ -1637,7 +1943,6 @@ class StructuralPlacersCreationService(
             # set above won't match the y position set here, due to multiple
             # objects in a scene with the same relative object label.
             end_height_obj_label = reconciled.end_height_relative_object_label
-            obj_repo = ObjectRepository.get_instance()
             if not obj_repo.has_label(end_height_obj_label):
                 raise ILEDelayException(
                     f'Cannot find end height relative object label '
@@ -1667,6 +1972,25 @@ class StructuralPlacersCreationService(
 
         return super()._on_valid_instances(
             scene, reconciled_template, new_obj, key)
+
+    def is_valid(self, scene, new_obj, bounds, try_num, retries) -> bool:
+        # Ignore the bounds of all placers, and all objects that are positioned
+        # by mechanisms, to support tasks like Shell Game, since the placers
+        # and the objects they hold (like the target object or a container lid)
+        # will intentionally start very close together.
+        bounds_subset = find_bounds(scene, ignore_ids=[
+            instance['id'] for instance in scene.objects if (
+                instance['id'].startswith('placer') or
+                instance['debug'].get('positionedBy') == 'mechanism'
+            )
+        ])
+        return super().is_valid(
+            scene,
+            new_obj,
+            bounds_subset,
+            try_num,
+            retries
+        )
 
 
 class StructuralDoorsCreationService(
@@ -1891,7 +2215,7 @@ class StructuralToolsCreationService(
         for shape, dim in LARGE_BLOCK_TOOLS_TO_DIMENSIONS.items():
             if dim == (width, length):
                 return shape
-        # For exception message, if no width or lenght specified,
+        # For exception message, if no width or length specified,
         # just apply the word 'any'
         width = width or "Any"
         length = length or "Any"
@@ -1903,10 +2227,9 @@ class StructuralToolsCreationService(
 @dataclass
 class PositionableStructuralObjectsConfig(BaseFeatureConfig):
     """Simple class used for user-positionable structural objects."""
-    position: Union[VectorFloatConfig, List[VectorFloatConfig]] = None
-    rotation_y: Union[float, MinMaxFloat,
-                      List[Union[float, MinMaxFloat]]] = None
-    material: Union[str, List[str]] = None
+    position: RandomizableVectorFloat3d = None
+    rotation_y: RandomizableFloat = None
+    material: RandomizableString = None
 
 
 @dataclass
@@ -1928,8 +2251,7 @@ class StructuralWallConfig(PositionableStructuralObjectsConfig):
     - `width` (float, or list of floats, or [MinMaxFloat](#MinMaxFloat) dict,
     or list of MinMaxFloat dicts): The width of the wall.
     """
-    width: Union[float, MinMaxFloat,
-                 List[Union[float, MinMaxFloat]]] = None
+    width: RandomizableFloat = None
 
 
 @dataclass
@@ -1994,10 +2316,10 @@ class StructuralPlatformConfig(PositionableStructuralObjectsConfig):
                 List[StructuralPlatformLipsConfig]] = None
     scale: Union[float, MinMaxFloat, List[Union[float, MinMaxFloat]],
                  VectorFloatConfig, List[VectorFloatConfig]] = None
-    attached_ramps: Union[int, MinMaxInt, List[Union[int, MinMaxInt]]] = None
-    platform_underneath: Union[bool, List[bool]] = None
-    platform_underneath_attached_ramps: Union[int, MinMaxInt, List[Union[int, MinMaxInt]]] = None  # noqa
-    auto_adjust_platforms: Union[bool, List[bool]] = False
+    attached_ramps: RandomizableInt = None
+    platform_underneath: RandomizableBool = None
+    platform_underneath_attached_ramps: RandomizableInt = None  # noqa
+    auto_adjust_platforms: RandomizableBool = False
 
 
 @dataclass
@@ -2031,14 +2353,11 @@ class StructuralRampConfig(PositionableStructuralObjectsConfig):
     - `width` (float, or list of floats, or [MinMaxFloat](#MinMaxFloat) dict,
     or list of MinMaxFloat dicts): Width of the ramp
     """
-    angle: Union[float, MinMaxFloat,
-                 List[Union[float, MinMaxFloat]]] = None
-    width: Union[float, MinMaxFloat,
-                 List[Union[float, MinMaxFloat]]] = None
-    length: Union[float, MinMaxFloat,
-                  List[Union[float, MinMaxFloat]]] = None
-    platform_underneath: Union[bool, List[bool]] = None
-    platform_underneath_attached_ramps: Union[int, MinMaxInt, List[Union[int, MinMaxInt]]] = None  # noqa
+    angle: RandomizableFloat = None
+    width: RandomizableFloat = None
+    length: RandomizableFloat = None
+    platform_underneath: RandomizableBool = None
+    platform_underneath_attached_ramps: RandomizableInt = None  # noqa
 
 
 @dataclass
@@ -2074,17 +2393,12 @@ class StructuralLOccluderConfig(PositionableStructuralObjectsConfig):
     dict, or list of MinMaxFloat dicts): Scale in the y direction for the
     entire occluder
     """
-    backwards: Union[bool, List[bool]] = None
-    scale_front_x: Union[float, MinMaxFloat,
-                         List[Union[float, MinMaxFloat]]] = None
-    scale_front_z: Union[float, MinMaxFloat,
-                         List[Union[float, MinMaxFloat]]] = None
-    scale_side_x: Union[float, MinMaxFloat,
-                        List[Union[float, MinMaxFloat]]] = None
-    scale_side_z: Union[float, MinMaxFloat,
-                        List[Union[float, MinMaxFloat]]] = None
-    scale_y: Union[float, MinMaxFloat,
-                   List[Union[float, MinMaxFloat]]] = None
+    backwards: RandomizableBool = None
+    scale_front_x: RandomizableFloat = None
+    scale_front_z: RandomizableFloat = None
+    scale_side_x: RandomizableFloat = None
+    scale_side_z: RandomizableFloat = None
+    scale_y: RandomizableFloat = None
 
 
 @dataclass
@@ -2127,18 +2441,15 @@ class StructuralDropperConfig(BaseFeatureConfig):
     - `projectile_shape` (string, or list of strings): The shape or type of
     the projectile.
     """
-    position_x: Union[float, MinMaxFloat,
-                      List[Union[float, MinMaxFloat]]] = None
-    position_z: Union[float, MinMaxFloat,
-                      List[Union[float, MinMaxFloat]]] = None
-    drop_step: Union[int, MinMaxInt,
-                     List[Union[int, MinMaxInt]]] = None
-    projectile_shape: Union[str, List[str]] = None
-    projectile_material: Union[str, List[str]] = None
+    position_x: RandomizableFloat = None
+    position_z: RandomizableFloat = None
+    drop_step: RandomizableInt = None
+    projectile_shape: RandomizableString = None
+    projectile_material: RandomizableString = None
     projectile_scale: Union[float, MinMaxFloat,
                             List[Union[float, MinMaxFloat]],
                             VectorFloatConfig, List[VectorFloatConfig]] = None
-    projectile_labels: Union[str, List[str]] = None
+    projectile_labels: RandomizableString = None
     position_relative: Union[
         RelativePositionConfig,
         List[RelativePositionConfig]
@@ -2165,10 +2476,10 @@ class StopPositionConfig():
     out of view of the performer agent. Only works if `passive_physics_scene`
     is `true`. Overrides the `x` and `z` options. Default: `false`
     """
-    x: Union[float, MinMaxFloat, List[Union[float, MinMaxFloat]]] = None
-    z: Union[float, MinMaxFloat, List[Union[float, MinMaxFloat]]] = None
-    behind: Union[str, List[str]] = None
-    offscreen: Union[bool, List[bool]] = None
+    x: RandomizableFloat = None
+    z: RandomizableFloat = None
+    behind: RandomizableString = None
+    offscreen: RandomizableBool = None
 
 
 @dataclass
@@ -2263,36 +2574,30 @@ class StructuralThrowerConfig(BaseFeatureConfig):
     - `wall` (string, or list of strings): Which wall the thrower should be
     placed on.  Options are: left, right, front, back.
     """
-    wall: Union[str, List[str]] = None
-    position_wall: Union[float, MinMaxFloat,
-                         List[Union[float, MinMaxFloat]]] = None
-    height: Union[float, MinMaxFloat,
-                  List[Union[float, MinMaxFloat]]] = None
-    rotation_y: Union[float, MinMaxFloat,
-                      List[Union[float, MinMaxFloat]]] = None
-    rotation_z: Union[float, MinMaxFloat,
-                      List[Union[float, MinMaxFloat]]] = None
-    throw_step: Union[int, MinMaxInt,
-                      List[Union[int, MinMaxInt]]] = None
-    throw_force: Union[float, MinMaxFloat,
-                       List[Union[float, MinMaxFloat]]] = None
-    projectile_shape: Union[str, List[str]] = None
-    projectile_material: Union[str, List[str]] = None
+    wall: RandomizableString = None
+    position_wall: RandomizableFloat = None
+    height: RandomizableFloat = None
+    rotation_y: RandomizableFloat = None
+    rotation_z: RandomizableFloat = None
+    throw_step: RandomizableInt = None
+    throw_force: RandomizableFloat = None
+    projectile_shape: RandomizableString = None
+    projectile_material: RandomizableString = None
     projectile_scale: Union[float, MinMaxFloat,
                             List[Union[float, MinMaxFloat]],
                             VectorFloatConfig, List[VectorFloatConfig]] = None
-    projectile_labels: Union[str, List[str]] = None
+    projectile_labels: RandomizableString = None
     position_relative: Union[
         RelativePositionConfig,
         List[RelativePositionConfig]
     ] = None
-    impulse: Union[bool, List[bool]] = True
+    impulse: RandomizableBool = True
     throw_force_multiplier: Union[
         float, MinMaxFloat, List[Union[float, MinMaxFloat]]
     ] = None
-    passive_physics_collision_force: Union[bool, List[bool]] = False
-    passive_physics_setup: Union[str, List[str]] = None
-    passive_physics_throw_force: Union[bool, List[bool]] = False
+    passive_physics_collision_force: RandomizableBool = False
+    passive_physics_setup: RandomizableString = None
+    passive_physics_throw_force: RandomizableBool = False
     stop_position: Union[StopPositionConfig, List[StopPositionConfig]] = None
 
 
@@ -2351,24 +2656,19 @@ class StructuralMovingOccluderConfig(BaseFeatureConfig):
     wall (cube)
     """
 
-    wall_material: Union[str, List[str]] = None
-    pole_material: Union[str, List[str]] = None
-    position_x: Union[float, MinMaxFloat,
-                      List[Union[float, MinMaxFloat]]] = None
-    position_z: Union[float, MinMaxFloat,
-                      List[Union[float, MinMaxFloat]]] = None
-    origin: Union[str, List[str]] = None
-    occluder_height: Union[float, MinMaxFloat,
-                           List[Union[float, MinMaxFloat]]] = None
-    occluder_width: Union[float, MinMaxFloat,
-                          List[Union[float, MinMaxFloat]]] = None
-    occluder_thickness: Union[float, MinMaxFloat,
-                              List[Union[float, MinMaxFloat]]] = None
-    repeat_movement: Union[bool, List[bool]] = None
-    repeat_interval: Union[int, MinMaxInt, List[Union[int, MinMaxInt]]] = None
-    reverse_direction: Union[bool, List[bool]] = None
-    rotation_y: Union[int, MinMaxInt, List[Union[int, MinMaxInt]]] = None
-    move_up_before_last_step: Union[bool, List[bool]] = None
+    wall_material: RandomizableString = None
+    pole_material: RandomizableString = None
+    position_x: RandomizableFloat = None
+    position_z: RandomizableFloat = None
+    origin: RandomizableString = None
+    occluder_height: RandomizableFloat = None
+    occluder_width: RandomizableFloat = None
+    occluder_thickness: RandomizableFloat = None
+    repeat_movement: RandomizableBool = None
+    repeat_interval: RandomizableInt = None
+    reverse_direction: RandomizableBool = None
+    rotation_y: RandomizableInt = None
+    move_up_before_last_step: RandomizableBool = None
 
 
 @dataclass
@@ -2390,10 +2690,8 @@ class FloorAreaConfig(BaseFeatureConfig):
     - `position_z` (int, or list of ints, or [MinMaxInt](#MinMaxInt) dict, or
     list of MinMaxInt dicts): Z position of the area.
     """
-    position_x: Union[int, MinMaxInt,
-                      List[Union[int, MinMaxInt]]] = None
-    position_z: Union[int, MinMaxInt,
-                      List[Union[int, MinMaxInt]]] = None
+    position_x: RandomizableInt = None
+    position_z: RandomizableInt = None
 
 
 @dataclass
@@ -2413,7 +2711,7 @@ class FloorMaterialConfig(FloorAreaConfig):
     - `position_z` (int, or list of ints, or [MinMaxInt](#MinMaxInt) dict, or
     list of MinMaxInt dicts): Z position of the area.
     """
-    material: Union[str, List[str]] = None
+    material: RandomizableString = None
 
 
 @dataclass
@@ -2445,14 +2743,14 @@ class StructuralOccludingWallConfig(PositionableStructuralObjectsConfig):
       `hole` - wall with a hole that reveals the target.
     Default: ['occludes', 'occludes', 'occludes', 'short', 'thin', 'hole']
     """
-    type: Union[str, List[str]] = None
+    type: RandomizableString = None
     scale: Union[float, MinMaxFloat, List[Union[float, MinMaxFloat]],
                  VectorFloatConfig, List[VectorFloatConfig]] = None
     keyword_location: Union[KeywordLocationConfig,
                             List[KeywordLocationConfig]] = None
 
 
-@dataclass
+@ dataclass
 class StructuralPlacerConfig(BaseFeatureConfig):
     """Defines details for an instance of a placer (cylinder) descending from
     the ceiling on the given activation step to place an object with the given
@@ -2479,8 +2777,13 @@ class StructuralPlacerConfig(BaseFeatureConfig):
     `end_height` if both are set.
     - `labels` (string, or list of strings): A label or labels to be assigned
     to this object. Always automatically assigned "placers"
+    - `placed_object_above` (string, or list of strings): A label for an
+    existing object in your configuration whose X/Z position will be used for
+    this placer's (and the placed object's) starting position. Overrides
+    `placed_object_position`. Please use `end_height_relative_object_label` if
+    you need to set the held object's ending Y position.
     - `placed_object_labels` (string, or list of strings): A label for an
-    existing object in your configuration that will be used as this device's
+    existing object in your configuration that will be used as this placer's
     placed object, or new label(s) to associate with a new placed object.
     Other configuration options may use this label to reference this object or
     a group of objects. Labels are not unique, and when multiple objects share
@@ -2508,35 +2811,50 @@ class StructuralPlacerConfig(BaseFeatureConfig):
     `position_x` or `position_z`. If configuring this as a list, then all
     listed options will be applied to each scene in the listed order, with
     later options overriding earlier options if necessary. Default: not used
-    - `empty_placer` (bool, or list of bools): If True, "The placer will not
+    - `empty_placer` (bool, or list of bools): If True, the placer will not
     hold/drop an object. Cannot be used in combination with any of the
     placed_object_* config options. Default: False
+    - `pickup_object` (bool): If True, a placer will be
+    generated to pickup an object. Default: False
+    - `move_object` (bool): If True, a placer will be
+    generated to pickup an object. Default: False
+    - `move_object_end_position`: ([VectorFloatConfig](#VectorFloatConfig)
+    dict, or list of VectorFloatConfig dicts): The placed object's end
+    position after being moved by a placer
+    - `move_object_y`: The placer will raise the object by this value
+        during the move object event.
+        Default: 0
+    - `move_object_z`: The placer will move the object along the z-axis,
+        slide along the x-axis and move back.
+        Default: 1.5
+
     """
 
-    num: Union[int, MinMaxInt, List[Union[int, MinMaxInt]]] = 0
-    activation_step: Union[int, MinMaxInt, List[Union[int, MinMaxInt]]] = None
-    end_height: Union[float, MinMaxFloat,
-                      List[Union[float, MinMaxFloat]]] = None
+    num: RandomizableInt = 0
+    activation_step: RandomizableInt = None
+    end_height: RandomizableFloat = None
     end_height_relative_object_label: str = None
-    placed_object_position: Union[VectorFloatConfig,
-                                  List[VectorFloatConfig]] = None
+    placed_object_position: RandomizableVectorFloat3d = None
     placed_object_scale: Union[float, MinMaxFloat,
                                VectorFloatConfig,
                                List[Union[float, MinMaxFloat,
                                           VectorFloatConfig]]] = None
-    placed_object_rotation: Union[int, MinMaxInt,
-                                  List[Union[int, MinMaxInt]]] = None
-    placed_object_shape: Union[str, List[str]] = None
-    placed_object_material: Union[str, List[str]] = None
-    placed_object_labels: Union[str, List[str]] = None
-    deactivation_step: Union[
-        int, MinMaxInt, List[Union[int, MinMaxInt]]
-    ] = None
+    placed_object_rotation: RandomizableInt = None
+    placed_object_shape: RandomizableString = None
+    placed_object_material: RandomizableString = None
+    placed_object_labels: RandomizableString = None
+    deactivation_step: RandomizableInt = None
     position_relative: Union[
         RelativePositionConfig,
         List[RelativePositionConfig]
     ] = None
-    empty_placer: Union[bool, List[bool]] = False
+    empty_placer: RandomizableBool = False
+    pickup_object: bool = False
+    move_object: bool = False
+    move_object_end_position: RandomizableVectorFloat3d = None
+    move_object_y: RandomizableFloat = None
+    move_object_z: RandomizableFloat = None
+    placed_object_above: RandomizableString = None
 
 
 @dataclass
@@ -2567,11 +2885,9 @@ class StructuralDoorConfig(PositionableStructuralObjectsConfig):
     greater than 2 for the top wall to appear.  Default: A random value between
     2 and the height of the room.
     """
-    wall_material: Union[str, List[str]] = None
-    wall_scale_x: Union[float, MinMaxFloat,
-                        List[Union[float, MinMaxFloat]]] = None
-    wall_scale_y: Union[float, MinMaxFloat,
-                        List[Union[float, MinMaxFloat]]] = None
+    wall_material: RandomizableString = None
+    wall_scale_x: RandomizableFloat = None
+    wall_scale_y: RandomizableFloat = None
 
 
 @dataclass
@@ -2591,10 +2907,9 @@ class StructuralObjectMovementConfig():
     will rotate each step. Default is randomly either 5 or -5.
     """
 
-    step_begin: Union[int, MinMaxInt, List[Union[int, MinMaxInt]]] = None
-    step_end: Union[int, MinMaxInt, List[Union[int, MinMaxInt]]] = None
-    rotation_y: Union[float, MinMaxFloat,
-                      List[Union[float, MinMaxFloat]]] = None
+    step_begin: RandomizableInt = None
+    step_end: RandomizableInt = None
+    rotation_y: RandomizableFloat = None
 
 
 @dataclass
@@ -2627,10 +2942,8 @@ class StructuralTurntableConfig(PositionableStructuralObjectsConfig):
     ([StructuralObjectMovementConfig](#StructuralObjectMovementConfig)):
     The config for turntable movement.
     """
-    turntable_height: Union[float, MinMaxFloat,
-                            List[Union[float, MinMaxFloat]]] = None
-    turntable_radius: Union[float, MinMaxFloat,
-                            List[Union[float, MinMaxFloat]]] = None
+    turntable_height: RandomizableFloat = None
+    turntable_radius: RandomizableFloat = None
     turntable_movement: Union[StructuralObjectMovementConfig,
                               List[StructuralObjectMovementConfig]] = None
 
@@ -2665,15 +2978,12 @@ class ToolConfig(BaseFeatureConfig):
     specific sizes and the values much match exactly.  Valid widths are
     0.5, 0.75, 1.0. If shape is set, this value is ignored. Default: Use shape
     """
-    position: Union[VectorFloatConfig, List[VectorFloatConfig]] = None
-    rotation_y: Union[float, MinMaxFloat,
-                      List[Union[float, MinMaxFloat]]] = None
-    shape: Union[str, List[str]] = None
-    length: Union[int, MinMaxInt,
-                  List[Union[float, MinMaxInt]]] = None
-    width: Union[float, MinMaxFloat,
-                 List[Union[float, MinMaxFloat]]] = None
-    guide_rails: Union[bool, List[bool]] = False
+    position: RandomizableVectorFloat3d = None
+    rotation_y: RandomizableFloat = None
+    shape: RandomizableString = None
+    length: RandomizableInt = None
+    width: RandomizableFloat = None
+    guide_rails: RandomizableBool = False
 
 
 DEFAULT_TEMPLATE_DROPPER = StructuralDropperConfig(
@@ -2777,6 +3087,7 @@ DEFAULT_TEMPLATE_OCCLUDING_WALL = StructuralOccludingWallConfig(
 
 DEFAULT_TEMPLATE_PLACER = StructuralPlacerConfig(
     0,
+    placed_object_above=None,
     placed_object_position=None,
     placed_object_rotation=MinMaxInt(0, 359),
     placed_object_scale=None,
@@ -2785,7 +3096,8 @@ DEFAULT_TEMPLATE_PLACER = StructuralPlacerConfig(
     deactivation_step=None,
     end_height=0,
     position_relative=None,
-    empty_placer=False
+    empty_placer=False,
+    pickup_object=False
 )
 
 DOOR_MATERIAL_RESTRICTIONS = [mat[0] for mat in (materials.METAL_MATERIALS +
@@ -3528,7 +3840,7 @@ def _convert_base_occluding_wall_to_holed_wall(
 
 
 def _get_existing_held_object_idl(
-    labels: Union[str, List[str]]
+    labels: RandomizableString
 ) -> Optional[InstanceDefinitionLocationTuple]:
     object_repository = ObjectRepository.get_instance()
     shuffled_labels = (
@@ -3546,6 +3858,11 @@ def _get_existing_held_object_idl(
             # Verify that this object has not already been given a final
             # position by another mechanism or keyword location.
             if idl.instance['debug'].get(DEBUG_FINAL_POSITION_KEY):
+                logger.trace(
+                    f'Ignoring existing object {idl.instance["id"]} for use '
+                    f'with a new device because it was previously positioned '
+                    f'by: {idl.instance["debug"]["positionedBy"]}'
+                )
                 continue
             return idl
     # If a target object does not exist or was already used by another
@@ -3572,6 +3889,9 @@ def _get_projectile_idl(
     if labels:
         idl = _get_existing_held_object_idl(labels)
         if idl:
+            logger.trace(
+                f'Using existing object for projectile: {idl.instance["id"]}'
+            )
             return idl, True
 
     use_random = template is None or (template.projectile_shape is None and
@@ -3605,6 +3925,7 @@ def _get_projectile_idl(
     idl = srv.idl
     idl.instance['debug']['positionedBy'] = 'mechanism'
     idl.instance['debug'][DEBUG_FINAL_POSITION_KEY] = True
+    logger.trace(f'Creating new object for projectile: {idl.instance["id"]}')
     return idl, False
 
 

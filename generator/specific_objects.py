@@ -1966,7 +1966,7 @@ _CONTAINERS_BINS = [
     # Each definition has multiple available sizes: the first is the smallest
     # size that can fit the soccer ball, and the rest are bigger sizes.
     create_variable_definition_from_base(
-        type='bowl_3',
+        type='bowl_3_static',
         size_multiplier_list=[
             Vector3d(x=3, y=3, z=3), Vector3d(x=3.5, y=3.5, z=3.5)],
         chosen_material_list=[
@@ -1976,7 +1976,7 @@ _CONTAINERS_BINS = [
         ]
     ),
     create_variable_definition_from_base(
-        type='bowl_4',
+        type='bowl_4_static',
         size_multiplier_list=[
             Vector3d(x=2.5, y=5, z=2.5), Vector3d(x=3, y=6, z=3)],
         chosen_material_list=[
@@ -1986,7 +1986,7 @@ _CONTAINERS_BINS = [
         ]
     ),
     create_variable_definition_from_base(
-        type='bowl_6',
+        type='bowl_6_static',
         size_multiplier_list=[
             Vector3d(x=3, y=4, z=3), Vector3d(x=3.5, y=4.5, z=3.5)],
         chosen_material_list=[
@@ -1996,7 +1996,7 @@ _CONTAINERS_BINS = [
         ]
     ),
     create_variable_definition_from_base(
-        type='cup_2',
+        type='cup_2_static',
         size_multiplier_list=[
             Vector3d(x=4, y=2.5, z=4), Vector3d(x=4.5, y=3, z=4.5)],
         chosen_material_list=[
@@ -2006,7 +2006,7 @@ _CONTAINERS_BINS = [
         ]
     ),
     create_variable_definition_from_base(
-        type='cup_3',
+        type='cup_3_static',
         size_multiplier_list=[
             Vector3d(x=4, y=2.5, z=4), Vector3d(x=4.5, y=3, z=4.5)],
         chosen_material_list=[
@@ -2016,7 +2016,7 @@ _CONTAINERS_BINS = [
         ]
     ),
     create_variable_definition_from_base(
-        type='cup_6',
+        type='cup_6_static',
         size_multiplier_list=[
             Vector3d(x=4, y=3, z=4), Vector3d(x=4, y=3.5, z=4)],
         chosen_material_list=[

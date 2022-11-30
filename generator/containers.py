@@ -2,7 +2,11 @@ from enum import Enum, auto
 from typing import Any, Dict, List, Optional, Tuple
 
 from .definitions import ObjectDefinition
-from .geometry import ORIGIN, create_bounds
+from .geometry import (
+    ORIGIN,
+    create_bounds,
+    get_magnitudes_of_x_z_dirs_for_rotation_and_move_vector
+)
 
 
 def put_object_in_container(
@@ -274,3 +278,39 @@ def can_contain_both(
             return area_index, [90, 90], Orientation.FRONT_TO_BACK
 
         return None
+
+
+def shift_lid_positions_based_on_movement(objects):
+    containers = [obj for obj in objects
+                  if obj['type'] == 'separate_container' and
+                  obj['debug']['lidId']]
+    for container in containers:
+        final_x = container['shows'][0]['position']['x']
+        final_z = container['shows'][0]['position']['z']
+        lid = next(
+            obj for obj in objects
+            if obj['id'] == container['debug']['lidId'])
+        placer = next(
+            obj for obj in objects
+            if obj['id'] == container['debug']['lidPlacerId'])
+        if container.get('moves') and len(container['moves']) > 0:
+            step_cutoff = lid['lidAttachment']['stepBegin']
+            for move in container['moves']:
+                for i in range(move['stepBegin'], move['stepEnd'] + 1):
+                    if i < step_cutoff:
+                        if move.get('globalSpace'):
+                            x = move['vector']['x']
+                            z = move['vector']['z']
+                        else:
+                            (x, z) = \
+                            get_magnitudes_of_x_z_dirs_for_rotation_and_move_vector(  # noqa
+                                container['shows'][0]['rotation']['y'],
+                                move['vector']['x'],
+                                move['vector']['z'])
+                        final_x += x
+                        final_z += z
+            lid['shows'][0]['position']['x'] = final_x
+            placer['shows'][0]['position']['x'] = final_x
+            lid['shows'][0]['position']['z'] = final_z
+            placer['shows'][0]['position']['z'] = final_z
+    return objects

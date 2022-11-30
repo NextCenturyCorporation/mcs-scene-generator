@@ -14,12 +14,14 @@ from generator import (
     specific_objects
 )
 from generator.materials import MaterialTuple
-from generator.mechanisms import CYLINDRICAL_SHAPES
+from generator.mechanisms import CYLINDRICAL_SHAPES, create_placer
 from generator.scene import Scene
 from ideal_learning_env.defs import (
+    ILEConfigurationException,
     ILEDelayException,
     ILEException,
-    ILESharedConfiguration
+    ILESharedConfiguration,
+    find_bounds
 )
 from ideal_learning_env.feature_creation_service import (
     BaseFeatureConfig,
@@ -33,6 +35,7 @@ from ideal_learning_env.feature_creation_service import (
 from ideal_learning_env.object_services import (
     InstanceDefinitionLocationTuple,
     KeywordLocation,
+    KeywordLocationConfig,
     ObjectRepository,
     RelativePositionConfig,
     add_random_placement_tag
@@ -57,102 +60,6 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass
-class KeywordLocationConfig():
-    """Describes an object's keyword location. Can have the following
-    properties:
-    - `keyword` (string, or list of strings): The keyword location, which can
-    be one of the following:
-        - `adjacent` - The object will be placed next to another object.  The
-        other object must be referenced by the 'relative_object_label' field.
-        - `adjacent_performer` - The object will be placed next to the
-        performer.  The object can be placed in 'front', 'back', left, or
-        'right' of the performer using the 'direction'.  The object
-        can also be specified to be 'in_reach' or 'out_of_reach' via the
-        'distance'.  By default, the object will be placed in a random
-        direction, but 'in_reach'.
-        other object must be referenced by the 'relative_object_label' field.
-        If multiple objects have this label, one will be randomly chosen.
-        - `back` - The object will be placed in the 180 degree arc behind the
-        performer's start position.
-        - `behind` - The object will be placed behind another object, relative
-        to the performer's start position.  The other object must be referenced
-        by the 'relative_object_label' field.  If multiple objects have this
-        label, one will be randomly chosen.
-        - `between` - The object will be placed between the performer's start
-        position and another object.  The other object must be referenced by
-        the 'relative_object_label' field.  If multiple objects have this
-        label, one will be randomly chosen.
-        - `front` - The object will be placed in a line in front of the
-        performer's start position.
-        - `in` - The object will be placed inside a container.  The container
-        must be referenced by the 'container_label' field.  If multiple objects
-        have this label, one will be randomly chosen.
-        - `in_with` - The object will be placed inside a container along with
-        another object.  The container must be referenced by the
-        'container_label' field.  The other object must be referenced by the
-        'relative_object_label' field.  If multiple objects have these label,
-        one will be randomly chosen for each field.
-        - `occlude` - The object will be placed between the performer's start
-        position and another object so that this object completely occludes the
-        view of the other object.  The other object must be referenced by
-        the 'relative_object_label' field.  If multiple objects have this
-        label, one will be randomly chosen.
-        - `on_center` - The object will be placed on top of another object
-        in the center of the bounds.  This option is best for objects the are
-        similar in size or for use cases where objects are desired to be
-        centered.  The object must be referenced by the 'relative_object_label'
-        field.  If multiple objects have this label,
-        one will be randomly chosen.
-        - `on_top` - The object will be placed on top of another object in a
-        random location.  This option is best for when the object is
-        significantly smaller than the object it is placed on (I.E. a small
-        ball on a large platform).  If the objects are similar in size
-        (I.E. two bowls), use 'on_center'.  The object must be referenced by
-        the 'relative_object_label' field.  If multiple objects have this
-        label, one will be randomly chosen.
-        - `opposite_x` - The object will be placed in the exact same location
-        as the object referenced by `relative_object_label` except that its x
-        location will be on the opposite side of the room.  There is no
-        adjustments to find a valid location if another object already exists
-        in location specified by this keyword.
-        - `opposite_z` - The object will be placed in the exact same location
-        as the object referenced by `relative_object_label` except that its z
-        location will be on the opposite side of the room.  There is no
-        adjustments to find a valid location if another object already exists
-        in location specified by this keyword.
-        - `random` - The object will be positioned in a random location, as if
-        it did not have a keyword location.
-        - `associated_with_agent` - This object will be held by an agent
-        referenced by the 'relative_object_label' field.
-        - `along_wall` - This object will be placed along a wall
-        referenced by the 'relative_object_label' field.  The wall labels are
-        'front_wall', 'back_wall', 'left_wall, and 'right_wall'.  If no wall is
-        provided, a wall will be chosen at random.
-    - `container_label` (string, or list of strings): The label of a container
-    object that already exists in your configuration. Only required by some
-    keyword locations.
-    - `relative_object_label` (string, or list of strings): The label of a
-    second object that already exists in your configuration. Only required by
-    some keyword locations.
-    - `position_relative_to_start` (VectorFloatConfig, or list of
-    VectorFloatConfigs): Currently only supported with the `on_center` keyword:
-    How much to translate object from the center position of the relative
-    object along the x and z axis. This works like a percentage, represented
-    as x/z values that range from -1.0 to 1.0 (with both of those values being
-    furthest from the center in either direction). Note that this assumes the
-    relative object has a rectangular boundary.
-
-    """
-    keyword: Union[str, List[str]] = None
-    container_label: Union[str, List[str]] = None
-    relative_object_label: Union[str, List[str]] = None
-    distance: Union[str, List[str]] = None
-    direction: Union[str, List[str]] = None
-    position_relative_to_start: Union[VectorFloatConfig,
-                                      List[VectorFloatConfig]] = None
-
-
-@dataclass
 class InteractableObjectConfig(BaseFeatureConfig):
     """Represents the template for a specific object (with one or more possible
     variations) that will be added to each scene. Each template can have the
@@ -167,9 +74,10 @@ class InteractableObjectConfig(BaseFeatureConfig):
     objects. For example, in a scene with 5 targets, a `num_targets_minus` of
     1 would generate 4 objects. Default: null
     - `dimensions` ([VectorFloatConfig](#VectorFloatConfig) dict, int,
-    [MinMaxInt](#MinMaxInt), or a list of any of those types): Sets the overal
-    dimensions of the object in meters.  This field will override scale.
-    Default: Use scale.
+    [MinMaxInt](#MinMaxInt), or a list of any of those types): Sets the
+    dimensions of the object in meters. Overrides `scale`. If only one
+    dimension is configured, then the same scale will be used for the other two
+    dimensions. Default: Use scale.
     - `identical_to` (str): Used to match to another object with
     the specified label, so that this definition can share that object's
     exact shape, scale, and material. Overrides `identical_except_color`
@@ -187,6 +95,20 @@ class InteractableObjectConfig(BaseFeatureConfig):
     - `locked` (bool or list of bools): If true and the resulting object is
     lockable, like a container or door, the object will be locked.  If the
     object is not lockable, this field has no affect.
+    - `separate_lid` (int, or list of ints, or [MinMaxInt](#MinMaxInt) dict):
+    Only applies to objects with a 'separate_container' shape.
+    If a negative number or None the container will not have a sepearate lid.
+    If 0 the container will have a separate lid already attatched at the
+    start of the scene. If greater than 0 the container's separate lid will
+    be placed by a placer. The number given will be the step the placer starts
+    its placement. 15 steps later the lid will be attached to the object.
+    Note that if the container has any `moves` configured, the placer and
+    separate lid will automatically calculate the x,z position of the container
+    until the step it starts it decent. So ensure the container is not moving
+    from the step the placer begins its decent to when the lid attachment
+    occurs 15 steps later, otherwise the placer will place the lid where
+    the container was at the step it started its decent while the container
+    moves away from that position.
     - `material` (string, or list of strings): The material (color/texture) to
     use on this object in each scene. For a list, a new material will be
     randomly chosen for each scene. Default: random
@@ -280,6 +202,7 @@ class InteractableObjectConfig(BaseFeatureConfig):
     keyword_location: Union[KeywordLocationConfig,
                             List[KeywordLocationConfig]] = None
     locked: Union[bool, List[bool]] = False
+    separate_lid: Union[int, List[int], MinMaxInt, List[MinMaxInt]] = None
     identical_to: str = None
     identical_except_color: str = None
     position_relative: Union[
@@ -297,8 +220,8 @@ class InteractableObjectConfig(BaseFeatureConfig):
 
 DEFAULT_TEMPLATE_INTERACTABLE = InteractableObjectConfig(
     num=1, material=None, scale=1, shape=None, position=None, rotation=None,
-    keyword_location=None, locked=False, labels=None, identical_to=None,
-    identical_except_color=None, not_material=None)
+    keyword_location=None, locked=False, separate_lid=None, labels=None,
+    identical_to=None, identical_except_color=None, not_material=None)
 
 
 class InteractableObjectCreationService(BaseObjectCreationService):
@@ -320,6 +243,13 @@ class InteractableObjectCreationService(BaseObjectCreationService):
             reconciled.dimensions = Vector3d(x=val, y=val, z=val)
         (reconciled.shape, mat) = choose_shape_material(
             reconciled.shape, reconciled.material, reconciled.not_material)
+        if (
+            reconciled.shape == 'separate_container' and
+            not reconciled.material
+        ):
+            # Always use this specific material for the separate_container
+            # unless a different one is manually configured for it.
+            mat = MaterialTuple('Custom/Materials/GreenWoodMCS', ['green'])
         reconciled.material = mat[0] if isinstance(mat, MaterialTuple) else mat
         reconciled.scale = choose_scale(
             source_template.scale,
@@ -331,6 +261,7 @@ class InteractableObjectCreationService(BaseObjectCreationService):
         defn = self._create_definition(reconciled)
         self.defn = defn
         reconciled.scale = defn.scale
+        reconciled.rotation = choose_rotation(reconciled.rotation)
 
         if (
             not reconciled.keyword_location or
@@ -344,7 +275,10 @@ class InteractableObjectCreationService(BaseObjectCreationService):
                 scene.room_dimensions.y,
                 scene.room_dimensions.z
             )
-            reconciled.rotation = choose_rotation(reconciled.rotation)
+        elif source_template.rotation:
+            # If rotation is configured, save it within the keyword location,
+            # since some keywords might need to use it.
+            reconciled.keyword_location.rotation = reconciled.rotation
 
         # If needed, adjust this device's position relative to another object.
         if source_template.position_relative:
@@ -373,6 +307,7 @@ class InteractableObjectCreationService(BaseObjectCreationService):
             try:
                 idl = KeywordLocation.get_keyword_location_object_tuple(
                     reconciled.keyword_location,
+                    source_template.keyword_location,
                     defn, scene.performer_start, self.bounds,
                     scene.room_dimensions)
                 if idl:
@@ -435,6 +370,14 @@ class InteractableObjectCreationService(BaseObjectCreationService):
                     reconciled_template.labels
                 )
                 scene.objects.append(obj)
+                separate_lid = reconciled_template.separate_lid
+                if (
+                    obj['type'] == 'separate_container' and
+                    separate_lid is not None and separate_lid is not False and
+                    separate_lid >= 0
+                ):
+                    self._add_separate_lid(scene, separate_lid, obj)
+
         log_feature_template(
             self._get_type().lower().replace('_', ' '),
             'ids' if len(new_obj) > 1 else 'id',
@@ -442,6 +385,62 @@ class InteractableObjectCreationService(BaseObjectCreationService):
             new_obj[0]['id'],
             [None, reconciled_template]
         )
+
+    def _add_separate_lid(
+        self,
+        scene: Scene,
+        lid_step_begin: int,
+        container_obj: Dict[str, Any]
+    ) -> None:
+        container_material = container_obj['materials'][0]
+        container_position = container_obj['shows'][0]['position']
+        container_rotation = container_obj['shows'][0]['rotation']
+        container_scale = container_obj['shows'][0]['scale']
+        lid_template = InteractableObjectConfig(
+            position=Vector3d(
+                x=container_position['x'],
+                y=container_position['y'] + container_scale['y'],
+                z=container_position['z']
+            ),
+            rotation=Vector3d(y=container_rotation['y']),
+            scale=Vector3d(
+                x=container_scale['x'],
+                y=container_scale['y'],
+                z=container_scale['z']
+            ),
+            shape='lid',
+            num=1,
+            material=container_material
+        )
+
+        FeatureCreationService.create_feature(
+            scene, FeatureTypes.INTERACTABLE, lid_template, find_bounds(scene))
+        lid = scene.objects[-1]
+        lid['lidAttachment'] = {
+            'stepBegin': 0,
+            'lidAttachmentObjId': container_obj['id']
+        }
+        container_obj['debug']['lidId'] = lid['id']
+        if lid_step_begin > 0:
+            self._create_placer_for_separate_lid(
+                scene, lid, container_obj, lid_step_begin)
+
+    def _create_placer_for_separate_lid(
+            self, scene: Scene, lid, container, step_begin):
+        scene.debug['containsSeparateLids'] = True
+        end_height = lid['shows'][0]['position']['y']
+        lid['shows'][0]['position']['y'] = end_height + scene.room_dimensions.y
+        placer = create_placer(
+            lid['shows'][0]['position'],
+            lid['debug']['dimensions'],
+            0,
+            step_begin,
+            end_height,
+            scene.room_dimensions.y)
+        lid['moves'] = [placer['moves'][0]]
+        lid['lidAttachment']['stepBegin'] = placer['moves'][0]['stepEnd']
+        container['debug']['lidPlacerId'] = placer['id']
+        scene.objects.append(placer)
 
     def _attach_location(
         self,
@@ -509,6 +508,15 @@ class InteractableObjectCreationService(BaseObjectCreationService):
             template.scale
         )
         if template.dimensions:
+            if (
+                not template.dimensions.x and not template.dimensions.y and
+                not template.dimensions.z
+            ):
+                raise ILEConfigurationException(
+                    f'At least one dimension must be configured to a non-zero '
+                    f'number, but none were set to a valid number: dimensions='
+                    f'{template.dimensions}'
+                )
             # We need the original defn to get the dimensions at a given scale.
             # We then adjust that scale relative to ratio of given dimensions
             # and desired dimensions to give a scale that will achieve the
@@ -516,6 +524,25 @@ class InteractableObjectCreationService(BaseObjectCreationService):
             template.scale.x *= template.dimensions.x / defn.dimensions.x
             template.scale.y *= template.dimensions.y / defn.dimensions.y
             template.scale.z *= template.dimensions.z / defn.dimensions.z
+            # If the object definition is intentionally turned sideways by
+            # default, switch the X and Z scales, since the definition's
+            # dimensions have already been switched.
+            if defn.rotation.y == 90:
+                temp = template.scale.x
+                template.scale.x = template.scale.z
+                template.scale.z = temp
+            # If only one dimension was configured, use the scale of that axis
+            # for the other axes.
+            if not template.scale.x and not template.scale.y:
+                template.scale.x = template.scale.z
+                template.scale.y = template.scale.z
+            if not template.scale.x and not template.scale.z:
+                template.scale.x = template.scale.y
+                template.scale.z = template.scale.y
+            if not template.scale.y and not template.scale.z:
+                template.scale.y = template.scale.x
+                template.scale.z = template.scale.x
+            # Recreate the object definition using the new scale.
             defn = base_objects.create_specific_definition_from_base(
                 shape,
                 mat,
@@ -548,8 +575,9 @@ def create_user_configured_interactable_object(
 ) -> Dict[str, Any]:
     """Create and return a user-configured interactable object, that may have
     a config option like "identical_to" or "identical_except_color" which must
-    be applied appropriately. Automatically updates the given list of object
-    bounds. May raise an ILEDelayException."""
+    be applied appropriately. The given object_config should NOT be reconciled
+    before calling this function. Automatically updates the given list of
+    object bounds. May raise an ILEDelayException."""
 
     # If identical_to is used, pick that object's shape/scale/material.
     # Otherwise, if identical_except_color is used, pick that object's

@@ -1,0 +1,41 @@
+# Generate an openable container.
+keyword_objects:
+    - num: 1
+      keyword: containers
+      labels: target_container
+
+# Add a Retrieval goal with a soccer ball as the target object positioned
+# inside the container (configured above).
+goal:
+    category: retrieval
+    target:
+        shape: soccer_ball
+        scale: 1
+        keyword_location:
+            keyword: in
+            container_label: target_container
+
+# Generate an agent who points at the container holding the target object.
+specific_agents:
+    num: 1
+    pointing:
+        step_begin: 1
+        object_label: target_container
+    movement: false
+
+# Generate one or more other containers identical to the container holding the
+# target object, but nothing is inside of them.
+specific_interactable_objects:
+    - num:
+          min: 1
+          max: 4
+      identical_to: target_container
+
+# Only the target can be a soccer ball.
+excluded_shapes: soccer_ball
+
+# Override the defaults to avoid randomly generating any other objects besides
+# the agent, containers, and target. Remove these lines if you want additional
+# randomly generated objects.
+random_structural_objects:
+    - num: 0

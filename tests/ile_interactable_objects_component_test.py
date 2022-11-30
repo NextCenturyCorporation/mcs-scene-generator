@@ -27,7 +27,10 @@ from .ile_helper import (
 def run_around_test():
     # Prepare test
     ObjectRepository.get_instance().clear()
-    ILESharedConfiguration.get_instance().set_excluded_shapes([])
+    # Exclude shapes that will automatically generate additional objects.
+    ILESharedConfiguration.get_instance().set_excluded_shapes(
+        ['lid', 'separate_container']
+    )
 
     # Run test
     yield
@@ -599,6 +602,11 @@ def test_specific_objects_position_relative_to_multiple_override():
 
 
 def test_specific_objects_array_multiple_scale():
+    # Do not use the separate_container, or else it will automatically add a
+    # separate lid to the scene, and our test cannot handle that edge case.
+    ILESharedConfiguration.get_instance().set_excluded_shapes(
+        ['separate_container']
+    )
     component = SpecificInteractableObjectsComponent({
         "specific_interactable_objects": [{
             "num": 1,
@@ -996,6 +1004,19 @@ def test_random_keyword_objects_types_none():
     assert 2 <= len(objs) <= 14
     for obj in objs:
         assert obj['debug']['random_position']
+
+
+def test_random_keyword_objects_types_no_keyword():
+    component = RandomKeywordObjectsComponent({
+        'keyword_objects': {
+            'num': 4,
+        }
+    })
+    assert component.keyword_objects.num == 4
+    # Test a bunch of times to make sure.
+    for _ in range(100):
+        scene = component.update_ile_scene(prior_scene())
+        assert (len(scene.objects) + len(component._delayed_actions)) == 4
 
 
 def test_random_keyword_objects_types_containers():
@@ -1798,3 +1819,93 @@ def test_specific_objects_delayed_action_in():
     assert len(objects) == 2
     component.get_num_delayed_actions() == 0
     assert objects[1]['locationParent'] == objects[0]['id']
+
+
+def test_run_actions_at_end_of_scene_generation_separate_container_with_lid_placer_and_moves():  # noqa
+    component = SpecificInteractableObjectsComponent({
+        "specific_interactable_objects": [{
+            "num": 1,
+            "shape": "separate_container",
+            "separate_lid": 30,
+            "scale": 0.4,
+            "rotation": {
+                "y": 45
+            },
+            "position": {
+                "x": -2,
+                "z": 2
+            }
+        }]})
+    scene = component.update_ile_scene(prior_scene())
+    assert len(scene.objects) == 3
+    container = scene.objects[0]
+    lid = scene.objects[1]
+    placer = scene.objects[2]
+    assert container['type'] == 'separate_container'
+    assert lid['type'] == 'lid'
+    assert placer['type'] == 'cylinder'
+
+    moves = [
+        {
+            'stepBegin': 1,
+            'stepEnd': 15,
+            'globalSpace': True,
+            'vector': {'x': 0.135, 'y': 0, 'z': 0}
+        },
+        {
+            'stepBegin': 16,
+            'stepEnd': 20,
+            'vector': {'x': 0, 'y': 0, 'z': -0.175}
+        },
+        {
+            'stepBegin': 21,
+            'stepEnd': 25,
+            'globalSpace': True,
+            'vector': {'x': -0.125, 'y': 0, 'z': 0.15}
+        },
+        {
+            'stepBegin': 55,
+            'stepEnd': 62,
+            'vector': {'x': 0.2, 'y': 0, 'z': 0.1}
+        }
+    ]
+    assert lid['shows'][0]['position']['x'] == \
+        container['shows'][0]['position']['x']
+    assert lid['shows'][0]['position']['z'] == \
+        container['shows'][0]['position']['z']
+    assert lid['shows'][0]['rotation']['y'] == \
+        container['shows'][0]['rotation']['y']
+    assert lid['shows'][0]['scale'] == container['shows'][0]['scale']
+    assert placer['shows'][0]['position']['x'] == \
+        container['shows'][0]['position']['x']
+    assert placer['shows'][0]['position']['z'] == \
+        container['shows'][0]['position']['z']
+
+    container['moves'] = moves
+    scene = component.run_actions_at_end_of_scene_generation(scene)
+
+    assert not lid['shows'][0]['position']['x'] == \
+        container['shows'][0]['position']['x']
+    assert not lid['shows'][0]['position']['z'] == \
+        container['shows'][0]['position']['z']
+    assert lid['shows'][0]['rotation']['y'] == \
+        container['shows'][0]['rotation']['y']
+    assert lid['shows'][0]['scale'] == container['shows'][0]['scale']
+    assert not placer['shows'][0]['position']['x'] == \
+        container['shows'][0]['position']['x']
+    assert not placer['shows'][0]['position']['z'] == \
+        container['shows'][0]['position']['z']
+
+    """
+    These hardcoded numbers were confirmed inside unity when running this
+    scene with this config. The container moves for its first 3 moves,
+    then the lid is placed correctly in the new location,
+    then the container moves again. We only want to keep track
+    of the first 3 moves, then we place the lid.
+    """
+    end_x = -1.2187
+    end_z = 2.1313
+    assert lid['shows'][0]['position']['x'] == pytest.approx(end_x, 1e-2)
+    assert lid['shows'][0]['position']['z'] == pytest.approx(end_z, 1e-2)
+    assert placer['shows'][0]['position']['z'] == pytest.approx(end_z, 1e-2)
+    assert placer['shows'][0]['position']['z'] == pytest.approx(end_z, 1e-2)

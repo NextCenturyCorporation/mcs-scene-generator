@@ -3,6 +3,7 @@ import math
 import pytest
 from machine_common_sense.config_manager import Vector3d
 
+from generator import geometry
 from generator.agents import AGENT_MOVEMENT_ANIMATIONS, AGENT_TYPES
 from generator.scene import Scene
 from ideal_learning_env.agent_service import (
@@ -10,16 +11,15 @@ from ideal_learning_env.agent_service import (
     AgentConfig,
     AgentCreationService,
     AgentMovementConfig,
+    AgentPointingConfig,
     AgentSettings,
     get_default_agent_settings
 )
 from ideal_learning_env.defs import ILEConfigurationException, ILEException
-from ideal_learning_env.interactable_object_service import (
-    KeywordLocationConfig
-)
 from ideal_learning_env.numerics import MinMaxFloat, VectorFloatConfig
 from ideal_learning_env.object_services import (
     KeywordLocation,
+    KeywordLocationConfig,
     ObjectRepository
 )
 from ideal_learning_env.structural_object_service import (
@@ -670,3 +670,297 @@ def test_agent_occlude_fail():
     srv = AgentCreationService()
     with pytest.raises(ILEConfigurationException):
         srv.add_to_scene(scene, template, [])
+
+
+def test_agent_pointing():
+    scene = prior_scene()
+    config = AgentConfig(
+        num=1,
+        type='agent_male_02',
+        agent_settings=AgentSettings(),
+        pointing=AgentPointingConfig(),
+        position=VectorFloatConfig(1, 0, 2),
+        rotation_y=90
+    )
+    service = AgentCreationService()
+    agent = service.create_feature_from_specific_values(scene, config, config)
+    assert agent['type'] == 'agent_male_02'
+    assert agent['id'].startswith('agent')
+    assert agent['agentSettings']
+    assert agent['shows'][0]['position'] == {'x': 1, 'y': 0, 'z': 2}
+    assert agent['shows'][0]['rotation'] == {'x': 0, 'y': 90, 'z': 0}
+    assert agent['shows'][0]['scale'] == {'x': 1, 'y': 1, 'z': 1}
+    assert not agent.get('agentMovement')
+    assert agent['actions'] == [{
+        'id': 'Point_start_index_finger',
+        'stepBegin': 1,
+        'stepEnd': 8
+    }, {
+        'id': 'Point_hold_index_finger',
+        'stepBegin': 8,
+        'isLoopAnimation': True
+    }]
+
+
+def test_agent_pointing_custom_step():
+    scene = prior_scene()
+    config = AgentConfig(
+        num=1,
+        type='agent_male_02',
+        agent_settings=AgentSettings(),
+        pointing=AgentPointingConfig(
+            step_begin=11
+        ),
+        position=VectorFloatConfig(1, 0, 2),
+        rotation_y=90
+    )
+    service = AgentCreationService()
+    agent = service.create_feature_from_specific_values(scene, config, config)
+    assert agent['type'] == 'agent_male_02'
+    assert agent['id'].startswith('agent')
+    assert agent['agentSettings']
+    assert agent['shows'][0]['position'] == {'x': 1, 'y': 0, 'z': 2}
+    assert agent['shows'][0]['rotation'] == {'x': 0, 'y': 90, 'z': 0}
+    assert agent['shows'][0]['scale'] == {'x': 1, 'y': 1, 'z': 1}
+    assert not agent.get('agentMovement')
+    assert agent['actions'] == [{
+        'id': 'Point_start_index_finger',
+        'stepBegin': 11,
+        'stepEnd': 18
+    }, {
+        'id': 'Point_hold_index_finger',
+        'stepBegin': 18,
+        'isLoopAnimation': True
+    }]
+
+
+def test_agent_pointing_at_object():
+    scene = prior_scene_with_target(add_to_repo=True)
+    config = AgentConfig(
+        num=1,
+        type='agent_male_02',
+        agent_settings=AgentSettings(),
+        pointing=AgentPointingConfig(
+            object_label='target'
+        ),
+        position=VectorFloatConfig(1, 0, 2),
+        rotation_y=90
+    )
+    service = AgentCreationService()
+    agent = service.create_feature_from_specific_values(scene, config, config)
+    assert agent['type'] == 'agent_male_02'
+    assert agent['id'].startswith('agent')
+    assert agent['agentSettings']
+    assert agent['shows'][0]['position'] == {'x': 1, 'y': 0, 'z': 2}
+    target = scene.get_targets()[0]
+    _, rotation_y = geometry.calculate_rotations(
+        Vector3d(**agent['shows'][0]['position']),
+        Vector3d(**target['shows'][0]['position']),
+        True
+    )
+    assert agent['shows'][0]['rotation'] == {'x': 0, 'y': rotation_y, 'z': 0}
+    assert agent['shows'][0]['scale'] == {'x': 1, 'y': 1, 'z': 1}
+    assert not agent.get('agentMovement')
+    assert agent['actions'] == [{
+        'id': 'Point_start_index_finger',
+        'stepBegin': 1,
+        'stepEnd': 8
+    }, {
+        'id': 'Point_hold_index_finger',
+        'stepBegin': 8,
+        'isLoopAnimation': True
+    }]
+
+
+def test_agent_pointing_override_actions():
+    scene = prior_scene()
+    config = AgentConfig(
+        num=1,
+        type='agent_male_02',
+        agent_settings=AgentSettings(),
+        pointing=AgentPointingConfig(),
+        position=VectorFloatConfig(1, 0, 2),
+        rotation_y=90,
+        actions=[
+            AgentActionConfig(id='a', step_begin=2, step_end=5),
+            AgentActionConfig(id='b', step_begin=10, is_loop_animation=True)
+        ]
+    )
+    service = AgentCreationService()
+    agent = service.create_feature_from_specific_values(scene, config, config)
+    assert agent['type'] == 'agent_male_02'
+    assert agent['id'].startswith('agent')
+    assert agent['agentSettings']
+    assert agent['shows'][0]['position'] == {'x': 1, 'y': 0, 'z': 2}
+    assert agent['shows'][0]['rotation'] == {'x': 0, 'y': 90, 'z': 0}
+    assert agent['shows'][0]['scale'] == {'x': 1, 'y': 1, 'z': 1}
+    assert not agent.get('agentMovement')
+    assert agent['actions'] == [{
+        'id': 'Point_start_index_finger',
+        'stepBegin': 1,
+        'stepEnd': 8
+    }, {
+        'id': 'Point_hold_index_finger',
+        'stepBegin': 8,
+        'isLoopAnimation': True
+    }]
+
+
+def test_agent_pointing_override_movement():
+    scene = prior_scene()
+    config = AgentConfig(
+        num=1,
+        type='agent_male_02',
+        agent_settings=AgentSettings(),
+        pointing=AgentPointingConfig(),
+        position=VectorFloatConfig(1, 0, 2),
+        rotation_y=90,
+        movement=AgentMovementConfig(
+            step_begin=2,
+            points=[
+                VectorFloatConfig(1, 0, 3),
+                VectorFloatConfig(2, 0, 3),
+                VectorFloatConfig(2, 0, 2),
+                VectorFloatConfig(1, 0, 2)
+            ],
+            repeat=True
+        )
+    )
+    service = AgentCreationService()
+    agent = service.create_feature_from_specific_values(scene, config, config)
+    assert agent['type'] == 'agent_male_02'
+    assert agent['id'].startswith('agent')
+    assert agent['agentSettings']
+    assert agent['shows'][0]['position'] == {'x': 1, 'y': 0, 'z': 2}
+    assert agent['shows'][0]['rotation'] == {'x': 0, 'y': 90, 'z': 0}
+    assert agent['shows'][0]['scale'] == {'x': 1, 'y': 1, 'z': 1}
+    assert not agent.get('agentMovement')
+    assert agent['actions'] == [{
+        'id': 'Point_start_index_finger',
+        'stepBegin': 1,
+        'stepEnd': 8
+    }, {
+        'id': 'Point_hold_index_finger',
+        'stepBegin': 8,
+        'isLoopAnimation': True
+    }]
+
+
+def test_agent_pointing_walk_distance():
+    scene = prior_scene_with_target(add_to_repo=True)
+    config = AgentConfig(
+        num=1,
+        type='agent_male_02',
+        agent_settings=AgentSettings(),
+        pointing=AgentPointingConfig(
+            object_label='target',
+            walk_distance=0.5
+        ),
+        position=VectorFloatConfig(1, 0, 2),
+        rotation_y=90
+    )
+    service = AgentCreationService()
+    agent = service.create_feature_from_specific_values(scene, config, config)
+    assert agent['type'] == 'agent_male_02'
+    assert agent['id'].startswith('agent')
+    assert agent['agentSettings']
+    assert agent['shows'][0]['position'] == pytest.approx(
+        {'x': 1.3492, 'y': 0, 'z': 1.6422}
+    )
+    target = scene.get_targets()[0]
+    _, rotation_y = geometry.calculate_rotations(
+        Vector3d(**agent['shows'][0]['position']),
+        Vector3d(**target['shows'][0]['position']),
+        True
+    )
+    # Agent starts turned around
+    rotation_y = (rotation_y + 180) % 360
+    assert agent['shows'][0]['rotation'] == {'x': 0, 'y': rotation_y, 'z': 0}
+    assert agent['shows'][0]['scale'] == {'x': 1, 'y': 1, 'z': 1}
+    assert agent['agentMovement'] == {
+        'repeat': False,
+        'stepBegin': 1,
+        'sequence': [{
+            'animation': 'TPM_walk',
+            'endPoint': {'x': 0.6508, 'z': 2.3578}
+        }]
+    }
+    assert agent['actions'] == [{
+        'id': 'Point_start_index_finger',
+        'stepBegin': 32,
+        'stepEnd': 39
+    }, {
+        'id': 'Point_hold_index_finger',
+        'stepBegin': 39,
+        'isLoopAnimation': True
+    }]
+
+
+def test_agent_pointing_walk_distance_custom_step():
+    scene = prior_scene_with_target(add_to_repo=True)
+    config = AgentConfig(
+        num=1,
+        type='agent_male_02',
+        agent_settings=AgentSettings(),
+        pointing=AgentPointingConfig(
+            step_begin=46,
+            object_label='target',
+            walk_distance=0.5
+        ),
+        position=VectorFloatConfig(1, 0, 2),
+        rotation_y=90
+    )
+    service = AgentCreationService()
+    agent = service.create_feature_from_specific_values(scene, config, config)
+    assert agent['type'] == 'agent_male_02'
+    assert agent['id'].startswith('agent')
+    assert agent['agentSettings']
+    assert agent['shows'][0]['position'] == pytest.approx(
+        {'x': 1.3492, 'y': 0, 'z': 1.6422}
+    )
+    target = scene.get_targets()[0]
+    _, rotation_y = geometry.calculate_rotations(
+        Vector3d(**agent['shows'][0]['position']),
+        Vector3d(**target['shows'][0]['position']),
+        True
+    )
+    # Agent starts turned around
+    rotation_y = (rotation_y + 180) % 360
+    assert agent['shows'][0]['rotation'] == {'x': 0, 'y': rotation_y, 'z': 0}
+    assert agent['shows'][0]['scale'] == {'x': 1, 'y': 1, 'z': 1}
+    assert agent['agentMovement'] == {
+        'repeat': False,
+        'stepBegin': 46,
+        'sequence': [{
+            'animation': 'TPM_walk',
+            'endPoint': {'x': 0.6508, 'z': 2.3578}
+        }]
+    }
+    assert agent['actions'] == [{
+        'id': 'Point_start_index_finger',
+        'stepBegin': 77,
+        'stepEnd': 84
+    }, {
+        'id': 'Point_hold_index_finger',
+        'stepBegin': 84,
+        'isLoopAnimation': True
+    }]
+
+
+def test_agent_pointing_walk_distance_collision():
+    scene = prior_scene_with_target(add_to_repo=True)
+    config = AgentConfig(
+        num=1,
+        type='agent_male_02',
+        agent_settings=AgentSettings(),
+        pointing=AgentPointingConfig(
+            step_begin=46,
+            object_label='target',
+            walk_distance=2.9
+        ),
+        position=VectorFloatConfig(1, 0, 2),
+        rotation_y=90
+    )
+    service = AgentCreationService()
+    with pytest.raises(ILEException):
+        service.create_feature_from_specific_values(scene, config, config)

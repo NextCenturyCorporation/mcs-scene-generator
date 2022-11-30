@@ -28,13 +28,16 @@ placers:
     - num: 0
 random_structural_objects: null
 restrict_open_doors: False
+restrict_open_objects: False
 room_dimensions: null
 room_shape: null
 shortcut_agent_with_target: False
 shortcut_bisecting_platform: False
+shortcut_imitation_task: False
 shortcut_lava_room: False
 shortcut_lava_target_tool: False
 shortcut_start_on_platform: False
+shortcut_tool_choice: False
 shortcut_triple_door_choice: False
 side_wall_opposite_colors: False
 specific_agents: null
@@ -60,6 +63,7 @@ teleports: null
 tools:
     - num: 0
 trapezoidal_room: False
+turntables_with_agent_and_non_agent: null
 wall_back_material: null
 wall_front_material: null
 wall_left_material: null

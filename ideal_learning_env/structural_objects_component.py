@@ -36,9 +36,8 @@ from .choosers import choose_counts, choose_random
 from .components import ILEComponent
 from .decorators import ile_config_setter
 from .defs import TARGET_LABEL, ILEDelayException, find_bounds, return_list
-from .interactable_object_service import KeywordLocationConfig
 from .numerics import MinMaxInt
-from .object_services import ObjectRepository
+from .object_services import KeywordLocationConfig, ObjectRepository
 from .validators import ValidateNumber, ValidateOptions
 
 logger = logging.getLogger(__name__)

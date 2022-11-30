@@ -1,0 +1,11 @@
+# Generates a cuboid container with a separate lid. Note that we normally use
+# a scale of 0.4 for this container to hold a soccer_ball of scale 1.
+specific_interactable_objects:
+    - num: 1
+      shape: separate_container
+      # A placer will descend with the container's lid, starting at this step.
+      # If zero, the container will begin with the lid attached to it.
+      # If null or false, the container will never have a lid attached.
+      separate_lid:
+          min: 1
+          max: 10

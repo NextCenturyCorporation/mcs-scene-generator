@@ -1,0 +1,172 @@
+# Use a specific room size for this task.
+room_dimensions:
+    x: 6
+    y: 4
+    z: 6
+
+# Generate a short, thin platform bisecting the room, and another platform on
+# the far wall of the room.
+shortcut_bisecting_platform:
+    is_short: true
+    is_thin: true
+    other_platforms:
+        - num: 1
+          position:
+              x: 0
+              y: 0
+              z: 2
+          rotation_y: 0
+          scale:
+              x: 6
+              y: 0.5
+              z: 2
+
+# Generates two turntables (rotating cogs) on top of the far platform, one on
+# the left and one on the right.
+structural_turntables:
+    - num: 1
+      labels: turntable_left
+      position:
+          x: -1
+          y: 0.5
+          z: 2
+      turntable_radius: 0.75
+      # Rotation will be set by turntables_with_agent_and_non_agent (below).
+      turntable_movement:
+          step_begin: 0
+          step_end: 0
+          rotation_y: 0
+    - num: 1
+      labels: turntable_right
+      position:
+          x: 1
+          y: 0.5
+          z: 2
+      turntable_radius: 0.75
+      # Rotation will be set by turntables_with_agent_and_non_agent (below).
+      turntable_movement:
+          step_begin: 0
+          step_end: 0
+          rotation_y: 0
+
+# Generates an openable container on either the left or the right of the
+# platform, in front of one of the two turntables.
+keyword_objects:
+    - num: 1
+      keyword: containers
+      labels: target_container
+      position:
+          - x: -1
+            y: 0
+            z: 0
+          - x: 1
+            y: 0
+            z: 0
+      # Container should always be facing the performer agent.
+      rotation:
+          x: 0
+          y: 180
+          z: 0
+
+# Add a Retrieval goal with a soccer ball as the target object positioned
+# inside the container (configured above).
+goal:
+    category: retrieval
+    target:
+        shape: soccer_ball
+        scale: 1
+        keyword_location:
+            keyword: in
+            container_label: target_container
+
+# Generate an agent who starts on one of the two turntables and points at the
+# container holding the target object.
+specific_agents:
+    num: 1
+    # Randomly start on either the left (50%) or the right (50%) turntable.
+    position:
+        - x: -1
+          y: 0.605
+          z: 2
+        - x: 1
+          y: 0.605
+          z: 2
+    pointing:
+        # Randomly start pointing on either step 1 (50%) or step 46 (50%), the
+        # latter of which causes the non-agent object to rotate first.
+        step_begin: [1, 46]
+        # Point at the container holding the target object.
+        object_label: target_container
+        # Turn around, then walk from one side of the turntable to the other,
+        # in a straight line toward the container, before pointing.
+        # IMPORTANT NOTE: Please DO NOT increase the walk_distance above this
+        # number (0.6), or else you will witness some unrealistic behavior.
+        walk_distance: 0.6
+
+specific_interactable_objects:
+    # Generates a second container, identical to the first, in a mirrored
+    # location, but empty.
+    - num: 1
+      identical_to: target_container
+      keyword_location:
+          keyword: opposite_x
+          relative_object_label: target_container
+      labels: non_target_container
+    # Generates a "non-agent" object on top of the turntable opposite from the
+    # agent. We have listed shapes here that point in obvious directions.
+    - num: 1
+      shape:
+          - bobcat
+          - bus_1
+          - car_1
+          - car_2
+          - car_3
+          - dog_on_wheels
+          - dog_on_wheels_2
+          - duck_on_wheels
+          - duck_on_wheels_2
+          - jeep
+          - racecar_red
+          - roller
+          - tank_1
+          - tank_2
+          - train_1
+          - train_2
+          - trolley_1
+          - truck_1
+          - truck_2
+          - truck_3
+          - truck_4
+          - turtle_on_wheels
+      # Object must not be longer than 0.3 in order to fit on the turntable;
+      # set the other dimensions as 0 in order to scale them normally.
+      dimensions:
+          x: 0
+          y: 0
+          z: 0.3
+      # All the shapes listed above start facing left, but the agent starts
+      # facing forward, so use a rotation of -90 to face these shapes forward.
+      rotation:
+          x: 0
+          y: -90
+          z: 0
+      keyword_location:
+          keyword: opposite_x
+          relative_object_label: agent
+      labels: non_agent
+
+# Rotate the turntable underneath the non-agent object so it faces either the
+# target_container (50%) or the non_target_container (50%).
+turntables_with_agent_and_non_agent:
+    agent_label: agent
+    non_agent_label: non_agent
+    turntable_labels: [turntable_left, turntable_right]
+    direction_labels: [target_container, non_target_container]
+
+# Only the target can be a soccer ball.
+excluded_shapes: soccer_ball
+
+# Override the defaults to avoid randomly generating any other objects besides
+# the objects for this task.
+random_structural_objects:
+    - num: 0

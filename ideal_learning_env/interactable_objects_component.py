@@ -20,6 +20,7 @@ from generator import (
     materials,
     specific_objects
 )
+from generator.containers import shift_lid_positions_based_on_movement
 from generator.scene import Scene
 from ideal_learning_env.defs import ILEDelayException
 from ideal_learning_env.feature_creation_service import (
@@ -44,13 +45,13 @@ from .defs import (
 )
 from .interactable_object_service import (
     InteractableObjectConfig,
-    KeywordLocationConfig,
     create_user_configured_interactable_object
 )
 from .numerics import MinMaxInt, VectorFloatConfig, VectorIntConfig
 from .object_services import (
     InstanceDefinitionLocationTuple,
     KeywordLocation,
+    KeywordLocationConfig,
     MaterialRestrictions,
     ObjectRepository
 )
@@ -150,6 +151,13 @@ class SpecificInteractableObjectsComponent(ILEComponent):
     def get_delayed_action_error_strings(self) -> List[str]:
         return [str(err) for _, _, err in self._delayed_templates]
 
+    def run_actions_at_end_of_scene_generation(
+            self, scene: Dict[str, Any]) -> Dict[str, Any]:
+        if scene.debug.get('containsSeparateLids'):
+            scene.objects = shift_lid_positions_based_on_movement(
+                scene.objects)
+        return scene
+
     def _add_object_from_template(
         self,
         scene: Scene,
@@ -175,18 +183,19 @@ class SpecificInteractableObjectsComponent(ILEComponent):
         num: int
     ) -> None:
         if template.num_targets_minus is not None:
+            num_targets_minus = choose_random(template.num_targets_minus)
             try:
                 targets = scene.get_targets()
                 if not targets:
                     raise ILEDelayException(
                         f'No targets for configured "num_targets_minus: '
-                        f'{template.num_targets_minus}'
+                        f'{num_targets_minus}'
                     )
                 # Not fewer than zero.
-                num = max((len(targets) - template.num_targets_minus), 0)
+                num = max((len(targets) - num_targets_minus), 0)
             except ILEDelayException as e:
                 self._delayed_templates.append(
-                    (template, template.num_targets_minus, e)
+                    (template, num_targets_minus, e)
                 )
 
         logger.trace(
@@ -481,17 +490,18 @@ class RandomKeywordObjectsComponent(ILEComponent):
             )
             for x in range(num):
                 keyword = choose_random(
-                    getattr(template, 'keyword', self.FULL_KEYWORD_LIST))
+                    getattr(template, 'keyword') or self.FULL_KEYWORD_LIST
+                )
                 if using_default:
                     logger.info(
                         f'Using default setting to generate random '
-                        f'keyword object number {x + 1} / {num + 1}: '
+                        f'keyword object number {x + 1} / {num}: '
                         f'{keyword.lower().replace("_", " ")}'
                     )
                 else:
                     logger.debug(
                         f'Using configured setting to generate random '
-                        f'keyword object number {x + 1} / {num + 1}: '
+                        f'keyword object number {x + 1} / {num}: '
                         f'{keyword.lower().replace("_", " ")}'
                     )
                 try:
@@ -787,7 +797,8 @@ class RandomKeywordObjectsComponent(ILEComponent):
         labels.extend(template_labels)
 
         # Find the keyword location or position/rotation from the template
-        keyword_location = choose_random(getattr(template, 'keyword_location'))
+        source_keyword_location = getattr(template, 'keyword_location')
+        reconciled_keyword_location = choose_random(source_keyword_location)
         positions = getattr(template, 'position') or []
         positions = positions if isinstance(positions, list) else [positions]
         rotations = getattr(template, 'rotation') or []
@@ -804,11 +815,15 @@ class RandomKeywordObjectsComponent(ILEComponent):
         random.shuffle(positions_rotations)
 
         # Use the keyword location is one was configured.
-        if keyword_location:
+        if reconciled_keyword_location:
             idl = KeywordLocation.get_keyword_location_object_tuple(
-                keyword_location, defn, scene.performer_start, bounds,
-                scene.room_dimensions)
-
+                reconciled_keyword_location,
+                source_keyword_location,
+                defn,
+                scene.performer_start,
+                bounds,
+                scene.room_dimensions
+            )
             if labels and idl:
                 object_repo.add_to_labeled_objects(idl, labels)
             return idl.instance

@@ -16,7 +16,8 @@ from generator.containers import (
     can_contain_both,
     can_enclose,
     put_object_in_container,
-    put_objects_in_container
+    put_objects_in_container,
+    shift_lid_positions_based_on_movement
 )
 
 DEFAULT_CONTAINER = definitions.finalize_object_definition(ObjectDefinition(
@@ -205,3 +206,283 @@ def test_can_contain_both():
 
 def test_containers():
     assert len(CONTAINER_DEFINITIONS) > 0
+
+
+def test_shift_lid_positions_based_on_movement():
+    """
+    Makes 3 separate instances of containers with separate lids and placers.
+    Containers have unique rotations and move vectors global and local based.
+    """
+    objects = [{
+        "id": "container_1",
+        "type": "separate_container",
+        "debug": {
+            'lidId': "lid_1",
+            'lidPlacerId': "placer_1"
+        },
+        "shows": [{
+            "position": {
+                "x": 0,
+                "y": 0.0,
+                "z": 0
+            },
+            "rotation": {
+                "x": 0,
+                "y": 45,
+                "z": 0
+            }
+        }],
+        "moves": [{
+            "stepBegin": 1,
+            "stepEnd": 12,
+            "globalSpace": True,
+            "vector": {
+                "x": 0.135,
+                "y": 0,
+                "z": 0
+            }
+        }, {
+            "stepBegin": 16,
+            "stepEnd": 23,
+            "vector": {
+                "x": 0,
+                "y": 0,
+                "z": -0.175
+            }
+        }, {
+            "stepBegin": 21,
+            "stepEnd": 27,
+            "globalSpace": True,
+            "vector": {
+                "x": -0.125,
+                "y": 0,
+                "z": 0.15
+            }
+        }, {
+            "stepBegin": 55,
+            "stepEnd": 62,
+            "vector": {
+                "x": 0.2,
+                "y": 0,
+                "z": 0.1
+            }
+        }]
+    }, {
+        "id": "lid_1",
+        "type": "lid",
+        "shows": [{
+            "position": {
+                "x": 0,
+                "y": 4.4,
+                "z": 0
+            },
+            "rotation": {
+                "x": 0,
+                "y": 45,
+                "z": 0
+            }
+        }],
+        "lidAttachment": {
+            "stepBegin": 32,
+            "lidAttachmentObjId": "container_1"
+        },
+    },
+        {
+        "id": "placer_1",
+        "type": "cylinder",
+        "shows": [{
+            "position": {
+                "x": 0,
+                "y": 6.325,
+                "z": 0
+            },
+        }],
+    }, {
+        "id": "container_2",
+        "type": "separate_container",
+        "debug": {
+            'lidId': "lid_2",
+            'lidPlacerId': "placer_2"
+        },
+        "shows": [{
+            "position": {
+                "x": -1,
+                "y": 0.0,
+                "z": 1
+            },
+            "rotation": {
+                "x": 0,
+                "y": -33,
+                "z": 0
+            }
+        }],
+        "moves": [{
+            "stepBegin": 1,
+            "stepEnd": 10,
+            "globalSpace": True,
+            "vector": {
+                "x": 0.15,
+                "y": 0,
+                "z": 0
+            }
+        }, {
+            "stepBegin": 25,
+            "stepEnd": 26,
+            "globalSpace": True,
+            "vector": {
+                "x": 0.125,
+                "y": 0,
+                "z": 0.175
+            }
+        }, {
+            "stepBegin": 55,
+            "stepEnd": 62,
+            "vector": {
+                "x": 0.2,
+                "y": 0,
+                "z": 0.15
+            }
+        }]
+    }, {
+        "id": "lid_2",
+        "type": "lid",
+        "shows": [{
+            "position": {
+                "x": 0,
+                "y": 4.4,
+                "z": 0
+            },
+            "rotation": {
+                "x": 0,
+                "y": 45,
+                "z": 0
+            }
+        }],
+        "lidAttachment": {
+            "stepBegin": 28,
+            "lidAttachmentObjId": "container_2"
+        },
+    },
+        {
+        "id": "placer_2",
+        "type": "cylinder",
+        "shows": [{
+            "position": {
+                "x": 0,
+                "y": 6.325,
+                "z": 0
+            },
+        }],
+    }, {
+        "id": "container_3",
+        "type": "separate_container",
+        "debug": {
+            'lidId': "lid_3",
+            'lidPlacerId': "placer_3"
+        },
+        "shows": [{
+            "position": {
+                "x": 1,
+                "y": 0.0,
+                "z": -1
+            },
+            "rotation": {
+                "x": 0,
+                "y": 123,
+                "z": 0
+            }
+        }],
+        "moves": [{
+            "stepBegin": 1,
+            "stepEnd": 15,
+            "globalSpace": True,
+            "vector": {
+                "x": -0.135,
+                "y": 0,
+                "z": 0
+            }
+        }, {
+            "stepBegin": 16,
+            "stepEnd": 20,
+            "vector": {
+                "x": 0,
+                "y": 0,
+                "z": 0.175
+            }
+        }, {
+            "stepBegin": 22,
+            "stepEnd": 24,
+            "vector": {
+                "x": 0,
+                "y": 0,
+                "z": 0.175
+            }
+        }, {
+            "stepBegin": 25,
+            "stepEnd": 27,
+            "globalSpace": True,
+            "vector": {
+                "x": 0.125,
+                "y": 0,
+                "z": 0.15
+            }
+        }, {
+            "stepBegin": 50,
+            "stepEnd": 57,
+            "vector": {
+                "x": 0.15,
+                "y": 0,
+                "z": -0.19
+            }
+        }]
+    }, {
+        "id": "lid_3",
+        "type": "lid",
+        "shows": [{
+            "position": {
+                "x": 0,
+                "y": 4.4,
+                "z": 0
+            },
+            "rotation": {
+                "x": 0,
+                "y": 45,
+                "z": 0
+            }
+        }],
+        "lidAttachment": {
+            "stepBegin": 63,
+            "lidAttachmentObjId": "container_3"
+        },
+    },
+        {
+        "id": "placer_3",
+        "type": "cylinder",
+        "shows": [{
+            "position": {
+                "x": 0,
+                "y": 6.325,
+                "z": 0
+            },
+        }],
+    }]
+
+    objects = shift_lid_positions_based_on_movement(objects)
+
+    # lid_1 placer_1
+    assert round(objects[1]['shows'][0]['position']['x'], 4) == -0.2449
+    assert round(objects[1]['shows'][0]['position']['z'], 4) == 0.0601
+    assert round(objects[2]['shows'][0]['position']['x'], 4) == -0.2449
+    assert round(objects[2]['shows'][0]['position']['z'], 4) == 0.0601
+
+    # lid_2 placer_2
+    assert round(objects[4]['shows'][0]['position']['x'], 4) == 0.75
+    assert round(objects[4]['shows'][0]['position']['z'], 4) == 1.35
+    assert round(objects[5]['shows'][0]['position']['x'], 4) == 0.75
+    assert round(objects[5]['shows'][0]['position']['z'], 4) == 1.35
+
+    # lid_3 placer_3
+    assert round(objects[7]['shows'][0]['position']['x'], 4) == -1.4042
+    assert round(objects[7]['shows'][0]['position']['z'], 4) == -1.491
+    assert round(objects[8]['shows'][0]['position']['x'], 4) == -1.4042
+    assert round(objects[8]['shows'][0]['position']['z'], 4) == -1.491

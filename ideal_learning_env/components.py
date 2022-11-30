@@ -47,3 +47,8 @@ class ILEComponent(ABC):
         " of the problem.ny delayed actions and execute them if possible.
         """
         return []
+
+    def run_actions_at_end_of_scene_generation(self, scene: Scene) -> Scene:
+        """Called to execute any actions dependent on the scene being finished
+        """
+        return scene

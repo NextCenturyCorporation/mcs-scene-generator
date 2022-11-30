@@ -1015,7 +1015,7 @@ def test_GravitySupportHypercube_scenes_fall_down():
                 show_step + move_step_count + 11
             )
             assert pole['moves'][1]['stepEnd'] == (
-                pole['moves'][1]['stepBegin'] + move_step_count
+                pole['moves'][1]['stepBegin'] + move_step_count - 1
             )
             assert 'changeMaterials' in pole
             assert len(pole['changeMaterials']) == 1

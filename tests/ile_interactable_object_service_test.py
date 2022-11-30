@@ -27,7 +27,10 @@ from .ile_helper import prior_scene, prior_scene_custom_size
 def run_around_test():
     # Prepare test
     ObjectRepository.get_instance().clear()
-    ILESharedConfiguration.get_instance().set_excluded_shapes([])
+    # Exclude shapes that will automatically generate additional objects.
+    ILESharedConfiguration.get_instance().set_excluded_shapes(
+        ['lid', 'separate_container']
+    )
 
     # Run test
     yield
@@ -269,6 +272,65 @@ def test_interactable_object_service_create_instance_specific():
     assert instance['shows'][0]['scale'] == {'x': 3, 'y': 3, 'z': 3}
 
 
+def test_interactable_object_service_create_instance_with_dimensions():
+    config = InteractableObjectConfig(
+        dimensions=VectorFloatConfig(0.1, 0.33, 0.5),
+        shape='block_blank_wood_cube'
+    )
+
+    srv = InteractableObjectCreationService()
+    scene = prior_scene()
+    reconciled = srv.reconcile(scene, config)
+    instance = srv.create_feature_from_specific_values(
+        scene=scene,
+        reconciled=reconciled,
+        source_template=config
+    )
+    assert instance['type'] == 'block_blank_wood_cube'
+    assert instance['shows'][0]['scale'] == {'x': 1, 'y': 3.3, 'z': 5}
+    assert instance['debug']['dimensions'] == {'x': 0.1, 'y': 0.33, 'z': 0.5}
+
+
+def test_interactable_object_service_create_instance_with_one_dimension():
+    config = InteractableObjectConfig(
+        dimensions=VectorFloatConfig(0, 0.33, 0),
+        shape='block_blank_wood_cube'
+    )
+
+    srv = InteractableObjectCreationService()
+    scene = prior_scene()
+    reconciled = srv.reconcile(scene, config)
+    instance = srv.create_feature_from_specific_values(
+        scene=scene,
+        reconciled=reconciled,
+        source_template=config
+    )
+    assert instance['type'] == 'block_blank_wood_cube'
+    assert instance['shows'][0]['scale'] == {'x': 3.3, 'y': 3.3, 'z': 3.3}
+    assert instance['debug']['dimensions'] == {'x': 0.33, 'y': 0.33, 'z': 0.33}
+
+
+def test_interactable_object_service_create_instance_with_sideways_dimension():
+    config = InteractableObjectConfig(
+        dimensions=VectorFloatConfig(0.1, 0.33, 0.5),
+        shape='trolley_1'
+    )
+
+    srv = InteractableObjectCreationService()
+    scene = prior_scene()
+    reconciled = srv.reconcile(scene, config)
+    instance = srv.create_feature_from_specific_values(
+        scene=scene,
+        reconciled=reconciled,
+        source_template=config
+    )
+    assert instance['type'] == 'trolley_1'
+    assert instance['shows'][0]['scale'] == pytest.approx(
+        {'x': 3.125, 'y': 1.65, 'z': 0.434783}
+    )
+    assert instance['debug']['dimensions'] == {'x': 0.1, 'y': 0.33, 'z': 0.5}
+
+
 def test_interactable_object_service_create_instance_locked():
     config = InteractableObjectConfig(
         shape='chest_4',
@@ -305,6 +367,113 @@ def test_interactable_object_service_create_instance_locked_unlockable():
     srv._on_valid_instances(scene, reconciled, [instance], 'objects')
     assert instance['type'] == 'ball'
     assert instance.get('locked') is None
+
+
+def test_interactable_object_service_separate_container_no_lid():
+    config = InteractableObjectConfig(
+        shape='separate_container',
+        separate_lid=-1,
+        scale=0.4
+    )
+    srv = InteractableObjectCreationService()
+    scene = prior_scene()
+    reconciled = srv.reconcile(scene, config)
+    assert reconciled.position
+    assert reconciled.rotation
+    assert reconciled.scale
+    assert reconciled.material
+    instance = srv.create_feature_from_specific_values(
+        scene=scene, reconciled=reconciled, source_template=config)
+    srv._on_valid_instances(scene, reconciled, [instance], 'objects')
+    assert instance['type'] == 'separate_container'
+
+    assert len(scene.objects) == 1
+    container = scene.objects[0]
+    assert container['type'] == 'separate_container'
+
+
+def test_interactable_object_service_separate_container_lid_with_no_placer():
+    config = InteractableObjectConfig(
+        shape='separate_container',
+        separate_lid=0,
+        scale=0.4
+    )
+    srv = InteractableObjectCreationService()
+    scene = prior_scene()
+    reconciled = srv.reconcile(scene, config)
+    assert reconciled.position
+    assert reconciled.rotation
+    assert reconciled.scale
+    assert reconciled.material
+    instance = srv.create_feature_from_specific_values(
+        scene=scene, reconciled=reconciled, source_template=config)
+    srv._on_valid_instances(scene, reconciled, [instance], 'objects')
+    assert instance['type'] == 'separate_container'
+
+    assert len(scene.objects) == 2
+    container = scene.objects[0]
+    lid = scene.objects[1]
+    assert container['type'] == 'separate_container'
+    assert lid['type'] == 'lid'
+
+    assert lid['shows'][0]['position']['x'] == \
+        container['shows'][0]['position']['x']
+    assert lid['shows'][0]['position']['y'] == (
+        container['shows'][0]['position']['y'] +
+        container['shows'][0]['scale']['y'])
+    assert lid['shows'][0]['position']['z'] == \
+        container['shows'][0]['position']['z']
+    assert lid['shows'][0]['rotation']['y'] == \
+        container['shows'][0]['rotation']['y']
+    assert lid['shows'][0]['scale'] == container['shows'][0]['scale']
+
+
+def test_interactable_object_service_separate_container_with_lid_placer():
+    config = InteractableObjectConfig(
+        shape='separate_container',
+        separate_lid=1,
+        scale=0.4
+    )
+    srv = InteractableObjectCreationService()
+    scene = prior_scene()
+    reconciled = srv.reconcile(scene, config)
+    assert reconciled.position
+    assert reconciled.rotation
+    assert reconciled.scale
+    assert reconciled.material
+    instance = srv.create_feature_from_specific_values(
+        scene=scene, reconciled=reconciled, source_template=config)
+    srv._on_valid_instances(scene, reconciled, [instance], 'objects')
+    assert instance['type'] == 'separate_container'
+
+    assert len(scene.objects) == 3
+    container = scene.objects[0]
+    lid = scene.objects[1]
+    placer = scene.objects[2]
+    assert container['type'] == 'separate_container'
+    assert lid['type'] == 'lid'
+    assert placer['type'] == 'cylinder'
+
+    assert lid['shows'][0]['position']['x'] == \
+        container['shows'][0]['position']['x']
+    assert lid['shows'][0]['position']['y'] == (
+        container['shows'][0]['position']['y'] +
+        scene.room_dimensions.y + 0.4)
+    assert lid['shows'][0]['position']['z'] == \
+        container['shows'][0]['position']['z']
+    assert lid['shows'][0]['rotation']['y'] == \
+        container['shows'][0]['rotation']['y']
+    assert lid['shows'][0]['scale'] == container['shows'][0]['scale']
+
+    assert placer['shows'][0]['position']['x'] == \
+        container['shows'][0]['position']['x']
+    assert placer['shows'][0]['position']['y'] == (
+        # container height + lid height = 0.432
+        scene.room_dimensions.y + 0.432 +
+        placer['shows'][0]['scale']['y']
+    )
+    assert placer['shows'][0]['position']['z'] == \
+        container['shows'][0]['position']['z']
 
 
 def test_interactable_object_service_create_instance_specific_excluded():
@@ -543,7 +712,8 @@ def test_interactable_object_service_create_keyword_location_behind():
 def test_interactable_object_service_create_keyword_location_adjacent():
     rel_config = InteractableObjectConfig(
         material='AI2-THOR/Materials/Plastics/OrangePlastic',
-        position=VectorFloatConfig(3, 0, 3),
+        position=VectorFloatConfig(2, 0, 1),
+        rotation=VectorFloatConfig(0, 0, 0),
         scale=1,
         shape='ball',
         labels="rel_label"
@@ -556,8 +726,9 @@ def test_interactable_object_service_create_keyword_location_adjacent():
         KeywordLocation.ADJACENT_TO_OBJECT,
         relative_object_label="rel_label")
     config = InteractableObjectConfig(
-        material='AI2-THOR/Materials/Plastics/OrangePlastic',
         keyword_location=klc,
+        material='AI2-THOR/Materials/Plastics/OrangePlastic',
+        rotation=VectorFloatConfig(0, 0, 0),
         scale=1,
         shape='ball'
     )
@@ -569,12 +740,195 @@ def test_interactable_object_service_create_keyword_location_adjacent():
     assert instance['debug'][DEBUG_FINAL_POSITION_KEY]
     assert instance['materials'] == [
         'AI2-THOR/Materials/Plastics/OrangePlastic']
-    assert 1.5 < instance['shows'][0]['position']['x'] < 4.5
     assert instance['shows'][0]['position']['y'] == 0.5
-    assert 1.5 < instance['shows'][0]['position']['z'] < 4.5
-
+    assert (
+        instance['shows'][0]['position']['x'] == pytest.approx(3.1) and
+        instance['shows'][0]['position']['z'] == pytest.approx(1.0)
+    ) or (
+        instance['shows'][0]['position']['x'] == pytest.approx(0.9) and
+        instance['shows'][0]['position']['z'] == pytest.approx(1.0)
+    ) or (
+        instance['shows'][0]['position']['x'] == pytest.approx(2.0) and
+        instance['shows'][0]['position']['z'] == pytest.approx(2.1)
+    ) or (
+        instance['shows'][0]['position']['x'] == pytest.approx(2.0) and
+        instance['shows'][0]['position']['z'] == pytest.approx(-0.1)
+    )
+    assert instance['shows'][0]['rotation'] == {'x': 0, 'y': 0, 'z': 0}
     assert instance['shows'][0]['scale'] == {'x': 1, 'y': 1, 'z': 1}
     assert relative_instance['debug'][DEBUG_FINAL_POSITION_KEY]
+
+
+def test_interactable_object_service_create_keyword_location_adjacent_with_rotation():  # noqa: E501
+    rel_config = InteractableObjectConfig(
+        position=VectorFloatConfig(2, 0, 1),
+        rotation=VectorFloatConfig(0, 45, 0),
+        scale=1,
+        shape='ball',
+        labels="rel_label"
+    )
+    srv = InteractableObjectCreationService()
+    scene = prior_scene()
+    rel_insts, _ = srv.add_to_scene(scene, rel_config, [])
+    relative_instance = rel_insts[0]
+    klc = KeywordLocationConfig(
+        KeywordLocation.ADJACENT_TO_OBJECT,
+        relative_object_label="rel_label"
+    )
+    config = InteractableObjectConfig(
+        keyword_location=klc,
+        rotation=VectorFloatConfig(0, 45, 0),
+        scale=1,
+        shape='ball'
+    )
+    srv = InteractableObjectCreationService()
+    reconciled = srv.reconcile(scene, config)
+    instance = srv.create_feature_from_specific_values(
+        scene=scene,
+        reconciled=reconciled,
+        source_template=config
+    )
+    assert instance['type'] == 'ball'
+    assert instance['debug'][DEBUG_FINAL_POSITION_KEY]
+    assert instance['shows'][0]['position']['y'] == 0.5
+    assert (
+        instance['shows'][0]['position']['x'] == pytest.approx(3.514214) and
+        instance['shows'][0]['position']['z'] == pytest.approx(1.0)
+    ) or (
+        instance['shows'][0]['position']['x'] == pytest.approx(0.485786) and
+        instance['shows'][0]['position']['z'] == pytest.approx(1.0)
+    ) or (
+        instance['shows'][0]['position']['x'] == pytest.approx(2.0) and
+        instance['shows'][0]['position']['z'] == pytest.approx(2.514214)
+    ) or (
+        instance['shows'][0]['position']['x'] == pytest.approx(2.0) and
+        instance['shows'][0]['position']['z'] == pytest.approx(-0.514214)
+    )
+    assert instance['shows'][0]['rotation'] == {'x': 0, 'y': 45, 'z': 0}
+    assert instance['shows'][0]['scale'] == {'x': 1, 'y': 1, 'z': 1}
+    assert relative_instance['debug'][DEBUG_FINAL_POSITION_KEY]
+
+
+def test_interactable_object_service_create_keyword_location_adjacent_with_distance():  # noqa: E501
+    rel_config = InteractableObjectConfig(
+        position=VectorFloatConfig(2, 0, 1),
+        rotation=VectorFloatConfig(0, 0, 0),
+        scale=1,
+        shape='ball',
+        labels="rel_label"
+    )
+    srv = InteractableObjectCreationService()
+    scene = prior_scene()
+    rel_insts, _ = srv.add_to_scene(scene, rel_config, [])
+    relative_instance = rel_insts[0]
+    klc = KeywordLocationConfig(
+        KeywordLocation.ADJACENT_TO_OBJECT,
+        adjacent_distance=VectorFloatConfig(-3, 0, -4),
+        relative_object_label="rel_label"
+    )
+    config = InteractableObjectConfig(
+        keyword_location=klc,
+        rotation=VectorFloatConfig(0, 0, 0),
+        scale=1,
+        shape='ball'
+    )
+    srv = InteractableObjectCreationService()
+    reconciled = srv.reconcile(scene, config)
+    instance = srv.create_feature_from_specific_values(
+        scene=scene,
+        reconciled=reconciled,
+        source_template=config
+    )
+    assert instance['type'] == 'ball'
+    assert instance['debug'][DEBUG_FINAL_POSITION_KEY]
+    assert instance['shows'][0]['position']['y'] == 0.5
+    assert (
+        instance['shows'][0]['position']['x'] == pytest.approx(-2.0) and
+        instance['shows'][0]['position']['z'] == pytest.approx(-4.0)
+    )
+    assert instance['shows'][0]['rotation'] == {'x': 0, 'y': 0, 'z': 0}
+    assert instance['shows'][0]['scale'] == {'x': 1, 'y': 1, 'z': 1}
+    assert relative_instance['debug'][DEBUG_FINAL_POSITION_KEY]
+
+
+def test_interactable_object_service_create_keyword_location_adjacent_with_distance_list():  # noqa: E501
+    rel_config = InteractableObjectConfig(
+        position=VectorFloatConfig(2, 0, 1),
+        rotation=VectorFloatConfig(0, 0, 0),
+        scale=1,
+        shape='ball',
+        labels="rel_label"
+    )
+    srv = InteractableObjectCreationService()
+    scene = prior_scene()
+    rel_insts, _ = srv.add_to_scene(scene, rel_config, [])
+    relative_instance = rel_insts[0]
+    klc = KeywordLocationConfig(
+        KeywordLocation.ADJACENT_TO_OBJECT,
+        adjacent_distance=[
+            VectorFloatConfig(-3, 0, 0),
+            VectorFloatConfig(0, 0, -4)
+        ],
+        relative_object_label="rel_label"
+    )
+    config = InteractableObjectConfig(
+        keyword_location=klc,
+        rotation=VectorFloatConfig(0, 0, 0),
+        scale=1,
+        shape='ball'
+    )
+    srv = InteractableObjectCreationService()
+    reconciled = srv.reconcile(scene, config)
+    instance = srv.create_feature_from_specific_values(
+        scene=scene,
+        reconciled=reconciled,
+        source_template=config
+    )
+    assert instance['type'] == 'ball'
+    assert instance['debug'][DEBUG_FINAL_POSITION_KEY]
+    assert instance['shows'][0]['position']['y'] == 0.5
+    assert (
+        instance['shows'][0]['position']['x'] == pytest.approx(-2.0) and
+        instance['shows'][0]['position']['z'] == pytest.approx(1.0)
+    ) or (
+        instance['shows'][0]['position']['x'] == pytest.approx(2.0) and
+        instance['shows'][0]['position']['z'] == pytest.approx(-4.0)
+    )
+    assert instance['shows'][0]['rotation'] == {'x': 0, 'y': 0, 'z': 0}
+    assert instance['shows'][0]['scale'] == {'x': 1, 'y': 1, 'z': 1}
+    assert relative_instance['debug'][DEBUG_FINAL_POSITION_KEY]
+
+
+def test_interactable_object_service_create_keyword_location_adjacent_failed():
+    rel_config = InteractableObjectConfig(
+        position=VectorFloatConfig(2, 0, 1),
+        rotation=VectorFloatConfig(0, 0, 0),
+        scale=1,
+        shape='ball',
+        labels="rel_label"
+    )
+    srv = InteractableObjectCreationService()
+    scene = prior_scene()
+    srv.add_to_scene(scene, rel_config, [])
+    klc = KeywordLocationConfig(
+        KeywordLocation.ADJACENT_TO_OBJECT,
+        adjacent_distance=VectorFloatConfig(10, 0, 10),
+        relative_object_label="rel_label"
+    )
+    config = InteractableObjectConfig(
+        keyword_location=klc,
+        rotation=VectorFloatConfig(0, 0, 0),
+        scale=1,
+        shape='ball'
+    )
+    srv = InteractableObjectCreationService()
+    reconciled = srv.reconcile(scene, config)
+    with pytest.raises(ILEException):
+        srv.create_feature_from_specific_values(
+            scene=scene,
+            reconciled=reconciled,
+            source_template=config
+        )
 
 
 def test_interactable_object_service_create_keyword_location_in():
@@ -908,6 +1262,7 @@ def test_interactable_object_service_create_keyword_location_opposite_x():
     rel_config = InteractableObjectConfig(
         material='AI2-THOR/Materials/Plastics/OrangePlastic',
         position=VectorFloatConfig(4, 0, 2),
+        rotation=VectorIntConfig(0, 0, 0),
         scale=1,
         shape='ball',
         labels="rel_label"
@@ -930,8 +1285,45 @@ def test_interactable_object_service_create_keyword_location_opposite_x():
         scene=scene, reconciled=reconciled, source_template=config)
     assert instance['type'] == 'crayon_blue'
     assert instance['shows'][0]['position']['x'] == -4
-    assert instance['shows'][0]['position']['y'] == 0
+    assert instance['shows'][0]['position']['y'] == pytest.approx(0.005)
     assert instance['shows'][0]['position']['z'] == 2
+    assert instance['shows'][0]['rotation'] == {'x': 0, 'y': 0, 'z': 0}
+    assert instance['shows'][0]['scale'] == {'x': 1, 'y': 1, 'z': 1}
+
+
+def test_interactable_object_service_create_keyword_location_opposite_x_with_rotation():  # noqa: E501
+    rel_config = InteractableObjectConfig(
+        position=VectorFloatConfig(4, 0, 2),
+        rotation=VectorIntConfig(0, 0, 0),
+        scale=1,
+        shape='ball',
+        labels='rel_label'
+    )
+    srv = InteractableObjectCreationService()
+    scene = prior_scene()
+    srv.add_to_scene(scene, rel_config, [])
+    klc = KeywordLocationConfig(
+        KeywordLocation.OPPOSITE_X,
+        relative_object_label='rel_label'
+    )
+    config = InteractableObjectConfig(
+        keyword_location=klc,
+        rotation=VectorIntConfig(0, 45, 0),
+        scale=1,
+        shape='block_blank_wood_cube'
+    )
+    srv = InteractableObjectCreationService()
+    reconciled = srv.reconcile(scene, config)
+    instance = srv.create_feature_from_specific_values(
+        scene=scene,
+        reconciled=reconciled,
+        source_template=config
+    )
+    assert instance['type'] == 'block_blank_wood_cube'
+    assert instance['shows'][0]['position']['x'] == -4
+    assert instance['shows'][0]['position']['y'] == pytest.approx(0.05)
+    assert instance['shows'][0]['position']['z'] == 2
+    assert instance['shows'][0]['rotation'] == {'x': 0, 'y': 45, 'z': 0}
     assert instance['shows'][0]['scale'] == {'x': 1, 'y': 1, 'z': 1}
 
 
@@ -939,6 +1331,7 @@ def test_interactable_object_service_create_keyword_location_opposite_z():
     rel_config = InteractableObjectConfig(
         material='AI2-THOR/Materials/Plastics/OrangePlastic',
         position=VectorFloatConfig(4, 0, 2),
+        rotation=VectorIntConfig(0, 0, 0),
         scale=1,
         shape='ball',
         labels="rel_label"
@@ -961,8 +1354,9 @@ def test_interactable_object_service_create_keyword_location_opposite_z():
         scene=scene, reconciled=reconciled, source_template=config)
     assert instance['type'] == 'crayon_blue'
     assert instance['shows'][0]['position']['x'] == 4
-    assert instance['shows'][0]['position']['y'] == 0
+    assert instance['shows'][0]['position']['y'] == pytest.approx(0.005)
     assert instance['shows'][0]['position']['z'] == -2
+    assert instance['shows'][0]['rotation'] == {'x': 0, 'y': 0, 'z': 0}
     assert instance['shows'][0]['scale'] == {'x': 1, 'y': 1, 'z': 1}
 
 

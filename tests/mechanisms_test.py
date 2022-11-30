@@ -1,6 +1,7 @@
 import copy
 
 import pytest
+from machine_common_sense.config_manager import Vector3d
 
 from generator import base_objects, instances, mechanisms
 
@@ -182,7 +183,7 @@ def test_create_placer():
 
     assert len(placer['shows']) == 1
     assert placer['shows'][0]['stepBegin'] == 0
-    assert placer['shows'][0]['position'] == {'x': 1, 'y': 6, 'z': -1}
+    assert placer['shows'][0]['position'] == {'x': 1, 'y': 6.0, 'z': -1}
     assert placer['shows'][0]['rotation'] == {'x': 0, 'y': 0, 'z': 0}
     assert placer['shows'][0]['scale'] == {'x': 0.2, 'y': 2, 'z': 0.2}
     placer_bounds = placer['shows'][0]['boundingBox']
@@ -198,7 +199,7 @@ def test_create_placer():
     assert placer['moves'][0]['stepEnd'] == 21
     assert placer['moves'][0]['vector'] == {'x': 0, 'y': -0.25, 'z': 0}
     assert placer['moves'][1]['stepBegin'] == 32
-    assert placer['moves'][1]['stepEnd'] == 43
+    assert placer['moves'][1]['stepEnd'] == 42
     assert placer['moves'][1]['vector'] == {'x': 0, 'y': 0.25, 'z': 0}
 
     assert placer['states'] == ([['active']] * 26) + [['inactive']]
@@ -230,7 +231,7 @@ def test_create_placer_with_deactivation_step():
 
     assert len(placer['shows']) == 1
     assert placer['shows'][0]['stepBegin'] == 0
-    assert placer['shows'][0]['position'] == {'x': 1, 'y': 6, 'z': -1}
+    assert placer['shows'][0]['position'] == {'x': 1, 'y': 6.0, 'z': -1}
     assert placer['shows'][0]['rotation'] == {'x': 0, 'y': 0, 'z': 0}
     assert placer['shows'][0]['scale'] == {'x': 0.2, 'y': 2, 'z': 0.2}
     placer_bounds = placer['shows'][0]['boundingBox']
@@ -246,7 +247,7 @@ def test_create_placer_with_deactivation_step():
     assert placer['moves'][0]['stepEnd'] == 21
     assert placer['moves'][0]['vector'] == {'x': 0, 'y': -0.25, 'z': 0}
     assert placer['moves'][1]['stepBegin'] == 105
-    assert placer['moves'][1]['stepEnd'] == 116
+    assert placer['moves'][1]['stepEnd'] == 115
     assert placer['moves'][1]['vector'] == {'x': 0, 'y': 0.25, 'z': 0}
 
     assert placer['states'] == ([['active']] * 99) + [['inactive']]
@@ -277,7 +278,7 @@ def test_create_placer_with_position_y_offset():
 
     assert len(placer['shows']) == 1
     assert placer['shows'][0]['stepBegin'] == 0
-    assert placer['shows'][0]['position'] == {'x': 1, 'y': 6, 'z': -1}
+    assert placer['shows'][0]['position'] == {'x': 1, 'y': 6.0, 'z': -1}
     assert placer['shows'][0]['rotation'] == {'x': 0, 'y': 0, 'z': 0}
     assert placer['shows'][0]['scale'] == {'x': 0.2, 'y': 2, 'z': 0.2}
     placer_bounds = placer['shows'][0]['boundingBox']
@@ -293,7 +294,7 @@ def test_create_placer_with_position_y_offset():
     assert placer['moves'][0]['stepEnd'] == 21
     assert placer['moves'][0]['vector'] == {'x': 0, 'y': -0.25, 'z': 0}
     assert placer['moves'][1]['stepBegin'] == 32
-    assert placer['moves'][1]['stepEnd'] == 43
+    assert placer['moves'][1]['stepEnd'] == 42
     assert placer['moves'][1]['vector'] == {'x': 0, 'y': 0.25, 'z': 0}
 
     assert placer['states'] == ([['active']] * 26) + [['inactive']]
@@ -341,7 +342,7 @@ def test_create_placer_with_placer_offset():
     assert placer['moves'][0]['stepEnd'] == 21
     assert placer['moves'][0]['vector'] == {'x': 0, 'y': -0.25, 'z': 0}
     assert placer['moves'][1]['stepBegin'] == 32
-    assert placer['moves'][1]['stepEnd'] == 43
+    assert placer['moves'][1]['stepEnd'] == 42
     assert placer['moves'][1]['vector'] == {'x': 0, 'y': 0.25, 'z': 0}
 
     assert placer['states'] == ([['active']] * 26) + [['inactive']]
@@ -373,7 +374,7 @@ def test_create_placer_with_last_step():
 
     assert len(placer['shows']) == 1
     assert placer['shows'][0]['stepBegin'] == 0
-    assert placer['shows'][0]['position'] == {'x': 1, 'y': 6, 'z': -1}
+    assert placer['shows'][0]['position'] == {'x': 1, 'y': 6.0, 'z': -1}
     assert placer['shows'][0]['rotation'] == {'x': 0, 'y': 0, 'z': 0}
     assert placer['shows'][0]['scale'] == {'x': 0.2, 'y': 2, 'z': 0.2}
     placer_bounds = placer['shows'][0]['boundingBox']
@@ -389,7 +390,7 @@ def test_create_placer_with_last_step():
     assert placer['moves'][0]['stepEnd'] == 21
     assert placer['moves'][0]['vector'] == {'x': 0, 'y': -0.25, 'z': 0}
     assert placer['moves'][1]['stepBegin'] == 32
-    assert placer['moves'][1]['stepEnd'] == 43
+    assert placer['moves'][1]['stepEnd'] == 42
     assert placer['moves'][1]['vector'] == {'x': 0, 'y': 0.25, 'z': 0}
 
     assert placer['states'] == ([['active']] * 26) + ([['inactive']] * 73)
@@ -994,6 +995,87 @@ def test_place_object_with_start_height_position_y_offset():
     assert mock_instance['moves'][0]['stepBegin'] == 10
     assert mock_instance['moves'][0]['stepEnd'] == 20
     assert mock_instance['moves'][0]['vector'] == {'x': 0, 'y': -0.25, 'z': 0}
+
+
+def test_pickup_object():
+    mock_instance = {
+        'shows': [{
+            'position': {'x': 1, 'y': 1, 'z': -1},
+            'rotation': {'x': 0, 'y': 0, 'z': 0},
+            'scale': {'x': 0.5, 'y': 0.5, 'z': 0.5}
+        }],
+        'debug': {
+            'dimensions': {'x': 2, 'y': 2, 'z': 2},
+            'positionY': 0
+        }
+    }
+    mechanisms.pickup_object(
+        mock_instance,
+        10,
+        start_height=1,
+        end_height=5,
+        deactivation_step=50)
+    assert mock_instance['kinematic'] is False
+    assert mock_instance['togglePhysics'] == [{'stepBegin': 10}]
+
+    assert len(mock_instance['shows']) == 1
+    assert mock_instance['shows'][0]['position'] == {'x': 1, 'y': 1, 'z': -1}
+    assert mock_instance['shows'][0]['rotation'] == {'x': 0, 'y': 0, 'z': 0}
+    assert mock_instance['shows'][0]['scale'] == {'x': 0.5, 'y': 0.5, 'z': 0.5}
+
+    bounds = mock_instance['shows'][0]['boundingBox']
+    assert bounds.max_y == pytest.approx(3)
+    assert bounds.min_y == pytest.approx(1)
+
+    assert len(mock_instance['moves']) == 1
+    assert mock_instance['moves'][0]['stepBegin'] == 55
+    assert mock_instance['moves'][0]['stepEnd'] == 68
+    assert mock_instance['moves'][0]['vector'] == {'x': 0, 'y': 0.25, 'z': 0}
+
+
+def test_move_object():
+    mock_instance = {
+        'shows': [{
+            'position': {'x': 3, 'y': 0, 'z': 3},
+            'rotation': {'x': 0, 'y': 0, 'z': 0},
+            'scale': {'x': 1, 'y': 1, 'z': 1}
+        }],
+        'debug': {
+            'dimensions': {'x': 1, 'y': 1, 'z': 1},
+            'positionY': 0
+        }
+    }
+    move_object_end_position = Vector3d(x=-3.0, y=0.0, z=3.0)
+    move_object_y = 0
+    mechanisms.move_object(
+        instance=mock_instance,
+        move_object_end_position=move_object_end_position,
+        activation_step=10,
+        start_height=0,
+        end_height=5,
+        deactivation_step=50,
+        move_object_y=move_object_y)
+    assert mock_instance['kinematic'] is True
+
+    assert len(mock_instance['shows']) == 1
+    assert mock_instance['shows'][0]['position'] == {'x': 3, 'y': 0, 'z': 3}
+    assert mock_instance['shows'][0]['rotation'] == {'x': 0, 'y': 0, 'z': 0}
+    assert mock_instance['shows'][0]['scale'] == {'x': 1, 'y': 1, 'z': 1}
+
+    bounds = mock_instance['shows'][0]['boundingBox']
+    assert bounds.max_y == pytest.approx(1)
+    assert bounds.min_y == 0
+
+    assert len(mock_instance['moves']) == 3
+    assert mock_instance['moves'][0]['stepBegin'] == 32
+    assert mock_instance['moves'][0]['stepEnd'] == 37
+    assert mock_instance['moves'][0]['vector'] == {'x': 0, 'y': 0, 'z': -0.25}
+    assert mock_instance['moves'][1]['stepBegin'] == 38
+    assert mock_instance['moves'][1]['stepEnd'] == 61
+    assert mock_instance['moves'][1]['vector'] == {'x': -0.25, 'y': 0, 'z': 0}
+    assert mock_instance['moves'][2]['stepBegin'] == 62
+    assert mock_instance['moves'][2]['stepEnd'] == 67
+    assert mock_instance['moves'][2]['vector'] == {'x': 0, 'y': 0, 'z': .25}
 
 
 def test_throw_object():

@@ -106,6 +106,30 @@ specific_interactable_objects:
                 z: -0.1
           relative_object_label: non_target_1
 
+structural_moving_occluders:
+    - num: 1
+      occluder_height: 1.5
+      occluder_thickness: 0.1
+      occluder_width: 2
+      origin: 'left'
+      position_x: -1.55
+      position_z: 0
+      move_up_before_last_step: false
+      reverse_direction: false
+      rotation_y: 0
+      labels: left_occluder
+    - num: 1
+      occluder_height: 1.5
+      occluder_thickness: 0.1
+      occluder_width: 2
+      origin: 'right'
+      position_x: 1.55
+      position_z: 0
+      move_up_before_last_step: false
+      reverse_direction: false
+      rotation_y: 0
+      labels: right_occluder
+
 # Override the defaults to avoid randomly generating any other objects besides
 # the platform, the targets, and the non-targets. Remove these lines if you
 # want additional randomly generated objects.

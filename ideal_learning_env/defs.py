@@ -162,7 +162,8 @@ def choose_random(data: Any, data_type: Type = None) -> Any:
 
 def find_bounds(
     scene: Scene,
-    ignore_ground: bool = False
+    ignore_ground: bool = False,
+    ignore_ids: List[str] = None
 ) -> List[ObjectBounds]:
     """Calculate and return the bounds for all the given objects."""
     # Create a bounding box for each hole and lava area and add it to the list.
@@ -177,6 +178,8 @@ def find_bounds(
 
     # Add each object's bounding box to the list.
     for instance in scene.objects:
+        if instance.get('id') in (ignore_ids or []):
+            continue
         try:
             bounds.append(instance['shows'][0]['boundingBox'])
         except(KeyError):

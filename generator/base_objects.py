@@ -106,7 +106,8 @@ class ObjectBaseSize():
     open_area_list: List[ObjectInteractableArea] = None
     sideways: ObjectSidewaysSize = None
     placer_offset_x: List[float] = None
-    placer_offset_y: float = 0
+    placer_offset_y: List[float] = None
+    placer_offset_z: List[float] = None
 
     def make(self, size_multiplier: Union[float, Vector3d]) -> SizeChoice:
         is_vector = isinstance(size_multiplier, Vector3d)
@@ -157,6 +158,10 @@ class ObjectBaseSize():
             (offset_y * y_multiplier) for offset_y in
             (self.placer_offset_y or [0])
         ]
+        placer_offset_z = [
+            (offset_z * z_multiplier) for offset_z in
+            (self.placer_offset_z or [0])
+        ]
         positionY = (self.positionY * y_multiplier)
         scale = Vector3d(x=x_multiplier, y=y_multiplier, z=z_multiplier)
         sideways = {
@@ -186,6 +191,7 @@ class ObjectBaseSize():
             openAreas=openAreas,
             placerOffsetX=placer_offset_x,
             placerOffsetY=placer_offset_y,
+            placerOffsetZ=placer_offset_z,
             positionY=positionY,
             scale=scale,
             sideways=sideways,
@@ -1444,6 +1450,13 @@ _FOAM_FLOOR_TILES_SIZE = ObjectBaseSize(
     offset=Vector3d(x=0, y=0.01, z=0),
     positionY=0.01
 )
+_LID_SQUARE_SIZE = ObjectBaseSize(
+    dimensions=Vector3d(x=1, y=0.08, z=1),
+    mass=0.25,
+    offset=Vector3d(x=0, y=0, z=0),
+    positionY=0,
+    placer_offset_y=[0.04],
+)
 _MILITARY_CASE_1_SIZE = ObjectBaseSize(
     dimensions=Vector3d(x=0.66, y=0.82, z=0.62),
     mass=5,
@@ -1529,6 +1542,20 @@ _PRIMITIVE_WIDE_TALL_SIZE = ObjectBaseSize(
     mass=1,
     offset=Vector3d(x=0, y=1, z=0),
     positionY=1
+)
+_SEPARATE_CONTAINER_SIZE = ObjectBaseSize(
+    dimensions=Vector3d(x=1, y=1, z=1),
+    mass=1,
+    offset=Vector3d(x=0, y=0, z=0),
+    # Ideal for shell game
+    placer_offset_z=[-0.4],
+    positionY=0,
+    enclosed_area_list=[
+        ObjectInteractableArea(
+            dimensions=Vector3d(x=0.9, y=0.96, z=0.9),
+            position=Vector3d(x=0, y=0.04, z=0)
+        )
+    ]
 )
 _SKATEBOARD_SIZE = ObjectBaseSize(
     dimensions=Vector3d(x=0.24, y=0.17, z=0.76),
@@ -2746,9 +2773,12 @@ def _create_bookcase_4_shelf_sideless(args: _FunctionArgs) -> ObjectDefinition:
 
 
 def _create_bowl_3(args: _FunctionArgs) -> ObjectDefinition:
+    attributes = ['receptacle']
+    if not args.type.endswith('static'):
+        attributes.extend(['moveable', 'pickupable'])
     return ObjectDefinition(
-        type='bowl_3',
-        attributes=['moveable', 'pickupable', 'receptacle'],
+        type=args.type,
+        attributes=attributes,
         shape=['bowl'],
         stackTarget=True,
         chooseMaterialList=[item.copy() for item in args.chosen_material_list],
@@ -2759,9 +2789,12 @@ def _create_bowl_3(args: _FunctionArgs) -> ObjectDefinition:
 
 
 def _create_bowl_4(args: _FunctionArgs) -> ObjectDefinition:
+    attributes = ['receptacle']
+    if not args.type.endswith('static'):
+        attributes.extend(['moveable', 'pickupable'])
     return ObjectDefinition(
-        type='bowl_4',
-        attributes=['moveable', 'pickupable', 'receptacle'],
+        type=args.type,
+        attributes=attributes,
         shape=['bowl'],
         stackTarget=True,
         chooseMaterialList=[item.copy() for item in args.chosen_material_list],
@@ -2772,9 +2805,12 @@ def _create_bowl_4(args: _FunctionArgs) -> ObjectDefinition:
 
 
 def _create_bowl_6(args: _FunctionArgs) -> ObjectDefinition:
+    attributes = ['receptacle']
+    if not args.type.endswith('static'):
+        attributes.extend(['moveable', 'pickupable'])
     return ObjectDefinition(
-        type='bowl_6',
-        attributes=['moveable', 'pickupable', 'receptacle'],
+        type=args.type,
+        attributes=attributes,
         shape=['bowl'],
         stackTarget=True,
         chooseMaterialList=[item.copy() for item in args.chosen_material_list],
@@ -3615,9 +3651,12 @@ def _create_crib(args: _FunctionArgs) -> ObjectDefinition:
 
 
 def _create_cup_2(args: _FunctionArgs) -> ObjectDefinition:
+    attributes = ['receptacle']
+    if not args.type.endswith('static'):
+        attributes.extend(['moveable', 'pickupable'])
     return ObjectDefinition(
-        type='cup_2',
-        attributes=['moveable', 'pickupable', 'receptacle'],
+        type=args.type,
+        attributes=attributes,
         shape=['cup'],
         stackTarget=True,
         chooseMaterialList=[item.copy() for item in args.chosen_material_list],
@@ -3628,9 +3667,12 @@ def _create_cup_2(args: _FunctionArgs) -> ObjectDefinition:
 
 
 def _create_cup_3(args: _FunctionArgs) -> ObjectDefinition:
+    attributes = ['receptacle']
+    if not args.type.endswith('static'):
+        attributes.extend(['moveable', 'pickupable'])
     return ObjectDefinition(
-        type='cup_3',
-        attributes=['moveable', 'pickupable', 'receptacle'],
+        type=args.type,
+        attributes=attributes,
         shape=['cup'],
         stackTarget=True,
         chooseMaterialList=[item.copy() for item in args.chosen_material_list],
@@ -3641,9 +3683,12 @@ def _create_cup_3(args: _FunctionArgs) -> ObjectDefinition:
 
 
 def _create_cup_6(args: _FunctionArgs) -> ObjectDefinition:
+    attributes = ['receptacle']
+    if not args.type.endswith('static'):
+        attributes.extend(['moveable', 'pickupable'])
     return ObjectDefinition(
-        type='cup_6',
-        attributes=['moveable', 'pickupable', 'receptacle'],
+        type=args.type,
+        attributes=attributes,
         shape=['cup'],
         stackTarget=True,
         chooseMaterialList=[item.copy() for item in args.chosen_material_list],
@@ -3843,6 +3888,19 @@ def _create_letter_l_wide_tall(args: _FunctionArgs) -> ObjectDefinition:
     return definition
 
 
+def _create_lid_square(args: _FunctionArgs) -> ObjectDefinition:
+    return ObjectDefinition(
+        type='lid',
+        attributes=['openable'],
+        shape=['lid'],
+        chooseMaterialList=[item.copy() for item in args.chosen_material_list],
+        chooseSizeList=[
+            _LID_SQUARE_SIZE.make(size) for size in
+            args.size_multiplier_list
+        ]
+    )
+
+
 def _create_military_case_1(args: _FunctionArgs) -> ObjectDefinition:
     return ObjectDefinition(
         type='military_case_1',
@@ -4016,6 +4074,19 @@ def _create_shelf_2(args: _FunctionArgs) -> ObjectDefinition:
         chooseMaterialList=[item.copy() for item in args.chosen_material_list],
         chooseSizeList=[
             _SHELF_2_TABLE_SIZE.make(size) for size in
+            args.size_multiplier_list
+        ]
+    )
+
+
+def _create_separate_container(args: _FunctionArgs) -> ObjectDefinition:
+    return ObjectDefinition(
+        type='separate_container',
+        attributes=['receptacle', 'openable'],
+        shape=['container'],
+        chooseMaterialList=[item.copy() for item in args.chosen_material_list],
+        chooseSizeList=[
+            _SEPARATE_CONTAINER_SIZE.make(size) for size in
             args.size_multiplier_list
         ]
     )
@@ -4633,6 +4704,9 @@ def _create_table_27(args: _FunctionArgs) -> ObjectDefinition:
 
 # Maps each tool type to its base X/Z dimensions.
 LARGE_BLOCK_TOOLS_TO_DIMENSIONS = {
+    'tool_rect_0_50_x_1_00': (0.5, 1),
+    'tool_rect_0_75_x_1_00': (0.75, 1),
+    'tool_rect_1_00_x_1_00': (1, 1),
     'tool_rect_0_50_x_4_00': (0.5, 4),
     'tool_rect_0_50_x_5_00': (0.5, 5),
     'tool_rect_0_50_x_6_00': (0.5, 6),
@@ -4651,6 +4725,24 @@ LARGE_BLOCK_TOOLS_TO_DIMENSIONS = {
     'tool_rect_1_00_x_7_00': (1, 7),
     'tool_rect_1_00_x_8_00': (1, 8),
     'tool_rect_1_00_x_9_00': (1, 9),
+    'tool_hooked_0_50_x_4_00': (1.5, 4),
+    'tool_hooked_0_50_x_5_00': (1.5, 5),
+    'tool_hooked_0_50_x_6_00': (1.5, 6),
+    'tool_hooked_0_50_x_7_00': (1.5, 7),
+    'tool_hooked_0_50_x_8_00': (1.5, 8),
+    'tool_hooked_0_50_x_9_00': (1.5, 9),
+    'tool_hooked_0_75_x_4_00': (2.25, 4),
+    'tool_hooked_0_75_x_5_00': (2.25, 5),
+    'tool_hooked_0_75_x_6_00': (2.25, 6),
+    'tool_hooked_0_75_x_7_00': (2.25, 7),
+    'tool_hooked_0_75_x_8_00': (2.25, 8),
+    'tool_hooked_0_75_x_9_00': (2.25, 9),
+    'tool_hooked_1_00_x_4_00': (3, 4),
+    'tool_hooked_1_00_x_5_00': (3, 5),
+    'tool_hooked_1_00_x_6_00': (3, 6),
+    'tool_hooked_1_00_x_7_00': (3, 7),
+    'tool_hooked_1_00_x_8_00': (3, 8),
+    'tool_hooked_1_00_x_9_00': (3, 9),
 }
 
 
@@ -5165,10 +5257,19 @@ _TYPES_TO_DETAILS: Dict[str, TypeDetailsTuple] = {
     ), 'bowl_3': TypeDetailsTuple(
         _create_bowl_3,
         METAL_MATERIALS + WOOD_MATERIALS + PLASTIC_MATERIALS
+    ), 'bowl_3_static': TypeDetailsTuple(
+        _create_bowl_3,
+        METAL_MATERIALS + WOOD_MATERIALS + PLASTIC_MATERIALS
     ), 'bowl_4': TypeDetailsTuple(
         _create_bowl_4,
         METAL_MATERIALS + WOOD_MATERIALS + PLASTIC_MATERIALS
+    ), 'bowl_4_static': TypeDetailsTuple(
+        _create_bowl_4,
+        METAL_MATERIALS + WOOD_MATERIALS + PLASTIC_MATERIALS
     ), 'bowl_6': TypeDetailsTuple(
+        _create_bowl_6,
+        METAL_MATERIALS + WOOD_MATERIALS + PLASTIC_MATERIALS
+    ), 'bowl_6_static': TypeDetailsTuple(
         _create_bowl_6,
         METAL_MATERIALS + WOOD_MATERIALS + PLASTIC_MATERIALS
     ), 'bus_1': TypeDetailsTuple(
@@ -5378,10 +5479,19 @@ _TYPES_TO_DETAILS: Dict[str, TypeDetailsTuple] = {
     ), 'cup_2': TypeDetailsTuple(
         _create_cup_2,
         METAL_MATERIALS + WOOD_MATERIALS + PLASTIC_MATERIALS
+    ), 'cup_2_static': TypeDetailsTuple(
+        _create_cup_2,
+        METAL_MATERIALS + WOOD_MATERIALS + PLASTIC_MATERIALS
     ), 'cup_3': TypeDetailsTuple(
         _create_cup_3,
         METAL_MATERIALS + WOOD_MATERIALS + PLASTIC_MATERIALS
+    ), 'cup_3_static': TypeDetailsTuple(
+        _create_cup_3,
+        METAL_MATERIALS + WOOD_MATERIALS + PLASTIC_MATERIALS
     ), 'cup_6': TypeDetailsTuple(
+        _create_cup_6,
+        METAL_MATERIALS + WOOD_MATERIALS + PLASTIC_MATERIALS
+    ), 'cup_6_static': TypeDetailsTuple(
         _create_cup_6,
         METAL_MATERIALS + WOOD_MATERIALS + PLASTIC_MATERIALS
     ), 'desk_1': TypeDetailsTuple(
@@ -5414,6 +5524,10 @@ _TYPES_TO_DETAILS: Dict[str, TypeDetailsTuple] = {
     ), 'jeep': TypeDetailsTuple(
         _create_toy_jeep,
         BLOCK_BLANK_MATERIALS + WOOD_MATERIALS
+    ), 'lid': TypeDetailsTuple(
+        _create_lid_square,
+        BLOCK_BLANK_MATERIALS + METAL_MATERIALS + PLASTIC_MATERIALS +
+        WOOD_MATERIALS
     ), 'military_case_1': TypeDetailsTuple(
         _create_military_case_1,
         METAL_MATERIALS + PLASTIC_MATERIALS
@@ -5438,6 +5552,10 @@ _TYPES_TO_DETAILS: Dict[str, TypeDetailsTuple] = {
     ), 'roller': TypeDetailsTuple(
         _create_toy_roller,
         BLOCK_BLANK_MATERIALS + WOOD_MATERIALS
+    ), 'separate_container': TypeDetailsTuple(
+        _create_separate_container,
+        BLOCK_BLANK_MATERIALS + METAL_MATERIALS + PLASTIC_MATERIALS +
+        WOOD_MATERIALS
     ), 'shelf_1': TypeDetailsTuple(
         _create_shelf_1,
         METAL_MATERIALS + PLASTIC_MATERIALS + WOOD_MATERIALS

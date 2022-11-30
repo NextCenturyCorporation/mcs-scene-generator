@@ -67,7 +67,7 @@ def generate_ile_scene(
         scene = component.update_ile_scene(scene)
 
     scene = _handle_delayed_actions(component_list, scene)
-
+    scene = _handle_actions_at_end_of_scene_generation(component_list, scene)
     return scene
 
 
@@ -103,6 +103,12 @@ def _handle_delayed_actions(component_list, scene):
             if component.get_num_delayed_actions() > 0:
                 scene = component.run_delayed_actions(scene)
         previous_sum = new_sum
+    return scene
+
+
+def _handle_actions_at_end_of_scene_generation(component_list, scene):
+    for component in component_list:
+        scene = component.run_actions_at_end_of_scene_generation(scene)
     return scene
 
 

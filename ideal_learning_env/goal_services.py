@@ -1,11 +1,12 @@
 import logging
+import random
 from dataclasses import dataclass
 from typing import Any, Dict, List, Tuple, Union
 
 from generator import ObjectBounds, Scene, tags
 
 from .choosers import choose_random
-from .defs import ILEConfigurationException, find_bounds
+from .defs import ILEConfigurationException, find_bounds, return_list
 from .interactable_object_service import (
     InteractableObjectConfig,
     create_user_configured_interactable_object
@@ -73,9 +74,8 @@ class GoalServices:
         """Validates all the categories in the given goal config template and
         returns the list of all possible categories (for reconciliation).
         Throws an exception if any categories are invalid."""
-        categories = [goal_category.lower() for goal_category in (
-            goal_template.category if isinstance(goal_template.category, list)
-            else ([goal_template.category] if goal_template.category else [])
+        categories = [goal_category.lower() for goal_category in return_list(
+            goal_template.category
         )]
         if not categories:
             if goal_template.target:
@@ -101,12 +101,14 @@ class GoalServices:
                         f'must also have configured "targets" property'
                     )
             elif goal_category not in [
-                tags.SCENE.INTUITIVE_PHYSICS, tags.SCENE.PASSIVE
+                tags.SCENE.INTUITIVE_PHYSICS, tags.SCENE.PASSIVE,
+                tags.SCENE.IMITATION
             ]:
                 raise ILEConfigurationException(
                     f'Interactive goal category must be one of the following: '
                     f'{tags.SCENE.RETRIEVAL}, {tags.SCENE.MULTI_RETRIEVAL}, '
-                    f'{tags.SCENE.PASSIVE}, {tags.SCENE.INTUITIVE_PHYSICS}'
+                    f'{tags.SCENE.PASSIVE}, {tags.SCENE.INTUITIVE_PHYSICS}, '
+                    f'{tags.SCENE.IMITATION}'
                 )
         return categories if len(categories) > 1 else categories[0]
 
@@ -129,22 +131,24 @@ class GoalServices:
 
         # Ensure retrieval goals have configured target(s).
         if goal_category == tags.SCENE.RETRIEVAL:
-            # If the config is a list, choose one random target, and resolve
-            # all random properties within that one target config.
+            # If the config is a list, choose just one random target, but do
+            # NOT resolve the random properties within that target config.
+            target_template = random.choice(return_list(goal_template.target))
+            config_list.append(target_template)
+            goal_metadata['target'] = {}
+        if goal_category == tags.SCENE.MULTI_RETRIEVAL:
+            # Do NOT choose only one random target (use all of them!) and do
+            # NOT resolve the random properties within the target configs.
+            for target_template in goal_template.targets:
+                num = choose_random(target_template.num or 1)
+                # Repeat the target config for the configured amount.
+                for _ in range(num):
+                    config_list.append(target_template)
+            goal_metadata['targets'] = []
+        if goal_category == tags.SCENE.IMITATION:
             target_reconciled = choose_random(goal_template.target)
             config_list.append(target_reconciled)
             goal_metadata['target'] = {}
-        if goal_category == tags.SCENE.MULTI_RETRIEVAL:
-            # Do NOT choose one random target (use all of them!) but resolve
-            # all random properties within EACH target config in the list.
-            for target_template in goal_template.targets:
-                target_reconciled = choose_random(target_template)
-                if target_reconciled.num is None:
-                    target_reconciled.num = 1
-                # Repeat the reconciled target for the configured amount.
-                for _ in range(target_reconciled.num):
-                    config_list.append(target_reconciled)
-            goal_metadata['targets'] = []
 
         # Create the target(s) and add ID(s) to the goal's metadata.
         for config in config_list:
@@ -156,7 +160,8 @@ class GoalServices:
             )
 
             # Update the goal's metadata.
-            if goal_category == tags.SCENE.RETRIEVAL:
+            if goal_category == tags.SCENE.RETRIEVAL or \
+                    goal_category == tags.SCENE.IMITATION:
                 goal_metadata['target'] = {
                     'id': instance['id']
                 }
@@ -183,7 +188,12 @@ class GoalServices:
                 f'Find and pick up as many objects as possible of type: '
                 f'{goal_string}.'
             )
-
+        if goal_category == tags.SCENE.IMITATION:
+            goal_string = target_list[0]["debug"]["goalString"]
+            goal_description = (
+                f'Open the containers in the correct order for '
+                f'the {goal_string} to be placed.'
+            )
         return {
             'category': goal_category,
             'description': goal_description,
@@ -195,9 +205,10 @@ class GoalServices:
         scene: Scene,
         goal_template: GoalConfig,
         bounds_list: List[ObjectBounds] = None
-    ) -> None:
-        """Attempt to add a goal to the scene.  The goal_template must NOT have
-        all randomness resolved before calling this function"""
+    ) -> List[Dict[str, Any]]:
+        """Attempt to add the given goal to the scene. The goal_template must
+        NOT have randomness resolved (a.k.a. be reconciled) before calling this
+        function. Returns the list of target objects."""
         # if the user passes an empty list, use that.
         bounds_list = (bounds_list if bounds_list is not None else find_bounds(
             scene))
@@ -211,3 +222,4 @@ class GoalServices:
                 f'Setting {scene.goal["category"]} goal with '
                 f'{len(target_list)} target(s): {scene.goal}'
             )
+        return target_list

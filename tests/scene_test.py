@@ -107,10 +107,10 @@ def test_set_performer_start_position():
 def test_set_performer_start_rotation():
     scene = Scene()
     assert scene.performer_start.rotation == Vector3d()
-    scene.set_performer_start_rotation(90)
+    scene.set_performer_start_rotation(0, 90)
     assert scene.performer_start.rotation == Vector3d(x=0, y=90, z=0)
-    scene.set_performer_start_rotation(258)
-    assert scene.performer_start.rotation == Vector3d(x=0, y=258, z=0)
+    scene.set_performer_start_rotation(23, 258)
+    assert scene.performer_start.rotation == Vector3d(x=23, y=258, z=0)
 
 
 def test_to_dict():
@@ -143,7 +143,7 @@ def test_to_dict():
             "y": 3,
             "z": 10}}
 
-    scene.set_performer_start_rotation(258)
+    scene.set_performer_start_rotation(23, 258)
     scene.set_performer_start_position(1, 2, 3)
     scene.set_room_dimensions(4, 5, 6)
     scene.name = "test"
@@ -182,7 +182,7 @@ def test_to_dict():
                 "y": 2,
                 "z": 3},
             "rotation": {
-                "x": 0,
+                "x": 23,
                 "y": 258,
                 "z": 0}},
         "roomDimensions": {

@@ -1,4 +1,5 @@
 import copy
+import math
 import uuid
 from dataclasses import dataclass
 from typing import Any, Dict, List, Tuple
@@ -51,6 +52,9 @@ AGENT_TEMPLATE = {
         }
     }]
 }
+
+# Should equal MOVE_MAGNITUDE in MCSSimulationAgent.cs
+MOVE_DISTANCE = 0.04
 
 
 @dataclass
@@ -105,6 +109,8 @@ BLOB_TEMPLATE = {
         }
     }]
 }
+
+POINT_START_FRAME_COUNT = 7
 
 
 def create_agent(
@@ -194,23 +200,58 @@ def create_blob(
     return blob
 
 
+def _check_steps(
+    actions: list,
+    step_begin: int,
+    step_end: int,
+    is_loop: bool
+) -> None:
+    if step_begin is None or step_begin < 0 or not isinstance(step_begin, int):
+        raise SceneException(
+            f"The step_begin must be an integer greater than or equal to 0, "
+            f"but was: {step_begin}"
+        )
+
+    for action in actions:
+        if 'stepEnd' not in action:
+            if action['stepBegin'] == step_begin:
+                raise SceneException(
+                    f"Cannot add a new agent action when an action that does "
+                    f"not end already exists with the same step_begin: "
+                    f"{step_begin}"
+                )
+            continue
+        if action['stepBegin'] <= step_begin < action['stepEnd']:
+            raise SceneException(
+                f"Cannot add a new agent action when an action already "
+                f"exists during that step: {action['stepBegin']} <= "
+                f"{step_begin=} < {action['stepEnd']}"
+            )
+        if step_end and (action['stepBegin'] <= step_end < action['stepEnd']):
+            raise SceneException(
+                f"Cannot add a new agent action when an action already "
+                f"exists during that step: {action['stepBegin']} <= "
+                f"{step_end=} < {action['stepEnd']}"
+            )
+        if is_loop and (
+            step_begin < action['stepBegin'] or step_begin < action['stepEnd']
+        ):
+            raise SceneException(
+                f"Cannot add a new agent action that does not end when an "
+                f"action already exists after that step: {step_begin=} < "
+                f"({action['stepBegin']} ==> {action['stepEnd']})"
+            )
+
+
 def add_agent_action(agent: dict, action_id, step_begin,
                      step_end=None, is_loop=False):
     actions = agent.get('actions', [])
-    if step_begin is None or step_begin < 0 or not isinstance(step_begin, int):
-        raise SceneException(
-            f"step_begin must be an integer greater or equal to 0.  "
-            f"step_begin={step_begin}")
+    _check_steps(actions, step_begin, step_end, is_loop)
 
     if action_id is None or not isinstance(action_id, str):
         raise SceneException(
-            f"action_id must be an string. action_id={action_id}")
-
-    for action in actions:
-        if action['stepBegin'] == step_begin:
-            raise SceneException(
-                f"Cannot add agent action when an action already exists with "
-                f"the same 'stepBegin'.  StepBegin={step_begin}")
+            f"The action_id must be a string, but was: {action_id}"
+        )
 
     new_action = {
         'id': action_id,
@@ -240,13 +281,32 @@ def add_agent_movement(
     }
 
 
-def get_default_idle_animation(agent: Dict[str, Any]) -> str:
-    """Returns the default idle animation for the given agent instance."""
-    if agent['type'].startswith('agent_female'):
-        return 'TPF_idle1'
-    if agent['type'].startswith('agent_male'):
-        return 'TPM_idle1'
-    return None
+def add_agent_pointing(agent: dict, step_begin: int) -> None:
+    """Adds a pointing animation (the agent points in whatever direction it's
+    facing) that begins at the given step and is held indefinitely."""
+
+    actions = agent.get('actions', [])
+    _check_steps(actions, step_begin, None, True)
+
+    actions.extend([{
+        'id': 'Point_start_index_finger',
+        'stepBegin': step_begin,
+        'stepEnd': step_begin + POINT_START_FRAME_COUNT
+    }, {
+        'id': 'Point_hold_index_finger',
+        'stepBegin': step_begin + POINT_START_FRAME_COUNT,
+        'isLoopAnimation': True
+    }])
+
+    agent['actions'] = sorted(actions, key=lambda x: x['stepBegin'])
+
+
+def estimate_move_step_length(begin: dict, end: dict) -> int:
+    """Estimates and returns the number of action steps the agent will take to
+    move from the given begin point to the given end point."""
+    distance = math.dist([begin['x'], begin['z']], [end['x'], end['z']])
+    # Add 6 steps for the rotation
+    return math.ceil((distance / MOVE_DISTANCE) + 6)
 
 
 AGENT_ANIMATIONS = [

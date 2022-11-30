@@ -9,9 +9,6 @@ from machine_common_sense.config_manager import Vector3d
 
 from generator import MaterialTuple, geometry, materials, tags
 from generator.scene import Scene, get_step_limit_from_dimensions
-from ideal_learning_env.interactable_object_service import (
-    KeywordLocationConfig
-)
 from ideal_learning_env.numerics import MinMaxFloat, MinMaxInt
 
 from .choosers import (
@@ -36,7 +33,11 @@ from .defs import (
 )
 from .goal_services import GoalConfig, GoalServices
 from .numerics import VectorFloatConfig, VectorIntConfig
-from .object_services import KeywordLocation, ObjectRepository
+from .object_services import (
+    KeywordLocation,
+    KeywordLocationConfig,
+    ObjectRepository
+)
 from .validators import ValidateNoNullProp, ValidateNumber, ValidateOptions
 
 logger = logging.getLogger(__name__)
@@ -414,6 +415,23 @@ class GlobalSettingsComponent(ILEComponent):
     ```
     """
 
+    restrict_open_objects: bool = None
+    """
+    (bool): If there are multiple openable objects in a scene, including
+    containers and doors, only allow for one to ever be opened.
+    Default: False
+
+    Simple Example:
+    ```
+    restrict_open_objects: False
+    ```
+
+    Advanced Example:
+    ```
+    restrict_open_objects: True
+    ```
+    """
+
     room_dimensions: Union[VectorIntConfig, List[VectorIntConfig]] = None
     """
     ([VectorIntConfig](#VectorIntConfig) dict, or list of VectorIntConfig
@@ -650,6 +668,7 @@ class GlobalSettingsComponent(ILEComponent):
             (key, value.material) for key, value in wall_material_data.items()
         ])
         scene.restrict_open_doors = self.get_restrict_open_doors()
+        scene.restrict_open_objects = self.get_restrict_open_objects()
         scene.debug['wallColors'] = list(set([
             color for value in wall_material_data.values()
             for color in value.color
@@ -788,7 +807,8 @@ class GlobalSettingsComponent(ILEComponent):
         return self.goal
 
     @ile_config_setter(validator=ValidateOptions(props=['category'], options=[
-        tags.SCENE.RETRIEVAL, tags.SCENE.MULTI_RETRIEVAL, tags.SCENE.PASSIVE
+        tags.SCENE.RETRIEVAL, tags.SCENE.MULTI_RETRIEVAL,
+        tags.SCENE.PASSIVE, tags.SCENE.IMITATION
     ]))
     def set_goal(self, data: Any) -> None:
         if data:
@@ -1016,12 +1036,18 @@ class GlobalSettingsComponent(ILEComponent):
     def set_restrict_open_doors(self, data: Any) -> None:
         self.restrict_open_doors = data
 
-    def get_restrict_open_doors(
-            self) -> bool:
+    def get_restrict_open_doors(self) -> bool:
         if self.restrict_open_doors is None:
             return False
 
         return self.restrict_open_doors
+
+    @ile_config_setter()
+    def set_restrict_open_objects(self, data: Any) -> None:
+        self.restrict_open_objects = data
+
+    def get_restrict_open_objects(self) -> bool:
+        return self.restrict_open_objects or False
 
     # If not null, all X/Y/Z properties are required.
     @ile_config_setter(validator=ValidateNumber(

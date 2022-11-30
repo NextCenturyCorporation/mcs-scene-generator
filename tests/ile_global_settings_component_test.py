@@ -14,14 +14,12 @@ from ideal_learning_env import (
     ILEException,
     ILESharedConfiguration,
     InteractableObjectConfig,
+    KeywordLocationConfig,
     SpecificInteractableObjectsComponent,
     VectorFloatConfig,
     VectorIntConfig
 )
 from ideal_learning_env.defs import ILEConfigurationException
-from ideal_learning_env.interactable_object_service import (
-    KeywordLocationConfig
-)
 from ideal_learning_env.numerics import MinMaxFloat, MinMaxInt
 from ideal_learning_env.object_services import ObjectRepository
 from tests.ile_helper import (
@@ -56,6 +54,7 @@ def test_global_settings():
     assert component.performer_start_position is None
     assert component.performer_start_rotation is None
     assert component.restrict_open_doors is None
+    assert component.restrict_open_objects is None
     assert component.room_dimensions is None
     assert component.room_shape is None
     assert component.side_wall_opposite_colors is None
@@ -102,6 +101,7 @@ def test_global_settings():
     assert scene.debug['floorColors']
     assert scene.debug['wallColors']
     assert scene.restrict_open_doors is False
+    assert scene.restrict_open_objects is False
     assert not scene.intuitive_physics
     assert not scene.objects
 
@@ -132,7 +132,7 @@ def test_global_settings_start_position_keyword():
     scene = component.update_ile_scene(prior_scene())
     pos = scene.performer_start.position
     assert pos.z == pytest.approx(6.72, 2)
-    assert -1.72 < pos.x < 1.72
+    assert -1.75 < pos.x < 1.75
 
 
 def test_global_settings_start_position_keyword_no_label():
@@ -245,6 +245,7 @@ def test_global_settings_configured():
         'performer_start_position': {'x': -1, 'y': 0, 'z': 1},
         'performer_start_rotation': {'x': -10, 'y': 90, 'z': 0},
         'restrict_open_doors': True,
+        'restrict_open_objects': True,
         'room_dimensions': {'x': 5, 'y': 3, 'z': 10},
         'room_shape': 'square',
         'wall_back_material': 'Custom/Materials/WhiteDrywallMCS',
@@ -264,6 +265,7 @@ def test_global_settings_configured():
     assert component.performer_start_position == VectorFloatConfig(-1, 0, 1)
     assert component.performer_start_rotation == VectorIntConfig(-10, 90, 0)
     assert component.restrict_open_doors
+    assert component.restrict_open_objects
     assert component.room_dimensions == VectorIntConfig(5, 3, 10)
     assert component.room_shape == 'square'
     assert component.wall_back_material == 'Custom/Materials/WhiteDrywallMCS'
@@ -290,6 +292,7 @@ def test_global_settings_configured():
     assert scene.performer_start == PerformerStart(
         position=Vector3d(x=-1, y=0, z=1), rotation=Vector3d(x=-10, y=90, z=0))
     assert scene.restrict_open_doors is True
+    assert scene.restrict_open_objects is True
     assert scene.room_dimensions == Vector3d(x=5, y=3, z=10)
     assert scene.room_materials == {
         'back': 'Custom/Materials/WhiteDrywallMCS',
@@ -323,7 +326,6 @@ def test_global_settings_passive_physics_scene():
         'performer_start_position': {'x': -1, 'y': 0, 'z': 1},
         # Expect this to be overridden after calling update_ile_scene
         'performer_start_rotation': {'x': -10, 'y': 90, 'z': 0},
-        'restrict_open_doors': True,
         # Expect this to be overridden after calling update_ile_scene
         'room_dimensions': {'x': 5, 'y': 3, 'z': 10},
         'room_shape': 'square',
@@ -343,7 +345,6 @@ def test_global_settings_passive_physics_scene():
     assert component.passive_physics_scene is True
     assert component.performer_start_position == VectorFloatConfig(-1, 0, 1)
     assert component.performer_start_rotation == VectorIntConfig(-10, 90, 0)
-    assert component.restrict_open_doors
     assert component.room_dimensions == VectorIntConfig(5, 3, 10)
     assert component.room_shape == 'square'
     assert component.wall_back_material == 'Custom/Materials/WhiteDrywallMCS'
@@ -373,7 +374,6 @@ def test_global_settings_passive_physics_scene():
         position=Vector3d(x=0, y=0, z=-4.5),
         rotation=Vector3d(x=0, y=0, z=0)
     )
-    assert scene.restrict_open_doors is True
     assert scene.room_dimensions == Vector3d(x=20, y=10, z=20)
     assert scene.room_materials == {
         'back': 'Custom/Materials/WhiteDrywallMCS',
@@ -1027,8 +1027,8 @@ def test_global_settings_wall_right_material_fail_restricted_material():
         })
 
 
+@pytest.mark.slow
 def test_global_settings_performer_starts_near():
-    # This test is a little slow
     for distance_away in arange(0.1, 2.1, 0.1):
         for _ in range(10):
             distance_away = round(distance_away, 1)
@@ -1075,3 +1075,91 @@ def test_global_settings_performer_starts_near():
             distance = round(performer_start.distance(object_polygon), 2)
             expected_distance = round(distance_away + PERFORMER_HALF_WIDTH, 2)
             assert distance == expected_distance
+
+
+def test_global_settings_adjacent_targets_without_error():
+    component = GlobalSettingsComponent({
+        'goal': {
+            'category': 'multi retrieval',
+            'targets': [{
+                'num': 1,
+                'shape': 'soccer_ball',
+                'scale': 1,
+                'position': {'x': 2, 'y': 0, 'z': 2},
+                'rotation': {'x': 0, 'y': 0, 'z': 0},
+                'labels': 'target_1'
+            }, {
+                'num': 8,
+                'shape': 'soccer_ball',
+                'scale': 1,
+                'keyword_location': {
+                    'keyword': 'adjacent',
+                    'relative_object_label': 'target_1',
+                    'adjacent_distance': [
+                        {'x': 0, 'z': 0.1},
+                        {'x': 0.1, 'z': 0.1},
+                        {'x': 0.1, 'z': 0},
+                        {'x': 0.1, 'z': -0.1},
+                        {'x': 0, 'z': -0.1},
+                        {'x': -0.1, 'z': -0.1},
+                        {'x': -0.1, 'z': 0},
+                        {'x': -0.1, 'z': 0.1}
+                    ]
+                }
+            }]
+        }
+    })
+    scene = component.update_ile_scene(prior_scene())
+    assert len(scene.objects) == 9
+    target_1 = scene.objects[0]
+    assert target_1['type'] == 'soccer_ball'
+    assert target_1['shows'][0]['scale'] == {'x': 1, 'y': 1, 'z': 1}
+    position_1 = target_1['shows'][0]['position']
+    assert position_1 == {'x': 2, 'y': 0.11, 'z': 2}
+    rotation_1 = target_1['shows'][0]['rotation']
+    assert rotation_1 == {'x': 0, 'y': 0, 'z': 0}
+    diff_x = 0.32
+    diff_z = 0.32
+    for target_i in scene.objects[1:]:
+        assert target_i['type'] == 'soccer_ball'
+        assert target_i['shows'][0]['scale'] == {'x': 1, 'y': 1, 'z': 1}
+        position_i = target_i['shows'][0]['position']
+        rotation_i = target_i['shows'][0]['rotation']
+        assert (
+            position_i['x'] == pytest.approx(position_1['x'] - diff_x) or
+            position_i['x'] == pytest.approx(position_1['x']) or
+            position_i['x'] == pytest.approx(position_1['x'] + diff_x)
+        )
+        assert (
+            position_i['z'] == pytest.approx(position_1['z'] - diff_z) or
+            position_i['z'] == pytest.approx(position_1['z']) or
+            position_i['z'] == pytest.approx(position_1['z'] + diff_z)
+        )
+        assert rotation_i == rotation_1
+
+
+def test_global_settings_identical_targets_without_error():
+    component = GlobalSettingsComponent({
+        'goal': {
+            'category': 'multi retrieval',
+            'targets': [{
+                'num': 1,
+                'shape': 'soccer_ball',
+                'scale': 2,
+                'labels': 'target_1'
+            }, {
+                'num': 4,
+                'identical_to': 'target_1'
+            }]
+        }
+    })
+    scene = component.update_ile_scene(prior_scene())
+    assert len(scene.objects) == 5
+    target_1 = scene.objects[0]
+    scale_1 = target_1['shows'][0]['scale']
+    assert target_1['type'] == 'soccer_ball'
+    assert target_1['shows'][0]['scale'] == {'x': 2, 'y': 2, 'z': 2}
+    for target_i in scene.objects[1:]:
+        scale_i = target_i['shows'][0]['scale']
+        assert target_1['type'] == target_i['type']
+        assert scale_1 == scale_i

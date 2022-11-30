@@ -1,0 +1,110 @@
+# Use a specific room size and starting position/rotation for this task.
+room_dimensions:
+    x: 10
+    y: 4
+    z: 10
+performer_start_position:
+    x: 0
+    y: 0
+    z: -2
+performer_start_rotation:
+    x: 0
+    y: 0
+
+# The performer agent is frozen until all the placers are finished moving.
+freezes:
+    - begin: 1
+      end: 150
+
+# Add a Retrieval goal with a soccer ball as the target object.
+goal:
+    category: retrieval
+    target:
+        shape: soccer_ball
+        scale: 1.0
+
+# Only the target can be a soccer ball.
+excluded_shapes: soccer_ball
+
+specific_interactable_objects:
+    # Generate zero, one, or two "non-target containers", which will not be
+    # holding the target object, using a specific scale and shape.
+    - num: [0, 1, 2]
+      labels: non_target_container
+      scale: 0.4
+      shape: separate_container
+      # The container's lid descends at a specific step.
+      separate_lid: 36
+      # The containers are positioned at one of five different locations.
+      position:
+          x: [-1.5, 0.75, 0, 0.75, 1.5]
+          y: 0
+          z: 4
+      rotation:
+          x: 0
+          y: 0
+          z: 0
+    # Generate a "target container", which will be holding the target object,
+    # using a specific scale and shape, identical to the other containers.
+    - num: 1
+      labels: target_container
+      scale: 0.4
+      shape: separate_container
+      # The container's lid descends at a specific step.
+      separate_lid: 36
+      # Default location - the placer will adjust this below.
+      position:
+          x: 0
+          y: 0
+          z: 0
+      rotation:
+          x: 0
+          y: 0
+          z: 0
+
+placers:
+    # Generate a placer that descends from the ceiling, grabs onto the target
+    # container, drags it to a new location, releases the container, and
+    # ascends back into the ceiling.
+    - num: 1
+      # Move the target container at a specific step, AFTER the target object
+      # has been inserted and the lid is attached.
+      move_object: true
+      activation_step: 81
+      placed_object_labels: target_container
+      # Start the container in one of the following possible locations.
+      placed_object_position:
+          x: [-1.5, -0.75, 0, 0.75, 1.5]
+          y: 0
+          z: 4
+      placed_object_rotation: 0
+      # Move the container to one of the following possible locations.
+      # Locations that are already occupied will be ignored.
+      move_object_end_position:
+          x: [-1.5, -0.75, 0, 0.75, 1.5]
+          y: 0
+          z: 4
+      # Move the container forward by a variable amount on the Z axis.
+      # The movement pattern is: Z axis (toward the camera), X axis (sideways),
+      # Z axis (away from the camera).
+      move_object_z: [1, 1.5, 2, 2.5]
+    # Generate a placer that starts holding the target object, descends from
+    # the ceiling on step 1 above the target container, releases the target
+    # object into the target container, and ascends back into the ceiling.
+    - num: 1
+      activation_step: 1
+      placed_object_labels: target
+      placed_object_above: target_container
+      placed_object_rotation: 0
+      end_height: 0.25
+
+# Can only open one container in each scene.
+restrict_open_objects: true
+
+# Override the defaults to avoid randomly generating any other objects besides
+# the placers, containers, and target. Remove these lines if you want
+# additional randomly generated objects.
+random_structural_objects:
+    - num: 0
+keyword_objects:
+    - num: 0

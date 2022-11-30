@@ -8,6 +8,7 @@ ANY = 'any'
 GOAL_DICT = {
     'RETRIEVAL': 'retrieval',
     'MULTI_RETRIEVAL': 'multi retrieval',
+    'IMITATION': 'imitation',
     # Deprecated
     'TRAVERSAL': 'traversal',
     'TRANSFERRAL': 'transferral'

@@ -1,0 +1,50 @@
+# Generate an Imitation scene:
+# - Room has a variable rectangular size.
+# - Performer agent starts with a specific position/rotation.
+# - Three closed containers (same size and shape, different colors) are
+#   positioned in a line, in view of the performer agent.
+# - Another agent in the scene opens one or two containers in a specific order.
+# - A placer holding the target object (soccer ball) descends from the ceiling
+#   and releases the ball.
+# - Performer agent is kidnaped; it and/or the containers may be repositioned.
+# - Containers are closed and placer holding target object is reset.
+# - Performer agent must open the containers in the correct order to trigger
+#   the placer and pick up the target object.
+# Please see the ILE_API.md for details on shortcut_imitation_task.
+shortcut_imitation_task:
+    # Whether the containers start on the left side of the performer agent's
+    # starting view (50%), or on the right (50%).
+    containers_on_right_side: [true, false]
+    # Order in which the containers must be opened. The ILE will randomly
+    # select from this list when generating each scene. Adjust this list to
+    # have the ILE only select from specific orders.
+    trigger_order:
+        # The left, middle, and right options only require one container to be
+        # opened; the other options require two containers to be opened.
+        - left
+        - middle
+        - right
+        - left_middle
+        - left_right
+        - middle_left
+        - middle_right
+        - right_left
+        - right_middle
+    # Whether objects are moved during the kidnaping event. For all options,
+    # the other agent is moved out of the way.
+    kidnap_option:
+        - agent_only
+        # The containers are repositioned, but still in the same order.
+        - containers
+        # The containers are repositioned AND rotated.
+        - containers_rotate
+        # The performer agent is repositioned, but still faces the containers.
+        - performer
+
+# Override the defaults to avoid randomly generating any other objects besides
+# the ones required for the Imitation task. Remove these lines if you want
+# additional randomly generated objects.
+keyword_objects:
+    - num: 0
+random_structural_objects:
+    - num: 0

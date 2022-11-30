@@ -289,7 +289,9 @@ def validate_all_locations_and_update_bounds(
 
     starting_pos = scene.performer_start.position
     for object in objects:
-        skip = object.get('locationParent', False)
+        skip = (object.get('locationParent', False) or (
+            object['type'] == 'lid' and
+            scene.objects[-1]['type'] == 'separate_container'))
         bb = object.get('shows')[0].get('boundingBox')
         if not skip and not geometry.validate_location_rect(
             bb,

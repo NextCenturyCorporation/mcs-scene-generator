@@ -79,6 +79,31 @@ python ile.py -c ile_config.yaml -n 10 -p scene
 
 ### Latest Release Notes
 
+#### Release 1.6
+
+Changelog:
+- Implemented asymmetric (a.k.a. "hooked" or "L-shape") tool shapes, and added the "tool_type" config option for the shortcut_lava_target_tool property to configure the type of tool.
+- Implemented containers with separate lids that are placed onto them (shape="separate_container").
+- Implemented devices that look like our "placers" but pick up or drag objects rather than placing them (see the "placers" property). Also added the "placed_object_above" config option for placers.
+- Implemented new options for the shortcut_bisecting_platform property, including "is_short", "is_thin", and "other_platforms".
+- Implemented "pointing" config option for agents.
+- Added the restrict_open_objects property for generating Set Rotation and Shell Game scenes.
+- Added the shortcut_imitation_task property for generating Imitation scenes.
+- Added the shortcut_tool_choice property for generating Tool Choice scenes.
+- Added the turntables_agent_non_agent_config property for generating Spatial Reference scenes.
+- Revised the "adjacent" keyword_location to work in global coordinates (using the new "adjacent_distance" property), rather than based on the position of the performer agent.
+- Updated the "placers" ILE config file to include examples of "placers" picking up objects.
+- Added new example ILE config files:
+    - Basic usage and core common sense concepts:
+        - `agent_pointing_at_hidden_target`
+        - `container_with_separate_lid`
+    - New evaluation tasks:
+        - `interactive_imitation`
+        - `interactive_set_rotation`
+        - `interactive_shell_game`
+        - `interactive_spatial_reference`
+        - `interactive_tool_choice`
+
 #### Release 1.5
 
 Changelog:
@@ -232,18 +257,20 @@ See the list of the Core Domains in our [MCS BAA Table doc](./docs/MCS_BAA_TABLE
 | --- | --- |
 | P1, P6, P7 | [navigation_2d.yaml](./ile_configs/navigation_2d.yaml), [navigation_3d.yaml](./ile_configs/navigation_3d.yaml) |
 | P2, P3 | [room_of_many_colors.yaml](./ile_configs/room_of_many_colors.yaml) |
-| P4 | [containment.yaml](./ile_configs/containment.yaml), [occlusion_by_furniture.yaml](./ile_configs/occlusion_by_furniture.yaml), [occlusion_by_structure.yaml](./ile_configs/occlusion_by_structure.yaml) |
+| P4 | [container_with_separate_lid.yaml](./ile_configs/container_with_separate_lid.yaml), [containment.yaml](./ile_configs/containment.yaml), [occlusion_by_furniture.yaml](./ile_configs/occlusion_by_furniture.yaml), [occlusion_by_structure.yaml](./ile_configs/occlusion_by_structure.yaml) |
 | O2 | [collisions.yaml](./ile_configs/collisions.yaml), [throwers.yaml](./ile_configs/throwers.yaml) |
 | O3 | [collisions.yaml](./ile_configs/collisions.yaml), [droppers.yaml](./ile_configs/droppers.yaml), [placers.yaml](./ile_configs/placers.yaml) |
 | O4 | [occlusion_by_furniture.yaml](./ile_configs/occlusion_by_furniture.yaml), [occlusion_by_structure.yaml](./ile_configs/occlusion_by_structure.yaml) |
 | O6 | [droppers.yaml](./ile_configs/droppers.yaml), [placers.yaml](./ile_configs/placers.yaml) |
 | O8 | [throwers.yaml](./ile_configs/throwers.yaml) |
-| A5 | [agents.yaml](./ile_configs/agents.yaml) |
+| A5 | [agent_holds_target.yaml](./ile_configs/agent_holds_target.yaml),[agent_pointing_at_hidden_target.yaml](./ile_configs/agent_pointing_at_hidden_target.yaml) |
 | TODO | [turntable.yaml](./ile_configs/turntable.yaml) |
 
 List of example ILE configuration files helpful for learning core common sense concepts:
 
-- [agents.yaml](./ile_configs/agents.yaml) Generates scenes with one interactive simulation-controlled agent holding the soccer ball retrieval target.
+- [agent_holds_target.yaml](./ile_configs/agent_holds_target.yaml) Generates scenes with one interactive simulation-controlled agent holding the soccer ball retrieval target.
+- [agent_pointing_at_hidden_target.yaml](./ile_configs/agent_pointing_at_hidden_target.yaml) Generates scenes with one interactive simulation-controlled agent pointing at a closed container in which the soccer ball retrieval target is hidden.
+- [container_with_separate_lid.yaml](./ile_configs/agent_pointing_at_hidden_target.yaml) Generates scenes with a cuboid container which has a separate lid that is attached to the container by a placer.
 - [collisions.yaml](./ile_configs/collisions.yaml) Generates scenes with a randomly positioned soccer ball retrieval target and a rolled ball that may or may not collide with it.
 - [containment.yaml](./ile_configs/containment.yaml) Generates scenes with many closed containers and a soccer ball retrieval target hidden inside one of the containers.
 - [droppers.yaml](./ile_configs/droppers.yaml) Generates scenes with many droppers and a soccer ball retrieval target held by one such device.
@@ -251,7 +278,7 @@ List of example ILE configuration files helpful for learning core common sense c
 - [navigation_3d.yaml](./ile_configs/navigation_3d.yaml) Generates scenes with holes, walls, lava, and platforms with ramps, as well as a randomly positioned soccer ball retrieval target.
 - [occlusion_by_furniture.yaml](./ile_configs/occlusion_by_furniture.yaml) Generates scenes with many large objects and a soccer ball retrieval target either hidden behind an object or visible in front of an object.
 - [occlusion_by_structure.yaml](./ile_configs/occlusion_by_structure.yaml) Generates scenes with many large structures and a soccer ball retrieval target either hidden behind a structure or visible in front of a structure.
-- [placers.yaml](./ile_configs/placers.yaml) Generates scenes with many placers (some placers will be empty) and a soccer ball retrieval target held by one such device.
+- [placers.yaml](./ile_configs/placers.yaml) Generates scenes with many placers (some placers will be empty, and some placers will instead pick up objects) and a soccer ball retrieval target held by one such device.
 - [room_of_many_colors.yaml](./ile_configs/room_of_many_colors.yaml) Generates scenes with randomly colored outer room walls and areas of floor, as well as a soccer ball retrieval target.
 - [throwers.yaml](./ile_configs/throwers.yaml) Generates scenes with many throwers and a soccer ball retrieval target held by one such device.
 - [turntable.yaml](./ile_configs/throwers.yaml) Generates scenes with a turntable (cog), a container, and a soccer ball retrieval target; sometimes the soccer ball and/or the container are on top of the turntable; sometimes the soccer ball is hidden inside of the container; the turntable rotates either 90, 180, 270, or 360 degrees.
@@ -318,16 +345,27 @@ Eval 6 Tasks:
 
 | Eval 6 Task | MCS Core Domains | Example Config Files |
 | --- | --- | --- |
-| Navigation: Holes (Interactive) | P7 | See the Eval 5 Tasks above |
-| Navigation: Lava (Interactive) | P7 | See the Eval 5 Tasks above |
-| Navigation: Ramps (Interactive) | P6 | See the Eval 5 Tasks above |
+| Imitation (Interactive) | O5 | [interactive_imitation.yaml](./ile_configs/interactive_imitation.yaml) |
+| Navigation: Holes (Interactive) | P7 | New variations with agents; see the Eval 5 Tasks above |
+| Navigation: Lava (Interactive) | P7 | New variations with agents; see the Eval 5 Tasks above |
+| Navigation: Ramps (Interactive) | P6 | New variations with agents; see the Eval 5 Tasks above |
 | Number Comparison (Interactive) | TODO | [interactive_number_comparison.yaml](./ile_configs/interactive_number_comparison.yaml) |
+| Set Rotation (Interactive) | TODO | [interactive_set_rotation.yaml](./ile_configs/interactive_set_rotation.yaml) |
+| Shell Game (Interactive) | TODO | [interactive_shell_game.yaml](./ile_configs/interactive_shell_game.yaml) |
+| Spatial Reference (Interactive) | TODO | [interactive_spatial_reference.yaml](./ile_configs/interactive_spatial_reference.yaml) |
 | Spatial Reorientation (Interactive) | P2, P3 | [interactive_spatial_reorientation.yaml](./ile_configs/interactive_spatial_reorientation.yaml) |
+| Tool Choice (Interactive) | O5 | [interactive_tool_choice.yaml](./ile_configs/interactive_tool_choice.yaml) |
+| Tool Use (Interactive) | O5 | New variations with asymmetric (hooked) tools; see the Eval 5 Tasks above |
 
 List of example ILE configuration files for generating scenes similar to specific evaluation tasks:
 
+- [interactive_imitation.yaml](./ile_configs/interactive_imitation.yaml) Generates scenes similar to the interactive imitation eval tasks.
 - [interactive_number_comparison.yaml](./ile_configs/interactive_number_comparison.yaml) Generates scenes similar to the interactive number comparison eval tasks: start on a platform bisecting the room; one or more soccer ball multi-retrieval targets on one side; fewer soccer balls on the other side.
+- [interactive_set_rotation.yaml](./ile_configs/interactive_set_rotation.yaml) Generates scenes similar to the interactive set rotation eval tasks: start in a room with one or more identical containers positioned on top of a turntable (giant cog); a soccer ball retrieval target is placed inside a container; lids are placed on all containers; the turntable rotates between 90 and 360 degrees.
+- [interactive_shell_game.yaml](./ile_configs/interactive_shell_game.yaml) Generates scenes similar to the interactive shell game eval tasks: start in a room with one or more identical containers; a soccer ball retrieval target is placed inside a container; lids are placed on all containers; a placer drags the target's container to a new location.
+- [interactive_spatial_reference.yaml](./ile_configs/interactive_spatial_reference.yaml) Generates scenes similar to the interactive spatial reference eval tasks: start on a platform bisecting the room; identical closed containers on both sides; an agent walks and points at the container hiding the soccer ball retrieval target; a turntable (giant cog) rotates a non-agent object so it "points" at a container, which may be the same container, or the opposite container.
 - [interactive_spatial_reorientation.yaml](./ile_configs/interactive_spatial_reorientation.yaml) Generates scenes similar to the interactive spatial reorientation eval tasks: start on a platform bisecting the room; identical bins on either side of the room; a placer drops a soccer ball retrieval target into one bin; the performer agent is kidnapped and sometimes teleported to the other side of the room; sometimes one room wall is a different color, and/or the room is trapezoidal.
+- [interactive_tool_choice.yaml](./ile_configs/interactive_tool_choice.yaml) Generates scenes similar to the interactive tool choice eval tasks: start on a platform bisecting the room; soccer balls surrounded by lava on both sides; one side has a useful tool, but the other side does not have a tool, or has a tool that is too small to use.
 
 ## Scene Validation
 

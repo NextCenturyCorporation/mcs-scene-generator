@@ -566,6 +566,101 @@ def get_along_wall_xz(wall_label, room_dimensions, dimensions,
     return x, z
 
 
+def generate_location_adjacent_to(
+    # TODO MCS-697 Define an ObjectInstance class extending ObjectDefinition.
+    adjacent_instance: Dict[str, Any],
+    # TODO MCS-697 Define an ObjectInstance class extending ObjectDefinition.
+    relative_instance: Dict[str, Any],
+    distance_x: float,
+    distance_z: float,
+    performer_start: Dict[str, Dict[str, float]],
+    bounds_list: List[ObjectBounds],
+    room_dimensions: Dict[str, float] = None
+) -> Dict[str, Any]:
+    """Creates and returns a location for the given object to position it
+    adjacent to the given relative object using the given distances in global
+    X/Z coordinates that should be between the bounding boxes of the two
+    objects. Returns null if the location would be invalid."""
+
+    # Identify the min/max X/Z around the relative_instance
+    relative_bounds = relative_instance['shows'][0]['boundingBox']
+    relative_points_x = [point.x for point in relative_bounds.box_xz]
+    relative_points_z = [point.z for point in relative_bounds.box_xz]
+    relative_x_min = min(relative_points_x)
+    relative_x_max = max(relative_points_x)
+    relative_z_min = min(relative_points_z)
+    relative_z_max = max(relative_points_z)
+
+    # Begin making the position and rotation for the adjacent_object
+    base_rotation = adjacent_instance['debug'].get('originalRotation', {})
+    adjacent_position = relative_instance['shows'][0]['position'].copy()
+    adjacent_position['y'] = adjacent_instance['debug'].get('positionY', 0)
+    adjacent_rotation = relative_instance['shows'][0]['rotation'].copy()
+    for axis in ['x', 'y', 'z']:
+        adjacent_rotation[axis] = (
+            adjacent_rotation.get(axis, 0) + base_rotation.get(axis, 0)
+        )
+
+    # Identify the min/max X/Z around the adjacent_instance using a temporary
+    # ObjectBounds at the position of the relative_instance (the math here can
+    # be difficult to do otherwise/manually since the objects may be angled).
+    temp_bounds = create_bounds(
+        adjacent_instance['debug']['dimensions'],
+        adjacent_instance['debug'].get('offset', {'x': 0, 'y': 0, 'z': 0}),
+        adjacent_position,
+        adjacent_rotation,
+        standing_y=adjacent_instance['debug'].get('positionY', 0)
+    )
+    adjacent_points_x = [point.x for point in temp_bounds.box_xz]
+    adjacent_points_z = [point.z for point in temp_bounds.box_xz]
+    adjacent_x_min = min(adjacent_points_x)
+    adjacent_x_max = max(adjacent_points_x)
+    adjacent_z_min = min(adjacent_points_z)
+    adjacent_z_max = max(adjacent_points_z)
+
+    # Identify how much to move the adjacent_instance so its bounding box does
+    # not overlap/collide with the relative_instance
+    adjacent_x_size = abs(adjacent_x_max - adjacent_x_min)
+    relative_x_size = abs(relative_x_max - relative_x_min)
+    move_x = (adjacent_x_size + relative_x_size) / 2.0
+    move_x *= (-1 if distance_x < 0 else 1)
+    adjacent_z_size = abs(adjacent_z_max - adjacent_z_min)
+    relative_z_size = abs(relative_z_max - relative_z_min)
+    move_z = (adjacent_z_size + relative_z_size) / 2.0
+    move_z *= (-1 if distance_z < 0 else 1)
+
+    # Add the input distance.
+    if distance_x:
+        adjacent_position['x'] += distance_x + move_x
+    if distance_z:
+        adjacent_position['z'] += distance_z + move_z
+
+    # Generate the new location.
+    location = {
+        'position': adjacent_position,
+        'rotation': adjacent_rotation,
+        'boundingBox': create_bounds(
+            adjacent_instance['debug']['dimensions'],
+            adjacent_instance['debug'].get('offset', {'x': 0, 'y': 0, 'z': 0}),
+            adjacent_position,
+            adjacent_rotation,
+            standing_y=adjacent_instance['debug'].get('positionY', 0)
+        )
+    }
+
+    # Ensure the new location is valid.
+    if validate_location_rect(
+        location['boundingBox'],
+        performer_start['position'],
+        bounds_list + [relative_bounds],
+        room_dimensions or DEFAULT_ROOM_DIMENSIONS
+    ):
+        return location
+
+    # Return None if invalid.
+    return None
+
+
 def generate_location_on_object(
     # TODO MCS-697 Define an ObjectInstance class extending ObjectDefinition.
     object_definition_or_instance: Union[ObjectDefinition, Dict[str, Any]],
@@ -1221,24 +1316,60 @@ def calculate_rotations(
     return int(round(rotation_x)), int(round(rotation_y)) % 360
 
 
+def get_magnitudes_of_x_z_dirs_for_rotation_and_move_vector(
+    object_rotation, x_move_magnitude, z_move_magnitude
+):
+    """
+    Converts to unity rotation \n
+    'Standard' unit circle: x,y
+            90 y
+    180 -|- 0 x
+           270
+
+    \n\n
+    'Unity' unit circle: x,z
+             0 z
+    270 -|- 90 x
+           180
+    And returns the unity x,z components of the movement vector
+    in the rotation direction
+    """
+    # The comment above looks strange but it looks good in the doctring
+    object_rotation = -object_rotation + 90
+    transform_right_angle = object_rotation - 90
+    transform_forward_angle = object_rotation
+
+    x_length_x_shift = \
+        x_move_magnitude * math.cos(math.radians(transform_right_angle))
+    z_length_x_shift = \
+        x_move_magnitude * math.sin(math.radians(transform_right_angle))
+
+    x_length_z_shift = \
+        z_move_magnitude * math.cos(math.radians(transform_forward_angle))
+    z_length_z_shift = \
+        z_move_magnitude * math.sin(math.radians(transform_forward_angle))
+
+    final_x_shift = x_length_x_shift + x_length_z_shift
+    final_z_shift = z_length_x_shift + z_length_z_shift
+
+    return final_x_shift, final_z_shift\
+
+
+
 def get_position_distance_away_from_obj(
         room_dimensions: Vector3d, obj,
         distance, bounds) -> Tuple[float, float]:
     """ Calculates and returns a position around an object at a
     specified distance away from an edge of the objects bounding box
     """
-    bb_boxes = obj['shows'][0]['boundingBox'].box_xz
-    top_right = geometry.Point(bb_boxes[0].x, bb_boxes[0].z)
-    bottom_right = geometry.Point(bb_boxes[1].x, bb_boxes[1].z)
-    bottom_left = geometry.Point(bb_boxes[2].x, bb_boxes[2].z)
-    top_left = geometry.Point(bb_boxes[3].x, bb_boxes[3].z)
-    normalized_vertical_vector = \
-        get_normalized_vector_from_two_points(
-            top_right, bottom_right)
-    normalized_horizontal_vector = \
-        get_normalized_vector_from_two_points(
-            top_right, top_left)
     distance_away = distance + PERFORMER_HALF_WIDTH
+    (top_right, bottom_right, bottom_left, top_left,
+     normalized_vertical_vector, normalized_horizontal_vector) = \
+        get_basic_bounding_box_point_and_directional_vectors(obj)
+    (resultant_vector_up_right, resultant_vector_down_right,
+     resultant_vector_down_left, resultant_vector_up_left, directions) = \
+        get_resultant_vectors(normalized_horizontal_vector,
+                              normalized_vertical_vector, distance_away)
     """
     p4----------p1
     |  tl   tr  |
@@ -1248,27 +1379,6 @@ def get_position_distance_away_from_obj(
     |  bl   br  |
     p3---------p2
     """
-    resultant_vector_up_right = Vector3d(
-        x=(normalized_vertical_vector.x +
-           normalized_horizontal_vector.x) * distance_away,
-        z=(normalized_vertical_vector.y +
-           normalized_horizontal_vector.y) * distance_away)
-    resultant_vector_down_right = Vector3d(
-        x=(-normalized_vertical_vector.x +
-           normalized_horizontal_vector.x) * distance_away,
-        z=(-normalized_vertical_vector.y +
-            normalized_horizontal_vector.y) * distance_away)
-    resultant_vector_down_left = Vector3d(
-        x=-(normalized_vertical_vector.x +
-            normalized_horizontal_vector.x) * distance_away,
-        z=-(normalized_vertical_vector.y +
-            normalized_horizontal_vector.y) * distance_away)
-    resultant_vector_up_left = Vector3d(
-        x=(normalized_vertical_vector.x -
-           normalized_horizontal_vector.x) * distance_away,
-        z=(normalized_vertical_vector.y -
-            normalized_horizontal_vector.y) * distance_away)
-
     p1 = geometry.Point(
         top_right.x + resultant_vector_up_right.x,
         top_right.y + resultant_vector_up_right.z)
@@ -1282,7 +1392,6 @@ def get_position_distance_away_from_obj(
         top_left.x + resultant_vector_up_left.x,
         top_left.y + resultant_vector_up_left.z)
 
-    pos = Vector3d(x=0, y=0, z=0)
     # The perimeter line
     line = geometry.LineString((
         [p1.x, p1.y],
@@ -1290,6 +1399,118 @@ def get_position_distance_away_from_obj(
         [p3.x, p3.y],
         [p4.x, p4.y],
         [p1.x, p1.y]))
+    poly = geometry.Polygon(
+        [top_right, bottom_right, bottom_left, top_left])
+    valid, pos = get_valid_starts_near_position_on_perimeter(
+        line, poly, room_dimensions, bounds, directions, distance_away)
+    if valid:
+        return (pos.x, pos.z)
+
+    raise Exception(
+        f"Failed to find valid performer location "
+        f"with distance away: ({distance}) from object: ({obj['id']})"
+        f"because location is obstructed or outside of room bounds")
+
+
+def get_position_distance_away_from_hooked_tool(
+        room_dimensions: Vector3d, tool,
+        distance, bounds) -> Tuple[float, float]:
+    """ Calculates and returns a position around an object at a
+    specified distance away from an edge of the unique hooked tool bounding box
+    """
+    distance_away = distance + PERFORMER_HALF_WIDTH
+    (top_right, bottom_right, bottom_left, top_left,
+     normalized_vertical_vector, normalized_horizontal_vector) = \
+        get_basic_bounding_box_point_and_directional_vectors(tool)
+    thickness = tool['debug']['tool_thickness']
+    # unique points
+    bottom_left = geometry.Point(
+        bottom_right.x - (normalized_horizontal_vector.x * thickness),
+        bottom_right.y - (normalized_horizontal_vector.y * thickness))
+    far_left = geometry.Point(
+        top_left.x - normalized_vertical_vector.x * thickness,
+        top_left.y - normalized_vertical_vector.y * thickness)
+    middle_left = geometry.Point(
+        far_left.x + normalized_horizontal_vector.x * (thickness * 2),
+        far_left.y + normalized_horizontal_vector.y * (thickness * 2))
+    """
+    |-------------|
+    | tl       tr |
+    |  [h][o][o]  |
+    | fl   ml[b]  |
+    |-----|  [j]  |
+          |  [e]  |
+          |  [c]  |
+          |  [t]  |
+          | bl br |
+          |-------|
+    """
+    (resultant_vector_up_right, resultant_vector_down_right,
+     resultant_vector_down_left, resultant_vector_up_left, directions) = \
+        get_resultant_vectors(normalized_horizontal_vector,
+                              normalized_vertical_vector, distance_away)
+
+    p1 = geometry.Point(
+        top_right.x + resultant_vector_up_right.x,
+        top_right.y + resultant_vector_up_right.z)
+    p2 = geometry.Point(
+        bottom_right.x + resultant_vector_down_right.x,
+        bottom_right.y + resultant_vector_down_right.z)
+    p3 = geometry.Point(
+        bottom_left.x + resultant_vector_down_left.x,
+        bottom_left.y + resultant_vector_down_left.z)
+    p4 = geometry.Point(
+        middle_left.x + resultant_vector_down_left.x,
+        middle_left.y + resultant_vector_down_left.z)
+    p5 = geometry.Point(
+        far_left.x + resultant_vector_down_left.x,
+        far_left.y + resultant_vector_down_left.z)
+    p6 = geometry.Point(
+        top_left.x + resultant_vector_up_left.x,
+        top_left.y + resultant_vector_up_left.z)
+
+    # The perimeter line
+    line = geometry.LineString((
+        [p1.x, p1.y],
+        [p2.x, p2.y],
+        [p3.x, p3.y],
+        [p4.x, p4.y],
+        [p5.x, p5.y],
+        [p6.x, p6.y],
+        [p1.x, p1.y]))
+    poly = geometry.Polygon(
+        [top_right, bottom_right, bottom_left,
+            middle_left, far_left, top_left])
+    valid, pos = get_valid_starts_near_position_on_perimeter(
+        line, poly, room_dimensions, bounds, directions, distance_away)
+    if valid:
+        return (pos.x, pos.z)
+
+    raise Exception(
+        f"Failed to find valid performer location "
+        f"with distance away: ({distance}) from object: ({tool['id']})"
+        f"because location is obstructed or outside of room bounds")
+
+
+def get_basic_bounding_box_point_and_directional_vectors(obj):
+    bb_boxes = obj['shows'][0]['boundingBox'].box_xz
+    top_right = geometry.Point(bb_boxes[0].x, bb_boxes[0].z)
+    bottom_right = geometry.Point(bb_boxes[1].x, bb_boxes[1].z)
+    bottom_left = geometry.Point(bb_boxes[2].x, bb_boxes[2].z)
+    top_left = geometry.Point(bb_boxes[3].x, bb_boxes[3].z)
+
+    normalized_vertical_vector = \
+        get_normalized_vector_from_two_points(
+            top_right, bottom_right)
+    normalized_horizontal_vector = \
+        get_normalized_vector_from_two_points(
+            top_right, top_left)
+    return (top_right, bottom_right, bottom_left, top_left,
+            normalized_vertical_vector, normalized_horizontal_vector)
+
+
+def get_valid_starts_near_position_on_perimeter(
+        line, polygon, room_dimensions, bounds, directions, distance_away):
     mp = geometry.MultiPoint()
     # Seperation of spawn points on the line
     seperation_between_spawn_points = 0.5
@@ -1300,6 +1521,7 @@ def get_position_distance_away_from_obj(
         mp = mp.union(segment.boundary)
     x = [point.x for point in mp]
     y = [point.y for point in mp]
+    pos = Vector3d(x=0, y=0, z=0)
     for _ in range(MAX_TRIES):
         index = random.randint(0, len(x) - 1)
         pos.x = x[index]
@@ -1331,7 +1553,6 @@ def get_position_distance_away_from_obj(
         )
         if not valid:
             continue
-
         """
         This is another check to verify the distance is correct
         If its not, it means the position is in the corner of the
@@ -1343,49 +1564,74 @@ def get_position_distance_away_from_obj(
         """
         (valid, start_difference) = \
             distance_between_point_and_bounding_box_is_valid(
-                pos.x, pos.z, top_right, bottom_right,
-                bottom_left, top_left, distance_away)
+                pos.x, pos.z, polygon, distance_away)
         if not valid:
-            directions = [
-                resultant_vector_up_left, resultant_vector_down_right,
-                resultant_vector_down_left, resultant_vector_up_left]
-            for direction in directions:
-                shift_amount = start_difference
-                shift_amount = start_difference
-                for _ in range(MAX_TRIES):
-                    reverse_x = -direction.x * shift_amount
-                    reverse_z = -direction.z * shift_amount
-                    new_pos_x = pos.x + reverse_x
-                    new_pos_z = pos.z + reverse_z
-                    (valid, difference_after_shift) = \
-                        distance_between_point_and_bounding_box_is_valid(
-                            new_pos_x, new_pos_z,
-                            top_right, bottom_right, bottom_left,
-                            top_left, distance_away)
-                    shift_amount += 0.01
-                    # the shift is in the wrong direction
-                    if difference_after_shift > start_difference:
-                        break
-                    if valid:
-                        return (new_pos_x, new_pos_z)
+            valid = shift_point_closer_to_polygon(
+                directions, start_difference, polygon, distance_away, pos)
         if valid:
-            return (pos.x, pos.z)
+            return (True, pos)
+    return (False, None)
 
-    raise Exception(
-        f"Failed to find valid performer location "
-        f"with distance away: ({distance}) from object: ({obj['id']})"
-        f"because location is obstructed or outside of room bounds")
+
+def get_resultant_vectors(normalized_horizontal_vector,
+                          normalized_vertical_vector, distance_away):
+    resultant_vector_up_right = Vector3d(
+        x=(normalized_vertical_vector.x +
+           normalized_horizontal_vector.x) * distance_away,
+        z=(normalized_vertical_vector.y +
+           normalized_horizontal_vector.y) * distance_away)
+    resultant_vector_down_right = Vector3d(
+        x=(-normalized_vertical_vector.x +
+           normalized_horizontal_vector.x) * distance_away,
+        z=(-normalized_vertical_vector.y +
+            normalized_horizontal_vector.y) * distance_away)
+    resultant_vector_down_left = Vector3d(
+        x=-(normalized_vertical_vector.x +
+            normalized_horizontal_vector.x) * distance_away,
+        z=-(normalized_vertical_vector.y +
+            normalized_horizontal_vector.y) * distance_away)
+    resultant_vector_up_left = Vector3d(
+        x=(normalized_vertical_vector.x -
+           normalized_horizontal_vector.x) * distance_away,
+        z=(normalized_vertical_vector.y -
+            normalized_horizontal_vector.y) * distance_away)
+    directions = [
+        resultant_vector_up_left, resultant_vector_down_right,
+        resultant_vector_down_left, resultant_vector_up_left]
+    return (resultant_vector_up_right, resultant_vector_down_right,
+            resultant_vector_down_left, resultant_vector_up_left, directions)
+
+
+def shift_point_closer_to_polygon(
+        directions, start_difference, polygon, distance_away, pos):
+    for direction in directions:
+        shift_amount = start_difference
+        shift_amount = start_difference
+        for _ in range(MAX_TRIES):
+            reverse_x = -direction.x * shift_amount
+            reverse_z = -direction.z * shift_amount
+            new_pos_x = pos.x + reverse_x
+            new_pos_z = pos.z + reverse_z
+            (valid, difference_after_shift) = \
+                distance_between_point_and_bounding_box_is_valid(  # noqa
+                    new_pos_x, new_pos_z, polygon, distance_away)
+            shift_amount += 0.01
+            # the shift is in the wrong direction
+            if difference_after_shift > start_difference:
+                break
+            if valid:
+                pos.x = new_pos_x
+                pos.z = new_pos_z
+                return True
+    return False
 
 
 def distance_between_point_and_bounding_box_is_valid(
-        x, z, top_right, bottom_right,
-        bottom_left, top_left, target_distance_away):
+        x, z, polygon, target_distance_away):
     """
     Checks if an x,z position is a distance away from a bounding box.
     """
     point = geometry.Point(x, z)
-    polygon = geometry.Polygon(
-        [top_right, bottom_right, bottom_left, top_left])
     target_distance_away = round(target_distance_away, 2)
     end_distance = round(point.distance(polygon), 2)
     difference = round(end_distance - target_distance_away, 2)
@@ -1405,3 +1651,13 @@ def get_normalized_vector_from_two_points(
         x=vector_direction.x / length_of_vector,
         y=vector_direction.y / length_of_vector)
     return normalized_vector
+
+
+def is_above(above: Dict[str, Any], below: Dict[str, Any]) -> bool:
+    """Returns whether the first given object instance is at least partially
+    above the second."""
+    above_bounds = above['shows'][0]['boundingBox']
+    below_bounds = below['shows'][0]['boundingBox']
+    if sat_entry(above_bounds.box_xz, below_bounds.box_xz):
+        return above_bounds.min_y >= below_bounds.max_y
+    return False

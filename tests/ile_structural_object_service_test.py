@@ -852,8 +852,8 @@ def test_placer_creation_reconcile():
     assert r3.placed_object_shape in PLACER_SHAPES
     assert 0 <= r3.activation_step <= 100
     assert r3.end_height == .7
-    # Test empty_placer config
 
+    # Test empty_placer config
     tmp4 = StructuralPlacerConfig(
         [2, 3], placed_object_rotation=MinMaxInt(230, 260),
         placed_object_position=VectorFloatConfig(3, 0, [2, 3]),
@@ -867,6 +867,39 @@ def test_placer_creation_reconcile():
     assert r4.num in [2, 3]
     assert r4.end_height in [5, 6]
     assert r4.empty_placer is True
+
+    # Test pickup_object placer config
+    tmp5 = StructuralPlacerConfig(
+        [2, 3], placed_object_rotation=MinMaxInt(230, 260),
+        placed_object_position=VectorFloatConfig(3, 0, [2, 3]),
+        placed_object_scale=4, placed_object_shape='soccer_ball',
+        activation_step=MinMaxInt(90, 100), end_height=[5, 6],
+        pickup_object=True
+    )
+    srv = StructuralPlacersCreationService()
+    r5: StructuralPlacerConfig = srv.reconcile(scene, tmp5)
+
+    assert r5.num in [2, 3]
+    assert r5.end_height in [5, 6]
+    assert r5.pickup_object is True
+
+    # Test move_object placer config
+    tmp6 = StructuralPlacerConfig(
+        1, placed_object_rotation=MinMaxInt(230, 260),
+        placed_object_position=VectorFloatConfig(3, 0, 3),
+        move_object_end_position=VectorFloatConfig(-3, 0, 3),
+        placed_object_scale=1, placed_object_shape='crate_1',
+        activation_step=MinMaxInt(90, 100), end_height=[5, 6],
+        move_object_y=2
+    )
+    srv = StructuralPlacersCreationService()
+    r6: StructuralPlacerConfig = srv.reconcile(scene, tmp6)
+
+    assert r6.num == 1
+    assert r6.end_height in [5, 6]
+    assert r6.placed_object_position == Vector3d(x=3.0, y=0.0, z=3.0)
+    assert r6.move_object_end_position == Vector3d(x=-3.0, y=0.0, z=3.0)
+    assert r6.move_object_y == 2
 
 
 def test_platform_creation_reconcile():
@@ -1093,7 +1126,10 @@ def test_tool_creation_reconcile_by_size():
     assert r2.shape in [
         'tool_rect_0_50_x_6_00',
         'tool_rect_0_75_x_6_00',
-        'tool_rect_1_00_x_6_00']
+        'tool_rect_1_00_x_6_00',
+        'tool_hooked_0_50_x_6_00',
+        'tool_hooked_0_75_x_6_00',
+        'tool_hooked_1_00_x_6_00']
 
 
 def test_tool_creation_reconcile_by_size_error():
@@ -1398,7 +1434,7 @@ def test_placer_create():
     assert move1['vector'] == {'x': 0, 'y': -0.25, 'z': 0}
 
     assert move2['stepBegin'] == 15
-    assert move2['stepEnd'] == 16
+    assert move2['stepEnd'] == 15
     assert move2['vector'] == {'x': 0, 'y': 0.25, 'z': 0}
 
     target = scene.objects[0]
@@ -1449,7 +1485,7 @@ def test_placer_create_with_non_zero_position_y():
     assert move1['vector'] == {'x': 0, 'y': -0.25, 'z': 0}
 
     assert move2['stepBegin'] == 15
-    assert move2['stepEnd'] == 16
+    assert move2['stepEnd'] == 15
     assert move2['vector'] == {'x': 0, 'y': 0.25, 'z': 0}
 
     target = scene.objects[0]
@@ -1486,7 +1522,6 @@ def test_placer_create_container_asymmetric():
     instance = instantiate_object(defn, location)
     srv.object_idl = InstanceDefinitionLocationTuple(instance, defn, location)
     objects = srv.create_feature_from_specific_values(scene, temp, None)
-    print(objects)
     assert len(objects) == 3
 
     container = objects[0]
@@ -1524,7 +1559,7 @@ def test_placer_create_container_asymmetric():
     assert placer['moves'][0]['stepEnd'] == 4
     assert placer['moves'][0]['vector'] == {'x': 0, 'y': -0.25, 'z': 0}
     assert placer['moves'][1]['stepBegin'] == 15
-    assert placer['moves'][1]['stepEnd'] == 16
+    assert placer['moves'][1]['stepEnd'] == 15
     assert placer['moves'][1]['vector'] == {'x': 0, 'y': 0.25, 'z': 0}
 
     assert len(placer['changeMaterials']) == 1
@@ -1548,7 +1583,7 @@ def test_placer_create_container_asymmetric():
     assert placer['moves'][0]['stepEnd'] == 4
     assert placer['moves'][0]['vector'] == {'x': 0, 'y': -0.25, 'z': 0}
     assert placer['moves'][1]['stepBegin'] == 15
-    assert placer['moves'][1]['stepEnd'] == 16
+    assert placer['moves'][1]['stepEnd'] == 15
     assert placer['moves'][1]['vector'] == {'x': 0, 'y': 0.25, 'z': 0}
 
     assert len(placer['changeMaterials']) == 1
@@ -1575,7 +1610,6 @@ def test_placer_create_container_asymmetric_with_rotation():
     instance = instantiate_object(defn, location)
     srv.object_idl = InstanceDefinitionLocationTuple(instance, defn, location)
     objects = srv.create_feature_from_specific_values(scene, temp, None)
-    print(objects)
     assert len(objects) == 3
 
     container = objects[0]
@@ -1615,7 +1649,7 @@ def test_placer_create_container_asymmetric_with_rotation():
     assert placer['moves'][0]['stepEnd'] == 4
     assert placer['moves'][0]['vector'] == {'x': 0, 'y': -0.25, 'z': 0}
     assert placer['moves'][1]['stepBegin'] == 15
-    assert placer['moves'][1]['stepEnd'] == 16
+    assert placer['moves'][1]['stepEnd'] == 15
     assert placer['moves'][1]['vector'] == {'x': 0, 'y': 0.25, 'z': 0}
 
     assert len(placer['changeMaterials']) == 1
@@ -1641,7 +1675,7 @@ def test_placer_create_container_asymmetric_with_rotation():
     assert placer['moves'][0]['stepEnd'] == 4
     assert placer['moves'][0]['vector'] == {'x': 0, 'y': -0.25, 'z': 0}
     assert placer['moves'][1]['stepBegin'] == 15
-    assert placer['moves'][1]['stepEnd'] == 16
+    assert placer['moves'][1]['stepEnd'] == 15
     assert placer['moves'][1]['vector'] == {'x': 0, 'y': 0.25, 'z': 0}
 
     assert len(placer['changeMaterials']) == 1
@@ -1953,6 +1987,44 @@ def test_tool_create():
     assert tool
     assert tool['id'].startswith('tool_')
     assert tool['type'] == 'tool_rect_0_75_x_4_00'
+    show = tool['shows'][0]
+    pos = show['position']
+    rot = show['rotation']
+    scale = show['scale']
+    assert pos == {'x': 1.1, 'y': 0.15, 'z': 1.3}
+    assert rot == {'x': 0, 'y': 34, 'z': 0}
+    assert scale == {'x': 1, 'y': 1, 'z': 1}
+
+
+def test_tool_create_hooked():
+    temp = ToolConfig(
+        position=VectorFloatConfig(1.1, 1.2, 1.3), rotation_y=34,
+        guide_rails=False, shape='tool_hooked_0_75_x_4_00')
+    tool = StructuralToolsCreationService(
+    ).create_feature_from_specific_values(prior_scene(), temp, None)
+
+    assert tool
+    assert tool['id'].startswith('tool_')
+    assert tool['type'] == 'tool_hooked_0_75_x_4_00'
+    show = tool['shows'][0]
+    pos = show['position']
+    rot = show['rotation']
+    scale = show['scale']
+    assert pos == {'x': 1.1, 'y': 0.15, 'z': 1.3}
+    assert rot == {'x': 0, 'y': 34, 'z': 0}
+    assert scale == {'x': 1, 'y': 1, 'z': 1}
+
+
+def test_tool_create_short():
+    temp = ToolConfig(
+        position=VectorFloatConfig(1.1, 1.2, 1.3), rotation_y=34,
+        guide_rails=False, shape='tool_rect_0_75_x_1_00')
+    tool = StructuralToolsCreationService(
+    ).create_feature_from_specific_values(prior_scene(), temp, None)
+
+    assert tool
+    assert tool['id'].startswith('tool_')
+    assert tool['type'] == 'tool_rect_0_75_x_1_00'
     show = tool['shows'][0]
     pos = show['position']
     rot = show['rotation']

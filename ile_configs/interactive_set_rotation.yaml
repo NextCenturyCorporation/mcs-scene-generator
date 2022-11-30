@@ -1,0 +1,100 @@
+# Use a specific room size and starting position/rotation for this task.
+room_dimensions:
+    x: 10
+    y: 4
+    z: 10
+performer_start_position:
+    x: 0
+    y: 0
+    z: -3
+performer_start_rotation:
+    x: 0
+    y: 0
+
+# The performer agent is frozen until the turntable (cog) is finished rotating.
+freezes:
+    - begin: 1
+      end: 150
+
+# Add a Retrieval goal with a soccer ball as the target object.
+goal:
+    category: retrieval
+    target:
+        shape: soccer_ball
+        scale: 1.0
+
+# Only the target can be a soccer ball.
+excluded_shapes: soccer_ball
+
+# Generate a large turntable (cog) with a specific color, height, position,
+# radius, and starting rotation (facing).
+structural_turntables:
+    - num: 1
+      position:
+          x: 0
+          y: 0
+          z: 2
+      rotation_y: 0
+      turntable_radius: 2
+      # Start rotating the turntable after the lids have been placed on their
+      # containers. It will rotate by either 5 or -5 degrees on each step.
+      turntable_movement:
+          step_begin: 78
+          step_end:
+              # 78 (step_begin) + 17 (at 5 degrees per step: 90 degrees)
+              - 95
+              # 78 (step_begin) + 35 (at 5 degrees per step: 180 degrees)
+              - 113
+              # 78 (step_begin) + 53 (at 5 degrees per step: 270 degrees)
+              - 131
+              # 78 (step_begin) + 71 (at 5 degrees per step: 360 degrees)
+              - 149
+
+specific_interactable_objects:
+    # Generate one, two, or three identical containers using a specific scale
+    # and shape that are each positioned on top of the turntable (cog).
+    - num: [1, 2, 3]
+      labels: containers
+      scale: 0.4
+      shape: separate_container
+      keyword_location:
+          keyword: on_center
+          relative_object_label: turntables
+          # Each container will either be on the left edge, the right edge, or
+          # the middle of the turntable (cog).
+          position_relative_to_start:
+              - x: -0.9
+                z: 0
+              - x: 0
+                z: 0
+              - x: 0.9
+                z: 0
+      # The containers should all have the same starting rotation (facing).
+      rotation:
+          x: 0
+          y: 0
+          z: 0
+      # The containers' lids descend at a specific step.
+      separate_lid: 36
+
+placers:
+    # Generate a placer that starts holding the target object, descends from
+    # the ceiling on step 1 above one of the containers, releases the target
+    # object into that container, and ascends back into the ceiling.
+    - num: 1
+      activation_step: 1
+      placed_object_labels: target
+      placed_object_above: containers
+      placed_object_rotation: 0
+      end_height: 0.35
+
+# Can only open one container in each scene.
+restrict_open_objects: true
+
+# Override the defaults to avoid randomly generating any other objects besides
+# the turntable, containers, lids, placers, and target. Remove these lines if
+# you want additional randomly generated objects.
+random_structural_objects:
+    - num: 0
+keyword_objects:
+    - num: 0

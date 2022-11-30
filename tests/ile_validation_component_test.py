@@ -235,7 +235,7 @@ def test_valid_path_with_platform_and_ramp():
     component = ValidPathComponent({'check_valid_path': True})
     scene = prior_scene_with_target()
     scene.set_performer_start_position(x=1.9, y=0.5, z=-2.009)
-    scene.set_performer_start_rotation(y=225)
+    scene.set_performer_start_rotation(x=0, y=225)
 
     objs = scene.objects
 
@@ -377,7 +377,7 @@ def test_valid_path_with_platform_and_ramp_delayed():
     scene = prior_scene_with_target()
     # start with invalid performer position
     scene.set_performer_start_position(x=10, y=0.5, z=10)
-    scene.set_performer_start_rotation(y=225)
+    scene.set_performer_start_rotation(x=0, y=225)
 
     objs = scene.objects
 

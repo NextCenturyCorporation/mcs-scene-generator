@@ -1,8 +1,9 @@
 import copy
 import logging
+import math
 import random
 from dataclasses import dataclass
-from typing import List, Union
+from typing import Any, Dict, List, Union
 
 from machine_common_sense.config_manager import Vector3d
 from shapely.geometry import Point, Polygon
@@ -12,11 +13,23 @@ from generator.agents import (
     AGENT_TYPES,
     add_agent_action,
     add_agent_movement,
-    create_agent
+    add_agent_pointing,
+    create_agent,
+    estimate_move_step_length
 )
-from generator.geometry import MAX_TRIES
+from generator.geometry import (
+    MAX_TRIES,
+    calculate_rotations,
+    create_bounds,
+    move_to_location,
+    validate_location_rect
+)
 from generator.scene import Scene
-from ideal_learning_env.defs import ILEException
+from ideal_learning_env.defs import (
+    ILEDelayException,
+    ILEException,
+    find_bounds
+)
 from ideal_learning_env.feature_creation_service import (
     BaseFeatureConfig,
     BaseObjectCreationService,
@@ -28,6 +41,7 @@ from ideal_learning_env.interactable_object_service import (
 )
 from ideal_learning_env.object_services import (
     KeywordLocation,
+    ObjectRepository,
     add_random_placement_tag,
     reconcile_template
 )
@@ -40,6 +54,7 @@ from .defs import (
 )
 from .numerics import (
     MinMaxInt,
+    RandomizableFloat,
     RandomizableInt,
     RandomizableVectorFloat3d,
     VectorFloatConfig
@@ -72,29 +87,28 @@ class AgentActionConfig():
 @dataclass
 class AgentMovementConfig():
     """Represents what movements the agent is to perform.  If the
-    'points' field is set, the 'bounds' and 'num_points' fields will
+    `points` field is set, the `bounds` and `num_points` fields will
     be ignored.
-    - `animation` (str or list of str): Determines animation that
-    should occur while movement is happening.
-    Default: 'TPM_walk' or 'TPM_run'
+    - `animation` (str, or list of str): The animation that will be shown while
+    the agent moves. Default: 'TPM_walk' or 'TPM_run'
+    - `bounds` (list of [VectorFloatConfig](#VectorFloatConfig) dicts): A set
+    of points that create a polygon, inside of which the movement `points` will
+    be chosen randomly. If `bounds` has fewer than 3 points, then the entire
+    room is used as the bounds. This option is ignored if `points` is
+    configured. Default: Entire room
+    - `num_points` (int, or [MinMaxInt](#MinMaxInt) dict, or list of ints
+    and/or MinMaxInt dicts): The number of random movement points to generate
+    inside of the `bounds`. This option is ignored if `points` is set.
+    Default: between 2 and 10, inclusive.
+    - `points` (list of [VectorFloatConfig](#VectorFloatConfig)): The list of
+    points to which the agent should move. If set, `points` takes precedence
+    over `bounds` and `num_points`. Default: Use `bounds`
+    - `repeat` (bool or list of bool): Whether the agent's movement pattern
+    should loop indefinitely (`true`) or end when finished (`false`).
+    Default: random
     - `step_begin` (int, or list of ints, or [MinMaxInt](#MinMaxInt) dict):
-    The step at which this movement should start.
-    - `points` (list of [VectorFloatConfig](#VectorFloatConfig)): List of
-    points the agent should move to.  If this value is set, it will take
-    precedence over 'bounds' and 'num_points'.  Default: Use bounds
-    - `bounds` (list of [VectorFloatConfig](#VectorFloatConfig)): A set of
-    points that create a polygon in which points will be generated inside.
-    If there are less than 3 points, the entire room will be used.  This
-    option will be ignored if 'points' is set.
-    Default: Entire room
-    - `num_points` (int, or list of ints, or [MinMaxInt](#MinMaxInt) dict):
-    The number of points to generate inside the bounds.  Only valid if points
-    is not used.  Default: random between 2 and 10 inclusive.
-    - `repeat` (bool or list of bool): Determines whether the
-    set of movements should loop or end when finished.
-    Default: Random
+    The step at which this movement should start. Required.
     """
-
     animation: RandomizableString = None
     step_begin: RandomizableInt = None
     points: List[RandomizableVectorFloat3d] = None
@@ -104,11 +118,60 @@ class AgentMovementConfig():
 
 
 @dataclass
+class AgentPointingConfig():
+    """Represents the agent pointing.
+    - `object_label` (string, or list of strings): The label of the object in
+    the scene at which to point. Default: The agent points in whatever
+    direction it's facing (based on its `rotation_y` setting).
+    The step in which the pointing should start. Default: 1
+    - `step_begin` (int, or [MinMaxInt](#MinMaxInt) dict, or list of ints
+    and/or MinMaxInt dicts): The step on which the pointing should start.
+    The agent will idle up to this step. If `walk_distance` is set, then the
+    movement will begin on this step, and the pointing will happen immediately
+    after the movement. Default: 1
+    `walk_distance` (float, or [MinMaxFloat](#MinMaxFloat) dict, or list of
+    floats and/or MinMaxFloat dict): If set, adjusts the agent's starting
+    position (which can still be set normally using the `position` option) by
+    the configured distance in the direction away from the object corresponding
+    to `object_label`; the agent will then turn around, walk two times the
+    configured distance, and then point at the object. Will override
+    `step_begin` to be after the movement ends. Use the `step_begin` option to
+    configure when the movement should begin. Default: no movement
+    """
+    object_label: RandomizableString = None
+    step_begin: RandomizableInt = None
+    walk_distance: RandomizableFloat = None
+
+
+@dataclass
 class AgentSettings():
     # TODO copied from MCS.  See if we can use MCS version after release.
-    """Describes the appearance of the agent.  Detailed information can be
-    found in the MCS schema documentation.  All values Default to a random
-    value in the full range of that value.
+    """Describes the appearance of the agent. Each property defaults to a
+    random valid setting. Please see the sections in our [schema doc](
+    https://nextcenturycorporation.github.io/MCS/schema.html#agent-settings)
+    for the available options.
+    - `chest` (int, or list of ints)
+    - `chestMaterial` (int, or list of ints)
+    - `eyes` (int, or list of ints)
+    - `feet` (int, or list of ints)
+    - `feetMaterial` (int, or list of ints)
+    - `glasses` (int, or list of ints)
+    - `hair` (int, or list of ints)
+    - `hairMaterial` (int, or list of ints)
+    - `hatMaterial` (int, or list of ints)
+    - `hideHair` (bool, or list of bools)
+    - `isElder` (bool, or list of bools)
+    - `jacket` (int, or list of ints)
+    - `jacketMaterial` (int, or list of ints)
+    - `legs` (int, or list of ints)
+    - `legsMaterial` (int, or list of ints)
+    - `showBeard` (bool, or list of bools)
+    - `showGlasses` (bool, or list of bools)
+    - `showJacket` (bool, or list of bools)
+    - `showTie` (bool, or list of bools)
+    - `skin` (int, or list of ints)
+    - `tie` (int, or list of ints)
+    - `tieMaterial` (int, or list of ints)
     """
     chest: RandomizableInt = 0
     chestMaterial: RandomizableInt = 0
@@ -136,39 +199,46 @@ class AgentSettings():
 
 @dataclass
 class AgentConfig(BaseFeatureConfig):
-    """Represents the template for a specific object (with one or more possible
+    """Represents the template for a specific agent (with one or more possible
     variations) that will be added to each scene. Each template can have the
     following optional properties:
-    - `num` (int, or list of ints, or [MinMaxInt](#MinMaxInt) dict): The number
-    of agents with this template to generate in each scene. For a list or a
-    MinMaxInt, a new number will be randomly chosen for each scene.
-    Default: `1`
-    - `actions` ([AgentActionConfig](#AgentActionConfig)) or list of
-    ([AgentActionConfig](#AgentActionConfig)): The config for agent actions
-    or animations.  Enties in a list are NOT choices.  Each entry will be kept
-    and any randomness will be reconciled inside the entry.
-    - `movement` ([AgentMovementConfig](#AgentMovementConfig)) or list of
-    ([AgentMovementConfig](#AgentMovementConfig)): The config for agent
-    movement.
-    - `agent_settings` ([AgentSettings](#AgentSettings) or list of
-    [AgentSettings](#AgentSettings)): The settings that describe how an agent
-    will look. Default: random
+    - `num` (int, or [MinMaxInt](#MinMaxInt) dict, or list of ints and/or
+    MinMaxInt dicts): The number of agents with this template to generate in
+    each scene. For a list or a MinMaxInt, a new number will be randomly chosen
+    for each scene. Default: `1`
+    - `actions` ([AgentActionConfig](#AgentActionConfig)) dict, or list of
+    AgentActionConfig dicts): Configures the agent's actions (a.k.a.
+    animations). If configured as a list, each action will be applied, and any
+    randomness will be reconciled within each array element for each scene.
+    Default: idle
+    - `agent_settings` ([AgentSettings](#AgentSettings) dict, or list of
+    AgentSettings dicts): Configures the agent's appearance. Default: random
+    - `keyword_location` ([KeywordLocationConfig](#KeywordLocationConfig)
+    dict): A keyword location for this agent.
+    - `movement` (bool, or [AgentMovementConfig](#AgentMovementConfig)) dict,
+    or list of bools and/or AgentMovementConfig dicts): Configures this agent
+    to move (walk/run) around the room. If `true`, the agent will be assigned
+    a random movement pattern for each scene. If configured as a list, one
+    option will be randomly chosen for each scene. Default: none
+    - `pointing` ([AgentPointingConfig](#AgentPointingConfig) dict, or list of
+    AgentPointingConfig dicts): Configures this agent to start pointing on a
+    specific step. The pointing lasts indefinitely. This cancels out any other
+    actions or movement. Use `pointing.object_label` to point at a specific
+    object. Use `pointing.walk_distance` to turn around and walk toward the
+    object before pointing at it. If configured as a list, one option will be
+    randomly chosen for each scene. Default: none
     - `position` ([VectorFloatConfig](#VectorFloatConfig) dict, or list of
-    VectorFloatConfig dicts): The position of this object in each scene. For a
-    list, a new position will be randomly chosen for each scene.
-    Default: random
-    - `rotation_y` (int, or list of ints, or [MinMaxInt](#MinMaxInt) dict):
-    The rotation of this object in each scene. For a
-    list, a new rotation will be randomly chosen for each scene.
-    Default: random
-    - `type`: (string or list of strings) string to indicate the model of
-    agent to use.  Options are: agent_female_01, agent_female_02,
-    agent_female_04, agent_male_02, agent_male_03, agent_male_04.
-    Default: random
-    - `keyword_location`: ([KeywordLocationConfig](#KeywordLocationConfig)):
-    One of the keyword locations for this agent or set of agents. Any choices
-    in `keyword_location` are made for each object inside the group, not the
-    group as a whole.
+    VectorFloatConfig dicts): The position of this agent in each scene. If
+    configured as a list, a new position will be randomly chosen for each
+    scene. Default: random
+    - `rotation_y` (int, or [MinMaxInt](#MinMaxInt) dict, or list of ints
+    and/or MinMaxInt dicts): The rotation of this agent in each scene. If
+    configured as a list, a new rotation will be randomly chosen for each
+    scene. Default: random
+    - `type` (string, or list of strings) The model ("type") of the agent.
+    Please see the list in our [schema doc](
+    https://nextcenturycorporation.github.io/MCS/schema.html#agents) for all
+    available options. Default: random
 
     Example:
     ```
@@ -195,8 +265,13 @@ class AgentConfig(BaseFeatureConfig):
     position: Union[VectorFloatConfig, List[VectorFloatConfig]] = None
     rotation_y: Union[int, MinMaxInt, List[Union[int, MinMaxInt]]] = None
     actions: List[AgentActionConfig] = None
-    movement: Union[AgentMovementConfig, List[AgentMovementConfig]] = None
+    movement: Union[
+        bool,
+        AgentMovementConfig,
+        List[Union[bool, AgentMovementConfig]]
+    ] = None
     keyword_location: KeywordLocationConfig = None
+    pointing: Union[AgentPointingConfig, List[AgentPointingConfig]] = None
 
 
 def get_default_agent_settings():
@@ -228,8 +303,7 @@ def get_default_agent_settings():
 
 DEFAULT_TEMPLATE_AGENT = AgentConfig(
     num=0, type=AGENT_TYPES, agent_settings=get_default_agent_settings(),
-    position=None, actions=None,
-    rotation_y=MinMaxInt(0, 359))
+    position=None, actions=None, rotation_y=MinMaxInt(0, 359), pointing=None)
 
 DEFAULT_TEMPLATE_AGENT_MOVEMENT = AgentMovementConfig(
     animation=['TPM_walk', 'TPM_run'], step_begin=MinMaxInt(0, 20),
@@ -253,23 +327,27 @@ class AgentCreationService(BaseObjectCreationService):
         template.actions = copy.deepcopy(source_template.actions)
         reconciled_actions = [choose_random(action)
                               for action in template.actions or []]
+
         if template.movement:
+            if template.movement is True:
+                template.movement = AgentMovementConfig()
             template.movement = reconcile_template(
-                DEFAULT_TEMPLATE_AGENT_MOVEMENT, template.movement)
+                DEFAULT_TEMPLATE_AGENT_MOVEMENT,
+                template.movement
+            )
+
             if template.movement.bounds:
-                template.movement.bounds = copy.deepcopy(
-                    source_template.movement.bounds)
-                reconciled_bounds = [
-                    choose_random(bound) for bound in
-                    template.movement.bounds or []]
-                template.movement.bounds = reconciled_bounds
+                template.movement.bounds = [
+                    choose_random(bound)
+                    for bound in source_template.movement.bounds.copy()
+                ] or None
+
             if template.movement.points:
-                template.movement.points = copy.deepcopy(
-                    source_template.movement.points)
-                reconciled_points = [
-                    choose_random(point) for point in
-                    template.movement.points or []]
-                template.movement.points = reconciled_points
+                template.movement.points = [
+                    choose_random(point)
+                    for point in source_template.movement.points.copy()
+                ] or None
+
         template.actions = reconciled_actions
 
         template.position = choose_position(
@@ -313,10 +391,14 @@ class AgentCreationService(BaseObjectCreationService):
             if reconciled.keyword_location.keyword != KeywordLocation.RANDOM:
                 KeywordLocation.move_to_keyword_location(
                     instance=agent,
-                    keyword_location=reconciled.keyword_location,
+                    reconciled=reconciled.keyword_location,
+                    source=source_template.keyword_location,
                     performer_start=scene.performer_start,
                     room_dimensions=scene.room_dimensions,
                     bounds=self.bounds)
+
+        if reconciled.pointing:
+            AgentCreationService.add_pointing(agent, scene, reconciled)
 
         for action in reconciled.actions or []:
             if not action.id:
@@ -333,9 +415,13 @@ class AgentCreationService(BaseObjectCreationService):
                 step_begin=action.step_begin,
                 step_end=action.step_end,
                 is_loop=action.is_loop_animation or False)
+
         if reconciled.movement:
             movement = reconciled.movement
-            if movement.points:
+            if movement is True or not movement.points:
+                AgentCreationService.add_random_agent_movement(
+                    scene, agent, movement)
+            else:
                 points = [(p.x, p.z) for p in movement.points]
                 add_agent_movement(
                     agent,
@@ -343,12 +429,127 @@ class AgentCreationService(BaseObjectCreationService):
                     points,
                     movement.animation,
                     movement.repeat)
-            else:
-                AgentCreationService.add_random_agent_movement(
-                    scene, agent, movement)
-        add_random_placement_tag(
-            agent, source_template)
+
+        add_random_placement_tag(agent, source_template)
+
         return agent
+
+    def add_pointing(
+        agent: Dict[str, Any],
+        scene: Scene,
+        reconciled: AgentConfig
+    ) -> None:
+        # Cannot configure any actions or movement.
+        reconciled.actions = None
+        reconciled.movement = None
+
+        add_agent_pointing(
+            agent=agent,
+            step_begin=(reconciled.pointing.step_begin or 1)
+        )
+
+        # If the agent is not pointing at a specific object, return here.
+        if not reconciled.pointing.object_label:
+            return
+
+        # Retrieve the object using the label, or delay if necessary.
+        object_repository = ObjectRepository.get_instance()
+        object_idl = object_repository.get_one_from_labeled_objects(
+            reconciled.pointing.object_label
+        )
+        if not object_idl:
+            raise ILEDelayException(
+                f'Cannot find object_label={reconciled.pointing.object_label} '
+                f'for agent pointing configuration.'
+            )
+        # Rotate the agent to face the configured object.
+        agent_position = agent['shows'][0]['position']
+        object_position = object_idl.instance['shows'][0]['position']
+        _, rotation_y = calculate_rotations(
+            Vector3d(**agent_position),
+            Vector3d(**object_position),
+            no_rounding_to_tens=True
+        )
+        agent['shows'][0]['rotation']['y'] = rotation_y
+
+        # If the agent is not walking toward a specific object, return here.
+        if not reconciled.pointing.walk_distance:
+            return
+
+        # Calculate the agent's new starting position, as well as its ending
+        # position, by drawing a line from the object's position to the agent's
+        # original position, and adding or subtracting the walk distance.
+        distance = math.dist(
+            [object_position['x'], object_position['z']],
+            [agent_position['x'], agent_position['z']]
+        )
+        begin_distance = distance + reconciled.pointing.walk_distance
+        end_distance = distance - reconciled.pointing.walk_distance
+
+        distance_x = agent_position['x'] - object_position['x']
+        distance_z = agent_position['z'] - object_position['z']
+        angle_radians = math.atan2(distance_z, distance_x)
+        angle_cos = math.cos(angle_radians)
+        angle_sin = math.sin(angle_radians)
+
+        begin_x = round(object_position['x'] + (begin_distance * angle_cos), 4)
+        begin_z = round(object_position['z'] + (begin_distance * angle_sin), 4)
+        end_x = round(object_position['x'] + (end_distance * angle_cos), 4)
+        end_z = round(object_position['z'] + (end_distance * angle_sin), 4)
+
+        # Save the original position for use elsewhere in the code.
+        agent['debug']['originalPosition'] = agent['shows'][0]['position']
+        # Move the agent to its new location based on the walk_distance.
+        agent = move_to_location(agent, {
+            'position': {
+                'x': begin_x,
+                'y': agent_position['y'],
+                'z': begin_z
+            },
+            'rotation': {
+                'x': 0,
+                'y': (agent['shows'][0]['rotation']['y'] + 180) % 360,
+                'z': 0
+            }
+        })
+        bounds_without_agent = find_bounds(scene, ignore_ids=[agent['id']])
+        ending_bounds = create_bounds(
+            agent['debug']['dimensions'],
+            agent['debug']['offset'],
+            {'x': end_x, 'y': agent['shows'][0]['position']['y'], 'z': end_z},
+            {'x': 0, 'y': agent['shows'][0]['rotation']['y'] + 180, 'z': 0},
+            agent['debug']['positionY']
+        )
+        # Ensure the agent's new position will not cause any collisions.
+        if not validate_location_rect(
+            agent['shows'][0]['boundingBox'],
+            vars(scene.performer_start.position),
+            # Ignore the agent's bounding box here.
+            bounds_without_agent,
+            vars(scene.room_dimensions)
+        ) or not validate_location_rect(
+            ending_bounds,
+            vars(scene.performer_start.position),
+            # Ignore the agent's bounding box here.
+            bounds_without_agent,
+            vars(scene.room_dimensions)
+        ):
+            raise ILEException(
+                f'The configured walk_distance for a pointing agent causes a '
+                f'collision with another object: '
+                f'position={agent["shows"][0]["position"]} '
+                f'walk_distance={reconciled.pointing.walk_distance}'
+            )
+        # Add the walking movement at the configured step, or 1 by default.
+        walk_step = reconciled.pointing.step_begin or 1
+        add_agent_movement(agent, walk_step, [(end_x, end_z)])
+        move_step_length = estimate_move_step_length(
+            {'x': begin_x, 'z': begin_z},
+            {'x': end_x, 'z': end_z}
+        )
+        # Reset the agent's pointing action to be after the movement.
+        agent['actions'] = []
+        add_agent_pointing(agent, walk_step + move_step_length)
 
     @staticmethod
     def add_random_agent_movement(

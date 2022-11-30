@@ -28,7 +28,6 @@ from .global_settings_component import GlobalSettingsComponent
 from .goal_services import GoalConfig
 from .interactable_object_service import InteractableObjectConfig
 from .interactable_objects_component import (
-    KeywordLocationConfig,
     KeywordObjectsConfig,
     RandomInteractableObjectsComponent,
     RandomKeywordObjectsComponent,
@@ -44,6 +43,7 @@ from .numerics import (
 from .object_services import (
     InstanceDefinitionLocationTuple,
     KeywordLocation,
+    KeywordLocationConfig,
     MaterialRestrictions,
     ObjectRepository
 )

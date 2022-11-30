@@ -328,3 +328,18 @@ def test_random_agent_component_doc_example():
         assert item['animation'] == 'TPE_walk'
         assert -2 <= item['endPoint']['x'] <= 2
         assert -2 <= item['endPoint']['z'] <= 2
+
+
+def test_agent_delay():
+    scene = Scene()
+    component = SpecificAgentComponent({
+        'specific_agents': {
+            'num': 1,
+            'keyword_location': {
+                'keyword': 'adjacent',
+                'relative_object_label': 'my_label'
+            }
+        }
+    })
+    component.update_ile_scene(scene)
+    assert len(component._delayed_templates) == 1

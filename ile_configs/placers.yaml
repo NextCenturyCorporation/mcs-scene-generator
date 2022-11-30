@@ -11,26 +11,30 @@ goal:
 excluded_shapes: soccer_ball
 
 # Generate many placers. One will begin holding the target, then release it.
-# Some placers will begin holding other objects, then release them.
-# Some placers will be empty (not holding an object) but still go through
-# the up/down motion.
 placers:
     - num: 1
       placed_object_labels: target
       # 50% of the time the object will be released in mid-air.
       end_height: [0, 0, 0, 0, 0, 0, 0.25, 0.5, 0.75, 1, 1.25, 1.5]
+    # Some placers will remain empty (never holding an object) but still go
+    # through the same down/up motion.
+    - num:
+        min: 1
+        max: 2
+      # 50% of the time the object will be released in mid-air.
+      end_height: [0, 0, 0, 0, 0, 0, 0.25, 0.5, 0.75, 1, 1.25, 1.5]
+      empty_placer: True
+    # Some placers will begin holding other objects, then release them.
     - num:
         min: 2
         max: 4
       # 50% of the time the object will be released in mid-air.
-      end_height: [0, 0, 0, 0, 0, 0, 0.25, 0.5, 0.75, 1, 1.25, 1.5]
-      empty_placer: True
+      end_height: [0, 0, 0, 0, 0, 0, 0.25, 0.5, 0.75, 1, 1.25, 1.5]      
+    # Some placers will pickup random small objects that begin on the ground.
     - num:
         min: 2
-        max: 5
-      # 50% of the time the object will be released in mid-air.
-      end_height: [0, 0, 0, 0, 0, 0, 0.25, 0.5, 0.75, 1, 1.25, 1.5]      
-      empty_placer: False
+        max: 4
+      pickup_object: True
 
 # Override the default to avoid randomly generating any other objects besides
 # the target and the objects that begin held by placers. Remove these lines if

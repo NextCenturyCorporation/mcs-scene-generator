@@ -5392,7 +5392,7 @@ def test_placer_specific():
     assert placer['moves'][0]['stepBegin'] == 5
     assert placer['moves'][0]['stepEnd'] == 10
     assert placer['moves'][1]['stepBegin'] == 21
-    assert placer['moves'][1]['stepEnd'] == 26
+    assert placer['moves'][1]['stepEnd'] == 25
     assert placer['changeMaterials'][0]['stepBegin'] == 16
 
     assert ObjectRepository.get_instance().has_label('placers')
@@ -5428,6 +5428,166 @@ def test_placer_empty_placer():
     # Test that only placer objects are in scene
     for obj in objs:
         assert obj['type'] == 'cylinder'
+
+
+def test_placer_pickup_object():
+    component = SpecificStructuralObjectsComponent({
+        'placers': [{
+            'num': 1,
+            'labels': 'test_label',
+            'pickup_object': True,
+            'placed_object_position': {
+                'x': 3,
+                'y': 0,
+                'z': 2
+            },
+            'placed_object_scale': {
+                'x': 1,
+                'y': 1,
+                'z': 1
+            },
+            'placed_object_shape': 'soccer_ball',
+            'activation_step': 1,
+            'deactivation_step': 50
+        }],
+        'room_dimensions': {
+            'x': 10,
+            'y': 5,
+            'z': 10,
+        }
+    })
+
+    assert isinstance(component.placers, List)
+    pre_placer = component.placers[0]
+    assert isinstance(pre_placer, StructuralPlacerConfig)
+    assert pre_placer.num == 1
+
+    scene = component.update_ile_scene(prior_scene())
+    assert isinstance(scene.objects, list)
+    objs = scene.objects
+
+    # Test number of placers are within min/max range
+    # assert == len(objs)
+
+    # Test that only placer and object are in the scene
+    assert len(scene.objects) == 2
+    for obj in objs:
+        assert obj['type'] == 'cylinder' or 'soccer_ball'
+
+    soccer_ball = scene.objects[0]
+    assert soccer_ball['type'] == 'soccer_ball'
+    assert soccer_ball['moveable']
+    assert soccer_ball['shows'][0]['position']['x'] == 3
+    assert soccer_ball['shows'][0]['position']['z'] == 2
+    assert soccer_ball['shows'][0]['scale']['x'] == 1
+    assert soccer_ball['shows'][0]['scale']['y'] == 1
+    assert soccer_ball['shows'][0]['scale']['z'] == 1
+    assert soccer_ball['moves'][0]['stepBegin'] == 55
+    assert soccer_ball['moves'][0]['stepEnd'] == 64
+    assert soccer_ball['togglePhysics'][0]['stepBegin'] == 1
+
+    placer = scene.objects[1]
+    assert placer['id'].startswith('placer_')
+    assert placer['type'] == 'cylinder'
+    assert placer['kinematic']
+    assert placer['structure']
+    assert placer['shows'][0]['position']['x'] == 3
+    assert placer['shows'][0]['position']['z'] == 2
+    assert placer['moves'][0]['stepBegin'] == 1
+    assert placer['moves'][0]['stepEnd'] == 11
+    assert placer['moves'][1]['stepBegin'] == 55
+    assert placer['moves'][1]['stepEnd'] == 64
+    assert placer['changeMaterials'][0]['stepBegin'] == 50
+
+
+def test_placer_shellgame_move():
+    component = SpecificStructuralObjectsComponent({
+        'placers': [{
+            'num': 1,
+            'labels': 'test_label',
+            'move_object': True,
+            'placed_object_position': {
+                'x': 3,
+                'y': 0,
+                'z': 3
+            },
+            'placed_object_scale': {
+                'x': 1,
+                'y': 1,
+                'z': 1
+            },
+            'move_object_end_position': {
+                'x': -3,
+                'y': 0,
+                'z': 3
+            },
+            'placed_object_rotation': 0,
+            'placed_object_shape': 'train_1',
+            'activation_step': 1,
+            'deactivation_step': 55
+        }],
+        'room_dimensions': {
+            'x': 20,
+            'y': 5,
+            'z': 20,
+        }
+    })
+
+    assert isinstance(component.placers, List)
+    pre_placer = component.placers[0]
+    assert isinstance(pre_placer, StructuralPlacerConfig)
+    assert pre_placer.num == 1
+
+    scene = component.update_ile_scene(prior_scene())
+    assert isinstance(scene.objects, list)
+    objs = scene.objects
+
+    # Test that only placer and object are in the scene
+    assert len(scene.objects) == 2
+    for obj in objs:
+        assert obj['type'] == 'cylinder' or 'train_1'
+
+    train_1 = scene.objects[0]
+    assert train_1['type'] == 'train_1'
+    assert train_1['moveable']
+    assert train_1['shows'][0]['position']['x'] == 3
+    assert train_1['shows'][0]['position']['z'] == 3
+    assert train_1['shows'][0]['scale']['x'] == 1
+    assert train_1['shows'][0]['scale']['y'] == 1
+    assert train_1['shows'][0]['scale']['z'] == 1
+    assert train_1['moves'][0]['stepBegin'] == 18
+    assert train_1['moves'][0]['stepEnd'] == 23
+    assert train_1['moves'][0]['vector'] == {'x': 0, 'y': 0, 'z': -0.25}
+    assert train_1['moves'][1]['stepBegin'] == 24
+    assert train_1['moves'][1]['stepEnd'] == 47
+    assert train_1['moves'][1]['vector'] == {'x': -0.25, 'y': 0, 'z': 0}
+    assert train_1['moves'][2]['stepBegin'] == 48
+    assert train_1['moves'][2]['stepEnd'] == 53
+    assert train_1['moves'][2]['vector'] == {'x': 0, 'y': 0, 'z': 0.25}
+
+    placer = scene.objects[1]
+    assert placer['id'].startswith('placer_')
+    assert placer['type'] == 'cylinder'
+    assert placer['kinematic']
+    assert placer['structure']
+    assert placer['shows'][0]['position']['x'] == 3
+    assert placer['shows'][0]['position']['z'] == 3
+    assert placer['moves'][0]['stepBegin'] == 1
+    assert placer['moves'][0]['stepEnd'] == 11
+    assert placer['moves'][0]['vector'] == {'x': 0, 'y': -.25, 'z': 0}
+    assert placer['moves'][1]['stepBegin'] == 17
+    assert placer['moves'][1]['stepEnd'] == 22
+    assert placer['moves'][1]['vector'] == {'x': 0, 'y': 0, 'z': -0.25}
+    assert placer['changeMaterials'][0]['stepBegin'] == 13
+    assert placer['moves'][2]['stepBegin'] == 23
+    assert placer['moves'][2]['stepEnd'] == 46
+    assert placer['moves'][2]['vector'] == {'x': -0.25, 'y': 0, 'z': 0}
+    assert placer['moves'][3]['stepBegin'] == 47
+    assert placer['moves'][3]['stepEnd'] == 52
+    assert placer['moves'][3]['vector'] == {'x': 0, 'y': 0, 'z': 0.25}
+    assert placer['moves'][4]['stepBegin'] == 57
+    assert placer['moves'][4]['stepEnd'] == 67
+    assert placer['moves'][4]['vector'] == {'x': 0, 'y': .25, 'z': 0}
 
 
 def test_placer_deactivation_step():
@@ -5487,7 +5647,7 @@ def test_placer_deactivation_step():
     assert placer['moves'][0]['stepBegin'] == 1
     assert placer['moves'][0]['stepEnd'] == 7
     assert placer['moves'][1]['stepBegin'] == 55
-    assert placer['moves'][1]['stepEnd'] == 61
+    assert placer['moves'][1]['stepEnd'] == 60
     assert placer['changeMaterials'][0]['stepBegin'] == 50
 
     assert ObjectRepository.get_instance().has_label('placers')
@@ -5761,7 +5921,7 @@ def test_placer_with_existing_labels():
     assert placer['moves'][0]['stepEnd'] == 11
     assert placer['moves'][0]['vector'] == {'x': 0, 'y': -0.25, 'z': 0}
     assert placer['moves'][1]['stepBegin'] == 22
-    assert placer['moves'][1]['stepEnd'] == 32
+    assert placer['moves'][1]['stepEnd'] == 31
     assert placer['moves'][1]['vector'] == {'x': 0, 'y': 0.25, 'z': 0}
     assert ObjectRepository.get_instance().has_label('placers')
     assert not ObjectRepository.get_instance().has_label('test_label')
@@ -5873,7 +6033,7 @@ def test_placer_with_new_labels():
     assert placer['moves'][0]['stepEnd'] == 10
     assert placer['moves'][0]['vector'] == {'x': 0, 'y': -0.25, 'z': 0}
     assert placer['moves'][1]['stepBegin'] == 21
-    assert placer['moves'][1]['stepEnd'] == 30
+    assert placer['moves'][1]['stepEnd'] == 29
     assert placer['moves'][1]['vector'] == {'x': 0, 'y': 0.25, 'z': 0}
     assert ObjectRepository.get_instance().has_label('placers')
     assert not ObjectRepository.get_instance().has_label('test_label')
@@ -5901,9 +6061,10 @@ def test_placer_with_used_target():
         component.update_ile_scene(prior_scene_with_target())
 
 
-def test_placer_test_overlap_fail():
+def test_placer_overlap_success():
     component = SpecificStructuralObjectsComponent({
         'placers': [{
+            # Two placers holding objects at the same position
             'num': 2,
             'placed_object_position': {
                 'x': 3,
@@ -5921,18 +6082,20 @@ def test_placer_test_overlap_fail():
             'placed_object_shape': 'ball'
         }]
     })
-    with pytest.raises(ILEException):
-        component.update_ile_scene(prior_scene())
+    scene = component.update_ile_scene(prior_scene())
+    assert len(scene.objects) == 4
 
 
-def test_placer_test_overlap_cleanup():
+def test_placer_overlap_failure():
     component = SpecificStructuralObjectsComponent({
         'placers': [{
             'num': 1,
+            'pickup_object': True,
+            # Should match the target's position in prior_scene_with_target
             'placed_object_position': {
-                'x': 3,
+                'x': -1.03,
                 'y': 0,
-                'z': 2
+                'z': 4.08
             },
             'placed_object_rotation': 27,
             'placed_object_scale': {
@@ -5945,12 +6108,40 @@ def test_placer_test_overlap_cleanup():
             'placed_object_shape': 'ball'
         }]
     })
-    scene = component.update_ile_scene(prior_scene())
+    scene = prior_scene_with_target()
+    with pytest.raises(ILEException):
+        component.update_ile_scene(scene)
+
+
+def test_placer_overlap_failure_cleanup():
+    component = SpecificStructuralObjectsComponent({
+        'placers': [{
+            'num': 1,
+            'pickup_object': True,
+            # Should match the target's position in prior_scene_with_target
+            'placed_object_position': {
+                'x': -1.03,
+                'y': 0,
+                'z': 4.08
+            },
+            'placed_object_rotation': 27,
+            'placed_object_scale': {
+                'x': .8,
+                'y': 1.1,
+                'z': 1.3
+            },
+            'placed_object_material':
+            'AI2-THOR/Materials/Metals/BrushedAluminum_Blue',
+            'placed_object_shape': 'ball'
+        }]
+    })
+    scene = prior_scene_with_target()
     try:
-        scene = component.update_ile_scene(scene)
+        component.update_ile_scene(scene)
     except BaseException:
+        # This should raise an exception; see test_placer_overlap_failure
         ...
-    assert len(scene.objects) == 2
+    assert len(scene.objects) == 1
 
 
 def test_placer_container_asymmetric():
@@ -6022,7 +6213,7 @@ def test_placer_container_asymmetric():
     assert placer['moves'][0]['stepEnd'] == 4
     assert placer['moves'][0]['vector'] == {'x': 0, 'y': -0.25, 'z': 0}
     assert placer['moves'][1]['stepBegin'] == 15
-    assert placer['moves'][1]['stepEnd'] == 16
+    assert placer['moves'][1]['stepEnd'] == 15
     assert placer['moves'][1]['vector'] == {'x': 0, 'y': 0.25, 'z': 0}
 
     assert len(placer['changeMaterials']) == 1
@@ -6046,7 +6237,7 @@ def test_placer_container_asymmetric():
     assert placer['moves'][0]['stepEnd'] == 4
     assert placer['moves'][0]['vector'] == {'x': 0, 'y': -0.25, 'z': 0}
     assert placer['moves'][1]['stepBegin'] == 15
-    assert placer['moves'][1]['stepEnd'] == 16
+    assert placer['moves'][1]['stepEnd'] == 15
     assert placer['moves'][1]['vector'] == {'x': 0, 'y': 0.25, 'z': 0}
 
     assert len(placer['changeMaterials']) == 1
@@ -6127,7 +6318,7 @@ def test_placer_container_asymmetric_with_rotation():
     assert placer['moves'][0]['stepEnd'] == 4
     assert placer['moves'][0]['vector'] == {'x': 0, 'y': -0.25, 'z': 0}
     assert placer['moves'][1]['stepBegin'] == 15
-    assert placer['moves'][1]['stepEnd'] == 16
+    assert placer['moves'][1]['stepEnd'] == 15
     assert placer['moves'][1]['vector'] == {'x': 0, 'y': 0.25, 'z': 0}
 
     assert len(placer['changeMaterials']) == 1
@@ -6153,7 +6344,7 @@ def test_placer_container_asymmetric_with_rotation():
     assert placer['moves'][0]['stepEnd'] == 4
     assert placer['moves'][0]['vector'] == {'x': 0, 'y': -0.25, 'z': 0}
     assert placer['moves'][1]['stepBegin'] == 15
-    assert placer['moves'][1]['stepEnd'] == 16
+    assert placer['moves'][1]['stepEnd'] == 15
     assert placer['moves'][1]['vector'] == {'x': 0, 'y': 0.25, 'z': 0}
 
     assert len(placer['changeMaterials']) == 1

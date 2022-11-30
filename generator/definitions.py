@@ -82,6 +82,7 @@ class SizeChoice(_DefinitionChoice):
     openAreas: List[Dict[str, Any]] = None
     placerOffsetX: List[float] = None
     placerOffsetY: List[float] = None
+    placerOffsetZ: List[float] = None
     positionY: float = None
     scale: Vector3d = None
     sideways: Dict[str, Any] = None
@@ -96,6 +97,7 @@ class SizeChoice(_DefinitionChoice):
         'openAreas',
         'placerOffsetX',
         'placerOffsetY',
+        'placerOffsetZ',
         'positionY',
         'scale',
         'sideways',
@@ -114,6 +116,7 @@ class SizeChoice(_DefinitionChoice):
         openAreas: List[Dict[str, Any]] = None,
         placerOffsetX: List[float] = None,
         placerOffsetY: List[float] = None,
+        placerOffsetZ: List[float] = None,
         positionY: float = 0,
         scale: Vector3d = None,
         sideways: Dict[str, Any] = None,
@@ -128,6 +131,7 @@ class SizeChoice(_DefinitionChoice):
         self.openAreas = openAreas or []
         self.placerOffsetX = placerOffsetX
         self.placerOffsetY = placerOffsetY
+        self.placerOffsetZ = placerOffsetZ
         self.positionY = positionY
         self.scale = scale or Vector3d(x=1, y=1, z=1)
         self.sideways = sideways
@@ -236,6 +240,7 @@ class ObjectDefinition(
         poly=None,
         placerOffsetX: List[float] = None,
         placerOffsetY: List[float] = None,
+        placerOffsetZ: List[float] = None,
         positionY: float = 0,
         prettyName: str = None,
         rotation: Vector3d = None,
@@ -270,6 +275,7 @@ class ObjectDefinition(
         self.poly = poly
         self.placerOffsetX = placerOffsetX
         self.placerOffsetY = placerOffsetY
+        self.placerOffsetZ = placerOffsetZ
         self.positionY = positionY
         self.prettyName = prettyName
         self.rotation = rotation or Vector3d()
