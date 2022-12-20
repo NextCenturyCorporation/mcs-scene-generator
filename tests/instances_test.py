@@ -3,7 +3,11 @@ import random
 from machine_common_sense.config_manager import Vector3d
 
 from generator import ObjectDefinition, base_objects
-from generator.instances import instantiate_object
+from generator.instances import (
+    get_earliest_active_step,
+    get_last_move_or_rotate_step,
+    instantiate_object
+)
 
 
 def test_instantiate_object():
@@ -481,3 +485,41 @@ def test_instantiate_soccer_ball():
     assert instance['shows'][0]['position'] == location['position']
     assert instance['shows'][0]['rotation'] == location['rotation']
     assert instance['shows'][0]['scale'] == vars(definition.scale)
+
+
+def test_get_earliest_active_step():
+    assert -1 == get_earliest_active_step({})
+    assert -1 == get_earliest_active_step({
+        'forces': [],
+        'moves': [],
+        'rotates': [],
+        'torques': []
+    })
+    assert 2 == get_earliest_active_step({'forces': [{'stepBegin': 2}]})
+    assert 3 == get_earliest_active_step({'moves': [{'stepBegin': 3}]})
+    assert 4 == get_earliest_active_step({'rotates': [{'stepBegin': 4}]})
+    assert 5 == get_earliest_active_step({'torques': [{'stepBegin': 5}]})
+    assert 10 == get_earliest_active_step({
+        'moves': [{'stepBegin': 10}, {'stepBegin': 15}]
+    })
+    assert 20 == get_earliest_active_step({
+        'moves': [{'stepBegin': 25}],
+        'rotates': [{'stepBegin': 20}]
+    })
+
+
+def test_get_last_move_or_rotate_step():
+    assert -1 == get_last_move_or_rotate_step({})
+    assert -1 == get_last_move_or_rotate_step({
+        'moves': [],
+        'rotates': [],
+    })
+    assert 2 == get_last_move_or_rotate_step({'moves': [{'stepEnd': 2}]})
+    assert 3 == get_last_move_or_rotate_step({'rotates': [{'stepEnd': 3}]})
+    assert 15 == get_last_move_or_rotate_step({
+        'moves': [{'stepEnd': 10}, {'stepEnd': 15}]
+    })
+    assert 25 == get_last_move_or_rotate_step({
+        'moves': [{'stepEnd': 20}],
+        'rotates': [{'stepEnd': 25}]
+    })

@@ -19,11 +19,11 @@ shortcut_lava_target_tool:
 room_dimensions:
     x:
         min: 15
-        max: 30
+        max: 25
     y: 3
     z:
         min: 15
-        max: 30
+        max: 25
 room_shape: square
 
 # Override the defaults to avoid randomly generating any other objects besides

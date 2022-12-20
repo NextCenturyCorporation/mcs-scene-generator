@@ -12,11 +12,11 @@ excluded_shapes: soccer_ball
 room_dimensions:
     x:
         min: 10
-        max: 30
+        max: 25
     y: 3
     z:
         min: 10
-        max: 30
+        max: 25
 
 # Generate a random number of holes.
 holes:

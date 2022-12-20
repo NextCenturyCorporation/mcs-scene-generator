@@ -21,6 +21,7 @@ from ideal_learning_env.defs import (
     ILEDelayException,
     ILEException,
     ILESharedConfiguration,
+    RandomizableString,
     find_bounds
 )
 from ideal_learning_env.feature_creation_service import (
@@ -72,12 +73,12 @@ class InteractableObjectConfig(BaseFeatureConfig):
     dict): Overrides the `num` option. Count the total number of targets,
     subtract `num_targets_minus` from the count, and generate that many
     objects. For example, in a scene with 5 targets, a `num_targets_minus` of
-    1 would generate 4 objects. Default: null
+    1 would generate 4 objects. Default: Use `num`
     - `dimensions` ([VectorFloatConfig](#VectorFloatConfig) dict, int,
     [MinMaxInt](#MinMaxInt), or a list of any of those types): Sets the
     dimensions of the object in meters. Overrides `scale`. If only one
     dimension is configured, then the same scale will be used for the other two
-    dimensions. Default: Use scale.
+    dimensions. Default: Use `scale`
     - `identical_to` (str): Used to match to another object with
     the specified label, so that this definition can share that object's
     exact shape, scale, and material. Overrides `identical_except_color`
@@ -95,20 +96,6 @@ class InteractableObjectConfig(BaseFeatureConfig):
     - `locked` (bool or list of bools): If true and the resulting object is
     lockable, like a container or door, the object will be locked.  If the
     object is not lockable, this field has no affect.
-    - `separate_lid` (int, or list of ints, or [MinMaxInt](#MinMaxInt) dict):
-    Only applies to objects with a 'separate_container' shape.
-    If a negative number or None the container will not have a sepearate lid.
-    If 0 the container will have a separate lid already attatched at the
-    start of the scene. If greater than 0 the container's separate lid will
-    be placed by a placer. The number given will be the step the placer starts
-    its placement. 15 steps later the lid will be attached to the object.
-    Note that if the container has any `moves` configured, the placer and
-    separate lid will automatically calculate the x,z position of the container
-    until the step it starts it decent. So ensure the container is not moving
-    from the step the placer begins its decent to when the lid attachment
-    occurs 15 steps later, otherwise the placer will place the lid where
-    the container was at the step it started its decent while the container
-    moves away from that position.
     - `material` (string, or list of strings): The material (color/texture) to
     use on this object in each scene. For a list, a new material will be
     randomly chosen for each scene. Default: random
@@ -134,6 +121,32 @@ class InteractableObjectConfig(BaseFeatureConfig):
     scene. A single float will be used as the scale for all object dimensions
     (X/Y/Z). For a list or a MinMaxFloat, a new scale will be randomly chosen
     for each scene. This field can be overriden by 'dimensions'. Default: `1`
+    - `separate_lid` (int, or list of ints, or [MinMaxInt](#MinMaxInt) dict):
+    Only applies to objects with a 'separate_container' shape.
+    If a negative number or None the container will not have a separate lid.
+    If 0 the container will have a separate lid already attatched at the
+    start of the scene. If greater than 0 the container's separate lid will
+    be placed by a placer. The number given will be the step the placer starts
+    its placement. 15 steps later the lid will be attached to the object.
+    Note that if the container has any `moves` configured, the placer and
+    separate lid will automatically calculate the x,z position of the container
+    until the step it starts it decent. So ensure the container is not moving
+    from the step the placer begins its decent to when the lid attachment
+    occurs 15 steps later, otherwise the placer will place the lid where
+    the container was at the step it started its decent while the container
+    moves away from that position.
+    - `separate_lid_after`: (str, or list of strs): Overrides the
+    `separate_lid` (overriding the manual config) based on the movement of
+    other object(s) in the scene. Should be set to one or more labels for
+    mechanical objects that may move or rotate, like placers. The
+    `separate_lid` of this object will be set to the step immediately after ALL
+    of the objects finish moving and rotating. If multiple labels are
+    configured, all labels will be used. Please note that if this container is
+    moved by a "placer" before its lid is attached, then its lid will be
+    correctly repositioned to use the new location; but if this container
+    changes position before its lid is attached due to a turntable rotating
+    underneath it, then its lid will NOT be correctly repositioned.
+    Default: Use `separate_lid`
     - `shape` (string, or list of strings): The shape (object type) of this
     object in each scene. For a list, a new shape will be randomly chosen for
     each scene. Default: random
@@ -216,12 +229,14 @@ class InteractableObjectConfig(BaseFeatureConfig):
         MinMaxInt,
         List[Union[int, MinMaxInt]]
     ] = None
+    separate_lid_after: RandomizableString = None
 
 
 DEFAULT_TEMPLATE_INTERACTABLE = InteractableObjectConfig(
     num=1, material=None, scale=1, shape=None, position=None, rotation=None,
     keyword_location=None, locked=False, separate_lid=None, labels=None,
-    identical_to=None, identical_except_color=None, not_material=None)
+    identical_to=None, identical_except_color=None, not_material=None,
+    separate_lid_after=None)
 
 
 class InteractableObjectCreationService(BaseObjectCreationService):
@@ -293,6 +308,9 @@ class InteractableObjectCreationService(BaseObjectCreationService):
                 reconciled.position.x = position_x
             if position_z is not None:
                 reconciled.position.z = position_z
+
+        # Save ALL the labels.
+        reconciled.labels = source_template.labels or []
 
         return reconciled
 
@@ -370,13 +388,6 @@ class InteractableObjectCreationService(BaseObjectCreationService):
                     reconciled_template.labels
                 )
                 scene.objects.append(obj)
-                separate_lid = reconciled_template.separate_lid
-                if (
-                    obj['type'] == 'separate_container' and
-                    separate_lid is not None and separate_lid is not False and
-                    separate_lid >= 0
-                ):
-                    self._add_separate_lid(scene, separate_lid, obj)
 
         log_feature_template(
             self._get_type().lower().replace('_', ' '),
@@ -386,8 +397,8 @@ class InteractableObjectCreationService(BaseObjectCreationService):
             [None, reconciled_template]
         )
 
-    def _add_separate_lid(
-        self,
+    @staticmethod
+    def add_separate_lid(
         scene: Scene,
         lid_step_begin: int,
         container_obj: Dict[str, Any]
@@ -422,11 +433,16 @@ class InteractableObjectCreationService(BaseObjectCreationService):
         }
         container_obj['debug']['lidId'] = lid['id']
         if lid_step_begin > 0:
-            self._create_placer_for_separate_lid(
+            InteractableObjectCreationService.create_placer_for_separate_lid(
                 scene, lid, container_obj, lid_step_begin)
 
-    def _create_placer_for_separate_lid(
-            self, scene: Scene, lid, container, step_begin):
+    @staticmethod
+    def create_placer_for_separate_lid(
+        scene: Scene,
+        lid: Dict[str, Any],
+        container: Dict[str, Any],
+        step_begin: int
+    ) -> None:
         scene.debug['containsSeparateLids'] = True
         end_height = lid['shows'][0]['position']['y']
         lid['shows'][0]['position']['y'] = end_height + scene.room_dimensions.y

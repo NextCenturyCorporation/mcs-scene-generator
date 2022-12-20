@@ -28,6 +28,7 @@ from ideal_learning_env.defs import (
     ILEConfigurationException,
     ILEDelayException,
     ILEException,
+    RandomizableString,
     return_list
 )
 
@@ -301,6 +302,7 @@ class KeywordLocation():
                 definition
             )
         idl = InstanceDefinitionLocationTuple(instance, definition, location)
+        idl.instance['debug']['positionedBy'] = reconciled.keyword
         idl.instance['debug'][DEBUG_FINAL_POSITION_KEY] = True
         return idl
 
@@ -418,6 +420,10 @@ class KeywordLocation():
             relative_instance = idl.instance
             relative_defn = idl.definition
             rel_object_location = idl.location
+            relative_instance['debug']['positionedBy'] = (
+                relative_instance['debug'].get('positionedBy') or
+                'relative_label'
+            )
             relative_instance['debug'][DEBUG_FINAL_POSITION_KEY] = True
 
         if keyword in [
@@ -534,6 +540,10 @@ class KeywordLocation():
                     relative_instance = idl.instance
                     relative_defn = idl.definition
                     rel_object_location = idl.location
+                    relative_instance['debug']['positionedBy'] = (
+                        relative_instance['debug'].get('positionedBy') or
+                        'relative_label'
+                    )
                     relative_instance['debug'][DEBUG_FINAL_POSITION_KEY] = True
                 except Exception:
                     attempts += 1
@@ -562,7 +572,6 @@ class KeywordLocation():
         idl = obj_repo.get_one_from_labeled_objects(con_tag)
         con_inst = idl.instance
         con_defn = idl.definition
-        con_inst['debug'][DEBUG_FINAL_POSITION_KEY] = True
 
         if keyword == KeywordLocation.IN_CONTAINER:
             indexes = containers.can_contain(con_defn, definition)
@@ -596,6 +605,11 @@ class KeywordLocation():
 
                         instance['togglePhysics'] = tog_list
 
+                con_inst['debug']['positionedBy'] = (
+                    positioned_by or 'container_label'
+                )
+                con_inst['debug'][DEBUG_FINAL_POSITION_KEY] = True
+
                 # Location will be None here because its dependent on the
                 # parent and shouldn't be used to locate other objects
                 return None
@@ -619,7 +633,14 @@ class KeywordLocation():
                 containers.put_objects_in_container(
                     instance, relative_instance, con_inst, idx,
                     orientation, rots[0], rots[1])
-                relative_instance['debug']['positionedBy'] = reconciled.keyword
+                relative_instance['debug']['positionedBy'] = (
+                    relative_instance['debug'].get('positionedBy') or
+                    'relative_label'
+                )
+                con_inst['debug']['positionedBy'] = (
+                    con_inst['debug'].get('positionBy') or 'container_label'
+                )
+                con_inst['debug'][DEBUG_FINAL_POSITION_KEY] = True
                 return None
             else:
                 raise ILEException(
@@ -757,3 +778,52 @@ class RelativePositionConfig():
     use_x: Union[bool, List[bool]] = None
     use_z: Union[bool, List[bool]] = None
     view_angle_x: Union[bool, List[bool]] = None
+
+
+def get_step_after_movement(labels: RandomizableString) -> int:
+    """Return the step after the last step on which all the objects for all the
+    given labels are scripted to end moving or rotating. Raise an
+    ILEDelayException if any of the labels do not have objects."""
+    object_repository = ObjectRepository.get_instance()
+    last_step = 0
+    for label in return_list(labels):
+        if not label:
+            continue
+        objects = object_repository.get_all_from_labeled_objects(label)
+        if not objects:
+            raise ILEDelayException(
+                f'Cannot find any existing objects with label: {label}'
+            )
+        for idl in objects:
+            step = instances.get_earliest_active_step(idl.instance)
+            step = instances.get_last_move_or_rotate_step(idl.instance)
+            if step > last_step:
+                last_step = step
+    return last_step + 1
+
+
+def get_step_after_movement_or_start(labels: RandomizableString) -> int:
+    """Return 1 if all the objects for all the given labels are scripted to
+    begin moving and rotating AFTER step 1 (or not at all); otherwise return
+    the step after the last step on which all the objects for all the given
+    labels are scripted to end moving or rotating. Raise an ILEDelayException
+    if any of the labels do not have objects."""
+    object_repository = ObjectRepository.get_instance()
+    last_step = 0
+    earliest_step = 0
+    for label in return_list(labels):
+        if not label:
+            continue
+        objects = object_repository.get_all_from_labeled_objects(label)
+        if not objects:
+            raise ILEDelayException(
+                'Cannot find any existing objects with label: {label}'
+            )
+        for idl in objects:
+            step = instances.get_earliest_active_step(idl.instance)
+            if step >= 0 and (earliest_step == 0 or step < earliest_step):
+                earliest_step = step
+            step = instances.get_last_move_or_rotate_step(idl.instance)
+            if step > last_step:
+                last_step = step
+    return (last_step + 1) if earliest_step == 1 else 1

@@ -56,14 +56,14 @@ dict): A keyword location for this agent.
 or list of bools and/or AgentMovementConfig dicts): Configures this agent
 to move (walk/run) around the room. If `true`, the agent will be assigned
 a random movement pattern for each scene. If configured as a list, one
-option will be randomly chosen for each scene. Default: none
+option will be randomly chosen for each scene. Default: no movement
 - `pointing` ([AgentPointingConfig](#AgentPointingConfig) dict, or list of
 AgentPointingConfig dicts): Configures this agent to start pointing on a
 specific step. The pointing lasts indefinitely. This cancels out any other
 actions or movement. Use `pointing.object_label` to point at a specific
 object. Use `pointing.walk_distance` to turn around and walk toward the
 object before pointing at it. If configured as a list, one option will be
-randomly chosen for each scene. Default: none
+randomly chosen for each scene. Default: no pointing
 - `position` ([VectorFloatConfig](#VectorFloatConfig) dict, or list of
 VectorFloatConfig dicts): The position of this agent in each scene. If
 configured as a list, a new position will be randomly chosen for each
@@ -203,7 +203,7 @@ than 1). Default: False
 - `other_platforms` ([StructuralPlatformConfig](#StructuralPlatformConfig)
 dict, or list of StructuralPlatformConfig dicts): Configurations to
 generate other platforms that may intersect with the bisecting platform.
-Default: None
+Default: No other platforms
 
 #### FloorAreaConfig
 
@@ -322,12 +322,12 @@ Default: `1`
 dict): Overrides the `num` option. Count the total number of targets,
 subtract `num_targets_minus` from the count, and generate that many
 objects. For example, in a scene with 5 targets, a `num_targets_minus` of
-1 would generate 4 objects. Default: null
+1 would generate 4 objects. Default: Use `num`
 - `dimensions` ([VectorFloatConfig](#VectorFloatConfig) dict, int,
 [MinMaxInt](#MinMaxInt), or a list of any of those types): Sets the
 dimensions of the object in meters. Overrides `scale`. If only one
 dimension is configured, then the same scale will be used for the other two
-dimensions. Default: Use scale.
+dimensions. Default: Use `scale`
 - `identical_to` (str): Used to match to another object with
 the specified label, so that this definition can share that object's
 exact shape, scale, and material. Overrides `identical_except_color`
@@ -345,20 +345,6 @@ specific label options for details.
 - `locked` (bool or list of bools): If true and the resulting object is
 lockable, like a container or door, the object will be locked.  If the
 object is not lockable, this field has no affect.
-- `separate_lid` (int, or list of ints, or [MinMaxInt](#MinMaxInt) dict):
-Only applies to objects with a 'separate_container' shape.
-If a negative number or None the container will not have a sepearate lid.
-If 0 the container will have a separate lid already attatched at the
-start of the scene. If greater than 0 the container's separate lid will
-be placed by a placer. The number given will be the step the placer starts
-its placement. 15 steps later the lid will be attached to the object.
-Note that if the container has any `moves` configured, the placer and
-separate lid will automatically calculate the x,z position of the container
-until the step it starts it decent. So ensure the container is not moving
-from the step the placer begins its decent to when the lid attachment
-occurs 15 steps later, otherwise the placer will place the lid where
-the container was at the step it started its decent while the container
-moves away from that position.
 - `material` (string, or list of strings): The material (color/texture) to
 use on this object in each scene. For a list, a new material will be
 randomly chosen for each scene. Default: random
@@ -384,6 +370,32 @@ dict, or list of VectorFloatConfig dicts): The scale of this object in each
 scene. A single float will be used as the scale for all object dimensions
 (X/Y/Z). For a list or a MinMaxFloat, a new scale will be randomly chosen
 for each scene. This field can be overriden by 'dimensions'. Default: `1`
+- `separate_lid` (int, or list of ints, or [MinMaxInt](#MinMaxInt) dict):
+Only applies to objects with a 'separate_container' shape.
+If a negative number or None the container will not have a separate lid.
+If 0 the container will have a separate lid already attatched at the
+start of the scene. If greater than 0 the container's separate lid will
+be placed by a placer. The number given will be the step the placer starts
+its placement. 15 steps later the lid will be attached to the object.
+Note that if the container has any `moves` configured, the placer and
+separate lid will automatically calculate the x,z position of the container
+until the step it starts it decent. So ensure the container is not moving
+from the step the placer begins its decent to when the lid attachment
+occurs 15 steps later, otherwise the placer will place the lid where
+the container was at the step it started its decent while the container
+moves away from that position.
+- `separate_lid_after`: (str, or list of strs): Overrides the
+`separate_lid` (overriding the manual config) based on the movement of
+other object(s) in the scene. Should be set to one or more labels for
+mechanical objects that may move or rotate, like placers. The
+`separate_lid` of this object will be set to the step immediately after ALL
+of the objects finish moving and rotating. If multiple labels are
+configured, all labels will be used. Please note that if this container is
+moved by a "placer" before its lid is attached, then its lid will be
+correctly repositioned to use the new location; but if this container
+changes position before its lid is attached due to a turntable rotating
+underneath it, then its lid will NOT be correctly repositioned.
+Default: Use `separate_lid`
 - `shape` (string, or list of strings): The shape (object type) of this
 object in each scene. For a list, a new shape will be randomly chosen for
 each scene. Default: random
@@ -650,7 +662,7 @@ This option cannot be used with `guide_rails`.  Default: 0
 or [MinMaxFloat](#MinMaxFloat): The distance away the performer is from the
 tool at start. The performer will be at random point around a rectangular
 perimeter surrounding the tool. This option cannot be used with
-`random_performer_position`.  Default: None
+`random_performer_position`.  Default: Use `random_performer_position`
 - `tool_type` (str, or list of strs): The type of tool to generate, either
 `rectangular` or `hooked`. Note that if `hooked` tools are chosen and lava
 widths are not specified, the room will default to having an island size
@@ -687,7 +699,7 @@ max: 10
 Defines details of performer_starts_near which places the performer near an
 object of a given label at a specified distance away.
 - `label` (string or list of strings):
-Label of the object the performer will be placed near.  Default: None
+Label of the object the performer will be placed near. Required.
 - `distance` (float or list of floats):
 Distance the performer will be from the object.  Default: 0.1
 
@@ -769,6 +781,39 @@ then `true`; otherwise, `false`
 X position based on the angle of view from the performer agent's starting
 position and the relative object's position. Useful for positioning objects
 behind occluders (especially in the passive physics tasks).
+
+#### SeeingLeadsToKnowingConfig
+
+Defines details of the shortcut_seeing_leads_to_knowing shortcut.
+In this shortcut, the performer starts with four open containers in view.
+An agent will then walk into view. Placers will descend into each
+container, with only one having the soccer ball. After the placers are
+finished moving, the agent will attempt to go to the container that has
+the target object. The performer will then have to pick whether the scene
+is plausible or implausible based on the agent's behavior (note that for
+training, all generated scenes are plausible).
+- `target_behind_agent` (bool, or list of bools): Determines whether or not
+the target is behind the agent. If target is behind the agent, the agent
+will guess and go towards one of the buckets behind itself.
+
+#### SidestepsConfig
+
+Contains data to describe the performer's sidesteps.
+
+- `begin` ([RandomizableInt](#RandomizableInt)):
+The step where the performer agent starts being frozen
+and can only use the `"Pass"` action. For example, if 1, the performer
+agent must pass immediately at the start of the scene.  This is an
+inclusive limit.
+- `object_label` ([RandomizableString](#RandomizableString)):
+The label of the object the performer will sidestep around. The performer
+must be 3 distance away from the object's center for sidesteps to work.
+- `degrees` ([RandomizableInt](#RandomizableInt)):
+The positive or negative degrees the performer will sidestep around the
+object. Positive forces the performer to sidestep right while negative
+sidesteps left. The degree value must always be in 90 or -90 degree
+increments: [90, 180, 270, 360, -90, -180, -270, -360]
+Default: [90, 180, 270, 360, -90, -180, -270, -360]
 
 #### StepBeginEnd
 
@@ -935,6 +980,11 @@ position of the center of the occluder
 - `position_z` (float, or list of floats, or
 [MinMaxFloat](#MinMaxFloat) dict, or list of MinMaxFloat dicts): Z
 position of the center of the occluder
+- `move_down_only` (bool, or list of bools): If true, occluder will start
+near the ceiling, moving downwards until it touches the floor with no
+rotation. Note that if this is true, the following settings are ignored:
+`move_up_before_last_step`, `repeat_movement`, and `reverse_direction`.
+Default: false
 - `move_up_before_last_step` (bool, or list of bools): If true, repeat the
 occluder's full movement and rotation before the scene's last step. Ignored
 if `last_step` isn't configured, or if `repeat_movement` is true.
@@ -960,14 +1010,21 @@ wall (cube)
 Represents what movements the structural object will make. Currently
 only used for configuring turntables.
 
+- `end_after_rotation` (int, or list of ints, or [MinMaxInt](#MinMaxInt)
+dict, or list of MinMaxInt dicts): The amount the structure will rotate in
+full, beginning on `step_begin` and rotating `rotation_y` each step.
+All values will be % 360 (set 360 for a complete rotation). If
+`end_after_rotation` does not divide evenly by `rotation_y`, then the
+number of rotation steps will round down. Default is either 90, 180, 270,
+or 360.
 - `step_begin` (int, or list of ints, or [MinMaxInt](#MinMaxInt) dict):
-The step at which this movement should start. Default will be a
-value between 0 and 10.
+The step at which this movement should start. Default is a value between 0
+and 10.
 - `step_end` (int, or list of ints, or [MinMaxInt](#MinMaxInt) dict):
-The step at which this movement should end. Default will be a value
-between 11 and 72.
-- `rotation_y` (float, or list of floats, or [MinMaxFloat](#MinMaxFloat)
-dict, or list of MinMaxFloat dicts): The amount that the structure
+The step at which this movement should end. Overrides `end_after_rotation`.
+Default will use `end_after_rotation`.
+- `rotation_y` (int, or list of ints, or [MinMaxInt](#MinMaxInt)
+dict, or list of MinMaxInt dicts): The amount that the structure
 will rotate each step. Default is randomly either 5 or -5.
 
 #### StructuralOccludingWallConfig
@@ -1008,6 +1065,24 @@ object.
 
 - `num` (int, or list of ints, or [MinMaxInt](#MinMaxInt) dict, or list of
 MinMaxInt dicts): Number of areas to be used with these parameters
+- `activate_after`: (str, or list of strs): Overrides the `activation_step`
+(overriding the manual config) based on the movement of other object(s) in
+the scene. Should be set to one or more labels for mechanical objects that
+may move or rotate, like placers or turntables. The `activation_step` of
+this object will be set to the step immediately after ALL of the objects
+finish moving and rotating. If multiple labels are configured, all labels
+will be used. Default: Use `activation_step`
+- `activate_on_start_or_after`: (str, or list of strs, or bool): Overrides
+the `activation_step` (overriding the manual config) based on the movement
+of other object(s) in the scene. Should be set to one or more labels for
+mechanical objects that can move or rotate, like placers or turntables. If
+ANY of the objects begin moving or rotating immediately at the start of the
+scene (step 1), then the `activation_step` of this object will be set to
+the step immediately after ALL of the objects finish moving and rotating;
+otherwise, if ALL of the objects begin moving and rotating after step 1,
+then the `activation_step` of this object will be set to 1. If multiple
+labels are configured, all labels will be used. Default: Use
+`activation_step`
 - `activation_step`: (int, or list of ints, or [MinMaxInt](#MinMaxInt)
 dict, or list of MinMaxInt dicts): Step on which the placer should begin
 its downward movement. Default: between 0 and 10
@@ -1015,6 +1090,9 @@ its downward movement. Default: between 0 and 10
 dict, or list of MinMaxInt dicts): Step on which the placer should release
 its held object. This number must be a step after the end of the placer's
 downward movement. Default: At the end of the placer's downward movement
+- `empty_placer` (bool, or list of bools): If True, the placer will not
+hold/drop an object. Cannot be used in combination with any of the
+placed_object_* config options. Default: False
 - `end_height`: (float, or list of floats, or [MinMaxFloat](#MinMaxFloat)
 dict): Height at which the placer should release its held object.
 Alternatively, one can use the `end_height_relative_object_label`.
@@ -1023,8 +1101,27 @@ Default: 0 (so the held object is in contact with the floor)
 the bottom of the object held by the placer to the height of another
 (for example, the support platform in gravity scenes). This will override
 `end_height` if both are set.
+- `existing_object_required` (bool, or list of bools): If this is `true`
+and `placed_object_labels` is set, this placer will be required to use an
+existing object with the configured label. If this is `false`, and no
+objects exist with the `placed_object_labels`, then the placer will
+automatically generate a new object and assign it all the
+`placed_object_labels`. Default: False
 - `labels` (string, or list of strings): A label or labels to be assigned
 to this object. Always automatically assigned "placers"
+- `move_object` (bool): If True, a placer will be
+generated to pickup an object. Default: False
+- `move_object_end_position`: ([VectorFloatConfig](#VectorFloatConfig)
+dict, or list of VectorFloatConfig dicts): The placed object's end
+position after being moved by a placer
+- `move_object_y`: The placer will raise the object by this value
+    during the move object event.
+    Default: 0
+- `move_object_z`: The placer will move the object along the z-axis,
+    slide along the x-axis and move back.
+    Default: 1.5
+- `pickup_object` (bool): If True, a placer will be
+generated to pickup an object. Default: False
 - `placed_object_above` (string, or list of strings): A label for an
 existing object in your configuration whose X/Z position will be used for
 this placer's (and the placed object's) starting position. Overrides
@@ -1056,25 +1153,17 @@ chosen for each scene. Default: random
 - `position_relative` ([RelativePositionConfig](#RelativePositionConfig)
 dict, or list of RelativePositionConfig dicts): Configuration options for
 positioning this object relative to another object, rather than using
-`position_x` or `position_z`. If configuring this as a list, then all
+`placed_object_position`. If configuring this as a list, then all
 listed options will be applied to each scene in the listed order, with
 later options overriding earlier options if necessary. Default: not used
-- `empty_placer` (bool, or list of bools): If True, the placer will not
-hold/drop an object. Cannot be used in combination with any of the
-placed_object_* config options. Default: False
-- `pickup_object` (bool): If True, a placer will be
-generated to pickup an object. Default: False
-- `move_object` (bool): If True, a placer will be
-generated to pickup an object. Default: False
-- `move_object_end_position`: ([VectorFloatConfig](#VectorFloatConfig)
-dict, or list of VectorFloatConfig dicts): The placed object's end
-position after being moved by a placer
-- `move_object_y`: The placer will raise the object by this value
-    during the move object event.
-    Default: 0
-- `move_object_z`: The placer will move the object along the z-axis,
-    slide along the x-axis and move back.
-    Default: 1.5
+- `randomize_once` (StructuralPlacerConfig dict) Placer configuration
+options that are only randomized once. If this configuration template would
+generate more than one placer (has a `num` greater than 1), then each
+placer generated by this template will use the same randomized values for
+all the options in `randomize_once`. Default: not used
+- `retain_position` (bool, or list of bools): The placed object will
+retain its current X/Z position. Overrides `placed_object_position` and
+`placed_object_above'. Default: False
 
 #### StructuralPlatformConfig
 
@@ -1092,7 +1181,7 @@ Default: 0
 to this object. Always automatically assigned "platforms"
 - `lips` ([StructuralPlatformLipsConfig]
 (#StructuralPlatformLipsConfig), or list of
-StructuralPlatformLipsConfig): The platform's lips. Default: None
+StructuralPlatformLipsConfig): The platform's lips. Default: no lips
 - `material` (string, or list of strings): The structure's material or
 material type.
 - `platform_underneath` (bool or list of bools): If true, add a platform
@@ -1603,7 +1692,7 @@ from being randomly generated. Objects with the listed shapes can still be
 generated using specifically set configuration options, like the `type`
 property in the `goal.target` and `specific_interactable_objects` options.
 Useful if you want to avoid randomly generating additional objects of the
-same shape as a configured goal target. Default: None
+same shape as a configured goal target. Default: no excluded shapes
 
 Simple Example:
 ```
@@ -1665,6 +1754,26 @@ floor_material_override:
 
 ```
 
+#### forced_choice_multi_retrieval_target
+
+(str): Whether to set a new "multi retrieval" goal using objects of a
+specific type that already exist in the scene. Set this option to an object
+shape like `"soccer_ball"`. This option splits all matching objects into
+"left" and "right" groups based on their X positions (ignoring objects that
+are picked up by placers). All objects in the larger group will be used as
+the new goal's target(s). Overrides the configured `goal`.
+Default: not used
+
+Simple Example:
+```
+forced_choice_multi_retrieval_target: null
+```
+
+Advanced Example:
+```
+forced_choice_multi_retrieval_target: 'soccer_ball'
+```
+
 #### freezes
 
 (list of [StepBeginEnd](#StepBeginEnd) dicts): When a freeze
@@ -1695,7 +1804,7 @@ freezes:
 #### goal
 
 ([GoalConfig](#GoalConfig) dict): The goal category and target(s) in each
-scene, if any. Default: None
+scene, if any. Default: no goal
 
 Simple Example:
 ```
@@ -1825,7 +1934,7 @@ Note: Creating too many random objects can increase the chance of failure.
 
 (int, or list of ints): The last possible action step, or list of last
 steps, from which one is chosen at random for each scene. This field will
-overwrite 'auto_last_step' if set.  Default: none
+overwrite 'auto_last_step' if set.  Default: no last step
 (unlimited)
 
 Simple Example:
@@ -1900,6 +2009,72 @@ Advanced Example:
 num_random_interactable_objects:
     min: 1
     max: 10
+```
+
+#### occluder_gap
+
+(float, or list of floats, or [MinMaxFloat](#MinMaxFloat) dict: Gap (X
+distance) between moving structual occluders. Will override
+`position_x`. Only applies when `passive_physics_scene` is True.
+Default: no restrictions
+
+All scenes are generated with a .5 gap between occluders.
+
+Simple Example:
+```
+occluder_gap: .5
+```
+
+All scenes are generated with .5 or 1.0 gap between occluders.
+
+Advanced Example:
+```
+occluder_gap: [.5, 1.0]
+```
+
+All scenes are generated with a gap between (inclusive) .5 and 1.0 between
+occluders.
+
+Advanced Example:
+```
+occluder_gap:
+    min: .5
+    max: 1.0
+```
+
+#### occluder_gap_viewport
+
+(float, or list of floats, or [MinMaxFloat](#MinMaxFloat) dict: Gap (X
+distance) between occluders and edge of viewport. If both are included,
+`occluder_gap` will take precedence over `occluder_gap_viewport`.
+Will override `position_x`.
+Only applies when `passive_physics_scene` is True.
+Default: no restrictions
+
+All scenes are generated with a .5 gap between the occluder and the
+viewport.
+
+Simple Example:
+```
+occluder_gap_viewport: .5
+```
+
+All scenes are generated with .5 or 1.0 gap between occluder and the
+viewport.
+
+Advanced Example:
+```
+occluder_gap_viewport: [.5, 1.0]
+```
+
+All scenes are generated with a gap between (inclusive) .5 and 1.0 between
+the occluder nad the edge of the viewport.
+
+Advanced Example:
+```
+occluder_gap_viewport:
+    min: .5
+    max: 1.0
 ```
 
 #### passive_physics_floor
@@ -2193,7 +2368,7 @@ dicts): The total dimensions for the room, or list of dimensions, from
 which one is chosen at random for each scene. Rooms are always rectangular
 or square. The X and Z must each be within [2, 100] and the Y must be
 within [2, 10]. The room's bounds will be [-X/2, X/2] and [-Z/2, Z/2].
-Default: random X from 5 to 30, random Y from 3 to 8, random Z from 5 to 30
+Default: random X from 5 to 25, random Y from 3 to 8, random Z from 5 to 25
 
 Simple Example:
 ```
@@ -2218,7 +2393,7 @@ room_dimensions:
 
 (string): Shape of the room to restrict the randomzed room dimensions if
 `room_dimensions` weren't configured. Options: `rectangle`, `square`.
-Default: None
+Default: Use `room_dimensions`
 
 Simple Example:
 ```
@@ -2379,6 +2554,30 @@ shortcut_lava_target_tool:
   guide_rails: [True, False]
 ```
 
+#### shortcut_seeing_leads_to_knowing
+
+(bool): Shortcut for the seeing leads to knowing task. The performer
+starts with four open containers in view. An agent will then walk into
+view. Placers will descend into each container, with only one having
+the soccer ball. After the placers are finished moving, the agent
+will attempt to go to the container that has the target object. The
+performer will then have to pick whether the scene is plausible or
+implausible based on the agent's behavior (note that for training,
+all generated scenes are plausible).
+
+Default: False
+
+Simple Example:
+```
+shortcut_seeing_leads_to_knowing: False
+```
+
+Advanced Example:
+```
+shortcut_seeing_leads_to_knowing:
+    target_behind_agent: True
+```
+
 #### shortcut_start_on_platform
 
 (bool): Ensures that the performer will start on top of a platform. In
@@ -2460,6 +2659,38 @@ side_wall_opposite_colors: False
 Advanced Example:
 ```
 side_wall_opposite_colors: True
+```
+
+#### sidesteps
+
+(list of [SidestepsConfig](#SidestepsConfig) dicts): When a sequence of
+sidesteps will occur, the label of the object the performer will sidestep
+around, and the degrees around the object the performer will sidestep.
+Degrees must be in increments of
+90 or -90: [90, 180, 270, 360, -90, -180, -270, -360].
+If a consecutive list all labels MUST be identical.
+The performer must be 3 distance away from the object's center
+for sidesteps to work.
+*Important Note*: this property will OVERRIDE 'performer_look_at'
+and `performer_start_rotation` forcing the performer to look at
+this object on scene start.
+
+Simple Example:
+```
+sidesteps: null
+```
+
+Advanced Example:
+```
+sidesteps:
+  -
+    begin: 50
+    object_label: turntable
+    degrees: 90
+  -
+    begin: 1
+    object_label: turntable
+    degrees: [90, 180, 270, 360, -90, -180, -270, -360]
 ```
 
 #### specific_agents

@@ -21,13 +21,13 @@ excluded_shapes: soccer_ball
 room_dimensions:
     x:
         min: 10
-        max: 30
+        max: 25
     y:
         min: 4
         max: 8
     z:
         min: 10
-        max: 30
+        max: 25
 
 # Generate one or two independent platforms.
 structural_platforms:

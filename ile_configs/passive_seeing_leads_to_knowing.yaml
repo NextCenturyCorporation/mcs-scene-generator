@@ -1,0 +1,20 @@
+# Seeing leads to knowing:
+# 1. The performer agent starts with four open containers in view.
+# 2. An agent will then walk into view.
+# 3. Placers will descend into each container, with only one having
+#    the soccer ball.
+# 4. After the placers are finished moving, the agent will attempt to go to the
+#    container that has the target object.
+# 5. The performer agent will then have to pick whether the scene is plausible
+#    or implausible based on the agent's behavior
+# Note that the ILE only generates plausible scenes.
+shortcut_seeing_leads_to_knowing:
+    # Note that, if `target_behind_agent` is True, the agent will guess one
+    # of the two containers placed behind itself. This behavior is plausible.
+    target_behind_agent: [True, False]
+
+# Override defaults to avoid randomly generating any objects.
+keyword_objects:
+    - num: 0
+random_structural_objects:
+    - num: 0

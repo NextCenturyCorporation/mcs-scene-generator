@@ -24,7 +24,7 @@ setuptools.setup(
     python_requires=">=3.8",
     packages=setuptools.find_packages(),
     install_requires=[
-        'machine-common-sense>=0.6.1',
+        'machine-common-sense>=0.6.3',
         'pyyaml>=5.3.1',
         'shapely>=1.7.0'
     ],

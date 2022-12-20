@@ -8,8 +8,19 @@ from typing import Any, Dict, List, Union
 
 from machine_common_sense.config_manager import Vector3d
 
-from generator import MAX_TRIES, ObjectBounds, Scene, geometry, materials, tags
-from generator.base_objects import LARGE_BLOCK_TOOLS_TO_DIMENSIONS
+from generator import (
+    MAX_TRIES,
+    ObjectBounds,
+    Scene,
+    geometry,
+    instances,
+    materials,
+    tags
+)
+from generator.base_objects import (
+    LARGE_BLOCK_TOOLS_TO_DIMENSIONS,
+    create_soccer_ball
+)
 from generator.mechanisms import create_placer
 from generator.structures import (
     BASE_DOOR_HEIGHT,
@@ -37,8 +48,10 @@ from ideal_learning_env.numerics import (
     VectorIntConfig
 )
 from ideal_learning_env.object_services import (
+    InstanceDefinitionLocationTuple,
     KeywordLocation,
-    ObjectRepository
+    ObjectRepository,
+    RelativePositionConfig
 )
 from ideal_learning_env.validators import (
     ValidateNumber,
@@ -51,6 +64,7 @@ from .decorators import ile_config_setter
 from .defs import (
     ILEDelayException,
     ILEException,
+    RandomizableBool,
     RandomizableString,
     choose_random,
     find_bounds,
@@ -63,6 +77,7 @@ from .structural_object_service import (
     FloorAreaConfig,
     PartitionFloorConfig,
     StructuralDoorConfig,
+    StructuralPlacerConfig,
     StructuralPlatformConfig,
     ToolConfig
 )
@@ -102,6 +117,11 @@ TOOL_HOOKED = 'hooked'
 TOOL_LENGTH_TOO_SHORT = 1
 MIN_TOOL_CHOICE_X_DIMENSION = 20
 
+IMITATION_TASK_CONTAINER_SCALE = 1
+IMITATION_TASK_TARGET_SEPARATION = 0.6
+IMITATION_AGENT_START_X = 0.3
+IMITATION_AGENT_END_X = 0.4
+
 
 class ImprobableToolOption(str, Enum):
     NO_TOOL = 'no_tool'
@@ -109,6 +129,14 @@ class ImprobableToolOption(str, Enum):
 
 
 TARGET_CONTAINER_LABEL = 'target_container'
+
+# for seeing leads to knowing tasks
+PLACER_ACTIVATION_STEP = 50
+PLACER_DEACTIVATION_STEP = 65
+BIN_LEFT_X_POS = -1
+BIN_RIGHT_X_POS = 1
+BIN_REAR_Z_POS = 0.5
+BIN_FRONT_Z_POS = -0.5
 
 
 @dataclass
@@ -160,7 +188,7 @@ class LavaTargetToolConfig():
     or [MinMaxFloat](#MinMaxFloat): The distance away the performer is from the
     tool at start. The performer will be at random point around a rectangular
     perimeter surrounding the tool. This option cannot be used with
-    `random_performer_position`.  Default: None
+    `random_performer_position`.  Default: Use `random_performer_position`
     - `tool_type` (str, or list of strs): The type of tool to generate, either
     `rectangular` or `hooked`. Note that if `hooked` tools are chosen and lava
     widths are not specified, the room will default to having an island size
@@ -294,7 +322,7 @@ class BisectingPlatformConfig():
     - `other_platforms` ([StructuralPlatformConfig](#StructuralPlatformConfig)
     dict, or list of StructuralPlatformConfig dicts): Configurations to
     generate other platforms that may intersect with the bisecting platform.
-    Default: None
+    Default: No other platforms
     """
     has_blocking_wall: bool = True
     has_long_blocking_wall: bool = False
@@ -375,6 +403,25 @@ class ToolChoiceConfig():
     """
 
     improbable_option: RandomizableString = None
+
+
+@dataclass
+class SeeingLeadsToKnowingConfig():
+    """
+    Defines details of the shortcut_seeing_leads_to_knowing shortcut.
+    In this shortcut, the performer starts with four open containers in view.
+    An agent will then walk into view. Placers will descend into each
+    container, with only one having the soccer ball. After the placers are
+    finished moving, the agent will attempt to go to the container that has
+    the target object. The performer will then have to pick whether the scene
+    is plausible or implausible based on the agent's behavior (note that for
+    training, all generated scenes are plausible).
+    - `target_behind_agent` (bool, or list of bools): Determines whether or not
+    the target is behind the agent. If target is behind the agent, the agent
+    will guess and go towards one of the buckets behind itself.
+
+    """
+    target_behind_agent: RandomizableBool = None
 
 
 @dataclass
@@ -668,6 +715,32 @@ class ShortcutComponent(ILEComponent):
     ```
     """
 
+    shortcut_seeing_leads_to_knowing: Union[bool,
+                                            SeeingLeadsToKnowingConfig] = False
+    """
+    (bool): Shortcut for the seeing leads to knowing task. The performer
+    starts with four open containers in view. An agent will then walk into
+    view. Placers will descend into each container, with only one having
+    the soccer ball. After the placers are finished moving, the agent
+    will attempt to go to the container that has the target object. The
+    performer will then have to pick whether the scene is plausible or
+    implausible based on the agent's behavior (note that for training,
+    all generated scenes are plausible).
+
+    Default: False
+
+    Simple Example:
+    ```
+    shortcut_seeing_leads_to_knowing: False
+    ```
+
+    Advanced Example:
+    ```
+    shortcut_seeing_leads_to_knowing:
+        target_behind_agent: True
+    ```
+    """
+
     def __init__(self, data: Dict[str, Any]):
         super().__init__(data)
         self._delayed_perf_pos = False
@@ -851,6 +924,20 @@ class ShortcutComponent(ILEComponent):
         config = choose_random(config)
         return config
 
+    @ile_config_setter()
+    def set_shortcut_seeing_leads_to_knowing(self, data: Any) -> None:
+        self.shortcut_seeing_leads_to_knowing = data
+
+    def get_shortcut_seeing_leads_to_knowing(
+            self) -> Union[bool, SeeingLeadsToKnowingConfig]:
+        if self.shortcut_seeing_leads_to_knowing is False:
+            return False
+        config = self.shortcut_seeing_leads_to_knowing
+        if self.shortcut_seeing_leads_to_knowing is True:
+            config = SeeingLeadsToKnowingConfig()
+        config = choose_random(config)
+        return config
+
     # Override
     def update_ile_scene(self, scene: Dict[str, Any]) -> Dict[str, Any]:
         logger.info('Configuring shortcut options for the scene...')
@@ -864,6 +951,8 @@ class ShortcutComponent(ILEComponent):
         scene = self._add_agent_holds_target(scene)
         scene = self._add_imitation_task(scene)
         scene = self._add_lava_tool_choice_goal(scene, room_dim)
+        scene = self._add_seeing_leads_to_knowing(scene)
+
         try:
             scene = self._update_turntables_with_agent_and_non_agent(scene)
         except ILEDelayException as e:
@@ -2310,7 +2399,6 @@ class ShortcutComponent(ILEComponent):
         material_choices = materials._CUSTOM_WOOD_MATERIALS
         for container_index in container_range:
             pos_z = container_index
-            scale = 0.55
             rotation_y = -90 if config.containers_on_right_side else 90
             for _ in range(MAX_TRIES):
                 try_new_color = False
@@ -2332,9 +2420,9 @@ class ShortcutComponent(ILEComponent):
                     z=pos_z),
                 rotation=Vector3d(y=rotation_y),
                 scale=Vector3d(
-                    x=scale,
-                    y=1,
-                    z=scale),
+                    x=IMITATION_TASK_CONTAINER_SCALE,
+                    y=IMITATION_TASK_CONTAINER_SCALE,
+                    z=IMITATION_TASK_CONTAINER_SCALE),
                 shape='chest_1',
                 num=1,
                 material=material[0]
@@ -2380,7 +2468,7 @@ class ShortcutComponent(ILEComponent):
 
         # position in front of the left containers if containers on left
         # position in front of the right containers if containers on right
-        target_separation = 0.5
+        target_separation = IMITATION_TASK_TARGET_SEPARATION
         container_to_put_in_front_of_index = \
             -1 if config.containers_on_right_side else 0
         target['shows'][0]['position']['z'] = (
@@ -2453,7 +2541,8 @@ class ShortcutComponent(ILEComponent):
         for container_index in containers_to_open_indexes:
             movement_points.append(
                 Vector3d(
-                    x=0.5 if config.containers_on_right_side else -0.5,
+                    x=(IMITATION_AGENT_END_X if config.containers_on_right_side
+                       else -IMITATION_AGENT_END_X),
                     y=0,
                     z=containers[container_index]['shows'][0]['position']['z']
                 )
@@ -2511,7 +2600,8 @@ class ShortcutComponent(ILEComponent):
         end_point_z = movement_points[-1].z - 0.15
         movement_points.append(
             Vector3d(
-                x=0.5 if config.containers_on_right_side else -0.5,
+                x=(IMITATION_AGENT_END_X if config.containers_on_right_side
+                   else -IMITATION_AGENT_END_X),
                 y=0,
                 z=end_point_z))
         movement = AgentMovementConfig(
@@ -2556,7 +2646,9 @@ class ShortcutComponent(ILEComponent):
 
         # Config the agent in front of the first chest to open
         start_position = Vector3d(
-            x=-0.2 if config.containers_on_right_side else 0.2, y=0,
+            x=(-IMITATION_AGENT_START_X if
+                config.containers_on_right_side else
+                IMITATION_AGENT_START_X), y=0,
             z=(containers[containers_to_open_indexes[0]]
                          ['shows'][0]['position']['z']))
         rotation_y = 90 if config.containers_on_right_side else -90
@@ -2637,7 +2729,7 @@ class ShortcutComponent(ILEComponent):
             -1 if config.containers_on_right_side else 0]
 
         # target and placer need to shift too
-        target_separation = 0.5
+        target_separation = IMITATION_TASK_TARGET_SEPARATION
         if rotate_90:
             target['shows'][1]['position']['x'] = (
                 end_container['shows'][1]['position']['x'] +
@@ -2808,6 +2900,244 @@ class ShortcutComponent(ILEComponent):
             self._teleport_performer_for_imitation_task(
                 scene, agent, kidnap_step)
 
+    def _add_seeing_leads_to_knowing(self, scene: Scene):
+        config = self.get_shortcut_seeing_leads_to_knowing()
+        if not config:
+            return scene
+        logger.trace("Adding seeing leads to knowing shortcut")
+
+        # Fixed room dimensions -- going with 10/3/10 for now
+        scene.room_dimensions.x = 10
+        scene.room_dimensions.y = 3
+        scene.room_dimensions.z = 10
+
+        # add platform and place performer on top
+        bounds = find_bounds(scene)
+        z_start = -2.65
+        platform_config = StructuralPlatformConfig(
+            num=1, position=VectorFloatConfig(0, 0, z_start), rotation_y=0,
+            scale=VectorFloatConfig(1, 1, 1))
+        scene.set_performer_start_position(
+            x=0, y=platform_config.scale.y + geometry.PERFORMER_CAMERA_Y,
+            z=z_start)
+        scene.set_performer_start_rotation(30, 0)
+
+        FeatureCreationService.create_feature(
+            scene,
+            FeatureTypes.PLATFORMS,
+            platform_config,
+            bounds.copy()
+        )[0]
+
+        self._create_target_goal_seeing_leads_to_knowing(scene)
+
+        targets = scene.get_targets()
+        target = random.choice(targets) if targets else None
+
+        self._create_bins_placers_seeing_leads_to_knowing(scene, target)  # noqa
+
+        self._agent_setup_seeing_leads_to_knowing(config, scene, target)
+
+        return scene
+
+    def _create_bins_placers_seeing_leads_to_knowing(
+            self, scene: Scene, target: Dict[str, Any]):
+        # bin/bucket setup
+        bin_shape_choices = ['cup_2_static', 'cup_3_static', 'cup_6_static']
+        bin_shape = random.choice(bin_shape_choices)
+        bin_y_scale = 3.75 if bin_shape == 'cup_6_static' else 2.75
+        bin_scale = VectorFloatConfig(x=3, y=bin_y_scale, z=3)
+        bin_mat = random.choice(
+            materials.METAL_MATERIALS + materials.PLASTIC_MATERIALS +
+            materials.WOOD_MATERIALS
+        ).material
+
+        bin_positions = [
+            {'label': 'bin_1', 'position': VectorFloatConfig(
+                x=BIN_LEFT_X_POS, y=0, z=BIN_REAR_Z_POS)},
+            {'label': 'bin_2', 'position': VectorFloatConfig(
+                x=BIN_LEFT_X_POS, y=0, z=BIN_FRONT_Z_POS)},
+            {'label': 'bin_3', 'position': VectorFloatConfig(
+                x=BIN_RIGHT_X_POS, y=0, z=BIN_REAR_Z_POS)},
+            {'label': 'bin_4', 'position': VectorFloatConfig(
+                x=BIN_RIGHT_X_POS, y=0, z=BIN_FRONT_Z_POS)}
+        ]
+
+        # randomly choose destination bucket for target
+        target_bucket = random.choice(bin_positions)
+
+        # create bins and placers
+        for bin_pos in bin_positions:
+            bucket_config = InteractableObjectConfig(
+                material=bin_mat,
+                scale=bin_scale,
+                shape=bin_shape,
+                position=bin_pos['position'],
+                labels=bin_pos['label']
+            )
+
+            FeatureCreationService.create_feature(
+                scene, FeatureTypes.INTERACTABLE, bucket_config,
+                find_bounds(scene))[0]
+
+            end_placer_height = 0.05
+
+            # if target should be in this bucket, move target to
+            # corresponding placer
+            if(bin_pos == target_bucket):
+                relative_bin = RelativePositionConfig(
+                    label=bin_pos['label']
+                )
+
+                placer_temp = StructuralPlacerConfig(
+                    activation_step=PLACER_ACTIVATION_STEP,
+                    deactivation_step=PLACER_DEACTIVATION_STEP,
+                    end_height=end_placer_height,
+                    position_relative=relative_bin,
+                    placed_object_labels='target')
+
+                FeatureCreationService.create_feature(
+                    scene,
+                    FeatureTypes.PLACERS,
+                    placer_temp,
+                    find_bounds(scene)
+                )
+            else:
+                target_placer_y_pos = scene.room_dimensions.y - target['debug']['positionY']  # noqa
+
+                non_target_placer = create_placer(
+                    placed_object_position={
+                        'x': bin_pos['position'].x,
+                        'y': target_placer_y_pos,
+                        'z': bin_pos['position'].z,
+                    },
+                    placed_object_dimensions=target['debug']['dimensions'],
+                    placed_object_offset_y=target['debug']['positionY'],
+                    activation_step=PLACER_ACTIVATION_STEP,
+                    deactivation_step=PLACER_DEACTIVATION_STEP,
+                    end_height=end_placer_height,
+                    max_height=scene.room_dimensions.y
+                )
+
+                scene.objects.append(non_target_placer)
+
+    def _create_target_goal_seeing_leads_to_knowing(self, scene: Scene):
+        # Note that soccer ball scale is slightly smaller than usual
+        # for this type of task
+        target_def = create_soccer_ball(size=0.75)
+        origin_pos = {'position': {'x': 0, 'y': 0, 'z': 0}}
+        target_inst = instances.instantiate_object(target_def, origin_pos)
+
+        target_idl = InstanceDefinitionLocationTuple(
+            target_inst, target_def, origin_pos
+        )
+
+        obj_repo = ObjectRepository.get_instance()
+        obj_repo.add_to_labeled_objects(target_idl, 'target')
+        scene.objects.append(target_inst)
+        total_steps = 100
+
+        scene.goal = {
+            'metadata': {
+                'target': {
+                    'id': target_inst['id']
+                }
+            },
+            'category': 'passive',
+            'answer': {
+                'choice': 'plausible'
+            },
+            'last_step': total_steps,
+            'action_list': [['Pass']] * total_steps,
+            'description': ''
+        }
+
+    def _agent_setup_seeing_leads_to_knowing(
+            self, config: SeeingLeadsToKnowingConfig,
+            scene: Scene, target: Dict[str, Any]):
+        """
+        Agent Setup
+        1. Enter from left or right
+        2. Walk to middle of buckets
+        3. Idle until after placers fall and ball is dropped in bucket
+        4. Walk to a bucket, possibly rotating before hand if correct bucket
+           is behind performer
+        """
+        agent_x_start_left = -2
+        agent_x_start_right = 2
+
+        if(config.target_behind_agent):
+            agent_x_start = (
+                agent_x_start_left
+                if target['shows'][0]['position']['x'] == BIN_LEFT_X_POS
+                else agent_x_start_right
+            )
+        else:
+            agent_x_start = (
+                agent_x_start_left
+                if target['shows'][0]['position']['x'] == BIN_RIGHT_X_POS
+                else agent_x_start_right
+            )
+
+        agent_start_position = Vector3d(x=agent_x_start, y=0, z=0)
+
+        walk_animation = "TPM_walk"
+        movement_points = []
+        movement_points.append(
+            Vector3d(
+                x=0,
+                y=0,
+                z=0
+            )
+        )
+
+        actions = []
+        agent_idle_begin = PLACER_ACTIVATION_STEP + 1
+        agent_idle_end = PLACER_DEACTIVATION_STEP + 6
+        agent_idle = AgentActionConfig(
+            step_begin=agent_idle_begin,
+            step_end=agent_idle_end,
+            is_loop_animation=True,
+            id='TPM_idle1'
+        )
+        actions.append(agent_idle)
+
+        # If target is in front of agent, walk towards it. Otherwise, pick a
+        # random bucket to walk towards behind the agent.
+        is_target_behind_agent = (config.target_behind_agent or
+                                  ((agent_x_start * target['shows'][0]['position']['x']) > 0))  # noqa
+
+        if(is_target_behind_agent):
+            movement_points.append(
+                VectorFloatConfig(
+                    x=target['shows'][0]['position']['x'],
+                    z=choose_random([BIN_FRONT_Z_POS, BIN_REAR_Z_POS])
+                )
+            )
+        else:
+            movement_points.append(
+                VectorFloatConfig(
+                    x=target['shows'][0]['position']['x'],
+                    z=target['shows'][0]['position']['z']
+                )
+            )
+
+        movement = AgentMovementConfig(
+            animation=walk_animation,
+            step_begin=1,
+            points=movement_points,
+            repeat=False
+        )
+        agent_config = AgentConfig(
+            position=agent_start_position,
+            rotation_y=90 if agent_x_start == agent_x_start_left else 270,
+            actions=actions,
+            movement=movement
+        )
+
+        FeatureCreationService.create_feature(
+            scene, FeatureTypes.AGENT, agent_config, find_bounds(scene))[0]
+
     def _add_imitation_task(self, scene: Scene):
         """
         Shortcut function to add all of the required scene elements for
@@ -2834,7 +3164,7 @@ class ShortcutComponent(ILEComponent):
         rectangle_direction = random.randint(0, 1)
         scene.room_dimensions.x = \
             base_dimension if rectangle_direction == 0 else rectangle_dimension
-        scene.room_dimensions.y = 3
+        scene.room_dimensions.y = 2
         scene.room_dimensions.z = \
             rectangle_dimension if rectangle_direction == 0 else base_dimension
 
@@ -2858,6 +3188,8 @@ class ShortcutComponent(ILEComponent):
             scene, config, target, placer, agent, open_steps[-1], containers,
             containers_to_open_indexes, separation_between_containers)
 
+        # raise the ceiling so the target and placer are visible
+        scene.room_dimensions.y = 3
         return scene
 
     def get_num_delayed_actions(self) -> int:

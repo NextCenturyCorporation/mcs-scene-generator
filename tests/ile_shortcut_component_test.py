@@ -22,6 +22,9 @@ from ideal_learning_env import (
 )
 from ideal_learning_env.defs import ILEException
 from ideal_learning_env.shortcut_component import (
+    IMITATION_AGENT_END_X,
+    IMITATION_AGENT_START_X,
+    IMITATION_TASK_TARGET_SEPARATION,
     LARGE_BLOCK_TOOLS_TO_DIMENSIONS,
     TripleDoorConfig
 )
@@ -57,6 +60,10 @@ def test_defaults():
     assert not component.shortcut_agent_with_target
     assert not component.get_shortcut_agent_with_target()
     assert not component.turntables_with_agent_and_non_agent
+    assert not component.get_shortcut_tool_choice()
+    assert not component.shortcut_tool_choice
+    assert not component.get_shortcut_seeing_leads_to_knowing()
+    assert not component.shortcut_seeing_leads_to_knowing
 
     scene = component.update_ile_scene(prior_scene())
     assert scene.objects == []
@@ -3023,9 +3030,9 @@ def test_shortcut_imitation_left_side_teleport_containers_rotation_left_right():
         assert containers[i]['shows'][0]['position']['z'] == (i - 1)
         assert containers[i]['shows'][0]['rotation']['y'] == 90
         assert containers[i]['type'] == 'chest_1'
-        assert containers[i]['shows'][0]['scale']['x'] == 0.55
+        assert containers[i]['shows'][0]['scale']['x'] == 1
         assert containers[i]['shows'][0]['scale']['y'] == 1
-        assert containers[i]['shows'][0]['scale']['z'] == 0.55
+        assert containers[i]['shows'][0]['scale']['z'] == 1
 
         teleport = containers[i]['shows'][1]
         assert teleport['rotation']['y'] == 180
@@ -3062,9 +3069,9 @@ def test_shortcut_imitation_left_side_teleport_containers_rotation_left_right():
     assert target['shows'][0]['position']['x'] == \
         end_container[0]['position']['x']
     assert target['shows'][0]['position']['z'] == \
-        end_container[0]['position']['z'] - 0.5
+        end_container[0]['position']['z'] - IMITATION_TASK_TARGET_SEPARATION
     assert target['shows'][1]['position']['x'] == \
-        end_container[1]['position']['x'] - 0.5
+        end_container[1]['position']['x'] - IMITATION_TASK_TARGET_SEPARATION
     assert target['shows'][1]['position']['z'] == \
         end_container[1]['position']['z']
     assert target['shows'][1]['stepBegin'] == kidnapp_step
@@ -3072,9 +3079,9 @@ def test_shortcut_imitation_left_side_teleport_containers_rotation_left_right():
     assert len(target['moves']) == 1
     assert target['moves'][0]['vector']['y'] == -0.25
     assert target['moves'][0]['stepBegin'] == 0
-    assert target['moves'][0]['stepEnd'] == 12
+    assert target['moves'][0]['stepEnd'] == 8
     assert len(target['togglePhysics']) == 1
-    assert target['togglePhysics'][0]['stepBegin'] == 18
+    assert target['togglePhysics'][0]['stepBegin'] == 14
 
     # placer
     placer = scene.objects[4]
@@ -3083,28 +3090,28 @@ def test_shortcut_imitation_left_side_teleport_containers_rotation_left_right():
     assert placer['shows'][0]['position']['x'] == \
         end_container[0]['position']['x']
     assert placer['shows'][0]['position']['z'] == \
-        end_container[0]['position']['z'] - 0.5
+        end_container[0]['position']['z'] - IMITATION_TASK_TARGET_SEPARATION
     assert placer['shows'][1]['position']['x'] == \
-        end_container[1]['position']['x'] - 0.5
+        end_container[1]['position']['x'] - IMITATION_TASK_TARGET_SEPARATION
     assert placer['shows'][1]['position']['z'] == \
         end_container[1]['position']['z']
     assert placer['shows'][1]['stepBegin'] == kidnapp_step
     assert len(placer['moves']) == 2
     assert placer['moves'][0]['stepBegin'] == 0
-    assert placer['moves'][0]['stepEnd'] == 12
+    assert placer['moves'][0]['stepEnd'] == 8
     assert placer['moves'][0]['vector']['y'] == -0.25
-    assert placer['moves'][1]['stepBegin'] == 23
-    assert placer['moves'][1]['stepEnd'] == 34
+    assert placer['moves'][1]['stepBegin'] == 19
+    assert placer['moves'][1]['stepEnd'] == 26
     assert placer['moves'][1]['vector']['y'] == 0.25
     assert len(placer['changeMaterials']) == 1
-    assert placer['changeMaterials'][0]['stepBegin'] == 18
+    assert placer['changeMaterials'][0]['stepBegin'] == 14
 
     # agent
     agent = scene.objects[5]
     assert agent['type'].startswith('agent')
     # positions
     start = agent['shows'][0]
-    assert start['position']['x'] == 0.2
+    assert start['position']['x'] == IMITATION_AGENT_START_X
     assert start['position']['z'] == -1  # left chest
     assert start['rotation']['y'] == -90  # face right
     teleport = agent['shows'][1]
@@ -3147,7 +3154,7 @@ def test_shortcut_imitation_left_side_teleport_containers_rotation_left_right():
             movement['sequence'][2]['animation'] == 'TPM_walk')
     assert (movement['sequence'][0]['endPoint']['x'] ==
             movement['sequence'][1]['endPoint']['x'] ==
-            movement['sequence'][2]['endPoint']['x'] == -0.5)
+            movement['sequence'][2]['endPoint']['x'] == -IMITATION_AGENT_END_X)
     assert movement['sequence'][0]['endPoint']['z'] == -1.0  # left
     assert movement['sequence'][1]['endPoint']['z'] == 1.0  # right
     assert movement['sequence'][2]['endPoint']['z'] == 0.85  # face performer
@@ -3215,9 +3222,9 @@ def test_shortcut_imitation_right_side_teleport_containers_rotation_left_right()
         assert containers[i]['shows'][0]['position']['z'] == -(i - 1)
         assert containers[i]['shows'][0]['rotation']['y'] == -90
         assert containers[i]['type'] == 'chest_1'
-        assert containers[i]['shows'][0]['scale']['x'] == 0.55
+        assert containers[i]['shows'][0]['scale']['x'] == 1
         assert containers[i]['shows'][0]['scale']['y'] == 1
-        assert containers[i]['shows'][0]['scale']['z'] == 0.55
+        assert containers[i]['shows'][0]['scale']['z'] == 1
 
         teleport = containers[i]['shows'][1]
         assert teleport['rotation']['y'] == 180
@@ -3254,9 +3261,9 @@ def test_shortcut_imitation_right_side_teleport_containers_rotation_left_right()
     assert target['shows'][0]['position']['x'] == \
         end_container[0]['position']['x']
     assert target['shows'][0]['position']['z'] == \
-        end_container[0]['position']['z'] - 0.5
+        end_container[0]['position']['z'] - IMITATION_TASK_TARGET_SEPARATION
     assert target['shows'][1]['position']['x'] == \
-        end_container[1]['position']['x'] + 0.5
+        end_container[1]['position']['x'] + IMITATION_TASK_TARGET_SEPARATION
     assert target['shows'][1]['position']['z'] == \
         end_container[1]['position']['z']
     assert target['shows'][1]['stepBegin'] == kidnapp_step
@@ -3264,9 +3271,9 @@ def test_shortcut_imitation_right_side_teleport_containers_rotation_left_right()
     assert len(target['moves']) == 1
     assert target['moves'][0]['vector']['y'] == -0.25
     assert target['moves'][0]['stepBegin'] == 0
-    assert target['moves'][0]['stepEnd'] == 12
+    assert target['moves'][0]['stepEnd'] == 8
     assert len(target['togglePhysics']) == 1
-    assert target['togglePhysics'][0]['stepBegin'] == 18
+    assert target['togglePhysics'][0]['stepBegin'] == 14
 
     # placer
     placer = scene.objects[4]
@@ -3275,28 +3282,28 @@ def test_shortcut_imitation_right_side_teleport_containers_rotation_left_right()
     assert placer['shows'][0]['position']['x'] == \
         end_container[0]['position']['x']
     assert placer['shows'][0]['position']['z'] == \
-        end_container[0]['position']['z'] - 0.5
+        end_container[0]['position']['z'] - IMITATION_TASK_TARGET_SEPARATION
     assert placer['shows'][1]['position']['x'] == \
-        end_container[1]['position']['x'] + 0.5
+        end_container[1]['position']['x'] + IMITATION_TASK_TARGET_SEPARATION
     assert placer['shows'][1]['position']['z'] == \
         end_container[1]['position']['z']
     assert placer['shows'][1]['stepBegin'] == kidnapp_step
     assert len(placer['moves']) == 2
     assert placer['moves'][0]['stepBegin'] == 0
-    assert placer['moves'][0]['stepEnd'] == 12
+    assert placer['moves'][0]['stepEnd'] == 8
     assert placer['moves'][0]['vector']['y'] == -0.25
-    assert placer['moves'][1]['stepBegin'] == 23
-    assert placer['moves'][1]['stepEnd'] == 34
+    assert placer['moves'][1]['stepBegin'] == 19
+    assert placer['moves'][1]['stepEnd'] == 26
     assert placer['moves'][1]['vector']['y'] == 0.25
     assert len(placer['changeMaterials']) == 1
-    assert placer['changeMaterials'][0]['stepBegin'] == 18
+    assert placer['changeMaterials'][0]['stepBegin'] == 14
 
     # agent
     agent = scene.objects[5]
     assert agent['type'].startswith('agent')
     # positions
     start = agent['shows'][0]
-    assert start['position']['x'] == -0.2
+    assert start['position']['x'] == -IMITATION_AGENT_START_X
     assert start['position']['z'] == 1  # left chest
     assert start['rotation']['y'] == 90  # face right
     teleport = agent['shows'][1]
@@ -3339,7 +3346,7 @@ def test_shortcut_imitation_right_side_teleport_containers_rotation_left_right()
             movement['sequence'][2]['animation'] == 'TPM_walk')
     assert (movement['sequence'][0]['endPoint']['x'] ==
             movement['sequence'][1]['endPoint']['x'] ==
-            movement['sequence'][2]['endPoint']['x'] == 0.5)
+            movement['sequence'][2]['endPoint']['x'] == IMITATION_AGENT_END_X)
     assert movement['sequence'][0]['endPoint']['z'] == 1.0  # left
     assert movement['sequence'][1]['endPoint']['z'] == -1.0  # right
     assert movement['sequence'][2]['endPoint']['z'] == -1.15  # face performer
@@ -3408,9 +3415,9 @@ def test_shortcut_imitation_left_side_teleport_containers_right_middle():
         assert containers[i]['shows'][0]['position']['z'] == (i - 1)
         assert containers[i]['shows'][0]['rotation']['y'] == 90
         assert containers[i]['type'] == 'chest_1'
-        assert containers[i]['shows'][0]['scale']['x'] == 0.55
+        assert containers[i]['shows'][0]['scale']['x'] == 1
         assert containers[i]['shows'][0]['scale']['y'] == 1
-        assert containers[i]['shows'][0]['scale']['z'] == 0.55
+        assert containers[i]['shows'][0]['scale']['z'] == 1
 
         teleport = containers[i]['shows'][1]
         assert teleport['rotation']['y'] == 90
@@ -3452,19 +3459,19 @@ def test_shortcut_imitation_left_side_teleport_containers_right_middle():
     assert target['shows'][0]['position']['x'] == \
         end_container[0]['position']['x']
     assert target['shows'][0]['position']['z'] == \
-        end_container[0]['position']['z'] - 0.5
+        end_container[0]['position']['z'] - IMITATION_TASK_TARGET_SEPARATION
     assert target['shows'][1]['position']['x'] == \
         end_container[1]['position']['x']
     assert target['shows'][1]['position']['z'] == \
-        end_container[1]['position']['z'] - 0.5
+        end_container[1]['position']['z'] - IMITATION_TASK_TARGET_SEPARATION
     assert target['shows'][1]['stepBegin'] == kidnapp_step
     assert target['kinematic']
     assert len(target['moves']) == 1
     assert target['moves'][0]['vector']['y'] == -0.25
     assert target['moves'][0]['stepBegin'] == 0
-    assert target['moves'][0]['stepEnd'] == 12
+    assert target['moves'][0]['stepEnd'] == 8
     assert len(target['togglePhysics']) == 1
-    assert target['togglePhysics'][0]['stepBegin'] == 18
+    assert target['togglePhysics'][0]['stepBegin'] == 14
 
     # placer
     placer = scene.objects[4]
@@ -3473,28 +3480,28 @@ def test_shortcut_imitation_left_side_teleport_containers_right_middle():
     assert placer['shows'][0]['position']['x'] == \
         end_container[0]['position']['x']
     assert placer['shows'][0]['position']['z'] == \
-        end_container[0]['position']['z'] - 0.5
+        end_container[0]['position']['z'] - IMITATION_TASK_TARGET_SEPARATION
     assert placer['shows'][1]['position']['x'] == \
         end_container[1]['position']['x']
     assert placer['shows'][1]['position']['z'] == \
-        end_container[1]['position']['z'] - 0.5
+        end_container[1]['position']['z'] - IMITATION_TASK_TARGET_SEPARATION
     assert placer['shows'][1]['stepBegin'] == kidnapp_step
     assert len(placer['moves']) == 2
     assert placer['moves'][0]['stepBegin'] == 0
-    assert placer['moves'][0]['stepEnd'] == 12
+    assert placer['moves'][0]['stepEnd'] == 8
     assert placer['moves'][0]['vector']['y'] == -0.25
-    assert placer['moves'][1]['stepBegin'] == 23
-    assert placer['moves'][1]['stepEnd'] == 34
+    assert placer['moves'][1]['stepBegin'] == 19
+    assert placer['moves'][1]['stepEnd'] == 26
     assert placer['moves'][1]['vector']['y'] == 0.25
     assert len(placer['changeMaterials']) == 1
-    assert placer['changeMaterials'][0]['stepBegin'] == 18
+    assert placer['changeMaterials'][0]['stepBegin'] == 14
 
     # agent
     agent = scene.objects[5]
     assert agent['type'].startswith('agent')
     # positions
     start = agent['shows'][0]
-    assert start['position']['x'] == 0.2
+    assert start['position']['x'] == IMITATION_AGENT_START_X
     assert start['position']['z'] == 1  # right chest
     assert start['rotation']['y'] == -90  # face left
     teleport = agent['shows'][1]
@@ -3537,7 +3544,7 @@ def test_shortcut_imitation_left_side_teleport_containers_right_middle():
             movement['sequence'][2]['animation'] == 'TPM_walk')
     assert (movement['sequence'][0]['endPoint']['x'] ==
             movement['sequence'][1]['endPoint']['x'] ==
-            movement['sequence'][2]['endPoint']['x'] == -0.5)
+            movement['sequence'][2]['endPoint']['x'] == -IMITATION_AGENT_END_X)
     assert movement['sequence'][0]['endPoint']['z'] == 1  # right
     assert movement['sequence'][1]['endPoint']['z'] == 0  # middle
     assert movement['sequence'][2]['endPoint']['z'] == -0.15  # face performer
@@ -3606,9 +3613,9 @@ def test_shortcut_imitation_right_side_teleport_containers_right_middle():
         assert containers[i]['shows'][0]['position']['z'] == -(i - 1)
         assert containers[i]['shows'][0]['rotation']['y'] == -90
         assert containers[i]['type'] == 'chest_1'
-        assert containers[i]['shows'][0]['scale']['x'] == 0.55
+        assert containers[i]['shows'][0]['scale']['x'] == 1
         assert containers[i]['shows'][0]['scale']['y'] == 1
-        assert containers[i]['shows'][0]['scale']['z'] == 0.55
+        assert containers[i]['shows'][0]['scale']['z'] == 1
 
         teleport = containers[i]['shows'][1]
         assert teleport['rotation']['y'] == -90
@@ -3649,19 +3656,19 @@ def test_shortcut_imitation_right_side_teleport_containers_right_middle():
     assert target['shows'][0]['position']['x'] == \
         end_container[0]['position']['x']
     assert target['shows'][0]['position']['z'] == \
-        end_container[0]['position']['z'] - 0.5
+        end_container[0]['position']['z'] - IMITATION_TASK_TARGET_SEPARATION
     assert target['shows'][1]['position']['x'] == \
         end_container[1]['position']['x']
     assert target['shows'][1]['position']['z'] == \
-        end_container[1]['position']['z'] - 0.5
+        end_container[1]['position']['z'] - IMITATION_TASK_TARGET_SEPARATION
     assert target['shows'][1]['stepBegin'] == kidnapp_step
     assert target['kinematic']
     assert len(target['moves']) == 1
     assert target['moves'][0]['vector']['y'] == -0.25
     assert target['moves'][0]['stepBegin'] == 0
-    assert target['moves'][0]['stepEnd'] == 12
+    assert target['moves'][0]['stepEnd'] == 8
     assert len(target['togglePhysics']) == 1
-    assert target['togglePhysics'][0]['stepBegin'] == 18
+    assert target['togglePhysics'][0]['stepBegin'] == 14
 
     # placer
     placer = scene.objects[4]
@@ -3670,28 +3677,28 @@ def test_shortcut_imitation_right_side_teleport_containers_right_middle():
     assert placer['shows'][0]['position']['x'] == \
         end_container[0]['position']['x']
     assert placer['shows'][0]['position']['z'] == \
-        end_container[0]['position']['z'] - 0.5
+        end_container[0]['position']['z'] - IMITATION_TASK_TARGET_SEPARATION
     assert placer['shows'][1]['position']['x'] == \
         end_container[1]['position']['x']
     assert placer['shows'][1]['position']['z'] == \
-        end_container[1]['position']['z'] - 0.5
+        end_container[1]['position']['z'] - IMITATION_TASK_TARGET_SEPARATION
     assert placer['shows'][1]['stepBegin'] == kidnapp_step
     assert len(placer['moves']) == 2
     assert placer['moves'][0]['stepBegin'] == 0
-    assert placer['moves'][0]['stepEnd'] == 12
+    assert placer['moves'][0]['stepEnd'] == 8
     assert placer['moves'][0]['vector']['y'] == -0.25
-    assert placer['moves'][1]['stepBegin'] == 23
-    assert placer['moves'][1]['stepEnd'] == 34
+    assert placer['moves'][1]['stepBegin'] == 19
+    assert placer['moves'][1]['stepEnd'] == 26
     assert placer['moves'][1]['vector']['y'] == 0.25
     assert len(placer['changeMaterials']) == 1
-    assert placer['changeMaterials'][0]['stepBegin'] == 18
+    assert placer['changeMaterials'][0]['stepBegin'] == 14
 
     # agent
     agent = scene.objects[5]
     assert agent['type'].startswith('agent')
     # positions
     start = agent['shows'][0]
-    assert start['position']['x'] == -0.2
+    assert start['position']['x'] == -IMITATION_AGENT_START_X
     assert start['position']['z'] == -1  # right chest
     assert start['rotation']['y'] == 90  # face right
     teleport = agent['shows'][1]
@@ -3734,7 +3741,7 @@ def test_shortcut_imitation_right_side_teleport_containers_right_middle():
             movement['sequence'][2]['animation'] == 'TPM_walk')
     assert (movement['sequence'][0]['endPoint']['x'] ==
             movement['sequence'][1]['endPoint']['x'] ==
-            movement['sequence'][2]['endPoint']['x'] == 0.5)
+            movement['sequence'][2]['endPoint']['x'] == IMITATION_AGENT_END_X)
     assert movement['sequence'][0]['endPoint']['z'] == -1  # right
     assert movement['sequence'][1]['endPoint']['z'] == 0  # middle
     assert movement['sequence'][2]['endPoint']['z'] == -0.15  # face performer
@@ -3823,9 +3830,9 @@ def test_shortcut_imitation_left_side_teleport_performer_left():
         assert containers[i]['shows'][0]['position']['z'] == (i - 1)
         assert containers[i]['shows'][0]['rotation']['y'] == 90
         assert containers[i]['type'] == 'chest_1'
-        assert containers[i]['shows'][0]['scale']['x'] == 0.55
+        assert containers[i]['shows'][0]['scale']['x'] == 1
         assert containers[i]['shows'][0]['scale']['y'] == 1
-        assert containers[i]['shows'][0]['scale']['z'] == 0.55
+        assert containers[i]['shows'][0]['scale']['z'] == 1
     # no duplicate colors
     assert len(colors_used) == len(set(colors_used))
     # open close
@@ -3843,19 +3850,19 @@ def test_shortcut_imitation_left_side_teleport_performer_left():
     assert target['shows'][0]['position']['x'] == \
         end_container[0]['position']['x']
     assert target['shows'][0]['position']['z'] == \
-        end_container[0]['position']['z'] - 0.5
+        end_container[0]['position']['z'] - IMITATION_TASK_TARGET_SEPARATION
     assert target['shows'][1]['position']['x'] == \
         end_container[0]['position']['x']
     assert target['shows'][1]['position']['z'] == \
-        end_container[0]['position']['z'] - 0.5
+        end_container[0]['position']['z'] - IMITATION_TASK_TARGET_SEPARATION
     assert target['shows'][1]['stepBegin'] == kidnapp_step
     assert target['kinematic']
     assert len(target['moves']) == 1
     assert target['moves'][0]['vector']['y'] == -0.25
     assert target['moves'][0]['stepBegin'] == 0
-    assert target['moves'][0]['stepEnd'] == 12
+    assert target['moves'][0]['stepEnd'] == 8
     assert len(target['togglePhysics']) == 1
-    assert target['togglePhysics'][0]['stepBegin'] == 18
+    assert target['togglePhysics'][0]['stepBegin'] == 14
 
     # placer
     placer = scene.objects[4]
@@ -3864,28 +3871,28 @@ def test_shortcut_imitation_left_side_teleport_performer_left():
     assert placer['shows'][0]['position']['x'] == \
         end_container[0]['position']['x']
     assert placer['shows'][0]['position']['z'] == \
-        end_container[0]['position']['z'] - 0.5
+        end_container[0]['position']['z'] - IMITATION_TASK_TARGET_SEPARATION
     assert placer['shows'][1]['position']['x'] == \
         end_container[0]['position']['x']
     assert placer['shows'][1]['position']['z'] == \
-        end_container[0]['position']['z'] - 0.5
+        end_container[0]['position']['z'] - IMITATION_TASK_TARGET_SEPARATION
     assert placer['shows'][1]['stepBegin'] == kidnapp_step
     assert len(placer['moves']) == 2
     assert placer['moves'][0]['stepBegin'] == 0
-    assert placer['moves'][0]['stepEnd'] == 12
+    assert placer['moves'][0]['stepEnd'] == 8
     assert placer['moves'][0]['vector']['y'] == -0.25
-    assert placer['moves'][1]['stepBegin'] == 23
-    assert placer['moves'][1]['stepEnd'] == 34
+    assert placer['moves'][1]['stepBegin'] == 19
+    assert placer['moves'][1]['stepEnd'] == 26
     assert placer['moves'][1]['vector']['y'] == 0.25
     assert len(placer['changeMaterials']) == 1
-    assert placer['changeMaterials'][0]['stepBegin'] == 18
+    assert placer['changeMaterials'][0]['stepBegin'] == 14
 
     # agent
     agent = scene.objects[5]
     assert agent['type'].startswith('agent')
     # positions
     start = agent['shows'][0]
-    assert start['position']['x'] == 0.2
+    assert start['position']['x'] == IMITATION_AGENT_START_X
     assert start['position']['z'] == -1  # left chest
     assert start['rotation']['y'] == -90  # face right
     # move agent after kidnapp
@@ -3914,7 +3921,7 @@ def test_shortcut_imitation_left_side_teleport_performer_left():
     assert (movement['sequence'][0]['animation'] ==
             movement['sequence'][1]['animation'] == 'TPM_walk')
     assert (movement['sequence'][0]['endPoint']['x'] ==
-            movement['sequence'][1]['endPoint']['x'] == -0.5)
+            movement['sequence'][1]['endPoint']['x'] == -IMITATION_AGENT_END_X)
     assert movement['sequence'][0]['endPoint']['z'] == -1  # left
     assert movement['sequence'][1]['endPoint']['z'] == -1.15  # face performer
 
@@ -4002,9 +4009,9 @@ def test_shortcut_imitation_right_side_teleport_performer_right():
         assert containers[i]['shows'][0]['position']['z'] == -(i - 1)
         assert containers[i]['shows'][0]['rotation']['y'] == -90
         assert containers[i]['type'] == 'chest_1'
-        assert containers[i]['shows'][0]['scale']['x'] == 0.55
+        assert containers[i]['shows'][0]['scale']['x'] == 1
         assert containers[i]['shows'][0]['scale']['y'] == 1
-        assert containers[i]['shows'][0]['scale']['z'] == 0.55
+        assert containers[i]['shows'][0]['scale']['z'] == 1
     # no duplicate colors
     assert len(colors_used) == len(set(colors_used))
     # open close
@@ -4022,19 +4029,19 @@ def test_shortcut_imitation_right_side_teleport_performer_right():
     assert target['shows'][0]['position']['x'] == \
         end_container[0]['position']['x']
     assert target['shows'][0]['position']['z'] == \
-        end_container[0]['position']['z'] - 0.5
+        end_container[0]['position']['z'] - IMITATION_TASK_TARGET_SEPARATION
     assert target['shows'][1]['position']['x'] == \
         end_container[0]['position']['x']
     assert target['shows'][1]['position']['z'] == \
-        end_container[0]['position']['z'] - 0.5
+        end_container[0]['position']['z'] - IMITATION_TASK_TARGET_SEPARATION
     assert target['shows'][1]['stepBegin'] == kidnapp_step
     assert target['kinematic']
     assert len(target['moves']) == 1
     assert target['moves'][0]['vector']['y'] == -0.25
     assert target['moves'][0]['stepBegin'] == 0
-    assert target['moves'][0]['stepEnd'] == 12
+    assert target['moves'][0]['stepEnd'] == 8
     assert len(target['togglePhysics']) == 1
-    assert target['togglePhysics'][0]['stepBegin'] == 18
+    assert target['togglePhysics'][0]['stepBegin'] == 14
 
     # placer
     placer = scene.objects[4]
@@ -4043,28 +4050,28 @@ def test_shortcut_imitation_right_side_teleport_performer_right():
     assert placer['shows'][0]['position']['x'] == \
         end_container[0]['position']['x']
     assert placer['shows'][0]['position']['z'] == \
-        end_container[0]['position']['z'] - 0.5
+        end_container[0]['position']['z'] - IMITATION_TASK_TARGET_SEPARATION
     assert placer['shows'][1]['position']['x'] == \
         end_container[0]['position']['x']
     assert placer['shows'][1]['position']['z'] == \
-        end_container[0]['position']['z'] - 0.5
+        end_container[0]['position']['z'] - IMITATION_TASK_TARGET_SEPARATION
     assert placer['shows'][1]['stepBegin'] == kidnapp_step
     assert len(placer['moves']) == 2
     assert placer['moves'][0]['stepBegin'] == 0
-    assert placer['moves'][0]['stepEnd'] == 12
+    assert placer['moves'][0]['stepEnd'] == 8
     assert placer['moves'][0]['vector']['y'] == -0.25
-    assert placer['moves'][1]['stepBegin'] == 23
-    assert placer['moves'][1]['stepEnd'] == 34
+    assert placer['moves'][1]['stepBegin'] == 19
+    assert placer['moves'][1]['stepEnd'] == 26
     assert placer['moves'][1]['vector']['y'] == 0.25
     assert len(placer['changeMaterials']) == 1
-    assert placer['changeMaterials'][0]['stepBegin'] == 18
+    assert placer['changeMaterials'][0]['stepBegin'] == 14
 
     # agent
     agent = scene.objects[5]
     assert agent['type'].startswith('agent')
     # positions
     start = agent['shows'][0]
-    assert start['position']['x'] == -0.2
+    assert start['position']['x'] == -IMITATION_AGENT_START_X
     assert start['position']['z'] == -1  # right chest
     assert start['rotation']['y'] == 90  # face right
     # move agent after kidnapp
@@ -4145,9 +4152,9 @@ def test_shortcut_imitation_left_side_middle():
         assert containers[i]['shows'][0]['position']['z'] == (i - 1)
         assert containers[i]['shows'][0]['rotation']['y'] == 90
         assert containers[i]['type'] == 'chest_1'
-        assert containers[i]['shows'][0]['scale']['x'] == 0.55
+        assert containers[i]['shows'][0]['scale']['x'] == 1
         assert containers[i]['shows'][0]['scale']['y'] == 1
-        assert containers[i]['shows'][0]['scale']['z'] == 0.55
+        assert containers[i]['shows'][0]['scale']['z'] == 1
     # no duplicate colors
     assert len(colors_used) == len(set(colors_used))
     # open close
@@ -4165,19 +4172,19 @@ def test_shortcut_imitation_left_side_middle():
     assert target['shows'][0]['position']['x'] == \
         end_container[0]['position']['x']
     assert target['shows'][0]['position']['z'] == \
-        end_container[0]['position']['z'] - 0.5
+        end_container[0]['position']['z'] - IMITATION_TASK_TARGET_SEPARATION
     assert target['shows'][1]['position']['x'] == \
         end_container[0]['position']['x']
     assert target['shows'][1]['position']['z'] == \
-        end_container[0]['position']['z'] - 0.5
+        end_container[0]['position']['z'] - IMITATION_TASK_TARGET_SEPARATION
     assert target['shows'][1]['stepBegin'] == kidnapp_step
     assert target['kinematic']
     assert len(target['moves']) == 1
     assert target['moves'][0]['vector']['y'] == -0.25
     assert target['moves'][0]['stepBegin'] == 0
-    assert target['moves'][0]['stepEnd'] == 12
+    assert target['moves'][0]['stepEnd'] == 8
     assert len(target['togglePhysics']) == 1
-    assert target['togglePhysics'][0]['stepBegin'] == 18
+    assert target['togglePhysics'][0]['stepBegin'] == 14
 
     # placer
     placer = scene.objects[4]
@@ -4186,28 +4193,28 @@ def test_shortcut_imitation_left_side_middle():
     assert placer['shows'][0]['position']['x'] == \
         end_container[0]['position']['x']
     assert placer['shows'][0]['position']['z'] == \
-        end_container[0]['position']['z'] - 0.5
+        end_container[0]['position']['z'] - IMITATION_TASK_TARGET_SEPARATION
     assert placer['shows'][1]['position']['x'] == \
         end_container[0]['position']['x']
     assert placer['shows'][1]['position']['z'] == \
-        end_container[0]['position']['z'] - 0.5
+        end_container[0]['position']['z'] - IMITATION_TASK_TARGET_SEPARATION
     assert placer['shows'][1]['stepBegin'] == kidnapp_step
     assert len(placer['moves']) == 2
     assert placer['moves'][0]['stepBegin'] == 0
-    assert placer['moves'][0]['stepEnd'] == 12
+    assert placer['moves'][0]['stepEnd'] == 8
     assert placer['moves'][0]['vector']['y'] == -0.25
-    assert placer['moves'][1]['stepBegin'] == 23
-    assert placer['moves'][1]['stepEnd'] == 34
+    assert placer['moves'][1]['stepBegin'] == 19
+    assert placer['moves'][1]['stepEnd'] == 26
     assert placer['moves'][1]['vector']['y'] == 0.25
     assert len(placer['changeMaterials']) == 1
-    assert placer['changeMaterials'][0]['stepBegin'] == 18
+    assert placer['changeMaterials'][0]['stepBegin'] == 14
 
     # agent
     agent = scene.objects[5]
     assert agent['type'].startswith('agent')
     # positions
     start = agent['shows'][0]
-    assert start['position']['x'] == 0.2
+    assert start['position']['x'] == IMITATION_AGENT_START_X
     assert start['position']['z'] == 0  # middle chest
     assert start['rotation']['y'] == -90  # face left
     # move agent after kidnapp
@@ -4233,7 +4240,7 @@ def test_shortcut_imitation_left_side_middle():
     assert (movement['sequence'][0]['animation'] ==
             movement['sequence'][1]['animation'] == 'TPM_walk')
     assert (movement['sequence'][0]['endPoint']['x'] ==
-            movement['sequence'][1]['endPoint']['x'] == -0.5)
+            movement['sequence'][1]['endPoint']['x'] == -IMITATION_AGENT_END_X)
     assert movement['sequence'][0]['endPoint']['z'] == 0  # middle
     assert movement['sequence'][1]['endPoint']['z'] == -0.15  # face performer
 
@@ -4301,9 +4308,9 @@ def test_shortcut_imitation_right_side_teleport_containers_middle_left():
         assert containers[i]['shows'][0]['position']['z'] == -(i - 1)
         assert containers[i]['shows'][0]['rotation']['y'] == -90
         assert containers[i]['type'] == 'chest_1'
-        assert containers[i]['shows'][0]['scale']['x'] == 0.55
+        assert containers[i]['shows'][0]['scale']['x'] == 1
         assert containers[i]['shows'][0]['scale']['y'] == 1
-        assert containers[i]['shows'][0]['scale']['z'] == 0.55
+        assert containers[i]['shows'][0]['scale']['z'] == 1
     # no duplicate colors
     assert len(colors_used) == len(set(colors_used))
     # open close
@@ -4324,19 +4331,19 @@ def test_shortcut_imitation_right_side_teleport_containers_middle_left():
     assert target['shows'][0]['position']['x'] == \
         end_container[0]['position']['x']
     assert target['shows'][0]['position']['z'] == \
-        end_container[0]['position']['z'] - 0.5
+        end_container[0]['position']['z'] - IMITATION_TASK_TARGET_SEPARATION
     assert target['shows'][1]['position']['x'] == \
         end_container[0]['position']['x']
     assert target['shows'][1]['position']['z'] == \
-        end_container[0]['position']['z'] - 0.5
+        end_container[0]['position']['z'] - IMITATION_TASK_TARGET_SEPARATION
     assert target['shows'][1]['stepBegin'] == kidnapp_step
     assert target['kinematic']
     assert len(target['moves']) == 1
     assert target['moves'][0]['vector']['y'] == -0.25
     assert target['moves'][0]['stepBegin'] == 0
-    assert target['moves'][0]['stepEnd'] == 12
+    assert target['moves'][0]['stepEnd'] == 8
     assert len(target['togglePhysics']) == 1
-    assert target['togglePhysics'][0]['stepBegin'] == 18
+    assert target['togglePhysics'][0]['stepBegin'] == 14
 
     # placer
     placer = scene.objects[4]
@@ -4345,28 +4352,28 @@ def test_shortcut_imitation_right_side_teleport_containers_middle_left():
     assert placer['shows'][0]['position']['x'] == \
         end_container[0]['position']['x']
     assert placer['shows'][0]['position']['z'] == \
-        end_container[0]['position']['z'] - 0.5
+        end_container[0]['position']['z'] - IMITATION_TASK_TARGET_SEPARATION
     assert placer['shows'][1]['position']['x'] == \
         end_container[0]['position']['x']
     assert placer['shows'][1]['position']['z'] == \
-        end_container[0]['position']['z'] - 0.5
+        end_container[0]['position']['z'] - IMITATION_TASK_TARGET_SEPARATION
     assert placer['shows'][1]['stepBegin'] == kidnapp_step
     assert len(placer['moves']) == 2
     assert placer['moves'][0]['stepBegin'] == 0
-    assert placer['moves'][0]['stepEnd'] == 12
+    assert placer['moves'][0]['stepEnd'] == 8
     assert placer['moves'][0]['vector']['y'] == -0.25
-    assert placer['moves'][1]['stepBegin'] == 23
-    assert placer['moves'][1]['stepEnd'] == 34
+    assert placer['moves'][1]['stepBegin'] == 19
+    assert placer['moves'][1]['stepEnd'] == 26
     assert placer['moves'][1]['vector']['y'] == 0.25
     assert len(placer['changeMaterials']) == 1
-    assert placer['changeMaterials'][0]['stepBegin'] == 18
+    assert placer['changeMaterials'][0]['stepBegin'] == 14
 
     # agent
     agent = scene.objects[5]
     assert agent['type'].startswith('agent')
     # positions
     start = agent['shows'][0]
-    assert start['position']['x'] == -0.2
+    assert start['position']['x'] == -IMITATION_AGENT_START_X
     assert start['position']['z'] == 0  # middle chest
     assert start['rotation']['y'] == 90  # face right
     teleport = agent['shows'][1]
@@ -4402,7 +4409,7 @@ def test_shortcut_imitation_right_side_teleport_containers_middle_left():
             movement['sequence'][2]['animation'] == 'TPM_walk')
     assert (movement['sequence'][0]['endPoint']['x'] ==
             movement['sequence'][1]['endPoint']['x'] ==
-            movement['sequence'][2]['endPoint']['x'] == 0.5)
+            movement['sequence'][2]['endPoint']['x'] == IMITATION_AGENT_END_X)
     assert movement['sequence'][0]['endPoint']['z'] == 0  # middle
     assert movement['sequence'][1]['endPoint']['z'] == 1  # left
     assert movement['sequence'][2]['endPoint']['z'] == 0.85  # face performer
@@ -4454,3 +4461,274 @@ def test_shortcut_imitation_trigger_order_options():
             }
         })
         assert component.shortcut_imitation_task
+
+
+def test_shortcut_seeing_leads_to_knowing_default():
+    component = ShortcutComponent({
+        'shortcut_seeing_leads_to_knowing': True
+    })
+    assert component.shortcut_seeing_leads_to_knowing
+    assert component.get_shortcut_seeing_leads_to_knowing()
+    scene = prior_scene_custom_size(10, 10)
+
+    scene = component.update_ile_scene(scene)
+
+    objs = scene.objects
+    assert len(objs) == 11
+
+    platform = objs[0]
+    target = objs[1]
+    agent = objs[10]
+
+    # platform and performer start
+    assert platform['type'] == 'cube'
+    assert platform['shows'][0]['position'] == {
+        'x': 0, 'y': 0.5, 'z': -2.65}
+    assert platform['shows'][0]['scale'] == {
+        'x': 1, 'y': 1, 'z': 1}
+
+    perf_pos = scene.performer_start.position
+    perf_rot = scene.performer_start.rotation
+    assert perf_pos == Vector3d(x=0, y=1.762, z=-2.65)
+    assert perf_rot == Vector3d(x=30, y=0, z=0)
+
+    # target and goal info
+    assert scene.goal
+    assert scene.goal['metadata']['target']
+    assert 'targets' not in scene.goal['metadata']
+    assert scene.goal['category'] == 'passive'
+    assert scene.goal['answer']['choice'] == 'plausible'
+    assert scene.goal['last_step'] == 100
+    assert scene.goal['action_list']
+    assert len(scene.goal['action_list']) == 100
+    for action in scene.goal['action_list']:
+        assert action == ['Pass']
+
+    assert target['debug']['dimensions'] == {
+        'x': 0.165, 'y': 0.165, 'z': 0.165}
+    assert target['debug']['positionY'] == 0.0825
+    target_pos = target['shows'][0]['position']
+    # target should start in a placer
+    assert abs(target_pos['x']) == 1
+    assert target_pos['y'] == 2.9125
+    assert abs(target_pos['z']) == 0.5
+    assert 'moves' in target
+    assert target['moves'] == [
+        {'stepBegin': 50, 'stepEnd': 60,
+         'vector': {'x': 0, 'y': -0.25, 'z': 0}}
+    ]
+
+    # placers and bins
+    check_shortcut_seeing_leads_to_knowing_bins_placers(objs)
+
+    # agent info
+    check_shortcut_seeing_leads_to_knowing_agent(agent)
+
+
+def test_shortcut_seeing_leads_to_knowing_target_behind_agent():
+    component = ShortcutComponent({
+        'shortcut_seeing_leads_to_knowing': {
+            'target_behind_agent': True
+        }
+    })
+    assert component.shortcut_seeing_leads_to_knowing
+    assert component.get_shortcut_seeing_leads_to_knowing()
+    scene = prior_scene_custom_size(10, 10)
+
+    scene = component.update_ile_scene(scene)
+
+    objs = scene.objects
+    assert len(objs) == 11
+
+    platform = objs[0]
+    target = objs[1]
+    agent = objs[10]
+
+    # platform and performer start
+    assert platform['type'] == 'cube'
+    assert platform['shows'][0]['position'] == {
+        'x': 0, 'y': 0.5, 'z': -2.65}
+    assert platform['shows'][0]['scale'] == {
+        'x': 1, 'y': 1, 'z': 1}
+
+    perf_pos = scene.performer_start.position
+    perf_rot = scene.performer_start.rotation
+    assert perf_pos == Vector3d(x=0, y=1.762, z=-2.65)
+    assert perf_rot == Vector3d(x=30, y=0, z=0)
+
+    # target and goal info
+    assert scene.goal
+    assert scene.goal['metadata']['target']
+    assert 'targets' not in scene.goal['metadata']
+    assert scene.goal['category'] == 'passive'
+    assert scene.goal['answer']['choice'] == 'plausible'
+    assert scene.goal['last_step'] == 100
+    assert scene.goal['action_list']
+    assert len(scene.goal['action_list']) == 100
+    for action in scene.goal['action_list']:
+        assert action == ['Pass']
+
+    assert target['debug']['dimensions'] == {
+        'x': 0.165, 'y': 0.165, 'z': 0.165}
+    assert target['debug']['positionY'] == 0.0825
+    target_pos = target['shows'][0]['position']
+    # target should start in a placer
+    assert abs(target_pos['x']) == 1
+    assert target_pos['y'] == 2.9125
+    assert abs(target_pos['z']) == 0.5
+    assert 'moves' in target
+    assert target['moves'] == [
+        {'stepBegin': 50, 'stepEnd': 60,
+         'vector': {'x': 0, 'y': -0.25, 'z': 0}}
+    ]
+    # placers and bins
+    check_shortcut_seeing_leads_to_knowing_bins_placers(objs)
+
+    # agent info
+    check_shortcut_seeing_leads_to_knowing_agent(agent)
+
+    agent_start_on_left = agent['shows'][0]['position']['x'] == -2
+
+    # ensure target is behind agent's path
+    if(agent_start_on_left):
+        assert target_pos['x'] == -1
+    else:
+        assert target_pos['x'] == 1
+
+
+def test_shortcut_seeing_leads_to_knowing_target_ahead_agent():
+    component = ShortcutComponent({
+        'shortcut_seeing_leads_to_knowing': {
+            'target_behind_agent': False
+        }
+    })
+    assert component.shortcut_seeing_leads_to_knowing
+    assert component.get_shortcut_seeing_leads_to_knowing()
+    scene = prior_scene_custom_size(10, 10)
+
+    scene = component.update_ile_scene(scene)
+
+    objs = scene.objects
+    assert len(objs) == 11
+
+    platform = objs[0]
+    target = objs[1]
+    agent = objs[10]
+
+    # platform and performer start
+    assert platform['type'] == 'cube'
+    assert platform['shows'][0]['position'] == {
+        'x': 0, 'y': 0.5, 'z': -2.65}
+    assert platform['shows'][0]['scale'] == {
+        'x': 1, 'y': 1, 'z': 1}
+
+    perf_pos = scene.performer_start.position
+    perf_rot = scene.performer_start.rotation
+    assert perf_pos == Vector3d(x=0, y=1.762, z=-2.65)
+    assert perf_rot == Vector3d(x=30, y=0, z=0)
+
+    # target and goal info
+    assert scene.goal
+    assert scene.goal['metadata']['target']
+    assert 'targets' not in scene.goal['metadata']
+    assert scene.goal['category'] == 'passive'
+    assert scene.goal['answer']['choice'] == 'plausible'
+    assert scene.goal['last_step'] == 100
+    assert scene.goal['action_list']
+    assert len(scene.goal['action_list']) == 100
+    for action in scene.goal['action_list']:
+        assert action == ['Pass']
+
+    assert target['debug']['dimensions'] == {
+        'x': 0.165, 'y': 0.165, 'z': 0.165}
+    assert target['debug']['positionY'] == 0.0825
+    target_pos = target['shows'][0]['position']
+    # target should start in a placer
+    assert abs(target_pos['x']) == 1
+    assert target_pos['y'] == 2.9125
+    assert abs(target_pos['z']) == 0.5
+    assert 'moves' in target
+    assert target['moves'] == [
+        {'stepBegin': 50, 'stepEnd': 60,
+         'vector': {'x': 0, 'y': -0.25, 'z': 0}}
+    ]
+
+    # placers and bins
+    check_shortcut_seeing_leads_to_knowing_bins_placers(objs)
+
+    # agent info
+    check_shortcut_seeing_leads_to_knowing_agent(agent)
+
+    agent_start_on_left = agent['shows'][0]['position']['x'] == -2
+
+    # ensure target is ahead of agent's path
+    if(agent_start_on_left):
+        assert target_pos['x'] == 1
+    else:
+        assert target_pos['x'] == -1
+
+
+def check_shortcut_seeing_leads_to_knowing_agent(agent):
+    assert abs(agent['shows'][0]['position']['x']) == 2
+    assert agent['shows'][0]['position']['y'] == 0
+    assert agent['shows'][0]['position']['z'] == 0
+    assert (agent['shows'][0]['rotation']['y'] ==
+            90 or agent['shows'][0]['rotation']['y'] == 270)
+    assert 'actions' in agent
+    assert agent['actions'] == [
+        {'id': 'TPM_idle1', 'stepBegin': 51,
+         'isLoopAnimation': True, 'stepEnd': 71}]
+    assert 'agentMovement' in agent
+    assert 'sequence' in agent['agentMovement']
+    assert len(agent['agentMovement']['sequence']) == 2
+    mvmt_seq = agent['agentMovement']['sequence']
+    assert mvmt_seq[0] == {
+        'animation': 'TPM_walk', 'endPoint': {'x': 0.0, 'z': 0.0}}
+    assert mvmt_seq[1]['animation'] == 'TPM_walk'
+    assert abs(mvmt_seq[1]['endPoint']['x']) == 1
+    assert abs(mvmt_seq[1]['endPoint']['z']) == 0.5
+
+
+def check_shortcut_seeing_leads_to_knowing_bins_placers(objs):
+    placers = list(
+        filter(
+            lambda obj: obj['type'] == ('cylinder'), objs))
+    bins = list(
+        filter(
+            lambda obj: obj['type'].startswith('cup_'), objs))
+    assert len(bins) == 4
+    assert len(placers) == 4
+
+    assert bins[0]['shows'][0]['position']['x'] == -1
+    assert bins[0]['shows'][0]['position']['z'] == 0.5
+    assert placers[0]['shows'][0]['position']['x'] == -1
+    assert placers[0]['shows'][0]['position']['z'] == 0.5
+
+    assert bins[1]['shows'][0]['position']['x'] == -1
+    assert bins[1]['shows'][0]['position']['z'] == -0.5
+    assert placers[1]['shows'][0]['position']['x'] == -1
+    assert placers[1]['shows'][0]['position']['z'] == -0.5
+
+    assert bins[2]['shows'][0]['position']['x'] == 1
+    assert bins[2]['shows'][0]['position']['z'] == 0.5
+    assert placers[2]['shows'][0]['position']['x'] == 1
+    assert placers[2]['shows'][0]['position']['z'] == 0.5
+
+    assert bins[3]['shows'][0]['position']['x'] == 1
+    assert bins[3]['shows'][0]['position']['z'] == -0.5
+    assert placers[3]['shows'][0]['position']['x'] == 1
+    assert placers[3]['shows'][0]['position']['z'] == -0.5
+
+    bin_material = bins[0]['materials']
+    for bin_object in bins:
+        assert bin_object['materials'] == bin_material
+
+    for placer in placers:
+        assert 'moves' in placer
+        assert len(placer['moves']) == 2
+        assert placer['moves'][0] == {
+            'stepBegin': 50, 'stepEnd': 60, 'vector': {
+                'x': 0, 'y': -0.25, 'z': 0}}
+        assert placer['moves'][1] == {
+            'stepBegin': 70, 'stepEnd': 79, 'vector': {
+                'x': 0, 'y': 0.25, 'z': 0}}

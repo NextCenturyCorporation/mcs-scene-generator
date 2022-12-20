@@ -39,6 +39,15 @@ structural_moving_occluders:
       rotation_y: 0
       labels: right_occluder
 
+# Set the X distance between the two occluders, and between the occluders and
+# the edge of the performer agent's viewport.
+occluder_gap:
+    min: 0.5
+    max: 1.5
+occluder_gap_viewport:
+    min: 0.5
+    max: 1.5
+
 # Two droppers with random small objects with semi-random positions.
 structural_droppers:
     - num: 1

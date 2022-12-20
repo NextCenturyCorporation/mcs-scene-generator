@@ -219,14 +219,14 @@ class AgentConfig(BaseFeatureConfig):
     or list of bools and/or AgentMovementConfig dicts): Configures this agent
     to move (walk/run) around the room. If `true`, the agent will be assigned
     a random movement pattern for each scene. If configured as a list, one
-    option will be randomly chosen for each scene. Default: none
+    option will be randomly chosen for each scene. Default: no movement
     - `pointing` ([AgentPointingConfig](#AgentPointingConfig) dict, or list of
     AgentPointingConfig dicts): Configures this agent to start pointing on a
     specific step. The pointing lasts indefinitely. This cancels out any other
     actions or movement. Use `pointing.object_label` to point at a specific
     object. Use `pointing.walk_distance` to turn around and walk toward the
     object before pointing at it. If configured as a list, one option will be
-    randomly chosen for each scene. Default: none
+    randomly chosen for each scene. Default: no pointing
     - `position` ([VectorFloatConfig](#VectorFloatConfig) dict, or list of
     VectorFloatConfig dicts): The position of this agent in each scene. If
     configured as a list, a new position will be randomly chosen for each

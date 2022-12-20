@@ -1,10 +1,15 @@
 import pytest
 
 from ideal_learning_env import (
+    ILEDelayException,
     ILEException,
     InstanceDefinitionLocationTuple,
     MaterialRestrictions,
     ObjectRepository
+)
+from ideal_learning_env.object_services import (
+    get_step_after_movement,
+    get_step_after_movement_or_start
 )
 
 
@@ -160,3 +165,149 @@ def test_material_restrictions_invalid():
     with pytest.raises(ILEException):
         MaterialRestrictions.valid_shape_material_or_raise(
             'cart_1', "AI2-THOR/Materials/Wood/DarkWood2")
+
+
+def test_get_step_after_movement():
+    repo = ObjectRepository.get_instance()
+
+    object_1 = {'id': 'object_1'}
+    object_2 = {
+        'id': 'object_2',
+        'moves': [{
+            'stepBegin': 1,
+            'stepEnd': 10
+        }]
+    }
+    object_3 = {
+        'id': 'object_3',
+        'moves': [{
+            'stepBegin': 21,
+            'stepEnd': 60
+        }]
+    }
+    object_4 = {
+        'id': 'object_4',
+        'moves': [{
+            'stepBegin': 31,
+            'stepEnd': 40
+        }]
+    }
+    object_5 = {
+        'id': 'object_5',
+        'rotates': [{
+            'stepBegin': 1,
+            'stepEnd': 10
+        }]
+    }
+    object_6 = {
+        'id': 'object_6',
+        'rotates': [{
+            'stepBegin': 21,
+            'stepEnd': 60
+        }]
+    }
+
+    idl_1 = InstanceDefinitionLocationTuple(object_1, {}, {})
+    idl_2 = InstanceDefinitionLocationTuple(object_2, {}, {})
+    idl_3 = InstanceDefinitionLocationTuple(object_3, {}, {})
+    idl_4 = InstanceDefinitionLocationTuple(object_4, {}, {})
+    idl_5 = InstanceDefinitionLocationTuple(object_5, {}, {})
+    idl_6 = InstanceDefinitionLocationTuple(object_6, {}, {})
+
+    repo.add_to_labeled_objects(idl_1, ['label_1'])
+    repo.add_to_labeled_objects(idl_2, ['label_2'])
+    repo.add_to_labeled_objects(idl_3, ['label_3'])
+    repo.add_to_labeled_objects(idl_4, ['label_4'])
+    repo.add_to_labeled_objects(idl_5, ['label_5_6'])
+    repo.add_to_labeled_objects(idl_6, ['label_5_6'])
+
+    assert get_step_after_movement([]) == 1
+    assert get_step_after_movement(['label_1']) == 1
+    assert get_step_after_movement(['label_2']) == 11
+    assert get_step_after_movement(['label_3']) == 61
+    assert get_step_after_movement(['label_4']) == 41
+    assert get_step_after_movement(['label_2', 'label_3']) == 61
+    assert get_step_after_movement(['label_2', 'label_4']) == 41
+    assert get_step_after_movement(['label_3', 'label_4']) == 61
+    assert get_step_after_movement(['label_2', 'label_3', 'label_4']) == 61
+    assert get_step_after_movement(['label_5_6']) == 61
+
+
+def test_get_step_after_movement_delay():
+    with pytest.raises(ILEDelayException):
+        # Error because no objects with this label are in the ObjectRepository
+        get_step_after_movement(['label_1'])
+
+
+def test_get_step_after_movement_or_start():
+    repo = ObjectRepository.get_instance()
+
+    object_1 = {'id': 'object_1'}
+    object_2 = {
+        'id': 'object_2',
+        'moves': [{
+            'stepBegin': 1,
+            'stepEnd': 10
+        }]
+    }
+    object_3 = {
+        'id': 'object_3',
+        'moves': [{
+            'stepBegin': 21,
+            'stepEnd': 60
+        }]
+    }
+    object_4 = {
+        'id': 'object_4',
+        'moves': [{
+            'stepBegin': 31,
+            'stepEnd': 40
+        }]
+    }
+    object_5 = {
+        'id': 'object_5',
+        'rotates': [{
+            'stepBegin': 1,
+            'stepEnd': 10
+        }]
+    }
+    object_6 = {
+        'id': 'object_6',
+        'rotates': [{
+            'stepBegin': 21,
+            'stepEnd': 60
+        }]
+    }
+
+    idl_1 = InstanceDefinitionLocationTuple(object_1, {}, {})
+    idl_2 = InstanceDefinitionLocationTuple(object_2, {}, {})
+    idl_3 = InstanceDefinitionLocationTuple(object_3, {}, {})
+    idl_4 = InstanceDefinitionLocationTuple(object_4, {}, {})
+    idl_5 = InstanceDefinitionLocationTuple(object_5, {}, {})
+    idl_6 = InstanceDefinitionLocationTuple(object_6, {}, {})
+
+    repo.add_to_labeled_objects(idl_1, ['label_1'])
+    repo.add_to_labeled_objects(idl_2, ['label_2'])
+    repo.add_to_labeled_objects(idl_3, ['label_3'])
+    repo.add_to_labeled_objects(idl_4, ['label_4'])
+    repo.add_to_labeled_objects(idl_5, ['label_5_6'])
+    repo.add_to_labeled_objects(idl_6, ['label_5_6'])
+
+    assert get_step_after_movement_or_start([]) == 1
+    assert get_step_after_movement_or_start(['label_1']) == 1
+    assert get_step_after_movement_or_start(['label_2']) == 11
+    assert get_step_after_movement_or_start(['label_3']) == 1
+    assert get_step_after_movement_or_start(['label_4']) == 1
+    assert get_step_after_movement_or_start(['label_2', 'label_3']) == 61
+    assert get_step_after_movement_or_start(['label_2', 'label_4']) == 41
+    assert get_step_after_movement_or_start(['label_3', 'label_4']) == 1
+    assert get_step_after_movement_or_start(
+        ['label_2', 'label_3', 'label_4']
+    ) == 61
+    assert get_step_after_movement_or_start(['label_5_6']) == 61
+
+
+def test_get_step_after_movement_or_start_delay():
+    with pytest.raises(ILEDelayException):
+        # Error because no objects with this label are in the ObjectRepository
+        get_step_after_movement_or_start(['label_1'])

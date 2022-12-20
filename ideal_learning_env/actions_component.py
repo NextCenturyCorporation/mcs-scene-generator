@@ -4,12 +4,17 @@ from typing import Any, Dict, List, Union
 from generator import tags
 from ideal_learning_env.defs import ILEConfigurationException
 
-from .action_service import ActionService, StepBeginEnd, TeleportConfig
+from .action_service import (
+    ActionService,
+    SidestepsConfig,
+    StepBeginEnd,
+    TeleportConfig
+)
 from .choosers import choose_random
 from .components import ILEComponent
 from .decorators import ile_config_setter
 from .numerics import MinMaxInt
-from .validators import ValidateNumber
+from .validators import ValidateNumber, ValidateOptions
 
 logger = logging.getLogger(__name__)
 
@@ -138,6 +143,39 @@ class ActionRestrictionsComponent(ILEComponent):
     ```
     """
 
+    sidesteps: List[Union[SidestepsConfig, List[SidestepsConfig]]] = None
+    """
+    (list of [SidestepsConfig](#SidestepsConfig) dicts): When a sequence of
+    sidesteps will occur, the label of the object the performer will sidestep
+    around, and the degrees around the object the performer will sidestep.
+    Degrees must be in increments of
+    90 or -90: [90, 180, 270, 360, -90, -180, -270, -360].
+    If a consecutive list all labels MUST be identical.
+    The performer must be 3 distance away from the object's center
+    for sidesteps to work.
+    *Important Note*: this property will OVERRIDE 'performer_look_at'
+    and `performer_start_rotation` forcing the performer to look at
+    this object on scene start.
+
+    Simple Example:
+    ```
+    sidesteps: null
+    ```
+
+    Advanced Example:
+    ```
+    sidesteps:
+      -
+        begin: 50
+        object_label: turntable
+        degrees: 90
+      -
+        begin: 1
+        object_label: turntable
+        degrees: [90, 180, 270, 360, -90, -180, -270, -360]
+    ```
+    """
+
     @ile_config_setter()
     def set_passive_scene(self, data: Any) -> None:
         self.passive_scene = data
@@ -183,6 +221,15 @@ class ActionRestrictionsComponent(ILEComponent):
     def get_teleports(self) -> List[TeleportConfig]:
         return [choose_random(t) for t in (self.teleports or [])]
 
+    @ile_config_setter(validator=ValidateOptions(
+        props=['degrees'],
+        options=[90, 180, 270, 360, -90, -180, -270, -360]))
+    def set_sidesteps(self, data: Any) -> None:
+        self.sidesteps = data
+
+    def get_sidesteps(self) -> List[TeleportConfig]:
+        return [choose_random(s) for s in (self.sidesteps or [])]
+
     # Override
     def update_ile_scene(self, scene: Dict[str, Any]) -> Dict[str, Any]:
         logger.info('Configuring action restrictions for the scene...')
@@ -193,14 +240,17 @@ class ActionRestrictionsComponent(ILEComponent):
         freezes = sorted(self.get_freezes(), key=lambda x: x.begin)
         swivels = sorted(self.get_swivels(), key=lambda x: x.begin)
         teleports = sorted(self.get_teleports(), key=lambda x: x.step)
+        sidesteps = sorted(self.get_sidesteps(), key=lambda x: x.begin)
         self._restriction_validation(
             circles,
             freezes,
             swivels,
             teleports,
+            sidesteps,
             total_steps
         )
         passive = self.get_passive_scene() or scene.intuitive_physics
+        self._delayed_actions = 0
         if passive:
             goal['category'] = tags.tag_to_label(
                 tags.SCENE.INTUITIVE_PHYSICS)
@@ -219,10 +269,25 @@ class ActionRestrictionsComponent(ILEComponent):
         if teleports:
             ActionService.add_teleports(goal, teleports, passive)
             logger.trace(f'Adding {len(teleports)} teleports to scene')
+        if sidesteps:
+            self._delayed_sidesteps = sidesteps
+            self._delayed_actions = 1
+            logger.trace(f'Adding {len(sidesteps)} teleports to scene')
+        return scene
+
+    def get_num_delayed_actions(self) -> int:
+        return self._delayed_actions
+
+    def run_delayed_actions(self, scene: Dict[str, Any]) -> Dict[str, Any]:
+        if self._delayed_sidesteps:
+            ActionService.add_sidesteps(
+                scene.goal, self._delayed_sidesteps, scene)
+        self._delayed_actions = 0
         return scene
 
     def _restriction_validation(
-            self, circles, freezes, swivels, teleports, total_steps):
+            self, circles, freezes, swivels,
+            teleports, sidesteps, total_steps):
         if self.get_passive_scene():
             if not total_steps or total_steps <= 0:
                 raise ILEConfigurationException(
@@ -244,6 +309,11 @@ class ActionRestrictionsComponent(ILEComponent):
                     "Error with action restriction "
                     "configuration. When 'passive_scene'=true"
                     "'swivels' can not be used")
+            if self.sidesteps:
+                raise ILEConfigurationException(
+                    "Error with action restriction "
+                    "configuration. When 'passive_scene'=true"
+                    "'sidesteps' can not be used")
         if freezes:
             for f in freezes:
                 if not f.begin and not f.end:
@@ -270,3 +340,10 @@ class ActionRestrictionsComponent(ILEComponent):
                         "'position_x' or 'position_z' must also have the "
                         "other."
                     )
+        if sidesteps:
+            for s in sidesteps:
+                if not s.begin and s.object_label:
+                    raise ILEConfigurationException(
+                        "Error with action restriction "
+                        "configuration. 'sidesteps' entries must have "
+                        "both 'begin' and 'object_label' fields.")

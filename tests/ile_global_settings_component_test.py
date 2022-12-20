@@ -6,7 +6,9 @@ from numpy import arange
 from shapely.geometry import Point, Polygon
 
 from generator import geometry, materials
+from generator.base_objects import create_soccer_ball
 from generator.geometry import PERFORMER_HALF_WIDTH
+from generator.instances import instantiate_object
 from generator.scene import Scene
 from ideal_learning_env import (
     GlobalSettingsComponent,
@@ -49,6 +51,8 @@ def test_global_settings():
     assert component.floor_material is None
     assert component.goal is None
     assert component.last_step is None
+    assert component.occluder_gap is None
+    assert component.occluder_gap_viewport is None
     assert component.passive_physics_floor is None
     assert component.passive_physics_scene is None
     assert component.performer_start_position is None
@@ -68,6 +72,9 @@ def test_global_settings():
     scene = component.update_ile_scene(prior_scene())
     assert isinstance(scene.ceiling_material, str)
     assert ILESharedConfiguration.get_instance().get_excluded_shapes() == []
+    assert ILESharedConfiguration.get_instance().get_occluder_gap() is None
+    assert ILESharedConfiguration.get_instance().get_occluder_gap_viewport() \
+        is None
     assert isinstance(scene.floor_material, str)
     assert scene.floor_properties is None
     assert scene.goal.get('last_step') is None
@@ -239,9 +246,11 @@ def test_global_settings_configured():
             'category': 'retrieval',
             'target': {
                 'shape': 'soccer_ball'
-            }
+            },
         },
         'last_step': 1000,
+        'occluder_gap': 1.0,
+        'occluder_gap_viewport': 1.0,
         'performer_start_position': {'x': -1, 'y': 0, 'z': 1},
         'performer_start_rotation': {'x': -10, 'y': 90, 'z': 0},
         'restrict_open_doors': True,
@@ -262,6 +271,8 @@ def test_global_settings_configured():
         target=InteractableObjectConfig(shape='soccer_ball')
     )
     assert component.last_step == 1000
+    assert component.occluder_gap == 1.0
+    assert component.occluder_gap_viewport == 1.0
     assert component.performer_start_position == VectorFloatConfig(-1, 0, 1)
     assert component.performer_start_rotation == VectorIntConfig(-10, 90, 0)
     assert component.restrict_open_doors
@@ -289,6 +300,9 @@ def test_global_settings_configured():
     ]
     assert scene.goal['last_step'] == 1000
     assert scene.goal['metadata']['target']['id']
+    assert ILESharedConfiguration.get_instance().get_occluder_gap() == 1.0
+    assert ILESharedConfiguration.get_instance().get_occluder_gap_viewport() \
+        == 1.0
     assert scene.performer_start == PerformerStart(
         position=Vector3d(x=-1, y=0, z=1), rotation=Vector3d(x=-10, y=90, z=0))
     assert scene.restrict_open_doors is True
@@ -306,6 +320,8 @@ def test_global_settings_configured():
 
     # Cleanup
     ILESharedConfiguration.get_instance().set_excluded_shapes([])
+    ILESharedConfiguration.get_instance().set_occluder_gap(None)
+    ILESharedConfiguration.get_instance().set_occluder_gap_viewport(None)
 
 
 def test_global_settings_passive_physics_scene():
@@ -321,6 +337,8 @@ def test_global_settings_passive_physics_scene():
             }
         },
         'last_step': 1000,
+        'occluder_gap': 1.0,
+        'occluder_gap_viewport': 1.0,
         'passive_physics_scene': True,
         # Expect this to be overridden after calling update_ile_scene
         'performer_start_position': {'x': -1, 'y': 0, 'z': 1},
@@ -342,6 +360,8 @@ def test_global_settings_passive_physics_scene():
         target=InteractableObjectConfig(shape='soccer_ball')
     )
     assert component.last_step == 1000
+    assert component.occluder_gap == 1.0
+    assert component.occluder_gap_viewport == 1.0
     assert component.passive_physics_scene is True
     assert component.performer_start_position == VectorFloatConfig(-1, 0, 1)
     assert component.performer_start_rotation == VectorIntConfig(-10, 90, 0)
@@ -359,6 +379,9 @@ def test_global_settings_passive_physics_scene():
     assert ILESharedConfiguration.get_instance().get_excluded_shapes() == [
         'ball', 'pacifier'
     ]
+    assert ILESharedConfiguration.get_instance().get_occluder_gap() == 1.0
+    assert ILESharedConfiguration.get_instance().get_occluder_gap_viewport() \
+        == 1.0
     assert scene.floor_material == 'Custom/Materials/GreyCarpetMCS'
     assert scene.floor_properties['enable'] is True
     assert scene.floor_properties['angularDrag'] == 0.5
@@ -384,6 +407,8 @@ def test_global_settings_passive_physics_scene():
 
     # Cleanup
     ILESharedConfiguration.get_instance().set_excluded_shapes([])
+    ILESharedConfiguration.get_instance().set_occluder_gap(None)
+    ILESharedConfiguration.get_instance().set_occluder_gap_viewport(None)
 
 
 def test_global_settings_side_wall_opposite_colors():
@@ -1163,3 +1188,103 @@ def test_global_settings_identical_targets_without_error():
         scale_i = target_i['shows'][0]['scale']
         assert target_1['type'] == target_i['type']
         assert scale_1 == scale_i
+
+
+def test_global_settings_forced_choice_multi_retrieval_target_left():
+    scene = prior_scene()
+    ball_1 = instantiate_object(
+        create_soccer_ball(),
+        {'position': {'x': -1, 'y': 0.11, 'z': 2}}
+    )
+    scene.objects = [ball_1]
+    component = GlobalSettingsComponent({
+        'forced_choice_multi_retrieval_target': 'soccer_ball'
+    })
+    scene = component.update_ile_scene(scene)
+    assert scene.goal == {'metadata': {}}
+    scene = component.run_actions_at_end_of_scene_generation(scene)
+    assert len(scene.objects) == 1
+    assert scene.goal['category'] == 'multi retrieval'
+    assert scene.goal['description']
+    assert scene.goal['metadata'] == {'targets': [
+        {'id': scene.objects[0]['id']}
+    ]}
+
+
+def test_global_settings_forced_choice_multi_retrieval_target_right():
+    scene = prior_scene()
+    ball_1 = instantiate_object(
+        create_soccer_ball(),
+        {'position': {'x': 1, 'y': 0.11, 'z': 2}}
+    )
+    ball_2 = instantiate_object(
+        create_soccer_ball(),
+        {'position': {'x': -1, 'y': 0.11, 'z': 2}}
+    )
+    ball_3 = instantiate_object(
+        create_soccer_ball(),
+        {'position': {'x': 2, 'y': 0.11, 'z': -1}}
+    )
+    scene.objects = [ball_1, ball_2, ball_3]
+    component = GlobalSettingsComponent({
+        'forced_choice_multi_retrieval_target': 'soccer_ball'
+    })
+    scene = component.update_ile_scene(scene)
+    assert scene.goal == {'metadata': {}}
+    scene = component.run_actions_at_end_of_scene_generation(scene)
+    assert len(scene.objects) == 3
+    assert scene.goal['category'] == 'multi retrieval'
+    assert scene.goal['description']
+    assert scene.goal['metadata'] == {'targets': [
+        {'id': scene.objects[0]['id']},
+        {'id': scene.objects[2]['id']}
+    ]}
+
+
+def test_global_settings_forced_choice_multi_retrieval_target_pickup():
+    scene = prior_scene()
+    ball_1 = instantiate_object(
+        create_soccer_ball(),
+        {'position': {'x': 1, 'y': 0.11, 'z': 2}}
+    )
+    ball_2 = instantiate_object(
+        create_soccer_ball(),
+        {'position': {'x': -1, 'y': 0.11, 'z': 2}}
+    )
+    ball_3 = instantiate_object(
+        create_soccer_ball(),
+        {'position': {'x': 2, 'y': 0.11, 'z': -1}}
+    )
+    ball_1['moves'] = [{'vector': {'y': 0.25}}]
+    ball_3['moves'] = [{'vector': {'y': -0.25}}, {'vector': {'y': 0.25}}]
+    scene.objects = [ball_1, ball_2, ball_3]
+    component = GlobalSettingsComponent({
+        'forced_choice_multi_retrieval_target': 'soccer_ball'
+    })
+    scene = component.update_ile_scene(scene)
+    assert scene.goal == {'metadata': {}}
+    scene = component.run_actions_at_end_of_scene_generation(scene)
+    assert len(scene.objects) == 3
+    assert scene.goal['category'] == 'multi retrieval'
+    assert scene.goal['description']
+    assert scene.goal['metadata'] == {'targets': [
+        {'id': scene.objects[1]['id']}
+    ]}
+
+
+def test_global_settings_forced_choice_multi_retrieval_target_equal():
+    scene = prior_scene()
+    ball_1 = instantiate_object(
+        create_soccer_ball(),
+        {'position': {'x': 1, 'y': 0.11, 'z': 2}}
+    )
+    ball_2 = instantiate_object(
+        create_soccer_ball(),
+        {'position': {'x': -1, 'y': 0.11, 'z': 2}}
+    )
+    scene.objects = [ball_1, ball_2]
+    component = GlobalSettingsComponent({
+        'forced_choice_multi_retrieval_target': 'soccer_ball'
+    })
+    with pytest.raises(ILEException):
+        component.run_actions_at_end_of_scene_generation(scene)

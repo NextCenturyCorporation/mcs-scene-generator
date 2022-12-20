@@ -1,12 +1,20 @@
 import logging
+import math
+import random
 from dataclasses import dataclass
 from typing import List, Union
 
+import matplotlib.pyplot as plt
 from machine_common_sense.config_manager import Vector3d
 
-from generator import geometry
-from ideal_learning_env.defs import ILEConfigurationException, ILEException
-from ideal_learning_env.numerics import MinMaxFloat, MinMaxInt
+from generator import Scene, geometry
+from ideal_learning_env.defs import (
+    ILEConfigurationException,
+    ILEException,
+    RandomizableString
+)
+from ideal_learning_env.numerics import MinMaxFloat, MinMaxInt, RandomizableInt
+from ideal_learning_env.object_services import ObjectRepository
 
 logger = logging.getLogger(__name__)
 
@@ -67,6 +75,31 @@ class TeleportConfig():
     rotation_y: Union[float, MinMaxFloat,
                       List[Union[float, MinMaxFloat]]] = None
     look_at_center: bool = False
+
+
+@dataclass
+class SidestepsConfig():
+    """
+    Contains data to describe the performer's sidesteps.
+
+    - `begin` ([RandomizableInt](#RandomizableInt)):
+    The step where the performer agent starts being frozen
+    and can only use the `"Pass"` action. For example, if 1, the performer
+    agent must pass immediately at the start of the scene.  This is an
+    inclusive limit.
+    - `object_label` ([RandomizableString](#RandomizableString)):
+    The label of the object the performer will sidestep around. The performer
+    must be 3 distance away from the object's center for sidesteps to work.
+    - `degrees` ([RandomizableInt](#RandomizableInt)):
+    The positive or negative degrees the performer will sidestep around the
+    object. Positive forces the performer to sidestep right while negative
+    sidesteps left. The degree value must always be in 90 or -90 degree
+    increments: [90, 180, 270, 360, -90, -180, -270, -360]
+    Default: [90, 180, 270, 360, -90, -180, -270, -360]
+    """
+    begin: RandomizableInt = None
+    object_label: RandomizableString = None
+    degrees: RandomizableInt = None
 
 
 class ActionService():
@@ -233,3 +266,211 @@ class ActionService():
                         al += swivel_actions
                     step = step + 1
             limit = s.end
+
+    @staticmethod
+    def add_sidesteps(goal: dict,
+                      sidesteps: List[SidestepsConfig],
+                      scene: Scene):
+        """Adds sidesteps to the goal portion of the scene. The sidesteps occur
+        over ranges provided by `sidesteps` and should not overlap.  All random
+        choices in any SidestepsConfig instances should be determined prior to
+        calling this method."""
+        # For a 90 degree increment
+        goal['action_list'] = goal.get('action_list', [])
+        al = goal['action_list']
+        object = None
+        label = None
+        start_x = scene.performer_start.position.x
+        start_z = scene.performer_start.position.z
+        start_rot_y = scene.performer_start.rotation.y
+        actions = []
+        for i, s in enumerate(sidesteps):
+            sidesteps_degrees = [90, 180, 270, 360, -90, -180, -270, -360]
+            if s.degrees is None:
+                s.degrees = random.choice(sidesteps_degrees)
+            if s.degrees not in sidesteps_degrees:
+                raise ILEException(
+                    f"Sidesteps with begin {s.begin} and degrees "
+                    f"{s.degrees} must have a degrees value of: "
+                    f"[90, 180, 270, 360, -90, -180, -270, -360]"
+                )
+            # Overlap
+            for step in range(s.begin - 1, len(al)):
+                if al[step] != []:
+                    raise ILEException(
+                        f"Sidesteps with begin {s.begin} and degrees "
+                        f"{s.degrees} overlap an existing action in "
+                        f"action_list. Sidestep {i} of {len(sidesteps)} "
+                        f"must begin or be greater than step: "
+                        f"{len(al) + 1}"
+                    )
+            # No overlap
+            if len(al) < s.begin:
+                empty_to_add = s.begin - len(al) - 1
+                al += [[]] * (empty_to_add)
+            movement_direction = "MoveRight" if s.degrees > 0 else "MoveLeft"
+            rotation_direction = \
+                "RotateLeft" if s.degrees > 0 else "RotateRight"
+
+            # Force the performer to look at the target
+            # And make sure labels are the same
+            if object is None:
+                label = s.object_label
+                # Object
+                obj_repo = ObjectRepository.get_instance()
+                instances = obj_repo.get_all_from_labeled_objects(
+                    s.object_label)
+                if instances is None or len(instances) == 0:
+                    raise ILEException(
+                        "No valid objects matching 'sidesteps."
+                        f"object_label': {s.object_label}"
+                    )
+                objects = [instance.instance for instance in instances]
+                object = random.choice(objects)
+                perf_pos = scene.performer_start.position
+                object_pos = object['shows'][0]['position']
+                tbb = object['shows'][0]['boundingBox']
+
+                # Forced to look at object with label
+                object_y = (tbb.min_y + tbb.max_y) / 2.0
+                tilt, rot = geometry.calculate_rotations(
+                    perf_pos,
+                    Vector3d(x=object_pos['x'], y=object_y, z=object_pos['z'])
+                )
+                scene.performer_start.rotation.y = rot
+                scene.performer_start.rotation.x = tilt
+                start_rot_y = scene.performer_start.rotation.y
+            elif s.object_label != label:
+                raise ILEException(
+                    "All consecutive 'sidesteps.object_labels' "
+                    f"must be identical. Mismatching labels: "
+                    f"('{s.object_label}', '{label}')"
+                )
+
+            # Distance
+            center_x, center_z = object[
+                'shows'][0]['boundingBox'].polygon_xz.centroid.coords[0]
+            base_distance = math.dist([center_x, center_z], [start_x, start_z])
+
+            # Any distance closer results in inconsistent behavior
+            # Where the performer may move and rotate in a circle endlessly
+            min_distance_to_prevent_circling = 3
+            base_rounded_distance = round(base_distance, 1)
+            if base_rounded_distance < min_distance_to_prevent_circling:
+                raise ILEException(
+                    "Performer must be at least "
+                    f"{min_distance_to_prevent_circling} distance away "
+                    "from the center of object with label "
+                    f"'{s.object_label}' when using 'sidesteps'"
+                )
+            end_x, end_z = geometry.rotate_point_around_origin(
+                center_x, center_z, start_x, start_z, -s.degrees)
+            end_x = round(end_x, 2)
+            end_z = round(end_z, 2)
+            position_x = start_x
+            position_z = start_z
+            rotation_y = start_rot_y
+
+            # This is so the movement after rotation has time to readjusted
+            # to the desired distance instead of rotating in circles
+            # endlessly and also makes sure the performer is guranteed to
+            # look at the object a few steps before rotating
+            base_skip_rotation_count = 2
+            skip_rotation_count = base_distance
+            # This is so if its a 360 degree rotation that the movement
+            # starts otherwise we are already where we want to be
+            # and nothing happens
+            initial_distance_check_skips = 2
+            # Small buffer for checking if the performer is where they
+            # need to be
+            move_distance = geometry.MOVE_DISTANCE
+
+            """
+            ***Note*** If you want to see this visually traced set
+            create_debug_graph to True to create a graph showing the path
+            """
+            create_debug_graph = False  # *DEBUG*
+            if create_debug_graph:
+                xs = []
+                zs = []
+
+            while True:
+                # Get current distance
+                distance = math.dist(
+                    [center_x, center_z],
+                    [position_x, position_z])
+                # Check if we need to rotate if the distance is too big now
+                if (abs(distance - base_distance) > move_distance and
+                        skip_rotation_count <= 0):
+                    actions.append([rotation_direction])
+                    rotation_y += 10 if s.degrees < 0 else -10
+                    skip_rotation_count = base_skip_rotation_count
+
+                # Get the transform right or left vector components of
+                # the performer
+                x, z = geometry.get_magnitudes_of_x_z_dirs_for_rotation_and_move_vector(  # noqa
+                    rotation_y,
+                    move_distance if s.degrees > 0 else -move_distance,
+                    0
+                )
+                # Keep track of where we are
+                position_x += x
+                position_z += z
+                # Add action
+                actions.append([movement_direction])
+
+                # Mark that we are closer to when we can rotate
+                skip_rotation_count -= 1
+                # Mark that we are clearing the start distance
+                initial_distance_check_skips -= \
+                    1 if initial_distance_check_skips > 0 else 0
+
+                buffer = 0.01
+                # If both x and z positions have reached the end
+                if (abs(position_x - end_x) <= move_distance + buffer and
+                    abs(position_z - end_z) <= move_distance + buffer and
+                        initial_distance_check_skips <= 0):
+                    # May need to add one more move if we are not totally
+                    # where we need to be
+                    if distance > base_distance:
+                        position_x += x
+                        position_z += z
+                        actions.append([movement_direction])
+                    # Then make sure we rotated the correct amount too
+                    # We are probably only 1 off in either direction
+                    # But check if theres more than 1 just in case
+                    if (rotation_y != scene.performer_start.rotation.y -
+                            s.degrees):
+                        additional_rotations = round((
+                            (rotation_y -
+                                (scene.performer_start.rotation.y -
+                                 s.degrees)) / 10))
+                        # Rotated too much
+                        if (additional_rotations < 0 and
+                                rotation_direction == "RotateLeft"):
+                            actions += [["RotateRight"]] * \
+                                abs(additional_rotations)
+                        elif (additional_rotations > 0 and
+                                rotation_direction == "RotateRight"):
+                            actions += [["RotateLeft"]] * \
+                                abs(additional_rotations)
+                        # Rotated too little
+                        else:
+                            actions += [[rotation_direction]] * \
+                                additional_rotations
+                    start_x = position_x
+                    start_z = position_z
+                    start_rot_y = rotation_y
+                    break
+                if create_debug_graph:
+                    xs.append(position_x)
+                    zs.append(position_z)
+            if create_debug_graph:
+                plt.gca().set_aspect('equal', adjustable='box')
+                plt.scatter(xs, zs)
+                plt.scatter(
+                    scene.performer_start.position.x,
+                    scene.performer_start.position.z)
+                plt.savefig("sidesteps.png")
+
+            al += actions

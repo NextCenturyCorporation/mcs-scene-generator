@@ -10,8 +10,10 @@ from generator.occluders import (
     find_rotate_step_length,
     generate_occluder_position,
     generate_sideways_pole_position_x,
-    make_occluder_sideways
+    make_occluder_sideways,
+    occluder_gap_positioning
 )
+from generator.scene import Scene
 
 TEST_MATERIAL_POLE = MaterialTuple('test_material_pole', ['brown'])
 TEST_MATERIAL_WALL = MaterialTuple('test_material_wall', ['white'])
@@ -57,7 +59,7 @@ def verify_bounds(
         pytest.fail(
             f'BOUNDS MISMATCH:\nEXPECTED={points}\nACTUAL={actual_points}'
         )
-    assert bounds.max_y == position_y + (scale_y / 2.0)
+    assert bounds.max_y == pytest.approx(position_y + (scale_y / 2.0))
     assert bounds.min_y == 0
 
 
@@ -73,8 +75,19 @@ def verify_pole(
     move_2_step_begin: int = 21,
     move_3_step_begin: int = 186,
     no_last_step: bool = False,
-    repeat: int = None
+    repeat: int = None,
+    room_dim_y: int = 4,
+    move_down_only: bool = False
 ):
+
+    if move_down_only:
+        position_y += room_dim_y - OCCLUDER_HEIGHT
+        wall_pos_y = room_dim_y - (OCCLUDER_HEIGHT * 0.5)
+        move_down_dist = (
+            wall_pos_y -
+            (OCCLUDER_HEIGHT * 0.5))
+        move_down_step_end = round(move_down_dist / 0.25)
+
     assert pole['type'] == 'cylinder'
     assert pole['materials'] == [TEST_MATERIAL_POLE[0]]
     assert pole['debug']['info'] == TEST_MATERIAL_POLE[1]
@@ -102,16 +115,22 @@ def verify_pole(
         scale_z
     )
 
-    assert len(pole['moves']) == (2 if no_last_step else 3)
-    assert pole['moves'][0]['stepBegin'] == 1
-    assert pole['moves'][0]['stepEnd'] == 6
-    assert pole['moves'][1]['stepBegin'] == move_2_step_begin
-    assert pole['moves'][1]['stepEnd'] == move_2_step_begin + 5
-    if not no_last_step:
-        assert pole['moves'][2]['stepBegin'] == move_3_step_begin
-        assert pole['moves'][2]['stepEnd'] == move_3_step_begin + 5
+    if(not move_down_only):
+        assert len(pole['moves']) == (2 if no_last_step else 3)
+        assert pole['moves'][0]['stepBegin'] == 1
+        assert pole['moves'][0]['stepEnd'] == 6
+        assert pole['moves'][1]['stepBegin'] == move_2_step_begin
+        assert pole['moves'][1]['stepEnd'] == move_2_step_begin + 5
+        if not no_last_step:
+            assert pole['moves'][2]['stepBegin'] == move_3_step_begin
+            assert pole['moves'][2]['stepEnd'] == move_3_step_begin + 5
 
-    assert 'rotates' not in pole
+        assert 'rotates' not in pole
+    else:
+        assert len(pole['moves']) == 1
+        assert pole['moves'][0]['stepBegin'] == 1
+        assert pole['moves'][0]['stepEnd'] == move_down_step_end
+        assert 'rotates' not in pole
 
 
 def verify_pole_sideways(
@@ -126,8 +145,19 @@ def verify_pole_sideways(
     move_2_step_begin: int = 21,
     move_3_step_begin: int = 186,
     no_last_step: bool = False,
-    repeat: int = None
+    repeat: int = None,
+    room_dim_y: int = 4,
+    move_down_only: bool = False
 ):
+
+    if move_down_only:
+        position_y = room_dim_y - 0.1
+        wall_pos_y = room_dim_y - (OCCLUDER_HEIGHT * 0.5)
+        move_down_dist = (
+            wall_pos_y -
+            (OCCLUDER_HEIGHT * 0.5))
+        move_down_step_end = round(move_down_dist / 0.25)
+
     assert pole['type'] == 'cylinder'
     assert pole['materials'] == [TEST_MATERIAL_POLE[0]]
     assert pole['debug']['info'] == TEST_MATERIAL_POLE[1]
@@ -156,16 +186,22 @@ def verify_pole_sideways(
             scale_z if rotation_y % 180 == 0 else (scale_y * 2)
         )
 
-    assert len(pole['moves']) == (2 if no_last_step else 3)
-    assert pole['moves'][0]['stepBegin'] == 1
-    assert pole['moves'][0]['stepEnd'] == 6
-    assert pole['moves'][1]['stepBegin'] == move_2_step_begin
-    assert pole['moves'][1]['stepEnd'] == move_2_step_begin + 5
-    if not no_last_step:
-        assert pole['moves'][2]['stepBegin'] == move_3_step_begin
-        assert pole['moves'][2]['stepEnd'] == move_3_step_begin + 5
+    if(not move_down_only):
+        assert len(pole['moves']) == (2 if no_last_step else 3)
+        assert pole['moves'][0]['stepBegin'] == 1
+        assert pole['moves'][0]['stepEnd'] == 6
+        assert pole['moves'][1]['stepBegin'] == move_2_step_begin
+        assert pole['moves'][1]['stepEnd'] == move_2_step_begin + 5
+        if not no_last_step:
+            assert pole['moves'][2]['stepBegin'] == move_3_step_begin
+            assert pole['moves'][2]['stepEnd'] == move_3_step_begin + 5
 
-    assert 'rotates' not in pole
+        assert 'rotates' not in pole
+    else:
+        assert len(pole['moves']) == 1
+        assert pole['moves'][0]['stepBegin'] == 1
+        assert pole['moves'][0]['stepEnd'] == move_down_step_end
+        assert 'rotates' not in pole
 
 
 def verify_wall(
@@ -181,8 +217,18 @@ def verify_wall(
     move_3_step_begin: int = 186,
     no_last_step: bool = False,
     sideways: bool = False,
-    repeat: int = None
+    repeat: int = None,
+    room_dim_y: int = 4,
+    move_down_only: bool = False
 ):
+
+    if(move_down_only):
+        position_y = room_dim_y - (OCCLUDER_HEIGHT * 0.5)
+        move_down_dist = (
+            wall['shows'][0]['position']['y'] -
+            (OCCLUDER_HEIGHT * 0.5))
+        move_down_step_end = round(move_down_dist / 0.25)
+
     assert wall['type'] == 'cube'
     assert wall['materials'] == [TEST_MATERIAL_WALL[0]]
     assert wall['debug']['info'] == TEST_MATERIAL_WALL[1]
@@ -214,49 +260,55 @@ def verify_wall(
     move_2_step_end = move_2_step_begin + 5
     move_3_step_end = move_3_step_begin + 5
 
-    assert len(wall['moves']) == (2 if no_last_step else 3)
-    assert wall['moves'][0]['stepBegin'] == 1
-    assert wall['moves'][0]['stepEnd'] == 6
-    assert wall['moves'][1]['stepBegin'] == move_2_step_begin
-    assert wall['moves'][1]['stepEnd'] == move_2_step_end
+    if(not move_down_only):
+        assert len(wall['moves']) == (2 if no_last_step else 3)
+        assert wall['moves'][0]['stepBegin'] == 1
+        assert wall['moves'][0]['stepEnd'] == 6
+        assert wall['moves'][1]['stepBegin'] == move_2_step_begin
+        assert wall['moves'][1]['stepEnd'] == move_2_step_end
 
-    rotate_length = find_rotate_step_length(scale_x) - 1
-    rotate_amount = int(90.0 / (rotate_length + 1)) * (
-        1 if (sideways or position_x < 0) else -1
-    )
-
-    assert len(wall['rotates']) == (2 if no_last_step else 3)
-    assert wall['rotates'][0]['stepBegin'] == 7
-    assert wall['rotates'][0]['stepEnd'] == 7 + rotate_length
-    assert wall['rotates'][1]['stepBegin'] == (
-        move_2_step_begin - 1 - rotate_length
-    )
-    assert wall['rotates'][1]['stepEnd'] == move_2_step_begin - 1
-
-    prop = 'x' if sideways else 'y'
-    assert wall['rotates'][0]['vector'][prop] == rotate_amount
-    assert wall['rotates'][1]['vector'][prop] == rotate_amount * -1
-
-    if not no_last_step:
-        assert wall['moves'][2]['stepBegin'] == move_3_step_begin
-        assert wall['moves'][2]['stepEnd'] == move_3_step_end
-        assert wall['rotates'][2]['stepBegin'] == move_3_step_end + 1
-        assert wall['rotates'][2]['stepEnd'] == (
-            move_3_step_end + 1 + rotate_length
+        rotate_length = find_rotate_step_length(scale_x) - 1
+        rotate_amount = int(90.0 / (rotate_length + 1)) * (
+            1 if (sideways or position_x < 0) else -1
         )
-        assert wall['rotates'][2]['vector'][prop] == rotate_amount
 
-    if repeat is not None:
-        assert wall['moves'][0]['repeat']
-        assert wall['moves'][1]['repeat']
-        move_interval = (move_2_step_end - 5 + repeat)
-        assert wall['moves'][0]['stepWait'] == move_interval
-        assert wall['moves'][1]['stepWait'] == move_interval
-        assert wall['rotates'][0]['repeat']
-        assert wall['rotates'][1]['repeat']
-        rotate_interval = (move_2_step_end - rotate_length + repeat)
-        assert wall['rotates'][0]['stepWait'] == rotate_interval
-        assert wall['rotates'][1]['stepWait'] == rotate_interval
+        assert len(wall['rotates']) == (2 if no_last_step else 3)
+        assert wall['rotates'][0]['stepBegin'] == 7
+        assert wall['rotates'][0]['stepEnd'] == 7 + rotate_length
+        assert wall['rotates'][1]['stepBegin'] == (
+            move_2_step_begin - 1 - rotate_length
+        )
+        assert wall['rotates'][1]['stepEnd'] == move_2_step_begin - 1
+
+        prop = 'x' if sideways else 'y'
+        assert wall['rotates'][0]['vector'][prop] == rotate_amount
+        assert wall['rotates'][1]['vector'][prop] == rotate_amount * -1
+
+        if not no_last_step:
+            assert wall['moves'][2]['stepBegin'] == move_3_step_begin
+            assert wall['moves'][2]['stepEnd'] == move_3_step_end
+            assert wall['rotates'][2]['stepBegin'] == move_3_step_end + 1
+            assert wall['rotates'][2]['stepEnd'] == (
+                move_3_step_end + 1 + rotate_length
+            )
+            assert wall['rotates'][2]['vector'][prop] == rotate_amount
+
+        if repeat is not None:
+            assert wall['moves'][0]['repeat']
+            assert wall['moves'][1]['repeat']
+            move_interval = (move_2_step_end - 5 + repeat)
+            assert wall['moves'][0]['stepWait'] == move_interval
+            assert wall['moves'][1]['stepWait'] == move_interval
+            assert wall['rotates'][0]['repeat']
+            assert wall['rotates'][1]['repeat']
+            rotate_interval = (move_2_step_end - rotate_length + repeat)
+            assert wall['rotates'][0]['stepWait'] == rotate_interval
+            assert wall['rotates'][1]['stepWait'] == rotate_interval
+    else:
+        assert len(wall['moves']) == 1
+        assert wall['moves'][0]['stepBegin'] == 1
+        assert wall['moves'][0]['stepEnd'] == move_down_step_end
+        assert 'rotates' not in wall
 
 
 def test_create_occluder_normal_positive_x():
@@ -1314,3 +1366,169 @@ def test_make_occluder_sideways():
         part['id'] = ''
 
     assert sideways_occluder_2 == occluder_2
+
+
+def test_make_occluder_sideways_move_down():
+    # Test a right occluder.
+    room_dim = {
+        'x': 8,
+        'y': 5,
+        'z': 12
+    }
+    occluder = create_occluder(
+        wall_material=TEST_MATERIAL_WALL,
+        pole_material=TEST_MATERIAL_POLE,
+        x_position=1,
+        occluder_width=2,
+        room_dimensions=room_dim,
+        sideways_right=True,
+        move_down_only=True
+    )
+
+    wall, pole = occluder
+    verify_wall(
+        wall,
+        position_x=1,
+        position_z=1,
+        rotation_y=0,
+        scale_x=2,
+        sideways=True,
+        room_dim_y=5,
+        move_down_only=True
+    )
+    verify_pole_sideways(
+        pole,
+        position_x=3,
+        position_z=1,
+        scale_y=1.0,
+        room_dim_y=5,
+        move_down_only=True
+    )
+
+
+def test_make_occluder_move_down():
+    occluder = create_occluder(
+        wall_material=TEST_MATERIAL_WALL,
+        pole_material=TEST_MATERIAL_POLE,
+        x_position=1,
+        occluder_width=1,
+        move_down_only=True
+    )
+    assert len(occluder) == 2
+    wall, pole = occluder
+    verify_wall(wall, position_x=1, move_down_only=True)
+    verify_pole(pole, position_x=1, move_down_only=True)
+
+
+def test_occluder_gap_positioning():
+    # set gap to .5
+    occluder_gap = .5
+    occluder_gap_viewport = None
+
+    scene = Scene()
+
+    occluder1 = create_occluder(
+        wall_material=TEST_MATERIAL_WALL,
+        pole_material=TEST_MATERIAL_POLE,
+        x_position=1,
+        occluder_width=1,
+        last_step=200
+    )
+
+    occluder2 = create_occluder(
+        wall_material=TEST_MATERIAL_WALL,
+        pole_material=TEST_MATERIAL_POLE,
+        x_position=-1,
+        occluder_width=1,
+        last_step=200
+    )
+
+    scene.objects.append(occluder1[0])
+    scene.objects.append(occluder1[1])
+    scene.occluder_gap = occluder_gap
+    scene.occluder_gap_viewport = occluder_gap_viewport
+
+    new_scene, new_object = occluder_gap_positioning(
+        scene, occluder_gap, occluder_gap_viewport, occluder2, False)
+
+    assert new_scene.objects[0]['shows'][0]['position']['x'] == 1.0
+    assert new_scene.objects[1]['shows'][0]['position']['x'] == 1.0
+    assert new_object[0]['shows'][0]['position']['x'] == -0.5
+    assert new_object[1]['shows'][0]['position']['x'] == -0.5
+
+
+def test_occluder_gap_sideways_positioning():
+    # set gap to .5
+    occluder_gap = .5
+    occluder_gap_viewport = None
+
+    scene = Scene()
+
+    occluder1 = create_occluder(
+        wall_material=TEST_MATERIAL_WALL,
+        pole_material=TEST_MATERIAL_POLE,
+        x_position=1,
+        occluder_width=1,
+        last_step=200,
+        sideways_right=True
+    )
+
+    occluder2 = create_occluder(
+        wall_material=TEST_MATERIAL_WALL,
+        pole_material=TEST_MATERIAL_POLE,
+        x_position=-1,
+        occluder_width=1,
+        last_step=200,
+        sideways_left=True
+    )
+
+    scene.objects.append(occluder1[0])
+    scene.objects.append(occluder1[1])
+    scene.occluder_gap = occluder_gap
+    scene.occluder_gap_viewport = occluder_gap_viewport
+
+    new_scene, new_object = occluder_gap_positioning(
+        scene, occluder_gap, occluder_gap_viewport, occluder2, True)
+
+    assert new_scene.objects[0]['shows'][0]['position']['x'] == 1.0
+    assert new_scene.objects[1]['shows'][0]['position']['z'] == 1.0
+    assert new_object[0]['shows'][0]['position']['x'] == -0.5
+    assert new_object[1]['shows'][0]['position']['z'] == 1
+
+
+def test_occluder_gap_viewport_positioning():
+    # set gap to .5
+    occluder_gap = None
+    occluder_gap_viewport = .5
+
+    scene = Scene()
+
+    occluder1 = create_occluder(
+        wall_material=TEST_MATERIAL_WALL,
+        pole_material=TEST_MATERIAL_POLE,
+        x_position=1,
+        occluder_width=1,
+        last_step=200
+    )
+
+    occluder2 = create_occluder(
+        wall_material=TEST_MATERIAL_WALL,
+        pole_material=TEST_MATERIAL_POLE,
+        x_position=-1,
+        occluder_width=1,
+        last_step=200
+    )
+
+    scene.objects.append(occluder1[0])
+    scene.objects.append(occluder1[1])
+
+    scene.occluder_gap = occluder_gap
+    scene.occluder_gap_viewport = occluder_gap_viewport
+
+    new_scene, new_object = occluder_gap_positioning(
+        scene, occluder_gap, occluder_gap_viewport, occluder2, False)
+
+    assert new_scene.objects[0]['shows'][0]['position']['x'] == 2.2
+    assert new_scene.objects[1]['shows'][0]['position']['x'] == 2.2
+    assert new_object[0]['shows'][0]['position']['x'] == -2.2
+    assert new_object[1]['shows'][0]['position']['x'] == -2.2

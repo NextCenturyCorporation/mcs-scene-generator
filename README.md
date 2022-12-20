@@ -79,6 +79,21 @@ python ile.py -c ile_config.yaml -n 10 -p scene
 
 ### Latest Release Notes
 
+#### Release 1.7
+
+Changelog:
+- Added `ile_confgs/interactive_arithmetic.yaml` for generating training data for the Arithmetic (Addition/Subtraction) task. Added the `forced_choice_multi_retrieval_target` and `move_down_only` config properties to support these scenes.
+- Added `ile_confgs/passive_seeing_leads_to_knowing.yaml` for generating training data for the Seeing Leads to Knowing task. Added the `shortcut_seeing_leads_to_knowing` config property to support these scenes.
+- Added the `end_rotation_after` config property for turntables, to set the total amount of degrees they should rotate rather than the number of steps. Updated `ile_configs/interactive_set_rotation.yaml`.
+- Added the `occluder_gap` and `occluder_gap_viewport` config properties to set a specific distance (or range) between multiple occluders and/or the edge of the viewport in passive physics scenes. Updated `ile_configs/passive_physics_fall_down.yaml` and `ile_configs/passive_physics_move_across.yaml`.
+- Added the `separate_lid_after` config property for containers with separate lids to "place" their lids after one or more other objects stop moving/rotating.
+- Added the `sidesteps` config property, primarily for generating training data for the Set Rotation task, which forces the performer agent to use Move and Rotate actions to circumnavigate a specific object.
+- Added many new config properties for placers, including: `activate_after` and `activate_on_start_or_after`, to activate them after one or more other objects stop moving/rotating; `existing_object_required`, to prevent the ILE from generating a new object for a placer to hold; `randomize_once`, to use the same randomized options for more than one placer; `retain_position`, to prevent the ILE from moving an object when it is given to a new placer.
+- Fixed the mass of containers-with-separate-lids so they will not fall over.
+- Fixed the size of chests in imitation scenes, and made sure the soccer ball was visible up near the ceiling before the correct sequence of actions was performed.
+- Reduced the default maximum X/Z room size to 25, including for the holes, lava, ramps, and tools example configs, corresponding to a similar reduction in the upcoming evaluation dataset.
+- Updated `ile_configs/interactive_shell_game.yaml` so sometimes two containers are moved, and sometimes the container(s) are moved before the target and lids are "placed" in/on the containers.
+
 #### Release 1.6
 
 Changelog:
@@ -91,6 +106,7 @@ Changelog:
 - Added the shortcut_imitation_task property for generating Imitation scenes.
 - Added the shortcut_tool_choice property for generating Tool Choice scenes.
 - Added the turntables_agent_non_agent_config property for generating Spatial Reference scenes.
+- Fixed using min/max for `distance` in `performer_starts_near`.
 - Revised the "adjacent" keyword_location to work in global coordinates (using the new "adjacent_distance" property), rather than based on the position of the performer agent.
 - Updated the "placers" ILE config file to include examples of "placers" picking up objects.
 - Added new example ILE config files:
@@ -264,7 +280,7 @@ See the list of the Core Domains in our [MCS BAA Table doc](./docs/MCS_BAA_TABLE
 | O6 | [droppers.yaml](./ile_configs/droppers.yaml), [placers.yaml](./ile_configs/placers.yaml) |
 | O8 | [throwers.yaml](./ile_configs/throwers.yaml) |
 | A5 | [agent_holds_target.yaml](./ile_configs/agent_holds_target.yaml),[agent_pointing_at_hidden_target.yaml](./ile_configs/agent_pointing_at_hidden_target.yaml) |
-| TODO | [turntable.yaml](./ile_configs/turntable.yaml) |
+| P5 | [turntable.yaml](./ile_configs/turntable.yaml) |
 
 List of example ILE configuration files helpful for learning core common sense concepts:
 
@@ -345,27 +361,31 @@ Eval 6 Tasks:
 
 | Eval 6 Task | MCS Core Domains | Example Config Files |
 | --- | --- | --- |
-| Imitation (Interactive) | O5 | [interactive_imitation.yaml](./ile_configs/interactive_imitation.yaml) |
+| Arithmetic (Interactive) | O7 | [interactive_arithmetic.yaml](./ile_configs/interactive_arithmetic.yaml) |
+| Imitation (Interactive) | A7 | [interactive_imitation.yaml](./ile_configs/interactive_imitation.yaml) |
 | Navigation: Holes (Interactive) | P7 | New variations with agents; see the Eval 5 Tasks above |
 | Navigation: Lava (Interactive) | P7 | New variations with agents; see the Eval 5 Tasks above |
 | Navigation: Ramps (Interactive) | P6 | New variations with agents; see the Eval 5 Tasks above |
-| Number Comparison (Interactive) | TODO | [interactive_number_comparison.yaml](./ile_configs/interactive_number_comparison.yaml) |
-| Set Rotation (Interactive) | TODO | [interactive_set_rotation.yaml](./ile_configs/interactive_set_rotation.yaml) |
-| Shell Game (Interactive) | TODO | [interactive_shell_game.yaml](./ile_configs/interactive_shell_game.yaml) |
-| Spatial Reference (Interactive) | TODO | [interactive_spatial_reference.yaml](./ile_configs/interactive_spatial_reference.yaml) |
+| Number Comparison (Interactive) | O7 | [interactive_number_comparison.yaml](./ile_configs/interactive_number_comparison.yaml) |
+| Seeing Leads to Knowing (Passive) | A6 | [passive_seeing_leads_to_knowing.yaml](./ile_configs/passive_seeing_leads_to_knowing.yaml) |
+| Set Rotation (Interactive) | P5 | [interactive_set_rotation.yaml](./ile_configs/interactive_set_rotation.yaml) |
+| Shell Game (Interactive) | P5 | [interactive_shell_game.yaml](./ile_configs/interactive_shell_game.yaml) |
+| Spatial Reference (Interactive) | A7 | [interactive_spatial_reference.yaml](./ile_configs/interactive_spatial_reference.yaml) |
 | Spatial Reorientation (Interactive) | P2, P3 | [interactive_spatial_reorientation.yaml](./ile_configs/interactive_spatial_reorientation.yaml) |
 | Tool Choice (Interactive) | O5 | [interactive_tool_choice.yaml](./ile_configs/interactive_tool_choice.yaml) |
 | Tool Use (Interactive) | O5 | New variations with asymmetric (hooked) tools; see the Eval 5 Tasks above |
 
 List of example ILE configuration files for generating scenes similar to specific evaluation tasks:
 
-- [interactive_imitation.yaml](./ile_configs/interactive_imitation.yaml) Generates scenes similar to the interactive imitation eval tasks.
+- [interactive_arithmetic.yaml](./ile_configs/interactive_arithmetic.yaml) Generates scenes similar to the interactive arithmetic (addition/subtraction) eval tasks: start on a platform bisecting the room; zero or more soccer balls are positioned on each side of the room; one or more soccer balls are either added to, or removed from, the same side of the room; pick up all of the soccer balls on the side of the room containing the most soccer balls; sometimes occluders descend to obstrct your view of the final number of soccer balls.
+- [interactive_imitation.yaml](./ile_configs/interactive_imitation.yaml) Generates scenes similar to the interactive imitation eval tasks. See the config file for details.
 - [interactive_number_comparison.yaml](./ile_configs/interactive_number_comparison.yaml) Generates scenes similar to the interactive number comparison eval tasks: start on a platform bisecting the room; one or more soccer ball multi-retrieval targets on one side; fewer soccer balls on the other side.
 - [interactive_set_rotation.yaml](./ile_configs/interactive_set_rotation.yaml) Generates scenes similar to the interactive set rotation eval tasks: start in a room with one or more identical containers positioned on top of a turntable (giant cog); a soccer ball retrieval target is placed inside a container; lids are placed on all containers; the turntable rotates between 90 and 360 degrees.
 - [interactive_shell_game.yaml](./ile_configs/interactive_shell_game.yaml) Generates scenes similar to the interactive shell game eval tasks: start in a room with one or more identical containers; a soccer ball retrieval target is placed inside a container; lids are placed on all containers; a placer drags the target's container to a new location.
 - [interactive_spatial_reference.yaml](./ile_configs/interactive_spatial_reference.yaml) Generates scenes similar to the interactive spatial reference eval tasks: start on a platform bisecting the room; identical closed containers on both sides; an agent walks and points at the container hiding the soccer ball retrieval target; a turntable (giant cog) rotates a non-agent object so it "points" at a container, which may be the same container, or the opposite container.
 - [interactive_spatial_reorientation.yaml](./ile_configs/interactive_spatial_reorientation.yaml) Generates scenes similar to the interactive spatial reorientation eval tasks: start on a platform bisecting the room; identical bins on either side of the room; a placer drops a soccer ball retrieval target into one bin; the performer agent is kidnapped and sometimes teleported to the other side of the room; sometimes one room wall is a different color, and/or the room is trapezoidal.
 - [interactive_tool_choice.yaml](./ile_configs/interactive_tool_choice.yaml) Generates scenes similar to the interactive tool choice eval tasks: start on a platform bisecting the room; soccer balls surrounded by lava on both sides; one side has a useful tool, but the other side does not have a tool, or has a tool that is too small to use.
+- [passive_seeing_leads_to_knowing.yaml](./ile_configs/passive_seeing_leads_to_knowing.yaml) Generates scenes similar to the passive seeing leads to knowing eval tasks. See the config file for details.
 
 ## Scene Validation
 

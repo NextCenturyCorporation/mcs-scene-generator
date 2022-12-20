@@ -44,6 +44,7 @@ from generator.intuitive_physics_util import (
     retrieve_off_screen_position_y
 )
 from generator.movements import BASE_MOVE_LIST, TOSS_MOVE_LIST
+from generator.occluders import occluder_gap_positioning
 from generator.scene import PartitionFloor, Scene
 from ideal_learning_env.global_settings_component import (
     ROOM_MIN_XZ,
@@ -61,7 +62,9 @@ from ideal_learning_env.object_services import (
     ObjectDefinition,
     ObjectRepository,
     RelativePositionConfig,
-    add_random_placement_tag
+    add_random_placement_tag,
+    get_step_after_movement,
+    get_step_after_movement_or_start
 )
 
 from .choosers import (
@@ -78,9 +81,11 @@ from .defs import (
     ILEConfigurationException,
     ILEDelayException,
     ILEException,
+    ILESharedConfiguration,
     RandomizableBool,
     RandomizableString,
-    find_bounds
+    find_bounds,
+    return_list
 )
 from .feature_creation_service import (
     BaseFeatureConfig,
@@ -1147,7 +1152,8 @@ class StructuralMovingOccluderCreationService(
             reconciled.move_up_before_last_step
         ) else None
         repeat_movement_arg = (
-            None if not reconciled.repeat_movement else
+            None if (reconciled.move_down_only or
+                     not reconciled.repeat_movement) else
             reconciled.repeat_interval
         )
         args = {
@@ -1168,11 +1174,22 @@ class StructuralMovingOccluderCreationService(
             'sideways_left': reconciled.origin == OccluderOrigin.LEFT,
             'sideways_right': reconciled.origin == OccluderOrigin.RIGHT,
             'y_rotation': reconciled.rotation_y,
-            'z_position': reconciled.position_z
+            'z_position': reconciled.position_z,
+            'move_down_only': reconciled.move_down_only
         }
 
         logger.trace(f'Creating moving occluder:\nINPUT = {args}')
         new_obj = occluders.create_occluder(**args)
+
+        shared_config = ILESharedConfiguration.get_instance()
+        if scene.intuitive_physics:
+            scene, new_obj = occluder_gap_positioning(
+                scene,
+                shared_config.get_occluder_gap(),
+                shared_config.get_occluder_gap_viewport(),
+                new_obj,
+                reconciled.origin in ['right', 'left'])
+
         new_obj = _post_instance(
             scene, new_obj, reconciled, source_template, self._get_type())
         return new_obj
@@ -1529,11 +1546,25 @@ class StructuralPlacersCreationService(
                 source_template
             )
         except Exception as e:
-            if self.object_idl:
-                placed_object = self.object_idl.instance
-                placed_object['debug']['positionedBy'] = None
-                placed_object['debug'][DEBUG_FINAL_POSITION_KEY] = None
+            self._cleanup_on_failure()
             raise e
+
+    def reconcile(
+        self,
+        scene: Scene,
+        source_template: StructuralPlacerConfig
+    ) -> StructuralPlacerConfig:
+        try:
+            return super().reconcile(scene, source_template)
+        except Exception as e:
+            self._cleanup_on_failure()
+            raise e
+
+    def _cleanup_on_failure(self) -> None:
+        if self.object_idl:
+            placed_object = self.object_idl.instance
+            placed_object['debug']['positionedBy'] = None
+            placed_object['debug'][DEBUG_FINAL_POSITION_KEY] = None
 
     def _create_feature_from_specific_values_helper(
             self, scene: Scene, reconciled: StructuralPlacerConfig,
@@ -1596,10 +1627,17 @@ class StructuralPlacersCreationService(
         elif reconciled.move_object:
             # Add the movement to the object.
             mechanisms.move_object(**args_move_object)
+            new_x = reconciled.move_object_end_position.x
+            new_z = reconciled.move_object_end_position.z
+            instance['debug']['moveToPosition'] = {'x': new_x, 'z': new_z}
+            instance['debug']['moveToPositionBy'] = (
+                instance['moves'][-1]['stepEnd']
+            )
 
-            # If the object is a container with a separate lid, and the lid is
-            # attached after the container is moved, reposition the lid and its
-            # placer to the new position.
+            objects_to_reposition = []
+
+            # If our object is a container with a separate lid, and the lid is
+            # attached after our container is moved, reposition the lid/placer.
             lid_id = instance['debug'].get('lidId')
             lid = scene.get_object_by_id(lid_id)
             lid_placer_id = instance['debug'].get('lidPlacerId')
@@ -1624,12 +1662,39 @@ class StructuralPlacersCreationService(
                         f'"separate_lid" configuration.'
                     )
                 if lid_placer_move_begin > object_move_end:
-                    new_x = reconciled.move_object_end_position.x
-                    new_z = reconciled.move_object_end_position.z
-                    lid['shows'][0]['position']['x'] = new_x
-                    lid['shows'][0]['position']['z'] = new_z
-                    lid_placer['shows'][0]['position']['x'] = new_x
-                    lid_placer['shows'][0]['position']['z'] = new_z
+                    objects_to_reposition.extend([lid, lid_placer])
+
+            # If any other objects were positioned above our moved object,
+            # and are "placed" after our object was moved, reposition them.
+            for possibly_held in scene.objects:
+                # Ignore our moved object!
+                if possibly_held['id'] == instance['id']:
+                    continue
+                # If this object was positioned by a placer...
+                if possibly_held['debug'].get('positionedBy') != 'mechanism':
+                    continue
+                # If this object was positioned above our moved object...
+                above_id = possibly_held['debug'].get('positionedAboveId')
+                if above_id != instance['id']:
+                    continue
+                # Find its corresponding placer...
+                for possible_placer in scene.objects:
+                    # If this object is a placer holding the other object...
+                    held_id = possible_placer['debug'].get('heldObjectId')
+                    if held_id != possibly_held['id']:
+                        continue
+                    # If this placer activates after our object was moved...
+                    move_step = possible_placer['moves'][0]['stepBegin']
+                    if move_step > reconciled.activation_step:
+                        # Reposition both the placer and its held object.
+                        objects_to_reposition.append([
+                            possibly_held,
+                            possible_placer
+                        ])
+
+            for object_to_reposition in objects_to_reposition:
+                object_to_reposition['shows'][0]['position']['x'] = new_x
+                object_to_reposition['shows'][0]['position']['z'] = new_z
         else:
             mechanisms.place_object(**args)
 
@@ -1697,6 +1762,7 @@ class StructuralPlacersCreationService(
             }
             logger.trace(f'Creating placer:\nINPUT = {args}')
             placer = mechanisms.create_placer(**args)
+            placer['debug']['heldObjectId'] = instance['id']
             _post_instance(
                 scene,
                 placer,
@@ -1757,13 +1823,17 @@ class StructuralPlacersCreationService(
             source_template
     ) -> StructuralPlacerConfig:
         obj_repo = ObjectRepository.get_instance()
-        labels = (source_template.placed_object_labels if source_template is
-                  not None else None)
-        self.labels = labels
         room_dim = scene.room_dimensions
         defn = None
-        if labels:
-            self.object_idl = _get_existing_held_object_idl(labels)
+
+        # Save the object labels from the source template.
+        self._target_labels = source_template.placed_object_labels
+        if self._target_labels:
+            self.object_idl = _get_existing_held_object_idl(
+                self._target_labels,
+                place_or_pickup=(not reconciled.move_object),
+                existing_object_required=reconciled.existing_object_required
+            )
 
         if self.object_idl:
             logger.trace(
@@ -1789,7 +1859,7 @@ class StructuralPlacersCreationService(
                 scale=scale,
                 shape=shape,
                 material=(material.material if material else None),
-                labels=self.labels)
+                labels=self._target_labels)
 
             srv: InteractableObjectCreationService = (
                 FeatureCreationService.get_service(FeatureTypes.INTERACTABLE))
@@ -1804,6 +1874,23 @@ class StructuralPlacersCreationService(
                 f'{self.object_idl.instance["id"]}'
             )
 
+        if reconciled.activate_after:
+            step = get_step_after_movement([
+                label for label in return_list(source_template.activate_after)
+                if label
+            ])
+            if step >= 1:
+                reconciled.activation_step = step
+
+        if reconciled.activate_on_start_or_after:
+            step = get_step_after_movement_or_start([
+                label for label in
+                return_list(source_template.activate_on_start_or_after)
+                if label
+            ])
+            if step >= 1:
+                reconciled.activation_step = step
+
         if reconciled.placed_object_above:
             # Position the held object above another object in the scene.
             if not obj_repo.has_label(reconciled.placed_object_above):
@@ -1812,15 +1899,27 @@ class StructuralPlacersCreationService(
                     f'"{reconciled.placed_object_above}" to position a new '
                     f'placer.'
                 )
+
             above_object = obj_repo.get_one_from_labeled_objects(
                 label=reconciled.placed_object_above
             ).instance
-            above_position = above_object['shows'][0]['position']
+            above_position = above_object['shows'][0]['position'].copy()
+            above_debug = above_object['debug']
+            # If the object was moved by something like a placer before this
+            # placer activates, use the object's moved position.
+            if (
+                above_debug.get('moveToPosition') and
+                above_debug['moveToPositionBy'] <= reconciled.activation_step
+            ):
+                above_position['x'] = above_debug['moveToPosition']['x']
+                above_position['z'] = above_debug['moveToPosition']['z']
             reconciled.placed_object_position = Vector3d(
                 x=above_position['x'],
                 y=above_position['y'],
                 z=above_position['z']
             )
+            above_id = above_object['id']
+            self.object_idl.instance['debug']['positionedAboveId'] = above_id
 
         # Retrieve the bounds for all objects in the scene, but ignore the held
         # object's current bounds, because they will change. Used below.
@@ -1828,6 +1927,25 @@ class StructuralPlacersCreationService(
             scene,
             ignore_ids=[self.object_idl.instance['id']]
         )
+        # Add the bounds for moved objects to the bounds_list.
+        for instance in scene.objects:
+            if instance['debug'].get('moveToPosition'):
+                position = instance['debug']['moveToPosition'].copy()
+                position['y'] = instance['shows'][0]['position']['y']
+                bounds_list.append(geometry.create_bounds(
+                    instance['debug']['dimensions'],
+                    instance['debug']['offset'],
+                    position,
+                    instance['shows'][0]['rotation'],
+                    instance['debug']['positionY']
+                ))
+
+        if reconciled.retain_position:
+            reconciled.placed_object_position = VectorFloatConfig(
+                x=self.object_idl.instance['shows'][0]['position']['x'],
+                y=self.object_idl.instance['shows'][0]['position']['y'],
+                z=self.object_idl.instance['shows'][0]['position']['z']
+            )
 
         # If this placer picks up or moves its object, check for collisions
         # with the object's starting position (assuming it is configured),
@@ -1931,9 +2049,6 @@ class StructuralPlacersCreationService(
                 reconciled.placed_object_position.x = position_x
             if position_z is not None:
                 reconciled.placed_object_position.z = position_z
-
-        # Save the projectile labels from the source template.
-        self._target_labels = source_template.placed_object_labels
 
         # Set the placer end_height based on a end_height_object_label,
         # if that is specified
@@ -2131,20 +2246,22 @@ class StructuralTurntableCreationService(
             if reconciled.position.z is None else reconciled.position.z
         )
 
-        reconciled.turntable_movement.rotation_y = (
-            random.choice([5, -5])
-            if reconciled.turntable_movement.rotation_y is None else
-            reconciled.turntable_movement.rotation_y)
+        # If no Y rotation is set, just ensure that step_end is a number.
+        if not reconciled.turntable_movement.rotation_y:
+            reconciled.turntable_movement.step_end = (
+                reconciled.turntable_movement.step_begin
+            )
 
-        reconciled.turntable_movement.step_begin = choose_random(
-            MinMaxInt(0, 10)
-            if reconciled.turntable_movement.step_begin is None else
-            reconciled.turntable_movement.step_begin)
-
-        reconciled.turntable_movement.step_end = choose_random(
-            MinMaxInt(11, 72)
-            if reconciled.turntable_movement.step_end is None else
-            reconciled.turntable_movement.step_end)
+        end_after = reconciled.turntable_movement.end_after_rotation
+        # If end_after_rotation is set but step_end is not set...
+        if end_after and not reconciled.turntable_movement.step_end:
+            # If % 360 = 0, use 360 instead.
+            end_after = (end_after % 360) or 360
+            # Set the step_end (remember to subtract 1 since it is inclusive).
+            reconciled.turntable_movement.step_end = (
+                reconciled.turntable_movement.step_begin - 1 +
+                int(end_after / abs(reconciled.turntable_movement.rotation_y))
+            )
 
         return reconciled
 
@@ -2288,7 +2405,7 @@ class StructuralPlatformConfig(PositionableStructuralObjectsConfig):
     to this object. Always automatically assigned "platforms"
     - `lips` ([StructuralPlatformLipsConfig]
     (#StructuralPlatformLipsConfig), or list of
-    StructuralPlatformLipsConfig): The platform's lips. Default: None
+    StructuralPlatformLipsConfig): The platform's lips. Default: no lips
     - `material` (string, or list of strings): The structure's material or
     material type.
     - `platform_underneath` (bool or list of bools): If true, add a platform
@@ -2635,6 +2752,11 @@ class StructuralMovingOccluderConfig(BaseFeatureConfig):
     - `position_z` (float, or list of floats, or
     [MinMaxFloat](#MinMaxFloat) dict, or list of MinMaxFloat dicts): Z
     position of the center of the occluder
+    - `move_down_only` (bool, or list of bools): If true, occluder will start
+    near the ceiling, moving downwards until it touches the floor with no
+    rotation. Note that if this is true, the following settings are ignored:
+    `move_up_before_last_step`, `repeat_movement`, and `reverse_direction`.
+    Default: false
     - `move_up_before_last_step` (bool, or list of bools): If true, repeat the
     occluder's full movement and rotation before the scene's last step. Ignored
     if `last_step` isn't configured, or if `repeat_movement` is true.
@@ -2669,6 +2791,7 @@ class StructuralMovingOccluderConfig(BaseFeatureConfig):
     reverse_direction: RandomizableBool = None
     rotation_y: RandomizableInt = None
     move_up_before_last_step: RandomizableBool = None
+    move_down_only: RandomizableBool = None
 
 
 @dataclass
@@ -2760,6 +2883,24 @@ class StructuralPlacerConfig(BaseFeatureConfig):
 
     - `num` (int, or list of ints, or [MinMaxInt](#MinMaxInt) dict, or list of
     MinMaxInt dicts): Number of areas to be used with these parameters
+    - `activate_after`: (str, or list of strs): Overrides the `activation_step`
+    (overriding the manual config) based on the movement of other object(s) in
+    the scene. Should be set to one or more labels for mechanical objects that
+    may move or rotate, like placers or turntables. The `activation_step` of
+    this object will be set to the step immediately after ALL of the objects
+    finish moving and rotating. If multiple labels are configured, all labels
+    will be used. Default: Use `activation_step`
+    - `activate_on_start_or_after`: (str, or list of strs, or bool): Overrides
+    the `activation_step` (overriding the manual config) based on the movement
+    of other object(s) in the scene. Should be set to one or more labels for
+    mechanical objects that can move or rotate, like placers or turntables. If
+    ANY of the objects begin moving or rotating immediately at the start of the
+    scene (step 1), then the `activation_step` of this object will be set to
+    the step immediately after ALL of the objects finish moving and rotating;
+    otherwise, if ALL of the objects begin moving and rotating after step 1,
+    then the `activation_step` of this object will be set to 1. If multiple
+    labels are configured, all labels will be used. Default: Use
+    `activation_step`
     - `activation_step`: (int, or list of ints, or [MinMaxInt](#MinMaxInt)
     dict, or list of MinMaxInt dicts): Step on which the placer should begin
     its downward movement. Default: between 0 and 10
@@ -2767,6 +2908,9 @@ class StructuralPlacerConfig(BaseFeatureConfig):
     dict, or list of MinMaxInt dicts): Step on which the placer should release
     its held object. This number must be a step after the end of the placer's
     downward movement. Default: At the end of the placer's downward movement
+    - `empty_placer` (bool, or list of bools): If True, the placer will not
+    hold/drop an object. Cannot be used in combination with any of the
+    placed_object_* config options. Default: False
     - `end_height`: (float, or list of floats, or [MinMaxFloat](#MinMaxFloat)
     dict): Height at which the placer should release its held object.
     Alternatively, one can use the `end_height_relative_object_label`.
@@ -2775,8 +2919,27 @@ class StructuralPlacerConfig(BaseFeatureConfig):
     the bottom of the object held by the placer to the height of another
     (for example, the support platform in gravity scenes). This will override
     `end_height` if both are set.
+    - `existing_object_required` (bool, or list of bools): If this is `true`
+    and `placed_object_labels` is set, this placer will be required to use an
+    existing object with the configured label. If this is `false`, and no
+    objects exist with the `placed_object_labels`, then the placer will
+    automatically generate a new object and assign it all the
+    `placed_object_labels`. Default: False
     - `labels` (string, or list of strings): A label or labels to be assigned
     to this object. Always automatically assigned "placers"
+    - `move_object` (bool): If True, a placer will be
+    generated to pickup an object. Default: False
+    - `move_object_end_position`: ([VectorFloatConfig](#VectorFloatConfig)
+    dict, or list of VectorFloatConfig dicts): The placed object's end
+    position after being moved by a placer
+    - `move_object_y`: The placer will raise the object by this value
+        during the move object event.
+        Default: 0
+    - `move_object_z`: The placer will move the object along the z-axis,
+        slide along the x-axis and move back.
+        Default: 1.5
+    - `pickup_object` (bool): If True, a placer will be
+    generated to pickup an object. Default: False
     - `placed_object_above` (string, or list of strings): A label for an
     existing object in your configuration whose X/Z position will be used for
     this placer's (and the placed object's) starting position. Overrides
@@ -2808,26 +2971,17 @@ class StructuralPlacerConfig(BaseFeatureConfig):
     - `position_relative` ([RelativePositionConfig](#RelativePositionConfig)
     dict, or list of RelativePositionConfig dicts): Configuration options for
     positioning this object relative to another object, rather than using
-    `position_x` or `position_z`. If configuring this as a list, then all
+    `placed_object_position`. If configuring this as a list, then all
     listed options will be applied to each scene in the listed order, with
     later options overriding earlier options if necessary. Default: not used
-    - `empty_placer` (bool, or list of bools): If True, the placer will not
-    hold/drop an object. Cannot be used in combination with any of the
-    placed_object_* config options. Default: False
-    - `pickup_object` (bool): If True, a placer will be
-    generated to pickup an object. Default: False
-    - `move_object` (bool): If True, a placer will be
-    generated to pickup an object. Default: False
-    - `move_object_end_position`: ([VectorFloatConfig](#VectorFloatConfig)
-    dict, or list of VectorFloatConfig dicts): The placed object's end
-    position after being moved by a placer
-    - `move_object_y`: The placer will raise the object by this value
-        during the move object event.
-        Default: 0
-    - `move_object_z`: The placer will move the object along the z-axis,
-        slide along the x-axis and move back.
-        Default: 1.5
-
+    - `randomize_once` (StructuralPlacerConfig dict) Placer configuration
+    options that are only randomized once. If this configuration template would
+    generate more than one placer (has a `num` greater than 1), then each
+    placer generated by this template will use the same randomized values for
+    all the options in `randomize_once`. Default: not used
+    - `retain_position` (bool, or list of bools): The placed object will
+    retain its current X/Z position. Overrides `placed_object_position` and
+    `placed_object_above'. Default: False
     """
 
     num: RandomizableInt = 0
@@ -2855,6 +3009,10 @@ class StructuralPlacerConfig(BaseFeatureConfig):
     move_object_y: RandomizableFloat = None
     move_object_z: RandomizableFloat = None
     placed_object_above: RandomizableString = None
+    activate_after: RandomizableString = None
+    activate_on_start_or_after: RandomizableString = None
+    existing_object_required: RandomizableBool = False
+    retain_position: RandomizableBool = False
 
 
 @dataclass
@@ -2896,20 +3054,28 @@ class StructuralObjectMovementConfig():
     Represents what movements the structural object will make. Currently
     only used for configuring turntables.
 
+    - `end_after_rotation` (int, or list of ints, or [MinMaxInt](#MinMaxInt)
+    dict, or list of MinMaxInt dicts): The amount the structure will rotate in
+    full, beginning on `step_begin` and rotating `rotation_y` each step.
+    All values will be % 360 (set 360 for a complete rotation). If
+    `end_after_rotation` does not divide evenly by `rotation_y`, then the
+    number of rotation steps will round down. Default is either 90, 180, 270,
+    or 360.
     - `step_begin` (int, or list of ints, or [MinMaxInt](#MinMaxInt) dict):
-    The step at which this movement should start. Default will be a
-    value between 0 and 10.
+    The step at which this movement should start. Default is a value between 0
+    and 10.
     - `step_end` (int, or list of ints, or [MinMaxInt](#MinMaxInt) dict):
-    The step at which this movement should end. Default will be a value
-    between 11 and 72.
-    - `rotation_y` (float, or list of floats, or [MinMaxFloat](#MinMaxFloat)
-    dict, or list of MinMaxFloat dicts): The amount that the structure
+    The step at which this movement should end. Overrides `end_after_rotation`.
+    Default will use `end_after_rotation`.
+    - `rotation_y` (int, or list of ints, or [MinMaxInt](#MinMaxInt)
+    dict, or list of MinMaxInt dicts): The amount that the structure
     will rotate each step. Default is randomly either 5 or -5.
     """
 
     step_begin: RandomizableInt = None
     step_end: RandomizableInt = None
-    rotation_y: RandomizableFloat = None
+    rotation_y: RandomizableInt = None
+    end_after_rotation: RandomizableInt = None
 
 
 @dataclass
@@ -3037,6 +3203,7 @@ DEFAULT_TEMPLATE_MOVING_OCCLUDER = StructuralMovingOccluderConfig(
         DEFAULT_MOVING_OCCLUDER_WIDTH_MAX),
     rotation_y=MinMaxFloat(
         DEFAULT_OCCLUDER_ROTATION_MIN, DEFAULT_OCCLUDER_ROTATION_MAX),
+    move_down_only=False,
     move_up_before_last_step=False,
     repeat_movement=False,
     repeat_interval=MinMaxInt(DEFAULT_MOVING_OCCLUDER_REPEAT_MIN,
@@ -3093,11 +3260,14 @@ DEFAULT_TEMPLATE_PLACER = StructuralPlacerConfig(
     placed_object_scale=None,
     placed_object_shape=PLACER_SHAPES,
     activation_step=MinMaxInt(0, 10),
+    activate_after=None,
+    activate_on_start_or_after=None,
     deactivation_step=None,
     end_height=0,
     position_relative=None,
     empty_placer=False,
-    pickup_object=False
+    pickup_object=False,
+    retain_position=False
 )
 
 DOOR_MATERIAL_RESTRICTIONS = [mat[0] for mat in (materials.METAL_MATERIALS +
@@ -3112,8 +3282,8 @@ DEFAULT_TEMPLATE_DOOR = StructuralDoorConfig(
     wall_scale_x=None, wall_scale_y=None)
 
 DEFAULT_TEMPLATE_STRUCT_OBJ_MOVEMENT = StructuralObjectMovementConfig(
-    step_begin=MinMaxInt(0, 10), step_end=MinMaxInt(11, 72),
-    rotation_y=[-5, 5]
+    step_begin=MinMaxInt(0, 10), step_end=None,
+    rotation_y=[-5, 5], end_after_rotation=[90, 180, 270, 360]
 )
 DEFAULT_TEMPLATE_TURNTABLE = StructuralTurntableConfig(
     num=0, position=VectorFloatConfig(x=None, y=0, z=None),
@@ -3840,7 +4010,9 @@ def _convert_base_occluding_wall_to_holed_wall(
 
 
 def _get_existing_held_object_idl(
-    labels: RandomizableString
+    labels: RandomizableString,
+    place_or_pickup: bool = False,
+    existing_object_required: bool = False
 ) -> Optional[InstanceDefinitionLocationTuple]:
     object_repository = ObjectRepository.get_instance()
     shuffled_labels = (
@@ -3858,23 +4030,33 @@ def _get_existing_held_object_idl(
             # Verify that this object has not already been given a final
             # position by another mechanism or keyword location.
             if idl.instance['debug'].get(DEBUG_FINAL_POSITION_KEY):
+                # Exempt place or pickup events on objects already positioned
+                # by keyword location.
+                if (
+                    idl.instance['debug']['positionedBy'] != 'mechanism' and
+                    place_or_pickup
+                ):
+                    return idl
+                # Try using another object.
                 logger.trace(
                     f'Ignoring existing object {idl.instance["id"]} for use '
-                    f'with a new device because it was previously positioned '
-                    f'by: {idl.instance["debug"]["positionedBy"]}'
+                    f'with a new device because it was already given a final '
+                    f'position by {idl.instance["debug"]["positionedBy"]}.'
                 )
                 continue
             return idl
-    # If a target object does not exist or was already used by another
-    # mechanism, do not generate a new one; just raise an error.
-    if labels == TARGET_LABEL or labels == [TARGET_LABEL]:
+    # If a required object does not exist or was already used by another
+    # mechanism, do not generate a new one; just raise an exception.
+    # For the TARGET_LABEL, an existing object is always required.
+    is_target = (labels == TARGET_LABEL or labels == [TARGET_LABEL])
+    if existing_object_required or is_target:
         error_message = (
-            f'all {idl_count} matching object(s) were already used with other '
-            f'mechanisms or positioned with keyword locations'
+            f'all {idl_count} matching object(s) are already being used with '
+            f'other mechanisms or positioned by keyword locations'
         ) if idl_count else 'no matching object(s) were previously generated'
-        raise ILEException(
-            f'Failed to find an available object with the "{TARGET_LABEL}" '
-            f'label for a dropper/placer/thrower because {error_message}.'
+        raise ILEDelayException(
+            f'Failed to find an available object with "{labels=}" for a new '
+            f'dropper/placer/thrower because {error_message}.'
         )
     return None
 

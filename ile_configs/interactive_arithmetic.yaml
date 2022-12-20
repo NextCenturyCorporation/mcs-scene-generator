@@ -1,92 +1,93 @@
-# Add a Multi Retrieval goal with two to five identical soccer balls as the
+# Add a Multi Retrieval goal with one to five identical soccer balls as the
 # target objects. The performer agent must pick up all targets to succeed.
 # All target objects will be positioned on either the left side or the right
-# side of the room, adjacent to each other.
-goal:
-    category: multi retrieval
-    targets:
-        - num: 1
-          shape: soccer_ball
-          scale:
-              min: 1.0
-              max: 3.0
-          position:
-              - x:
-                  min: -1.75
-                  max: -2.75
-                z:
-                  min: 2.0
-                  max: 4.5
-              - x:
-                  min: 1.75
-                  max: 2.75
-                z:
-                  min: 2.0
-                  max: 4.5
-          rotation:
-              - y: 0
-          labels: target_1
-        - num:
-              # Number of additional target objects, beyond the first.
-              min: 1
-              max: 4
-          shape: soccer_ball
-          identical_to: target_1
-          keyword_location:
-              keyword: adjacent
-              # Options for how close the additional target objects are
-              # positioned adjacent to the original one.
-              adjacent_distance:
-                  - x: 0.1
-                    z: 0
-                  - x: 0.1
-                    z: 0.1
-                  - x: 0
-                    z: 0.1
-                  - x: -0.1
-                    z: 0.1
-                  - x: -0.1
-                    z: 0
-                  - x: -0.1
-                    z: -0.1
-                  - x: 0
-                    z: -0.1
-                  - x: 0.1
-                    z: -0.1
-              relative_object_label: target_1
+# side of the room, adjacent to each other. Other identical soccer balls will
+# be positioned on the opposite side of the room, but in lesser quantity. Only
+# the soccer balls on the side with more soccer balls are considered "targets".
+# Furthermore, some soccer balls will either be added to or removed from the
+# scene; you must add or subtract in order to identify the correct side.
+forced_choice_multi_retrieval_target: soccer_ball
 
 # Use a specific room size for this task.
 room_dimensions:
     x: 8
-    y: 8
+    y: 6
     z: 12
 
-# Generate a platform bisecting the room.
-shortcut_bisecting_platform: True
+# Generate a platform bisecting the room (this is a forced choice task).
+shortcut_bisecting_platform:
+    is_short: true
 
-# Generate one to four objects identical to the target objects but on the
-# opposite side of the room. There will always be fewer of these objects than
-# the target objects. Picking up all these objects will NOT allow the performer
-# agent to succeed, even though they appear identical to the target objects.
+# The performer agent is frozen until all the objects are finished moving.
+freezes:
+    - begin: 1
+      end: 75
+
+# Generate two occluding walls that descend at the beginning of the scene to
+# completely occlude the objects positioned on each side of the room.
+# The performer agent must remember how many objects are initially on each
+# side, and must count the number of objects added or removed.
+# If you do not want occluders in your scenes, remove this entire config
+# option, and change the "activate_after" line for the placers below.
+structural_moving_occluders:
+    - num: 1
+      occluder_height: 1.5
+      occluder_thickness: 0.1
+      occluder_width: 2
+      origin: 'left'
+      position_x: -1.55
+      position_z: 0
+      reverse_direction: false
+      rotation_y: 0
+      labels: left_occluder
+      move_down_only: true
+    - num: 1
+      occluder_height: 1.5
+      occluder_thickness: 0.1
+      occluder_width: 2
+      origin: 'right'
+      position_x: 1.55
+      position_z: 0
+      reverse_direction: false
+      rotation_y: 0
+      labels: right_occluder
+      move_down_only: true
+
+# Generate one to five identical objects on each side of the room.
 specific_interactable_objects:
+    # Generate a possible target object to establish "group_1".
     - num: 1
       shape: soccer_ball
-      identical_to: target_1
-      labels: non_target_1
-      keyword_location:
-          keyword: opposite_x
-          relative_object_label: target_1
-    - num_targets_minus:
-          # Number of additional non-target objects, based on the number of
-          # target objects, ensuring there are fewer non-target objects.
-          min: 2
+      scale:
+          min: 1.0
+          max: 3.0
+      # Position it on either the left side or the right side of the room.
+      position:
+          - x:
+              min: -1.75
+              max: -2.75
+            z:
+              min: 2.0
+              max: 4.5
+          - x:
+              min: 1.75
+              max: 2.75
+            z:
+              min: 2.0
+              max: 4.5
+      rotation:
+          - y: 0
+      labels: [group_1, group_1_center_object]
+    # Generate zero or more additional possible target objects in "group_1".
+    - num:
+          min: 0
           max: 4
       shape: soccer_ball
-      identical_to: target_1
+      identical_to: group_1_center_object
+      labels: group_1
+      # Position them adjacent to the first "group_1" object.
       keyword_location:
           keyword: adjacent
-          # Options for how close the additional non-target objects are
-          # positioned adjacent to the original one.
           adjacent_distance:
               - x: 0.1
                 z: 0
@@ -104,31 +105,61 @@ specific_interactable_objects:
                 z: -0.1
               - x: 0.1
                 z: -0.1
-          relative_object_label: non_target_1
+          relative_object_label: group_1_center_object
+    # Generate a possible target object to establish "group_1".
+    - num: 1
+      shape: soccer_ball
+      identical_to: group_1_center_object
+      labels: [group_2, group_2_center_object]
+      # Position it on the opposite side from all the "group_1" objects.
+      keyword_location:
+          keyword: opposite_x
+          relative_object_label: group_1_center_object
+    # Generate zero or more additional possible target objects in "group_2".
+    - num:
+          min: 0
+          max: 4
+      shape: soccer_ball
+      identical_to: group_2_center_object
+      labels: group_2
+      # Position them adjacent to the first "group_2" object.
+      keyword_location:
+          keyword: adjacent
+          adjacent_distance:
+              - x: 0.1
+                z: 0
+              - x: 0.1
+                z: 0.1
+              - x: 0
+                z: 0.1
+              - x: -0.1
+                z: 0.1
+              - x: -0.1
+                z: 0
+              - x: -0.1
+                z: -0.1
+              - x: 0
+                z: -0.1
+              - x: 0.1
+                z: -0.1
+          relative_object_label: group_2_center_object
 
-structural_moving_occluders:
-    - num: 1
-      occluder_height: 1.5
-      occluder_thickness: 0.1
-      occluder_width: 2
-      origin: 'left'
-      position_x: -1.55
-      position_z: 0
-      move_up_before_last_step: false
-      reverse_direction: false
-      rotation_y: 0
-      labels: left_occluder
-    - num: 1
-      occluder_height: 1.5
-      occluder_thickness: 0.1
-      occluder_width: 2
-      origin: 'right'
-      position_x: 1.55
-      position_z: 0
-      move_up_before_last_step: false
-      reverse_direction: false
-      rotation_y: 0
-      labels: right_occluder
+# Generate one to four placers that descend after the occluders are finished
+# moving to either "place" (add) new objects or "pick up" (remove) existing
+# objects, which are all on one side of the room.
+placers:
+    - num: [1, 2, 3, 4]
+      activate_after: [left_occluder, right_occluder]
+      # If you remove the occluders from your scenes, replace the
+      # "activate_after" line with the following:
+      # activation_step: 1
+      randomize_once:
+          # All of the placers will either "place" or "pick up" in each scene.
+          pickup_object: [True, False]
+          # All of the placers will act on the same group in each scene.
+          placed_object_labels: [group_1, group_2]
+      existing_object_required: True
+      retain_position: True
 
 # Override the defaults to avoid randomly generating any other objects besides
 # the platform, the targets, and the non-targets. Remove these lines if you

@@ -53,7 +53,8 @@ from .object_services import (
     KeywordLocation,
     KeywordLocationConfig,
     MaterialRestrictions,
-    ObjectRepository
+    ObjectRepository,
+    get_step_after_movement
 )
 from .validators import ValidateNumber, ValidateOptions
 
@@ -110,6 +111,7 @@ class SpecificInteractableObjectsComponent(ILEComponent):
     ```
     """
     _delayed_templates = []
+    _delayed_separate_lids = []
 
     @ile_config_setter(validator=ValidateNumber(
         props=['num'], min_value=0, null_ok=True))
@@ -132,6 +134,7 @@ class SpecificInteractableObjectsComponent(ILEComponent):
 
         bounds = find_bounds(scene)
         self._delayed_templates = []
+        self._delayed_separate_lids = []
         templates = return_list(self.specific_interactable_objects)
         for template, num in choose_counts(templates):
             self._add_objects_from_template(scene, bounds, template, num)
@@ -139,17 +142,30 @@ class SpecificInteractableObjectsComponent(ILEComponent):
 
     def run_delayed_actions(self, scene: Scene) -> Scene:
         bounds = find_bounds(scene)
+        # Read ALL of the delayed actions BEFORE trying to run them again.
         templates = self._delayed_templates
         self._delayed_templates = []
-        for template, num, _ in templates:
+        separate_lids = self._delayed_separate_lids
+        self._delayed_separate_lids = []
+        # Try running the delayed actions again.
+        for _, template, num in templates:
             self._add_objects_from_template(scene, bounds, template, num)
+        for _, instance, separate_lid, separate_lid_after in separate_lids:
+            self._add_separate_lid(
+                scene,
+                instance,
+                separate_lid,
+                separate_lid_after
+            )
         return scene
 
     def get_num_delayed_actions(self) -> bool:
-        return len(self._delayed_templates)
+        return len(self._delayed_templates) + len(self._delayed_separate_lids)
 
     def get_delayed_action_error_strings(self) -> List[str]:
-        return [str(err) for _, _, err in self._delayed_templates]
+        delayed = self._delayed_templates + self._delayed_separate_lids
+        # The first element in each tuple should be the exception.
+        return [str(data[0]) for data in delayed]
 
     def run_actions_at_end_of_scene_generation(
             self, scene: Dict[str, Any]) -> Dict[str, Any]:
@@ -166,14 +182,31 @@ class SpecificInteractableObjectsComponent(ILEComponent):
     ) -> None:
         # Will automatically update the bounds list.
         try:
-            create_user_configured_interactable_object(
+            instance = create_user_configured_interactable_object(
                 scene,
                 bounds,
                 template
             )
-
         except ILEDelayException as e:
-            self._delayed_templates.append((template, 1, e))
+            self._delayed_templates.append((e, template, 1))
+            return
+
+        if instance['type'] == 'separate_container':
+            # Reconcile the configured separate_lid options.
+            separate_lid = choose_random(template.separate_lid)
+            # Use ALL the labels in the configured separate_lid_after.
+            separate_lid_after = return_list(template.separate_lid_after)
+            try:
+                self._add_separate_lid(
+                    scene,
+                    instance,
+                    separate_lid,
+                    separate_lid_after
+                )
+            except ILEDelayException as e:
+                self._delayed_separate_lids.append(
+                    (e, instance, separate_lid, separate_lid_after)
+                )
 
     def _add_objects_from_template(
         self,
@@ -204,6 +237,26 @@ class SpecificInteractableObjectsComponent(ILEComponent):
         )
         for _ in range(num):
             self._add_object_from_template(scene, bounds, template)
+
+    def _add_separate_lid(
+        self,
+        scene: Scene,
+        instance: Dict[str, Any],
+        separate_lid: int,
+        separate_lid_after: List[str]
+    ) -> None:
+        if separate_lid_after:
+            step = get_step_after_movement(separate_lid_after)
+            if step >= 1:
+                separate_lid = step
+        if (
+            separate_lid is not None and separate_lid is not False and
+            separate_lid >= 0
+        ):
+            service = FeatureCreationService.get_service(
+                FeatureTypes.INTERACTABLE
+            )
+            service.add_separate_lid(scene, separate_lid, instance)
 
 
 class RandomInteractableObjectsComponent(ILEComponent):

@@ -58,11 +58,12 @@ goal:
 # Use a specific room size for this task.
 room_dimensions:
     x: 8
-    y: 8
+    y: 6
     z: 12
 
 # Generate a platform bisecting the room.
-shortcut_bisecting_platform: True
+shortcut_bisecting_platform:
+    is_short: true
 
 # Generate one to four objects identical to the target objects but on the
 # opposite side of the room. There will always be fewer of these objects than

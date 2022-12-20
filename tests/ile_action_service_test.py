@@ -2,10 +2,13 @@ import pytest
 
 from ideal_learning_env.action_service import (
     ActionService,
+    SidestepsConfig,
     StepBeginEnd,
     TeleportConfig
 )
 from ideal_learning_env.defs import ILEException
+
+from .ile_helper import create_test_obj_scene
 
 
 def test_action_freezes_empty_array():
@@ -255,3 +258,711 @@ def test_action_swivels_overlap():
     steps = [StepBeginEnd(3, 5), StepBeginEnd(4, 7)]
     with pytest.raises(ILEException):
         ActionService.add_swivels(goal, steps)
+
+
+def test_action_sidesteps_empty_array():
+    goal = {}
+    ActionService.add_sidesteps(goal, [], create_test_obj_scene(0, 3))
+    assert goal['action_list'] == []
+
+
+def test_action_sidesteps_single_minimum_distance():
+    # Predetermined sidesteps action lists that are known to work after
+    # being tested and graphed
+    positive_90_right_movement = (
+        [['MoveRight']] * 8 +
+        [['RotateLeft']] * 1 +
+        [['MoveRight']] * 2 +
+        [['RotateLeft']] * 1 +
+        [['MoveRight']] * 2 +
+        [['RotateLeft']] * 1 +
+        [['MoveRight']] * 2 +
+        [['RotateLeft']] * 1 +
+        [['MoveRight']] * 15 +
+        [['RotateLeft']] * 1 +
+        [['MoveRight']] * 2 +
+        [['RotateLeft']] * 1 +
+        [['MoveRight']] * 2 +
+        [['RotateLeft']] * 1 +
+        [['MoveRight']] * 8 +
+        [['RotateLeft']] * 1 +
+        [['MoveRight']] * 5 +
+        [['RotateLeft']] * 1 +
+        [['MoveRight']] * 3
+    )
+
+    negative_90_left_movement = (
+        [['MoveLeft']] * 8 +
+        [['RotateRight']] * 1 +
+        [['MoveLeft']] * 2 +
+        [['RotateRight']] * 1 +
+        [['MoveLeft']] * 2 +
+        [['RotateRight']] * 1 +
+        [['MoveLeft']] * 2 +
+        [['RotateRight']] * 1 +
+        [['MoveLeft']] * 15 +
+        [['RotateRight']] * 1 +
+        [['MoveLeft']] * 2 +
+        [['RotateRight']] * 1 +
+        [['MoveLeft']] * 2 +
+        [['RotateRight']] * 1 +
+        [['MoveLeft']] * 8 +
+        [['RotateRight']] * 1 +
+        [['MoveLeft']] * 5 +
+        [['RotateRight']] * 1 +
+        [['MoveLeft']] * 3
+    )
+
+    positive_180_right_movement = (
+        [['MoveRight']] * 8 +
+        [['RotateLeft']] * 1 +
+        [['MoveRight']] * 2 +
+        [['RotateLeft']] * 1 +
+        [['MoveRight']] * 2 +
+        [['RotateLeft']] * 1 +
+        [['MoveRight']] * 2 +
+        [['RotateLeft']] * 1 +
+        [['MoveRight']] * 15 +
+        [['RotateLeft']] * 1 +
+        [['MoveRight']] * 2 +
+        [['RotateLeft']] * 1 +
+        [['MoveRight']] * 2 +
+        [['RotateLeft']] * 1 +
+        [['MoveRight']] * 8 +
+        [['RotateLeft']] * 1 +
+        [['MoveRight']] * 5 +
+        [['RotateLeft']] * 1 +
+        [['MoveRight']] * 5 +
+        [['RotateLeft']] * 1 +
+        [['MoveRight']] * 6 +
+        [['RotateLeft']] * 1 +
+        [['MoveRight']] * 5 +
+        [['RotateLeft']] * 1 +
+        [['MoveRight']] * 6 +
+        [['RotateLeft']] * 1 +
+        [['MoveRight']] * 2 +
+        [['RotateLeft']] * 1 +
+        [['MoveRight']] * 12 +
+        [['RotateLeft']] * 1 +
+        [['MoveRight']] * 2 +
+        [['RotateLeft']] * 1 +
+        [['MoveRight']] * 2 +
+        [['RotateLeft']] * 1 +
+        [['MoveRight']] * 12 +
+        [['RotateLeft']] * 1
+    )
+
+    negative_180_left_movement = (
+        [['MoveLeft']] * 8 +
+        [['RotateRight']] * 1 +
+        [['MoveLeft']] * 2 +
+        [['RotateRight']] * 1 +
+        [['MoveLeft']] * 2 +
+        [['RotateRight']] * 1 +
+        [['MoveLeft']] * 2 +
+        [['RotateRight']] * 1 +
+        [['MoveLeft']] * 15 +
+        [['RotateRight']] * 1 +
+        [['MoveLeft']] * 2 +
+        [['RotateRight']] * 1 +
+        [['MoveLeft']] * 2 +
+        [['RotateRight']] * 1 +
+        [['MoveLeft']] * 8 +
+        [['RotateRight']] * 1 +
+        [['MoveLeft']] * 5 +
+        [['RotateRight']] * 1 +
+        [['MoveLeft']] * 5 +
+        [['RotateRight']] * 1 +
+        [['MoveLeft']] * 6 +
+        [['RotateRight']] * 1 +
+        [['MoveLeft']] * 5 +
+        [['RotateRight']] * 1 +
+        [['MoveLeft']] * 6 +
+        [['RotateRight']] * 1 +
+        [['MoveLeft']] * 2 +
+        [['RotateRight']] * 1 +
+        [['MoveLeft']] * 12 +
+        [['RotateRight']] * 1 +
+        [['MoveLeft']] * 2 +
+        [['RotateRight']] * 1 +
+        [['MoveLeft']] * 2 +
+        [['RotateRight']] * 1 +
+        [['MoveLeft']] * 12
+    )
+
+    positive_270_right_movement = (
+        [['MoveRight']] * 8 +
+        [['RotateLeft']] * 1 +
+        [['MoveRight']] * 2 +
+        [['RotateLeft']] * 1 +
+        [['MoveRight']] * 2 +
+        [['RotateLeft']] * 1 +
+        [['MoveRight']] * 2 +
+        [['RotateLeft']] * 1 +
+        [['MoveRight']] * 15 +
+        [['RotateLeft']] * 1 +
+        [['MoveRight']] * 2 +
+        [['RotateLeft']] * 1 +
+        [['MoveRight']] * 2 +
+        [['RotateLeft']] * 1 +
+        [['MoveRight']] * 8 +
+        [['RotateLeft']] * 1 +
+        [['MoveRight']] * 5 +
+        [['RotateLeft']] * 1 +
+        [['MoveRight']] * 5 +
+        [['RotateLeft']] * 1 +
+        [['MoveRight']] * 6 +
+        [['RotateLeft']] * 1 +
+        [['MoveRight']] * 5 +
+        [['RotateLeft']] * 1 +
+        [['MoveRight']] * 6 +
+        [['RotateLeft']] * 1 +
+        [['MoveRight']] * 2 +
+        [['RotateLeft']] * 1 +
+        [['MoveRight']] * 12 +
+        [['RotateLeft']] * 1 +
+        [['MoveRight']] * 2 +
+        [['RotateLeft']] * 1 +
+        [['MoveRight']] * 2 +
+        [['RotateLeft']] * 1 +
+        [['MoveRight']] * 11 +
+        [['RotateLeft']] * 1 +
+        [['MoveRight']] * 2 +
+        [['RotateLeft']] * 1 +
+        [['MoveRight']] * 7 +
+        [['RotateLeft']] * 1 +
+        [['MoveRight']] * 4 +
+        [['RotateLeft']] * 1 +
+        [['MoveRight']] * 7 +
+        [['RotateLeft']] * 1 +
+        [['MoveRight']] * 4 +
+        [['RotateLeft']] * 1 +
+        [['MoveRight']] * 7 +
+        [['RotateLeft']] * 1 +
+        [['MoveRight']] * 2 +
+        [['RotateLeft']] * 1 +
+        [['MoveRight']] * 11 +
+        [['RotateLeft']] * 1 +
+        [['MoveRight']] * 2 +
+        [['RotateLeft']] * 1 +
+        [['MoveRight']] * 2 +
+        [['RotateLeft']] * 1 +
+        [['MoveRight']] * 2 +
+        [['RotateRight']] * 1
+    )
+
+    negative_270_left_movement = (
+        [['MoveLeft']] * 8 +
+        [['RotateRight']] * 1 +
+        [['MoveLeft']] * 2 +
+        [['RotateRight']] * 1 +
+        [['MoveLeft']] * 2 +
+        [['RotateRight']] * 1 +
+        [['MoveLeft']] * 2 +
+        [['RotateRight']] * 1 +
+        [['MoveLeft']] * 15 +
+        [['RotateRight']] * 1 +
+        [['MoveLeft']] * 2 +
+        [['RotateRight']] * 1 +
+        [['MoveLeft']] * 2 +
+        [['RotateRight']] * 1 +
+        [['MoveLeft']] * 8 +
+        [['RotateRight']] * 1 +
+        [['MoveLeft']] * 5 +
+        [['RotateRight']] * 1 +
+        [['MoveLeft']] * 5 +
+        [['RotateRight']] * 1 +
+        [['MoveLeft']] * 6 +
+        [['RotateRight']] * 1 +
+        [['MoveLeft']] * 5 +
+        [['RotateRight']] * 1 +
+        [['MoveLeft']] * 6 +
+        [['RotateRight']] * 1 +
+        [['MoveLeft']] * 2 +
+        [['RotateRight']] * 1 +
+        [['MoveLeft']] * 12 +
+        [['RotateRight']] * 1 +
+        [['MoveLeft']] * 2 +
+        [['RotateRight']] * 1 +
+        [['MoveLeft']] * 2 +
+        [['RotateRight']] * 1 +
+        [['MoveLeft']] * 11 +
+        [['RotateRight']] * 1 +
+        [['MoveLeft']] * 2 +
+        [['RotateRight']] * 1 +
+        [['MoveLeft']] * 7 +
+        [['RotateRight']] * 1 +
+        [['MoveLeft']] * 4 +
+        [['RotateRight']] * 1 +
+        [['MoveLeft']] * 7 +
+        [['RotateRight']] * 1 +
+        [['MoveLeft']] * 4 +
+        [['RotateRight']] * 1 +
+        [['MoveLeft']] * 7 +
+        [['RotateRight']] * 1 +
+        [['MoveLeft']] * 2 +
+        [['RotateRight']] * 1 +
+        [['MoveLeft']] * 11 +
+        [['RotateRight']] * 1 +
+        [['MoveLeft']] * 2 +
+        [['RotateRight']] * 1 +
+        [['MoveLeft']] * 2 +
+        [['RotateRight']] * 1 +
+        [['MoveLeft']] * 2 +
+        [['RotateLeft']] * 1
+    )
+
+    positive_360_right_movement = (
+        [['MoveRight']] * 8 +
+        [['RotateLeft']] * 1 +
+        [['MoveRight']] * 2 +
+        [['RotateLeft']] * 1 +
+        [['MoveRight']] * 2 +
+        [['RotateLeft']] * 1 +
+        [['MoveRight']] * 2 +
+        [['RotateLeft']] * 1 +
+        [['MoveRight']] * 15 +
+        [['RotateLeft']] * 1 +
+        [['MoveRight']] * 2 +
+        [['RotateLeft']] * 1 +
+        [['MoveRight']] * 2 +
+        [['RotateLeft']] * 1 +
+        [['MoveRight']] * 8 +
+        [['RotateLeft']] * 1 +
+        [['MoveRight']] * 5 +
+        [['RotateLeft']] * 1 +
+        [['MoveRight']] * 5 +
+        [['RotateLeft']] * 1 +
+        [['MoveRight']] * 6 +
+        [['RotateLeft']] * 1 +
+        [['MoveRight']] * 5 +
+        [['RotateLeft']] * 1 +
+        [['MoveRight']] * 6 +
+        [['RotateLeft']] * 1 +
+        [['MoveRight']] * 2 +
+        [['RotateLeft']] * 1 +
+        [['MoveRight']] * 12 +
+        [['RotateLeft']] * 1 +
+        [['MoveRight']] * 2 +
+        [['RotateLeft']] * 1 +
+        [['MoveRight']] * 2 +
+        [['RotateLeft']] * 1 +
+        [['MoveRight']] * 11 +
+        [['RotateLeft']] * 1 +
+        [['MoveRight']] * 2 +
+        [['RotateLeft']] * 1 +
+        [['MoveRight']] * 7 +
+        [['RotateLeft']] * 1 +
+        [['MoveRight']] * 4 +
+        [['RotateLeft']] * 1 +
+        [['MoveRight']] * 7 +
+        [['RotateLeft']] * 1 +
+        [['MoveRight']] * 4 +
+        [['RotateLeft']] * 1 +
+        [['MoveRight']] * 7 +
+        [['RotateLeft']] * 1 +
+        [['MoveRight']] * 2 +
+        [['RotateLeft']] * 1 +
+        [['MoveRight']] * 11 +
+        [['RotateLeft']] * 1 +
+        [['MoveRight']] * 2 +
+        [['RotateLeft']] * 1 +
+        [['MoveRight']] * 2 +
+        [['RotateLeft']] * 1 +
+        [['MoveRight']] * 13 +
+        [['RotateLeft']] * 1 +
+        [['MoveRight']] * 2 +
+        [['RotateLeft']] * 1 +
+        [['MoveRight']] * 2 +
+        [['RotateLeft']] * 1 +
+        [['MoveRight']] * 10 +
+        [['RotateLeft']] * 1 +
+        [['MoveRight']] * 2 +
+        [['RotateLeft']] * 1 +
+        [['MoveRight']] * 9 +
+        [['RotateLeft']] * 1 +
+        [['MoveRight']] * 2 +
+        [['RotateLeft']] * 1 +
+        [['MoveRight']] * 8 +
+        [['RotateLeft']] * 1 +
+        [['MoveRight']] * 2
+    )
+    negative_360_left_movement = (
+        [['MoveLeft']] * 8 +
+        [['RotateRight']] * 1 +
+        [['MoveLeft']] * 2 +
+        [['RotateRight']] * 1 +
+        [['MoveLeft']] * 2 +
+        [['RotateRight']] * 1 +
+        [['MoveLeft']] * 2 +
+        [['RotateRight']] * 1 +
+        [['MoveLeft']] * 15 +
+        [['RotateRight']] * 1 +
+        [['MoveLeft']] * 2 +
+        [['RotateRight']] * 1 +
+        [['MoveLeft']] * 2 +
+        [['RotateRight']] * 1 +
+        [['MoveLeft']] * 8 +
+        [['RotateRight']] * 1 +
+        [['MoveLeft']] * 5 +
+        [['RotateRight']] * 1 +
+        [['MoveLeft']] * 5 +
+        [['RotateRight']] * 1 +
+        [['MoveLeft']] * 6 +
+        [['RotateRight']] * 1 +
+        [['MoveLeft']] * 5 +
+        [['RotateRight']] * 1 +
+        [['MoveLeft']] * 6 +
+        [['RotateRight']] * 1 +
+        [['MoveLeft']] * 2 +
+        [['RotateRight']] * 1 +
+        [['MoveLeft']] * 12 +
+        [['RotateRight']] * 1 +
+        [['MoveLeft']] * 2 +
+        [['RotateRight']] * 1 +
+        [['MoveLeft']] * 2 +
+        [['RotateRight']] * 1 +
+        [['MoveLeft']] * 11 +
+        [['RotateRight']] * 1 +
+        [['MoveLeft']] * 2 +
+        [['RotateRight']] * 1 +
+        [['MoveLeft']] * 7 +
+        [['RotateRight']] * 1 +
+        [['MoveLeft']] * 4 +
+        [['RotateRight']] * 1 +
+        [['MoveLeft']] * 7 +
+        [['RotateRight']] * 1 +
+        [['MoveLeft']] * 4 +
+        [['RotateRight']] * 1 +
+        [['MoveLeft']] * 7 +
+        [['RotateRight']] * 1 +
+        [['MoveLeft']] * 2 +
+        [['RotateRight']] * 1 +
+        [['MoveLeft']] * 11 +
+        [['RotateRight']] * 1 +
+        [['MoveLeft']] * 2 +
+        [['RotateRight']] * 1 +
+        [['MoveLeft']] * 2 +
+        [['RotateRight']] * 1 +
+        [['MoveLeft']] * 13 +
+        [['RotateRight']] * 1 +
+        [['MoveLeft']] * 2 +
+        [['RotateRight']] * 1 +
+        [['MoveLeft']] * 2 +
+        [['RotateRight']] * 1 +
+        [['MoveLeft']] * 10 +
+        [['RotateRight']] * 1 +
+        [['MoveLeft']] * 2 +
+        [['RotateRight']] * 1 +
+        [['MoveLeft']] * 9 +
+        [['RotateRight']] * 1 +
+        [['MoveLeft']] * 2 +
+        [['RotateRight']] * 1 +
+        [['MoveLeft']] * 8 +
+        [['RotateRight']] * 1 +
+        [['MoveLeft']] * 2
+    )
+    minimum_distance = 3
+
+    # Try +x, -x, +z, -z. They should all be the same.
+    # Test all degree options [90, 180, 270, 360, -90, -180, -270, -360]
+    for i in range(4):
+        # Setup scene and object
+        x = minimum_distance if i == 0 else -minimum_distance if i == 1 else 0
+        z = minimum_distance if i == 2 else -minimum_distance if i == 3 else 0
+        scene = create_test_obj_scene(x, z)
+
+        # +90 Degrees
+        goal = {}
+        steps = [SidestepsConfig(begin=1, object_label='object', degrees=90)]
+        ActionService.add_sidesteps(goal, steps, scene)
+        assert goal['action_list'] == positive_90_right_movement
+
+        # -90 Degrees
+        goal = {}
+        steps = [SidestepsConfig(begin=1, object_label='object', degrees=-90)]
+        ActionService.add_sidesteps(goal, steps, scene)
+        assert goal['action_list'] == negative_90_left_movement
+
+        # +180 Degrees
+        goal = {}
+        steps = [SidestepsConfig(begin=1, object_label='object', degrees=180)]
+        ActionService.add_sidesteps(goal, steps, scene)
+        assert goal['action_list'] == positive_180_right_movement
+
+        # -180 Degrees
+        goal = {}
+        steps = [SidestepsConfig(begin=1, object_label='object', degrees=-180)]
+        ActionService.add_sidesteps(goal, steps, scene)
+        assert goal['action_list'] == negative_180_left_movement
+
+        # 270 Degrees
+        goal = {}
+        steps = [SidestepsConfig(begin=1, object_label='object', degrees=270)]
+        ActionService.add_sidesteps(goal, steps, scene)
+        assert goal['action_list'] == positive_270_right_movement
+
+        # -270 Degrees
+        goal = {}
+        steps = [SidestepsConfig(begin=1, object_label='object', degrees=-270)]
+        ActionService.add_sidesteps(goal, steps, scene)
+        assert goal['action_list'] == negative_270_left_movement
+
+        # +360 Degrees
+        goal = {}
+        steps = [SidestepsConfig(begin=1, object_label='object', degrees=360)]
+        ActionService.add_sidesteps(goal, steps, scene)
+        assert goal['action_list'] == positive_360_right_movement
+
+        # -360 Degrees
+        goal = {}
+        steps = [SidestepsConfig(begin=1, object_label='object', degrees=-360)]
+        ActionService.add_sidesteps(goal, steps, scene)
+        assert goal['action_list'] == negative_360_left_movement
+
+
+def test_action_sidesteps_multiple():
+    # Setup scene and object
+    scene = create_test_obj_scene(0, 3)
+    goal = {}
+    steps = [
+        SidestepsConfig(
+            begin=1,
+            object_label='object',
+            degrees=90),
+        SidestepsConfig(
+            begin=59,
+            object_label='object',
+            degrees=-90)]
+    ActionService.add_sidesteps(goal, steps, scene)
+    assert goal['action_list'] == (
+        [['MoveRight']] * 8 +
+        [['RotateLeft']] * 1 +
+        [['MoveRight']] * 2 +
+        [['RotateLeft']] * 1 +
+        [['MoveRight']] * 2 +
+        [['RotateLeft']] * 1 +
+        [['MoveRight']] * 2 +
+        [['RotateLeft']] * 1 +
+        [['MoveRight']] * 15 +
+        [['RotateLeft']] * 1 +
+        [['MoveRight']] * 2 +
+        [['RotateLeft']] * 1 +
+        [['MoveRight']] * 2 +
+        [['RotateLeft']] * 1 +
+        [['MoveRight']] * 8 +
+        [['RotateLeft']] * 1 +
+        [['MoveRight']] * 5 +
+        [['RotateLeft']] * 1 +
+        [['MoveRight']] * 11 +
+        [['RotateLeft']] * 1 +
+        [['MoveRight']] * 2 +
+        [['RotateLeft']] * 1 +
+        [['MoveRight']] * 2 +
+        [['RotateLeft']] * 1 +
+        [['MoveRight']] * 2 +
+        [['RotateLeft']] * 1 +
+        [['MoveRight']] * 15 +
+        [['RotateLeft']] * 1 +
+        [['MoveRight']] * 2 +
+        [['RotateLeft']] * 1 +
+        [['MoveRight']] * 2 +
+        [['RotateLeft']] * 1 +
+        [['MoveRight']] * 8 +
+        [['RotateLeft']] * 1 +
+        [['MoveRight']] * 5 +
+        [['RotateLeft']] * 1 +
+        [['MoveRight']] * 3 +
+        [['MoveLeft']] * 9 +
+        [['RotateRight']] * 1 +
+        [['MoveLeft']] * 2 +
+        [['RotateRight']] * 1 +
+        [['MoveLeft']] * 2 +
+        [['RotateRight']] * 1 +
+        [['MoveLeft']] * 2 +
+        [['RotateRight']] * 1 +
+        [['MoveLeft']] * 15 +
+        [['RotateRight']] * 1 +
+        [['MoveLeft']] * 2 +
+        [['RotateRight']] * 1 +
+        [['MoveLeft']] * 2 +
+        [['RotateRight']] * 1 +
+        [['MoveLeft']] * 9 +
+        [['RotateRight']] * 1 +
+        [['MoveLeft']] * 5 +
+        [['RotateRight']] * 1 +
+        [['MoveLeft']] * 3
+    )
+
+
+def test_action_sidesteps_begin_later():
+    # Setup scene and object
+    scene = create_test_obj_scene(0, 3)
+    goal = {}
+    steps = [
+        SidestepsConfig(
+            begin=10,
+            object_label='object',
+            degrees=90),
+        SidestepsConfig(
+            begin=100,
+            object_label='object',
+            degrees=-90)]
+    ActionService.add_sidesteps(goal, steps, scene)
+    assert goal['action_list'] == (
+        [[]] * 9 +
+        [['MoveRight']] * 8 +
+        [['RotateLeft']] * 1 +
+        [['MoveRight']] * 2 +
+        [['RotateLeft']] * 1 +
+        [['MoveRight']] * 2 +
+        [['RotateLeft']] * 1 +
+        [['MoveRight']] * 2 +
+        [['RotateLeft']] * 1 +
+        [['MoveRight']] * 15 +
+        [['RotateLeft']] * 1 +
+        [['MoveRight']] * 2 +
+        [['RotateLeft']] * 1 +
+        [['MoveRight']] * 2 +
+        [['RotateLeft']] * 1 +
+        [['MoveRight']] * 8 +
+        [['RotateLeft']] * 1 +
+        [['MoveRight']] * 5 +
+        [['RotateLeft']] * 1 +
+        [['MoveRight']] * 3 +
+        [[]] * 32 +
+        [['MoveRight']] * 8 +
+        [['RotateLeft']] * 1 +
+        [['MoveRight']] * 2 +
+        [['RotateLeft']] * 1 +
+        [['MoveRight']] * 2 +
+        [['RotateLeft']] * 1 +
+        [['MoveRight']] * 2 +
+        [['RotateLeft']] * 1 +
+        [['MoveRight']] * 15 +
+        [['RotateLeft']] * 1 +
+        [['MoveRight']] * 2 +
+        [['RotateLeft']] * 1 +
+        [['MoveRight']] * 2 +
+        [['RotateLeft']] * 1 +
+        [['MoveRight']] * 8 +
+        [['RotateLeft']] * 1 +
+        [['MoveRight']] * 5 +
+        [['RotateLeft']] * 1 +
+        [['MoveRight']] * 3 +
+        [['MoveLeft']] * 9 +
+        [['RotateRight']] * 1 +
+        [['MoveLeft']] * 2 +
+        [['RotateRight']] * 1 +
+        [['MoveLeft']] * 2 +
+        [['RotateRight']] * 1 +
+        [['MoveLeft']] * 2 +
+        [['RotateRight']] * 1 +
+        [['MoveLeft']] * 15 +
+        [['RotateRight']] * 1 +
+        [['MoveLeft']] * 2 +
+        [['RotateRight']] * 1 +
+        [['MoveLeft']] * 2 +
+        [['RotateRight']] * 1 +
+        [['MoveLeft']] * 9 +
+        [['RotateRight']] * 1 +
+        [['MoveLeft']] * 5 +
+        [['RotateRight']] * 1 +
+        [['MoveLeft']] * 3
+    )
+
+
+def test_action_sidesteps_overlap_freeze_error():
+    scene = create_test_obj_scene(0, 3)
+    goal = {}
+    steps = [StepBeginEnd(1, 3)]
+    ActionService.add_freezes(goal, steps)
+    assert goal['action_list'] == [['Pass'], ['Pass']]
+    steps = [SidestepsConfig(begin=1, object_label='object', degrees=90)]
+    with pytest.raises(ILEException):
+        ActionService.add_sidesteps(goal, steps, scene)
+    steps = [SidestepsConfig(begin=1, object_label='object', degrees=-90)]
+    with pytest.raises(ILEException):
+        ActionService.add_sidesteps(goal, steps, scene)
+
+
+def test_action_sidesteps_overlap_error():
+    scene = create_test_obj_scene(0, 3)
+    goal = {}
+    steps = [
+        SidestepsConfig(
+            begin=1,
+            object_label='object',
+            degrees=90),
+        SidestepsConfig(
+            begin=58,
+            object_label='object',
+            degrees=-90)]
+    with pytest.raises(ILEException):
+        ActionService.add_sidesteps(goal, steps, scene)
+
+
+def test_action_sidesteps_too_short_distance_error():
+    scene = create_test_obj_scene(0, 2.9)
+    goal = {}
+    steps = [
+        SidestepsConfig(
+            begin=1,
+            object_label='object',
+            degrees=90)]
+    with pytest.raises(ILEException):
+        ActionService.add_sidesteps(goal, steps, scene)
+
+
+def test_action_sidesteps_wrong_labels_error():
+    scene = create_test_obj_scene(0, 3)
+    goal = {}
+    steps = [
+        SidestepsConfig(
+            begin=1,
+            object_label='object',
+            degrees=90),
+        SidestepsConfig(
+            begin=100,
+            object_label='not_object',
+            degrees=-90)]
+    with pytest.raises(ILEException):
+        ActionService.add_sidesteps(goal, steps, scene)
+
+
+def test_action_sidesteps_bad_angle():
+    scene = create_test_obj_scene(0, 3)
+    goal = {}
+    steps = [
+        SidestepsConfig(
+            begin=1,
+            object_label='object',
+            degrees=91)]
+    with pytest.raises(ILEException):
+        ActionService.add_sidesteps(goal, steps, scene)
+    goal = {}
+    steps = [
+        SidestepsConfig(
+            begin=1,
+            object_label='object',
+            degrees=-91)]
+    with pytest.raises(ILEException):
+        ActionService.add_sidesteps(goal, steps, scene)
+
+
+def test_action_sidesteps_no_degrees():
+    scene = create_test_obj_scene(0, 3)
+    goal = {}
+    steps = [
+        SidestepsConfig(
+            begin=1,
+            object_label='object')
+    ]
+    ActionService.add_sidesteps(goal, steps, scene)
+    for action in goal['action_list']:
+        assert action in [
+            ["MoveRight"],
+            ["MoveLeft"],
+            ["RotateRight"],
+            ["RotateLeft"]
+        ]

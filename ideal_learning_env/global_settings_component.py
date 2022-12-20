@@ -9,7 +9,13 @@ from machine_common_sense.config_manager import Vector3d
 
 from generator import MaterialTuple, geometry, materials, tags
 from generator.scene import Scene, get_step_limit_from_dimensions
-from ideal_learning_env.numerics import MinMaxFloat, MinMaxInt
+from ideal_learning_env.numerics import (
+    MinMaxFloat,
+    MinMaxInt,
+    RandomizableFloat,
+    VectorFloatConfig,
+    VectorIntConfig
+)
 
 from .choosers import (
     choose_material_tuple_from_material,
@@ -32,7 +38,6 @@ from .defs import (
     find_bounds
 )
 from .goal_services import GoalConfig, GoalServices
-from .numerics import RandomizableFloat, VectorFloatConfig, VectorIntConfig
 from .object_services import (
     KeywordLocation,
     KeywordLocationConfig,
@@ -43,7 +48,7 @@ from .validators import ValidateNoNullProp, ValidateNumber, ValidateOptions
 logger = logging.getLogger(__name__)
 
 # Limit the possible random room dimensions to more typical choices.
-ROOM_RANDOM_XZ = MinMaxInt(5, 30)
+ROOM_RANDOM_XZ = MinMaxInt(5, 25)
 ROOM_RANDOM_Y = MinMaxInt(3, 8)
 
 TRAPEZOIDAL_WALL_LEFT = {
@@ -110,7 +115,7 @@ class PerformerStartsNearConfig():
     Defines details of performer_starts_near which places the performer near an
     object of a given label at a specified distance away.
     - `label` (string or list of strings):
-    Label of the object the performer will be placed near.  Default: None
+    Label of the object the performer will be placed near. Required.
     - `distance` (float or list of floats):
     Distance the performer will be from the object.  Default: 0.1
 
@@ -171,7 +176,7 @@ class GlobalSettingsComponent(ILEComponent):
     generated using specifically set configuration options, like the `type`
     property in the `goal.target` and `specific_interactable_objects` options.
     Useful if you want to avoid randomly generating additional objects of the
-    same shape as a configured goal target. Default: None
+    same shape as a configured goal target. Default: no excluded shapes
 
     Simple Example:
     ```
@@ -201,10 +206,31 @@ class GlobalSettingsComponent(ILEComponent):
     ```
     """
 
+    forced_choice_multi_retrieval_target: str = None
+    """
+    (str): Whether to set a new "multi retrieval" goal using objects of a
+    specific type that already exist in the scene. Set this option to an object
+    shape like `"soccer_ball"`. This option splits all matching objects into
+    "left" and "right" groups based on their X positions (ignoring objects that
+    are picked up by placers). All objects in the larger group will be used as
+    the new goal's target(s). Overrides the configured `goal`.
+    Default: not used
+
+    Simple Example:
+    ```
+    forced_choice_multi_retrieval_target: null
+    ```
+
+    Advanced Example:
+    ```
+    forced_choice_multi_retrieval_target: 'soccer_ball'
+    ```
+    """
+
     goal: Union[GoalConfig, List[GoalConfig]] = None
     """
     ([GoalConfig](#GoalConfig) dict): The goal category and target(s) in each
-    scene, if any. Default: None
+    scene, if any. Default: no goal
 
     Simple Example:
     ```
@@ -227,7 +253,7 @@ class GlobalSettingsComponent(ILEComponent):
     """
     (int, or list of ints): The last possible action step, or list of last
     steps, from which one is chosen at random for each scene. This field will
-    overwrite 'auto_last_step' if set.  Default: none
+    overwrite 'auto_last_step' if set.  Default: no last step
     (unlimited)
 
     Simple Example:
@@ -238,6 +264,74 @@ class GlobalSettingsComponent(ILEComponent):
     Advanced Example:
     ```
     last_step: 1000
+    ```
+    """
+
+    occluder_gap: RandomizableFloat = None
+    """
+    (float, or list of floats, or [MinMaxFloat](#MinMaxFloat) dict: Gap (X
+    distance) between moving structual occluders. Will override
+    `position_x`. Only applies when `passive_physics_scene` is True.
+    Default: no restrictions
+
+    All scenes are generated with a .5 gap between occluders.
+
+    Simple Example:
+    ```
+    occluder_gap: .5
+    ```
+
+    All scenes are generated with .5 or 1.0 gap between occluders.
+
+    Advanced Example:
+    ```
+    occluder_gap: [.5, 1.0]
+    ```
+
+    All scenes are generated with a gap between (inclusive) .5 and 1.0 between
+    occluders.
+
+    Advanced Example:
+    ```
+    occluder_gap:
+        min: .5
+        max: 1.0
+    ```
+    """
+
+    occluder_gap_viewport: RandomizableFloat = None
+    """
+    (float, or list of floats, or [MinMaxFloat](#MinMaxFloat) dict: Gap (X
+    distance) between occluders and edge of viewport. If both are included,
+    `occluder_gap` will take precedence over `occluder_gap_viewport`.
+    Will override `position_x`.
+    Only applies when `passive_physics_scene` is True.
+    Default: no restrictions
+
+    All scenes are generated with a .5 gap between the occluder and the
+    viewport.
+
+    Simple Example:
+    ```
+    occluder_gap_viewport: .5
+    ```
+
+    All scenes are generated with .5 or 1.0 gap between occluder and the
+    viewport.
+
+    Advanced Example:
+    ```
+    occluder_gap_viewport: [.5, 1.0]
+    ```
+
+    All scenes are generated with a gap between (inclusive) .5 and 1.0 between
+    the occluder nad the edge of the viewport.
+
+    Advanced Example:
+    ```
+    occluder_gap_viewport:
+        min: .5
+        max: 1.0
     ```
     """
 
@@ -439,7 +533,7 @@ class GlobalSettingsComponent(ILEComponent):
     which one is chosen at random for each scene. Rooms are always rectangular
     or square. The X and Z must each be within [2, 100] and the Y must be
     within [2, 10]. The room's bounds will be [-X/2, X/2] and [-Z/2, Z/2].
-    Default: random X from 5 to 30, random Y from 3 to 8, random Z from 5 to 30
+    Default: random X from 5 to 25, random Y from 3 to 8, random Z from 5 to 25
 
     Simple Example:
     ```
@@ -465,7 +559,7 @@ class GlobalSettingsComponent(ILEComponent):
     """
     (string): Shape of the room to restrict the randomzed room dimensions if
     `room_dimensions` weren't configured. Options: `rectangle`, `square`.
-    Default: None
+    Default: Use `room_dimensions`
 
     Simple Example:
     ```
@@ -630,10 +724,21 @@ class GlobalSettingsComponent(ILEComponent):
                 'staticFriction': 0.1
             }
 
+        occluder_gap = self.get_occluder_gap()
+        ILESharedConfiguration.get_instance().set_occluder_gap(
+            occluder_gap
+        )
+
+        occluder_gap_viewport = self.get_occluder_gap_viewport()
+        ILESharedConfiguration.get_instance().set_occluder_gap_viewport(
+            occluder_gap_viewport
+        )
+
         excluded_shapes = self.get_excluded_shapes()
         ILESharedConfiguration.get_instance().set_excluded_shapes(
             excluded_shapes
         )
+
         logger.trace(f'Setting excluded shapes = {excluded_shapes}')
 
         scene.room_dimensions = self.get_room_dimensions()
@@ -805,6 +910,10 @@ class GlobalSettingsComponent(ILEComponent):
     def set_floor_material(self, data: Any) -> None:
         self.floor_material = data
 
+    @ile_config_setter()
+    def set_forced_choice_multi_retrieval_target(self, data: Any) -> None:
+        self.forced_choice_multi_retrieval_target = data
+
     def get_goal(self):
         return self.goal
 
@@ -824,6 +933,20 @@ class GlobalSettingsComponent(ILEComponent):
     @ile_config_setter(validator=ValidateNumber(min_value=1))
     def set_last_step(self, data: Any) -> None:
         self.last_step = data
+
+    @ile_config_setter()
+    def set_occluder_gap(self, data: Any) -> None:
+        self.occluder_gap = data
+
+    def get_occluder_gap(self) -> RandomizableFloat:
+        return choose_random(self.occluder_gap) or None
+
+    @ile_config_setter()
+    def set_occluder_gap_viewport(self, data: Any) -> None:
+        self.occluder_gap_viewport = data
+
+    def get_occluder_gap_viewport(self) -> RandomizableFloat:
+        return choose_random(self.occluder_gap_viewport) or None
 
     @ile_config_setter()
     def set_passive_physics_floor(self, data: Any) -> None:
@@ -1182,3 +1305,55 @@ class GlobalSettingsComponent(ILEComponent):
         if self._delayed_rotation_label and self._delayed_rotation_reason:
             reasons.append(str(self._delayed_rotation_reason))
         return reasons
+
+    def run_actions_at_end_of_scene_generation(self, scene: Scene) -> Scene:
+        if not self.forced_choice_multi_retrieval_target:
+            return scene
+
+        # Use the configured value as the target type.
+        target_type = self.forced_choice_multi_retrieval_target
+
+        # Look for all viable targets on both the left and the right.
+        left_group = []
+        right_group = []
+        for instance in scene.objects:
+            # Skip this object if it is not the target type.
+            if instance['type'] != target_type:
+                continue
+            # Skip this object if it moves upward (assume it is picked up
+            # by a placer and held out-of-reach indefinitely).
+            movement = instance.get('moves')
+            if movement and movement[-1]['vector']['y'] > 0:
+                continue
+            # Assign this object to the left or right group appropriately.
+            if instance['shows'][0]['position']['x'] < 0:
+                left_group.append(instance)
+            if instance['shows'][0]['position']['x'] > 0:
+                right_group.append(instance)
+        # In the unlikely event that both groups have the same number of
+        # viable targets, raise an exception and retry generating the scene.
+        if len(left_group) == len(right_group):
+            raise ILEException(
+                f'Cannot create a forced choice multi retrieval goal with '
+                f'the target type {target_type} because both the left and '
+                f'the right sides have the same number of viable targets: '
+                f'{len(left_group)}'
+            )
+        # Otherwise use the group with more viable targets.
+        use_left_group = len(left_group) > len(right_group)
+        targets = left_group if use_left_group else right_group
+        logger.trace(
+            f'Setting forced choice multi retrieval goal with '
+            f'{len(targets)} {target_type} targets on the '
+            f'{"left" if use_left_group else "right"} side.'
+        )
+        # Set the goal in the scene.
+        scene.goal['category'] = tags.SCENE.MULTI_RETRIEVAL
+        scene.goal['description'] = GoalServices.make_goal_description(
+            scene.goal['category'],
+            targets
+        )
+        scene.goal['metadata'] = {
+            'targets': [{'id': target['id']} for target in targets]
+        }
+        return scene

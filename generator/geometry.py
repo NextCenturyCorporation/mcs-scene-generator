@@ -1661,3 +1661,16 @@ def is_above(above: Dict[str, Any], below: Dict[str, Any]) -> bool:
     if sat_entry(above_bounds.box_xz, below_bounds.box_xz):
         return above_bounds.min_y >= below_bounds.max_y
     return False
+
+
+def rotate_point_around_origin(origin_x, origin_z, point_x, point_z, rotation):
+    """
+    Rotate a point clockwise by an angle around an origin.
+    Modified code from here: https://stackoverflow.com/a/34374437
+    """
+    rotation = math.radians(rotation) * -1  # convert to radians and clockwise
+    result_x = origin_x + math.cos(rotation) * (point_x - origin_x) - \
+        math.sin(rotation) * (point_z - origin_z)
+    result_z = origin_z + math.sin(rotation) * (point_x - origin_x) + \
+        math.cos(rotation) * (point_z - origin_z)
+    return result_x, result_z

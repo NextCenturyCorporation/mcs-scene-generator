@@ -1545,7 +1545,8 @@ _PRIMITIVE_WIDE_TALL_SIZE = ObjectBaseSize(
 )
 _SEPARATE_CONTAINER_SIZE = ObjectBaseSize(
     dimensions=Vector3d(x=1, y=1, z=1),
-    mass=1,
+    # Must be heavy/sturdy enough to hold a soccer ball
+    mass=10,
     offset=Vector3d(x=0, y=0, z=0),
     # Ideal for shell game
     placer_offset_z=[-0.4],

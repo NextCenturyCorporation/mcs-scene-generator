@@ -915,6 +915,9 @@ class SpecificStructuralObjectsComponent(ILEComponent):
 
         for s_type, templates in structural_type_templates:
             for template, num in choose_counts(return_list(templates)):
+                randomize_once = getattr(template, 'randomize_once') or {}
+                for key, value in randomize_once.items():
+                    setattr(template, key, choose_random(value))
                 for i in range(num):
                     try:
                         FeatureCreationService.create_feature(

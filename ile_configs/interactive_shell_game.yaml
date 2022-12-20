@@ -27,14 +27,14 @@ goal:
 excluded_shapes: soccer_ball
 
 specific_interactable_objects:
-    # Generate zero, one, or two "non-target containers", which will not be
+    # Generate either one or two "non-target containers", which will not be
     # holding the target object, using a specific scale and shape.
-    - num: [0, 1, 2]
+    - num: [1, 2]
       labels: non_target_container
       scale: 0.4
       shape: separate_container
       # The container's lid descends at a specific step.
-      separate_lid: 36
+      separate_lid_after: target_placer
       # The containers are positioned at one of five different locations.
       position:
           x: [-1.5, 0.75, 0, 0.75, 1.5]
@@ -50,8 +50,8 @@ specific_interactable_objects:
       labels: target_container
       scale: 0.4
       shape: separate_container
-      # The container's lid descends at a specific step.
-      separate_lid: 36
+      # The container's lid descends after the target_placer finishes moving.
+      separate_lid_after: target_placer
       # Default location - the placer will adjust this below.
       position:
           x: 0
@@ -67,10 +67,11 @@ placers:
     # container, drags it to a new location, releases the container, and
     # ascends back into the ceiling.
     - num: 1
-      # Move the target container at a specific step, AFTER the target object
-      # has been inserted and the lid is attached.
+      # Move the target container either immediately after the scene begins
+      # (step 1) or after the target object has been inserted into this
+      # container and its lid is attached (step 81).
       move_object: true
-      activation_step: 81
+      activation_step: [1, 81]
       placed_object_labels: target_container
       # Start the container in one of the following possible locations.
       placed_object_position:
@@ -88,15 +89,46 @@ placers:
       # The movement pattern is: Z axis (toward the camera), X axis (sideways),
       # Z axis (away from the camera).
       move_object_z: [1, 1.5, 2, 2.5]
+      labels: container_dragger
+    # Sometimes generate a second placer that descends from the ceiling, grabs
+    # onto a non-target container, drags it to a new location, releases it, and
+    # ascends back into the ceiling.
+    - num: [0, 1]
+      # Move a non-target container either immediately after the scene begins
+      # (step 1) or after the target object has been inserted into this
+      # container and its lid is attached (step 81).
+      move_object: true
+      activate_after: container_dragger
+      placed_object_labels: non_target_container
+      # Start the container in one of the following possible locations.
+      placed_object_position:
+          x: [-1.5, -0.75, 0, 0.75, 1.5]
+          y: 0
+          z: 4
+      placed_object_rotation: 0
+      # Move the container to one of the following possible locations.
+      # Locations that are already occupied will be ignored.
+      move_object_end_position:
+          x: [-1.5, -0.75, 0, 0.75, 1.5]
+          y: 0
+          z: 4
+      # Move the container forward by a variable amount on the Z axis.
+      # The movement pattern is: Z axis (toward the camera), X axis (sideways),
+      # Z axis (away from the camera).
+      move_object_z: [1, 1.5, 2, 2.5]
+      labels: container_dragger
     # Generate a placer that starts holding the target object, descends from
-    # the ceiling on step 1 above the target container, releases the target
-    # object into the target container, and ascends back into the ceiling.
+    # the ceiling above the target container, releases the target object into
+    # the target container, and then ascends back into the ceiling.
     - num: 1
-      activation_step: 1
+      # Begin moving after the dragger finishes its movement, if the dragger
+      # started moving on step 1; otherwise begin moving on step 1.
+      activate_on_start_or_after: container_dragger
       placed_object_labels: target
       placed_object_above: target_container
       placed_object_rotation: 0
       end_height: 0.25
+      labels: target_placer
 
 # Can only open one container in each scene.
 restrict_open_objects: true

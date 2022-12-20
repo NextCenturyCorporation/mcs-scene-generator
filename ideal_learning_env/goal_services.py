@@ -174,26 +174,10 @@ class GoalServices:
             logger.trace(f'Creating goal target from config = {vars(config)}')
 
         # Create the description for interactive goals.
-        goal_description = ''
-        if goal_category == tags.SCENE.RETRIEVAL:
-            goal_string = target_list[0]["debug"]["goalString"]
-            goal_description = f'Find and pick up the {goal_string}.'
-        if goal_category == tags.SCENE.MULTI_RETRIEVAL:
-            goal_strings = [i['debug']['goalString'] for i in target_list]
-            goal_strings = sorted(set(goal_strings))
-            goal_string = goal_strings[0] if len(goal_strings) == 1 else (
-                '; '.join(goal_strings[:-1]) + '; and ' + goal_strings[-1]
-            )
-            goal_description = (
-                f'Find and pick up as many objects as possible of type: '
-                f'{goal_string}.'
-            )
-        if goal_category == tags.SCENE.IMITATION:
-            goal_string = target_list[0]["debug"]["goalString"]
-            goal_description = (
-                f'Open the containers in the correct order for '
-                f'the {goal_string} to be placed.'
-            )
+        goal_description = GoalServices.make_goal_description(
+            goal_category,
+            target_list
+        )
         return {
             'category': goal_category,
             'description': goal_description,
@@ -223,3 +207,31 @@ class GoalServices:
                 f'{len(target_list)} target(s): {scene.goal}'
             )
         return target_list
+
+    @staticmethod
+    def make_goal_description(
+        goal_category: str,
+        target_list: List[Dict[str, Any]]
+    ) -> str:
+        """Return the goal description for the given goal category and target
+        list."""
+        if goal_category == tags.SCENE.RETRIEVAL:
+            goal_string = target_list[0]["debug"]["goalString"]
+            return f'Find and pick up the {goal_string}.'
+        if goal_category == tags.SCENE.MULTI_RETRIEVAL:
+            goal_strings = [i['debug']['goalString'] for i in target_list]
+            goal_strings = sorted(set(goal_strings))
+            goal_string = goal_strings[0] if len(goal_strings) == 1 else (
+                '; '.join(goal_strings[:-1]) + '; and ' + goal_strings[-1]
+            )
+            return (
+                f'Find and pick up as many objects as possible of type: '
+                f'{goal_string}.'
+            )
+        if goal_category == tags.SCENE.IMITATION:
+            goal_string = target_list[0]["debug"]["goalString"]
+            return (
+                f'Open the containers in the correct order for '
+                f'the {goal_string} to be placed.'
+            )
+        return ''

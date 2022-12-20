@@ -1,12 +1,12 @@
 # Use a specific room size and starting position/rotation for this task.
 room_dimensions:
-    x: 10
+    x: 12
     y: 4
-    z: 10
+    z: 12
 performer_start_position:
     x: 0
     y: 0
-    z: -3
+    z: -3.5
 performer_start_rotation:
     x: 0
     y: 0
@@ -14,7 +14,15 @@ performer_start_rotation:
 # The performer agent is frozen until the turntable (cog) is finished rotating.
 freezes:
     - begin: 1
-      end: 150
+      end: 155
+# If desired, force the performer agent to circumnavigate the turntable.
+# You will need to change the "end" in "freezes" to 80 to avoid errors.
+# We also recommend you change the "rotation_y" in "turntable_movement" to 0,
+# so the turntable does not rotate during the sidestepping.
+# sidesteps:
+#    - begin: 81
+#      object_label: turntables
+#      degrees: [90, 180, 270, 360, -90, -180, -270, -360]
 
 # Add a Retrieval goal with a soccer ball as the target object.
 goal:
@@ -33,22 +41,16 @@ structural_turntables:
       position:
           x: 0
           y: 0
-          z: 2
+          z: 1
       rotation_y: 0
       turntable_radius: 2
       # Start rotating the turntable after the lids have been placed on their
-      # containers. It will rotate by either 5 or -5 degrees on each step.
+      # containers. It will rotate by either 5 or -5 degrees on each step,
+      # for a total rotation of either 90, 180, 270, or 360 degrees.
       turntable_movement:
-          step_begin: 78
-          step_end:
-              # 78 (step_begin) + 17 (at 5 degrees per step: 90 degrees)
-              - 95
-              # 78 (step_begin) + 35 (at 5 degrees per step: 180 degrees)
-              - 113
-              # 78 (step_begin) + 53 (at 5 degrees per step: 270 degrees)
-              - 131
-              # 78 (step_begin) + 71 (at 5 degrees per step: 360 degrees)
-              - 149
+          step_begin: 81
+          rotation_y: [5, -5]
+          end_after_rotation: [90, 180, 270, 360]
 
 specific_interactable_objects:
     # Generate one, two, or three identical containers using a specific scale
@@ -74,19 +76,21 @@ specific_interactable_objects:
           x: 0
           y: 0
           z: 0
-      # The containers' lids descend at a specific step.
-      separate_lid: 36
+      # The containers' lids descend after the target_placer finishes moving.
+      separate_lid_after: target_placer
 
 placers:
     # Generate a placer that starts holding the target object, descends from
-    # the ceiling on step 1 above one of the containers, releases the target
-    # object into that container, and ascends back into the ceiling.
+    # the ceiling above one of the containers, releases the target  object into
+    # the chosen container, and then ascends back into the ceiling.
     - num: 1
+      # Always start moving immediately after the scene begins (step 1).
       activation_step: 1
       placed_object_labels: target
       placed_object_above: containers
       placed_object_rotation: 0
       end_height: 0.35
+      labels: target_placer
 
 # Can only open one container in each scene.
 restrict_open_objects: true

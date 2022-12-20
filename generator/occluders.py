@@ -8,6 +8,7 @@ from .geometry import (
     create_bounds,
     random_real
 )
+from .intuitive_physics_util import retrieve_off_screen_position_x
 from .materials import MaterialTuple
 
 # Default occluder height of 1.8 enables seeing a falling object for 8+ frames.
@@ -26,6 +27,10 @@ OCCLUDER_BUFFER_EXIT_AND_STOP = 0.4 + OCCLUDER_BUFFER_MULTIPLE_EXIT
 # Remember to add the OCCLUDER_BUFFER!
 OCCLUDER_MAX_SCALE_X = 1.4
 OCCLUDER_MIN_SCALE_X = 0.4
+
+# Minimum separation from between occluder and viewport
+OCCLUDER_MIN_VIEWPORT_GAP = .25
+
 # Minimum separation between two adjacent occluders.
 OCCLUDER_SEPARATION_X = 0.5
 
@@ -181,7 +186,6 @@ _OCCLUDER_INSTANCE_NORMAL = [{
         }
     }]
 }]
-
 
 _OCCLUDER_INSTANCE_SIDEWAYS = [{
     "id": "occluder_wall_",
@@ -424,7 +428,8 @@ def create_occluder(
     sideways_left: bool = False,
     sideways_right: bool = False,
     y_rotation: int = 0,
-    z_position: float = OCCLUDER_POSITION_Z
+    z_position: float = OCCLUDER_POSITION_Z,
+    move_down_only: bool = False
 ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
     """
     Create and return a moving and rotating intuitive-physics-style occluder
@@ -458,11 +463,14 @@ def create_occluder(
     - y_rotation: Y rotation of a non-sideways occluder wall; not used if any
                   "sideways" arguments are set
     - z_position: Z position of the center of the occluder
+    - move_down_only: If true, occluder will start near the ceiling and move
+                      down until touching the floor, and will not rotate.
     """
 
     room = room_dimensions or DEFAULT_INTUITIVE_PHYSICS_ROOM_DIMENSIONS
     occluder_height_half = round(occluder_height / 2.0, 3)
 
+    # Move down only applies just to sideways occluders for now
     if sideways_left or sideways_right:
         occluder = copy.deepcopy(_OCCLUDER_INSTANCE_SIDEWAYS)
         pole_x_position = generate_sideways_pole_position_x(
@@ -472,7 +480,10 @@ def create_occluder(
             room['x']
         )
         occluder[POLE]['shows'][0]['position']['x'] = pole_x_position
-        occluder[POLE]['shows'][0]['position']['y'] = occluder_height_half
+        # make sure pole is towards the top of occluder for move_down_only
+        # setting, so that the performer has room to walk underneath the pole
+        occluder[POLE]['shows'][0]['position']['y'] = room['y'] - \
+            OCCLUDER_BUFFER if move_down_only else occluder_height_half
         occluder[POLE]['shows'][0]['position']['z'] = z_position
         occluder[POLE]['shows'][0]['scale']['y'] = round(
             (room['x'] * 0.5) - abs(pole_x_position),
@@ -492,7 +503,10 @@ def create_occluder(
             room['z']
         )
         occluder[POLE]['shows'][0]['position']['x'] = x_position
-        occluder[POLE]['shows'][0]['position']['y'] = occluder_height_half
+        # make sure pole is towards the top of occluder for move_down_only
+        # setting, so that the performer has room to walk underneath the pole
+        occluder[POLE]['shows'][0]['position']['y'] = room['y'] - \
+            OCCLUDER_BUFFER if move_down_only else occluder_height_half
         occluder[POLE]['shows'][0]['position']['z'] = pole_z_position
         occluder[POLE]['shows'][0]['scale']['y'] = round(
             (room['z'] * 0.5) - abs(pole_z_position),
@@ -511,11 +525,16 @@ def create_occluder(
             pole_length + occluder_height,
             3
         )
+        if(move_down_only):
+            occluder[POLE]['shows'][0]['position']['y'] += (
+                room['y'] - occluder_height)
         occluder[POLE]['shows'][0]['position']['z'] = z_position
         occluder[WALL]['shows'][0]['rotation']['y'] = y_rotation
 
     occluder[WALL]['shows'][0]['position']['x'] = x_position
-    occluder[WALL]['shows'][0]['position']['y'] = occluder_height_half
+    occluder[WALL]['shows'][0]['position']['y'] = (
+        room['y'] - occluder_height_half if move_down_only else
+        occluder_height_half)
     occluder[WALL]['shows'][0]['position']['z'] = z_position
     occluder[WALL]['shows'][0]['scale']['x'] = occluder_width
     occluder[WALL]['shows'][0]['scale']['y'] = occluder_height
@@ -546,12 +565,31 @@ def create_occluder(
     occluder[WALL]['debug']['info'] = wall_material.color
     occluder[POLE]['debug']['info'] = pole_material.color
 
-    adjust_movement_and_rotation_to_scale(
-        occluder,
-        sideways_back or sideways_front or sideways_left or sideways_right,
-        # Ignore the last_step behavior if the repeat_movement is not None
-        last_step if repeat_movement is None else None
-    )
+    if(move_down_only):
+        # remove extraneous moves/rotates for move down
+        # case
+        del occluder[POLE]['moves'][2]
+        del occluder[POLE]['moves'][0]
+        del occluder[WALL]['moves'][2]
+        del occluder[WALL]['moves'][0]
+        del occluder[WALL]['rotates']
+
+        move_down_dist = (
+            occluder[WALL]['shows'][0]['position']['y'] -
+            occluder_height_half)
+        step_end = round(move_down_dist / MOVE_AMOUNT_UP)
+
+        occluder[POLE]['moves'][0]['stepBegin'] = 1
+        occluder[WALL]['moves'][0]['stepBegin'] = 1
+        occluder[POLE]['moves'][0]['stepEnd'] = step_end
+        occluder[WALL]['moves'][0]['stepEnd'] = step_end
+    else:
+        adjust_movement_and_rotation_to_scale(
+            occluder,
+            sideways_back or sideways_front or sideways_left or sideways_right,
+            # Ignore the last_step behavior if the repeat_movement is not None
+            last_step if repeat_movement is None else None
+        )
 
     if repeat_movement is not None:
         # Calculate the intervals between each repeated movement/rotation, and
@@ -718,3 +756,297 @@ def make_occluder_sideways(
     for move in pole['moves']:
         move['vector']['x'] = move['vector']['y']
         move['vector']['y'] = 0
+
+
+def occluder_gap_positioning(scene, gap, vp_gap, new_obj, sideways):
+
+    #     """If gap is not None, changes the X position of the occluders' Pole
+    #     and wall so that the X distance between the inner edges of the
+    #     occluder walls are `gap`.
+    #     if vp_gap is not None and gap is None, changes the x position of the
+    #     occluders Pole and wall so that the egde of the occluder is 'vp_gap'
+    #     from the edge of the viewport.
+    #     if gap and vp_gap is not None, `gap` takes precedence over `vp_gap`
+    #     and `vp_gap` acts like a miinimum distance check
+    #     Assumptions:
+    #         1. In an occluder wall/pole set, wall comes first in the list
+    #         2. Occluder wall/pole has id prefix of 'occluder_wall_*` and
+    #            'occluder_pole_*`
+    #     Constraints:
+    #         1. The viewport gap (vp_gap) only works with 1 or 2 occluders.
+    #            The occluders are moved to the nearest viewport using the
+    #            `vp_gap` distance.
+    #     """
+
+    view_edge_x = retrieve_off_screen_position_x(
+        scene.performer_start.position.x)
+
+    set_complete = False
+    prev_wall_dim_x = None
+    prev_wall_x = None
+
+    # Make gap between occluders = gap
+    if gap is not None:
+        for index, key in enumerate(scene.objects):
+            # handle more than two occluders
+            if set_complete:  # next occluder set
+                if "occluder_wall_" in scene.objects[index]['id']:
+                    wall_dim_x = \
+                        scene.objects[index]['debug']['dimensions']['x'] / 2
+                    if prev_wall_x < \
+                            scene.objects[index]['shows'][0]['position']['x']:
+                        new_pos_x = \
+                            prev_wall_x + prev_wall_dim_x + gap + wall_dim_x
+                        scene.objects[index]['shows'][0]['position']['x'] = \
+                            new_pos_x
+                    else:
+                        new_pos_x = \
+                            prev_wall_x - prev_wall_dim_x - gap - wall_dim_x
+                        scene.objects[index]['shows'][0]['position']['x'] = \
+                            new_pos_x
+
+                    prev_wall_x = new_pos_x
+                    prev_wall_dim_x = wall_dim_x
+
+                if "occluder_pole_" in scene.objects[index]['id']:
+                    scene.objects[index]['shows'][0]['position']['x'] = \
+                        new_pos_x
+                    set_complete = False
+                    continue
+
+            if "occluder_wall_" in scene.objects[index]['id'] \
+                    and not set_complete:
+
+                # if gap and vp_gap make vp_gap a minimal check on the
+                # occluder
+                if vp_gap is not None:
+                    wall_x = \
+                        scene.objects[index]['debug']['dimensions']['x'] / 2
+
+                    # if smaller than viewport_gap, then move it to
+                    # viewport_gap
+                    if scene.objects[index]['shows'][0]['position']['x'] < \
+                       new_obj[1]['shows'][0]['position']['x']:
+                        if scene.objects[index]['shows'][0]['position']['x'] -\
+                                wall_x < (-view_edge_x + vp_gap):
+                            scene.objects[index]['shows'][0]['position']['x']\
+                                = -(view_edge_x) + wall_x + vp_gap
+                    else:
+                        if scene.objects[index]['shows'][0]['position']['x']\
+                                + wall_x > (view_edge_x - vp_gap):
+                            scene.objects[index]['shows'][0]['position']['x'] \
+                                = view_edge_x - wall_x - vp_gap
+
+                prev_wall_dim_x = \
+                    scene.objects[index]['debug']['dimensions']['x'] / 2
+                prev_wall_x = scene.objects[index]['shows'][0]['position']['x']
+
+            if "occluder_pole_" in scene.objects[index]['id'] \
+                    and not set_complete:
+
+                if prev_wall_x > 0:
+                    new_pos_x = prev_wall_x - prev_wall_dim_x - \
+                        (scene.objects[index]['debug']
+                         ['dimensions']['x'] / 2)
+                    new_pole_x = \
+                        scene.objects[index]['shows'][0]['position']['x'] + \
+                        (prev_wall_x + new_pos_x)
+                else:
+                    new_pos_x = prev_wall_x + prev_wall_dim_x + \
+                        (scene.objects[index]['debug']
+                         ['dimensions']['x'] / 2)
+                    new_pole_x = \
+                        scene.objects[index]['shows'][0]['position']['x'] - \
+                        (prev_wall_x - new_pos_x)
+
+                if sideways:
+                    scene.objects[index]['shows'][0]['position']['x'] = \
+                        new_pole_x
+                else:
+                    scene.objects[index]['shows'][0]['position']['x'] = \
+                        prev_wall_x
+
+                set_complete = True
+
+        if prev_wall_x is not None:
+            if prev_wall_x > new_obj[0]['shows'][0]['position']['x']:
+                new_pos_x = prev_wall_x - prev_wall_dim_x - gap - \
+                    (new_obj[0]['debug']['dimensions']['x'] / 2)
+                new_pole_x = new_obj[1]['shows'][0]['position']['x'] + \
+                    (new_obj[0]['shows'][0]['position']['x'] + new_pos_x)
+            else:
+                new_pos_x = prev_wall_x + prev_wall_dim_x + gap + \
+                    (new_obj[0]['debug']['dimensions']['x'] / 2)
+                new_pole_x = new_obj[1]['shows'][0]['position']['x'] - \
+                    (new_obj[0]['shows'][0]['position']['x'] - new_pos_x)
+
+            new_obj[0]['shows'][0]['position']['x'] = new_pos_x
+
+            if sideways:
+                new_obj[1]['shows'][0]['position']['x'] = new_pole_x
+            else:
+                new_obj[1]['shows'][0]['position']['x'] = new_pos_x
+
+    # Make view port gap on left/right edges = vp_gap
+    if vp_gap is not None and gap is None:
+        set_complete = False
+        prev_wall_x = None
+        prev_wall_dim_x = None
+        put_left = False
+        for index, key in enumerate(scene.objects):
+            if "occluder_wall_" in scene.objects[index]['id'] \
+                    and not set_complete:
+
+                prev_wall_dim_x = \
+                    scene.objects[index]['debug']['dimensions']['x'] / 2
+
+                if scene.objects[index]['shows'][0]['position']['x'] < 0:
+                    # put wall on left view port by `vp_gap`
+                    prev_wall_x = -view_edge_x + \
+                        prev_wall_dim_x + vp_gap
+                    put_left = True
+                else:
+                    # put wall on right view port by `vp_gap`
+                    prev_wall_x = view_edge_x - prev_wall_dim_x - vp_gap
+                    put_left = False
+
+                scene.objects[index]['shows'][0]['position']['x'] = prev_wall_x
+
+            if "occluder_pole_" in scene.objects[index]['id'] \
+                    and not set_complete:
+                if sideways:
+                    if put_left:
+                        new_pos_x = prev_wall_x - prev_wall_dim_x - \
+                            (scene.objects[index]['debug']['dimensions']['y'])
+                    else:
+                        new_pos_x = prev_wall_x + prev_wall_dim_x + \
+                            (scene.objects[index]['debug']['dimensions']['y'])
+
+                    scene.objects[index]['shows'][0]['position']['x'] = \
+                        new_pos_x
+                else:
+                    scene.objects[index]['shows'][0]['position']['x'] = \
+                        prev_wall_x
+                set_complete = True
+
+        # put second wall on right view port by `vp_gap`
+        # if prev_wall_x is not None:
+        if "occluder_wall_" in new_obj[0]['id']:
+            # Wall is always before pole in set?
+            prev_wall_dim_x = \
+                new_obj[0]['debug']['dimensions']['x'] / 2
+
+            if not put_left:
+                prev_wall_x = -view_edge_x + prev_wall_dim_x + vp_gap
+            else:
+                prev_wall_x = view_edge_x - prev_wall_dim_x - vp_gap
+
+            new_obj[0]['shows'][0]['position']['x'] = prev_wall_x
+        if "occluder_pole_" in new_obj[1]['id']:
+            if sideways:
+                if not put_left:
+                    new_pos_x = prev_wall_x - prev_wall_dim_x - \
+                        (new_obj[1]['debug']['dimensions']['y'])
+                else:
+                    new_pos_x = prev_wall_x + prev_wall_dim_x + \
+                        (new_obj[1]['debug']['dimensions']['y'])
+
+                new_obj[1]['shows'][0]['position']['x'] = new_pos_x
+
+            else:
+                new_obj[1]['shows'][0]['position']['x'] = \
+                    new_obj[0]['shows'][0]['position']['x']
+
+    if not sideways:
+        scene, new_obj = _occluder_min_viewport_validation(scene, new_obj)
+
+    return scene, new_obj
+
+
+def _occluder_min_viewport_validation(scene, new_obj):
+    """
+    Check for minimum separation between occluder and viewport
+    Move it over if separation isn't larger than
+    OCCLUDER_MIN_VIEWPORT_GAP. Can happen with larger random
+    size occluders and gaps.
+    """
+
+    view_edge_x = retrieve_off_screen_position_x(
+        scene.performer_start.position.x)
+
+    move_occ = False
+    move_occ_sign = -1
+
+    for index, key in enumerate(scene.objects):
+        if "occluder_wall_" in scene.objects[index]['id']:
+            # Wall is always before pole in set?
+            pos_x = scene.objects[index]['shows'][0]['position']['x']
+            dim_x = scene.objects[index]['debug']['dimensions']['x'] / 2
+            if pos_x - dim_x < \
+                    -view_edge_x + OCCLUDER_MIN_VIEWPORT_GAP:
+                move_occ = True
+                move_occ_sign = 1
+
+            if pos_x + dim_x > \
+                    view_edge_x - OCCLUDER_MIN_VIEWPORT_GAP:
+                move_occ = True
+
+    pos_x = new_obj[0]['shows'][0]['position']['x']
+    dim_x = new_obj[0]['debug']['dimensions']['x'] / 2
+    if pos_x - dim_x < \
+            -view_edge_x + OCCLUDER_MIN_VIEWPORT_GAP:
+        move_occ = True
+        move_occ_sign = 1
+
+    if pos_x + dim_x > \
+            view_edge_x - OCCLUDER_MIN_VIEWPORT_GAP:
+        move_occ = True
+
+    if move_occ:
+        prev_edge = None
+
+        for index, key in enumerate(scene.objects):
+            if "occluder_wall_" in scene.objects[index]['id']:
+                pos_x = scene.objects[index]['shows'][0]['position']['x']
+                dim_x = scene.objects[index]['debug']['dimensions']['x'] / 2
+                if move_occ_sign > 0:
+                    if prev_edge is None:
+                        prev_edge = pos_x - dim_x
+                    else:
+                        if (pos_x - dim_x) < prev_edge:
+                            prev_edge = pos_x - dim_x
+                else:
+                    if prev_edge is None:
+                        prev_edge = pos_x + dim_x
+                    else:
+                        if (pos_x + dim_x) > prev_edge:
+                            prev_edge = pos_x + dim_x
+
+        pos_x = new_obj[0]['shows'][0]['position']['x']
+        dim_x = new_obj[0]['debug']['dimensions']['x'] / 2
+        if move_occ_sign > 0:
+            if prev_edge is None:
+                prev_edge = pos_x - dim_x
+            else:
+                if (pos_x - dim_x) < prev_edge:
+                    prev_edge = pos_x - dim_x
+        else:
+            if prev_edge is None:
+                prev_edge = pos_x + dim_x
+            else:
+                if (pos_x + dim_x) > prev_edge:
+                    prev_edge = pos_x + dim_x
+
+        move_delta = (abs(prev_edge) - view_edge_x) + \
+            OCCLUDER_MIN_VIEWPORT_GAP
+
+        for index, key in enumerate(scene.objects):
+            if "occluder_wall_" in scene.objects[index]['id'] or \
+                    "occluder_pole_" in scene.objects[index]['id']:
+                scene.objects[index]['shows'][0]['position']['x'] += \
+                    move_delta * move_occ_sign
+
+        new_obj[0]['shows'][0]['position']['x'] += move_delta * move_occ_sign
+        new_obj[1]['shows'][0]['position']['x'] += move_delta * move_occ_sign
+
+    return scene, new_obj

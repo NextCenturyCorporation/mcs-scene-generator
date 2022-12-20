@@ -8,6 +8,7 @@ excluded_shapes: null
 floor_material: null
 floor_material_override:
     - num: 0
+forced_choice_multi_retrieval_target: null
 freezes: null
 goal: null
 holes:
@@ -18,6 +19,8 @@ lava:
     - num: 0
 num_random_agents: 0
 num_random_interactable_objects: null
+occluder_gap: .5
+occluder_gap_viewport: .5
 passive_physics_floor: False
 passive_physics_scene: False
 performer_look_at: null
@@ -36,10 +39,12 @@ shortcut_bisecting_platform: False
 shortcut_imitation_task: False
 shortcut_lava_room: False
 shortcut_lava_target_tool: False
+shortcut_seeing_leads_to_knowing: False
 shortcut_start_on_platform: False
 shortcut_tool_choice: False
 shortcut_triple_door_choice: False
 side_wall_opposite_colors: False
+sidesteps: null
 specific_agents: null
 specific_interactable_objects: null
 structural_droppers:

@@ -6,6 +6,9 @@ from generator import ObjectBounds, Scene
 from generator.base_objects import create_soccer_ball
 from generator.instances import instantiate_object
 from ideal_learning_env.defs import TARGET_LABEL
+from ideal_learning_env.interactable_objects_component import (
+    SpecificInteractableObjectsComponent
+)
 from ideal_learning_env.object_services import (
     InstanceDefinitionLocationTuple,
     ObjectRepository
@@ -187,3 +190,26 @@ def add_object_with_position_to_repo(label, x, y, z):
         }]
     }, None, None)
     obj_repo.add_to_labeled_objects(idl, label)
+
+
+def create_test_obj_scene(
+        perf_start_x=0, perf_start_z=3,
+        object_start_x=0, object_start_z=0):
+    """This creates a scene with a small object in the room.
+    This is mostly useful for 'sidesteps' testing which requires
+    an object already being in the scene for the performer to sidestep.
+    """
+    scene = prior_scene_custom_start(
+        start_x=perf_start_x, start_z=perf_start_z)
+    object_component = SpecificInteractableObjectsComponent({
+        "specific_interactable_objects": [{
+            "num": 1,
+            "labels": "object",
+            "scale": 0.1,
+            "position": {
+                "x": object_start_x,
+                "z": object_start_z
+            }
+        }]
+    })
+    return object_component.update_ile_scene(scene)

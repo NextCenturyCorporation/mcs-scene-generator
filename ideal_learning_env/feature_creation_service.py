@@ -59,6 +59,7 @@ class BaseFeatureConfig():
     """Base class that should used for all structural objects."""
     num: Union[int, MinMaxInt, List[Union[int, MinMaxInt]]] = 1
     labels: Union[str, List[str]] = None
+    randomize_once: Dict = None
 
 
 class FeatureCreationService():

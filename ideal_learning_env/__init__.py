@@ -13,6 +13,7 @@ from .defs import (
     TARGET_LABEL,
     ConverterClass,
     ILEConfigurationException,
+    ILEDelayException,
     ILEException,
     ILESharedConfiguration,
     find_bounds,

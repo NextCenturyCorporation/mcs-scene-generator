@@ -3,7 +3,7 @@ import pytest
 from ideal_learning_env.actions_component import ActionRestrictionsComponent
 from ideal_learning_env.defs import ILEConfigurationException, ILEException
 
-from .ile_helper import prior_scene
+from .ile_helper import create_test_obj_scene, prior_scene
 
 
 def test_action_restrictions_defaults():
@@ -13,6 +13,7 @@ def test_action_restrictions_defaults():
     assert component.freezes is None
     assert component.swivels is None
     assert component.teleports is None
+    assert component.sidesteps is None
 
     scene = component.update_ile_scene(prior_scene())
     goal = scene.goal
@@ -1542,3 +1543,75 @@ def test_action_restriction_passive_swivel_error():
 
     with pytest.raises(ILEConfigurationException):
         component.update_ile_scene(prior_scene(100))
+
+
+def test_action_sidesteps():
+    start_step = 1
+    object_label = 'object'
+    degrees = 90
+    component = ActionRestrictionsComponent({
+        'sidesteps': [
+            {
+                'begin': start_step,
+                'object_label': object_label,
+                'degrees': degrees
+            },
+            {
+                'begin': start_step + 100,
+                'object_label': object_label,
+                'degrees': -degrees
+            },
+        ]
+    })
+    sidesteps = component.get_sidesteps()
+    assert isinstance(sidesteps, list)
+    assert sidesteps[0].begin == start_step
+    assert sidesteps[1].begin == start_step + 100
+    assert sidesteps[0].object_label == object_label
+    assert sidesteps[1].object_label == object_label
+    assert sidesteps[0].degrees == degrees
+    assert sidesteps[1].degrees == -degrees
+
+    scene = component.update_ile_scene(create_test_obj_scene(0, 3))
+    assert component.get_num_delayed_actions() == 1
+    scene = component.run_delayed_actions(scene)
+    assert component.get_num_delayed_actions() == 0
+
+    goal = scene.goal
+    assert isinstance(goal, dict)
+    al = goal['action_list']
+    assert isinstance(al, list)
+    assert len(al) == 218
+    for action in al:
+        assert action in [
+            ["MoveRight"],
+            ["MoveLeft"],
+            ["RotateRight"],
+            ["RotateLeft"],
+            []
+        ]
+
+
+def test_action_sidesteps_error():
+    start_step = 1
+    object_label = 'object'
+    degrees = 91
+    component = ActionRestrictionsComponent({
+        'sidesteps': [
+            {
+                'begin': start_step,
+                'object_label': object_label,
+                'degrees': degrees
+            }
+        ]
+    })
+    sidesteps = component.get_sidesteps()
+    assert isinstance(sidesteps, list)
+    assert sidesteps[0].begin == start_step
+    assert sidesteps[0].object_label == object_label
+    assert sidesteps[0].degrees == degrees
+
+    scene = component.update_ile_scene(create_test_obj_scene(0, 3))
+    assert component.get_num_delayed_actions() == 1
+    with pytest.raises(ILEException):
+        component.run_delayed_actions(scene)

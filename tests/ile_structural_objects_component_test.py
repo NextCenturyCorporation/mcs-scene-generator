@@ -3,11 +3,13 @@ from typing import List
 import pytest
 
 from generator import materials
-from generator.base_objects import ALL_LARGE_BLOCK_TOOLS
+from generator.base_objects import ALL_LARGE_BLOCK_TOOLS, create_soccer_ball
+from generator.instances import instantiate_object
 from ideal_learning_env import (
     TARGET_LABEL,
     ILEConfigurationException,
     ILEException,
+    InstanceDefinitionLocationTuple,
     RandomStructuralObjectsComponent
 )
 from ideal_learning_env.interactable_objects_component import (
@@ -1865,10 +1867,10 @@ def test_structural_objects_dropper_with_missing_targets():
         }
     })
 
-    # Error because object with "target" label must exist in scene.
-    with pytest.raises(ILEException):
-        # Prior scene must NOT have target object.
-        component.update_ile_scene(prior_scene())
+    # Delay because object with "target" label must exist in scene.
+    scene = component.update_ile_scene(prior_scene())
+    assert len(scene.objects) == 0
+    component.get_num_delayed_actions() == 1
 
 
 def test_structural_objects_dropper_with_new_labels():
@@ -1955,11 +1957,11 @@ def test_structural_objects_dropper_with_used_target():
         }
     })
 
-    # Error because object with "target" label must not already be used by
+    # Delay because object with "target" label must not already be used by
     # another mechanism.
-    with pytest.raises(ILEException):
-        # Prior scene must have target object.
-        component.update_ile_scene(prior_scene_with_target())
+    scene = component.update_ile_scene(prior_scene_with_target())
+    assert len(scene.objects) == 1
+    component.get_num_delayed_actions() == 1
 
 
 def test_structural_objects_dropper_no_spec():
@@ -2523,10 +2525,10 @@ def test_structural_objects_thrower_with_missing_targets():
         }
     })
 
-    # Error because object with "target" label must exist in scene.
-    with pytest.raises(ILEException):
-        # Prior scene must NOT have target object.
-        component.update_ile_scene(prior_scene())
+    # Delay because object with "target" label must exist in scene.
+    scene = component.update_ile_scene(prior_scene())
+    assert len(scene.objects) == 0
+    component.get_num_delayed_actions() == 1
 
 
 def test_structural_objects_thrower_with_new_labels():
@@ -2859,11 +2861,11 @@ def test_structural_objects_thrower_with_used_target():
         }
     })
 
-    # Error because object with "target" label must not already be used by
+    # Delay because object with "target" label must not already be used by
     # another mechanism.
-    with pytest.raises(ILEException):
-        # Prior scene must have target object.
-        component.update_ile_scene(prior_scene_with_target())
+    scene = component.update_ile_scene(prior_scene_with_target())
+    assert len(scene.objects) == 1
+    component.get_num_delayed_actions() == 1
 
 
 def test_structural_objects_thrower_high_angle_z():
@@ -5941,10 +5943,10 @@ def test_placer_with_missing_targets():
         }]
     })
 
-    # Error because object with "target" label must exist in scene.
-    with pytest.raises(ILEException):
-        # Prior scene must NOT have target object.
-        component.update_ile_scene(prior_scene())
+    # Delay because object with "target" label must exist in scene.
+    scene = component.update_ile_scene(prior_scene())
+    assert len(scene.objects) == 0
+    component.get_num_delayed_actions() == 1
 
 
 def test_placer_with_new_labels():
@@ -6054,11 +6056,11 @@ def test_placer_with_used_target():
         }]
     })
 
-    # Error because object with "target" label must not already be used by
+    # Delay because object with "target" label must not already be used by
     # another mechanism.
-    with pytest.raises(ILEException):
-        # Prior scene must have target object.
-        component.update_ile_scene(prior_scene_with_target())
+    scene = component.update_ile_scene(prior_scene_with_target())
+    assert len(scene.objects) == 1
+    component.get_num_delayed_actions() == 1
 
 
 def test_placer_overlap_success():
@@ -6354,6 +6356,204 @@ def test_placer_container_asymmetric_with_rotation():
     assert ObjectRepository.get_instance().has_label('test_label')
 
 
+def test_placer_activate_after():
+    object_repository = ObjectRepository.get_instance()
+    mock_moving_object = {
+        'id': 'object_1',
+        'moves': [{'stepBegin': 41, 'stepEnd': 50}]
+    }
+    mock_idl = InstanceDefinitionLocationTuple(mock_moving_object, {}, {})
+    object_repository.add_to_labeled_objects(mock_idl, 'label_1')
+
+    component = SpecificStructuralObjectsComponent({
+        'placers': [{
+            'num': 1,
+            'placed_object_shape': 'ball',
+            'activate_after': ['label_1']
+        }]
+    })
+
+    assert isinstance(component.placers, List)
+    placer_config = component.placers[0]
+    assert isinstance(placer_config, StructuralPlacerConfig)
+    assert placer_config.num == 1
+    assert placer_config.placed_object_shape == 'ball'
+    assert placer_config.activate_after == ['label_1']
+    assert placer_config.activation_step is None
+
+    scene = component.update_ile_scene(prior_scene())
+    assert len(scene.objects) == 2
+
+    held_object = scene.objects[0]
+    assert held_object['moves'][0]['stepBegin'] == 51
+
+    placer = scene.objects[1]
+    assert placer['id'].startswith('placer_')
+    assert placer['type'] == 'cylinder'
+    assert placer['moves'][0]['stepBegin'] == 51
+
+
+def test_placer_activate_after_delay():
+    component = SpecificStructuralObjectsComponent({
+        'placers': [{
+            'num': 1,
+            'placed_object_shape': 'ball',
+            'activate_after': ['label_1']
+        }]
+    })
+
+    assert isinstance(component.placers, List)
+    placer_config = component.placers[0]
+    assert isinstance(placer_config, StructuralPlacerConfig)
+    assert placer_config.num == 1
+    assert placer_config.placed_object_shape == 'ball'
+    assert placer_config.activate_after == ['label_1']
+    assert placer_config.activation_step is None
+
+    scene = component.update_ile_scene(prior_scene())
+    assert len(scene.objects) == 0
+    component.get_num_delayed_actions() == 1
+
+
+def test_placer_activate_on_start_or_after_after():
+    object_repository = ObjectRepository.get_instance()
+    mock_moving_object = {
+        'id': 'object_1',
+        'moves': [{'stepBegin': 1, 'stepEnd': 10}]
+    }
+    mock_idl = InstanceDefinitionLocationTuple(mock_moving_object, {}, {})
+    object_repository.add_to_labeled_objects(mock_idl, 'label_1')
+
+    component = SpecificStructuralObjectsComponent({
+        'placers': [{
+            'num': 1,
+            'placed_object_shape': 'ball',
+            'activate_on_start_or_after': ['label_1']
+        }]
+    })
+
+    assert isinstance(component.placers, List)
+    placer_config = component.placers[0]
+    assert isinstance(placer_config, StructuralPlacerConfig)
+    assert placer_config.num == 1
+    assert placer_config.placed_object_shape == 'ball'
+    assert placer_config.activate_on_start_or_after == ['label_1']
+    assert placer_config.activation_step is None
+
+    scene = component.update_ile_scene(prior_scene())
+    assert len(scene.objects) == 2
+
+    held_object = scene.objects[0]
+    assert held_object['moves'][0]['stepBegin'] == 11
+
+    placer = scene.objects[1]
+    assert placer['id'].startswith('placer_')
+    assert placer['type'] == 'cylinder'
+    assert placer['moves'][0]['stepBegin'] == 11
+
+
+def test_placer_activate_on_start_or_after_start():
+    object_repository = ObjectRepository.get_instance()
+    mock_moving_object = {
+        'id': 'object_1',
+        'moves': [{'stepBegin': 41, 'stepEnd': 50}]
+    }
+    mock_idl = InstanceDefinitionLocationTuple(mock_moving_object, {}, {})
+    object_repository.add_to_labeled_objects(mock_idl, 'label_1')
+
+    component = SpecificStructuralObjectsComponent({
+        'placers': [{
+            'num': 1,
+            'placed_object_shape': 'ball',
+            'activate_on_start_or_after': ['label_1']
+        }]
+    })
+
+    assert isinstance(component.placers, List)
+    placer_config = component.placers[0]
+    assert isinstance(placer_config, StructuralPlacerConfig)
+    assert placer_config.num == 1
+    assert placer_config.placed_object_shape == 'ball'
+    assert placer_config.activate_on_start_or_after == ['label_1']
+    assert placer_config.activation_step is None
+
+    scene = component.update_ile_scene(prior_scene())
+    assert len(scene.objects) == 2
+
+    held_object = scene.objects[0]
+    assert held_object['moves'][0]['stepBegin'] == 1
+
+    placer = scene.objects[1]
+    assert placer['id'].startswith('placer_')
+    assert placer['type'] == 'cylinder'
+    assert placer['moves'][0]['stepBegin'] == 1
+
+
+def test_placer_activate_on_start_or_after_multiple():
+    object_repository = ObjectRepository.get_instance()
+    mock_moving_object_1 = {
+        'id': 'object_1',
+        'moves': [{'stepBegin': 1, 'stepEnd': 10}]
+    }
+    mock_idl_1 = InstanceDefinitionLocationTuple(mock_moving_object_1, {}, {})
+    object_repository.add_to_labeled_objects(mock_idl_1, 'label_1')
+    mock_moving_object_2 = {
+        'id': 'object_2',
+        'moves': [{'stepBegin': 41, 'stepEnd': 50}]
+    }
+    mock_idl_2 = InstanceDefinitionLocationTuple(mock_moving_object_2, {}, {})
+    object_repository.add_to_labeled_objects(mock_idl_2, 'label_2')
+
+    component = SpecificStructuralObjectsComponent({
+        'placers': [{
+            'num': 1,
+            'placed_object_shape': 'ball',
+            'activate_on_start_or_after': ['label_1', 'label_2']
+        }]
+    })
+
+    assert isinstance(component.placers, List)
+    placer_config = component.placers[0]
+    assert isinstance(placer_config, StructuralPlacerConfig)
+    assert placer_config.num == 1
+    assert placer_config.placed_object_shape == 'ball'
+    assert placer_config.activate_on_start_or_after == ['label_1', 'label_2']
+    assert placer_config.activation_step is None
+
+    scene = component.update_ile_scene(prior_scene())
+    assert len(scene.objects) == 2
+
+    held_object = scene.objects[0]
+    assert held_object['moves'][0]['stepBegin'] == 51
+
+    placer = scene.objects[1]
+    assert placer['id'].startswith('placer_')
+    assert placer['type'] == 'cylinder'
+    assert placer['moves'][0]['stepBegin'] == 51
+
+
+def test_placer_activate_on_start_or_after_delay():
+    component = SpecificStructuralObjectsComponent({
+        'placers': [{
+            'num': 1,
+            'placed_object_shape': 'ball',
+            'activate_on_start_or_after': ['label_1']
+        }]
+    })
+
+    assert isinstance(component.placers, List)
+    placer_config = component.placers[0]
+    assert isinstance(placer_config, StructuralPlacerConfig)
+    assert placer_config.num == 1
+    assert placer_config.placed_object_shape == 'ball'
+    assert placer_config.activate_on_start_or_after == ['label_1']
+    assert placer_config.activation_step is None
+
+    scene = component.update_ile_scene(prior_scene())
+    assert len(scene.objects) == 0
+    component.get_num_delayed_actions() == 1
+
+
 def test_door_random_values():
     component = SpecificStructuralObjectsComponent({
         'doors': [{
@@ -6388,6 +6588,315 @@ def test_door_random_values():
         assert obj['debug']['random_position']
     assert ObjectRepository.get_instance().has_label('doors')
     assert not ObjectRepository.get_instance().has_label('test_label')
+
+
+def create_scene_with_object(position_x=0, position_z=0, label='label_1'):
+    object_repository = ObjectRepository.get_instance()
+    definition = create_soccer_ball()
+    location = {'position': {'x': position_x, 'y': 0, 'z': position_z}}
+    instance = instantiate_object(definition, location)
+    idl = InstanceDefinitionLocationTuple(instance, definition, location)
+    object_repository.add_to_labeled_objects(idl, label)
+    scene = prior_scene()
+    scene.objects = [instance]
+    return scene, instance
+
+
+def test_placer_existing_object_required_true():
+    component = SpecificStructuralObjectsComponent({
+        'placers': [{
+            'num': 1,
+            'placed_object_labels': 'label_1',
+            'existing_object_required': True
+        }]
+    })
+
+    assert isinstance(component.placers, List)
+    placer_config = component.placers[0]
+    assert isinstance(placer_config, StructuralPlacerConfig)
+    assert placer_config.num == 1
+    assert placer_config.placed_object_labels == 'label_1'
+    assert placer_config.existing_object_required is True
+
+    scene, original = create_scene_with_object()
+    scene = component.update_ile_scene(scene)
+    assert len(scene.objects) == 2
+
+    held_object = scene.objects[0]
+    assert held_object['id'] == original['id']
+
+    placer = scene.objects[1]
+    assert placer['id'].startswith('placer_')
+    assert placer['type'] == 'cylinder'
+
+
+def test_placer_existing_object_required_true_delay():
+    component = SpecificStructuralObjectsComponent({
+        'placers': [{
+            'num': 1,
+            'placed_object_labels': 'label_1',
+            'existing_object_required': True
+        }]
+    })
+
+    assert isinstance(component.placers, List)
+    placer_config = component.placers[0]
+    assert isinstance(placer_config, StructuralPlacerConfig)
+    assert placer_config.num == 1
+    assert placer_config.placed_object_labels == 'label_1'
+    assert placer_config.existing_object_required is True
+
+    scene = component.update_ile_scene(prior_scene())
+    assert len(scene.objects) == 0
+    assert component.get_num_delayed_actions() == 1
+
+
+def test_placer_existing_object_required_false():
+    component = SpecificStructuralObjectsComponent({
+        'placers': [{
+            'num': 1,
+            'placed_object_shape': 'ball',
+            'placed_object_labels': 'label_1',
+            'existing_object_required': False
+        }]
+    })
+
+    assert isinstance(component.placers, List)
+    placer_config = component.placers[0]
+    assert isinstance(placer_config, StructuralPlacerConfig)
+    assert placer_config.num == 1
+    assert placer_config.placed_object_labels == 'label_1'
+    assert placer_config.existing_object_required is False
+
+    scene = component.update_ile_scene(prior_scene())
+    assert len(scene.objects) == 2
+
+    held_object = scene.objects[0]
+    assert not held_object['id'].startswith('placer_')
+
+    placer = scene.objects[1]
+    assert placer['id'].startswith('placer_')
+    assert placer['type'] == 'cylinder'
+
+
+def test_placer_retain_position():
+    component = SpecificStructuralObjectsComponent({
+        'placers': [{
+            'num': 1,
+            'placed_object_labels': 'label_1',
+            'retain_position': True
+        }]
+    })
+
+    assert isinstance(component.placers, List)
+    placer_config = component.placers[0]
+    assert isinstance(placer_config, StructuralPlacerConfig)
+    assert placer_config.num == 1
+    assert placer_config.placed_object_labels == 'label_1'
+    assert placer_config.retain_position is True
+
+    scene, original = create_scene_with_object(2, 4)
+    scene = component.update_ile_scene(scene)
+    assert len(scene.objects) == 2
+
+    held_object = scene.objects[0]
+    assert held_object['id'] == original['id']
+    assert held_object['shows'][0]['position']['x'] == 2
+    assert held_object['shows'][0]['position']['z'] == 4
+
+    placer = scene.objects[1]
+    assert placer['id'].startswith('placer_')
+    assert placer['type'] == 'cylinder'
+    assert placer['shows'][0]['position']['x'] == 2
+    assert placer['shows'][0]['position']['z'] == 4
+
+
+def test_placer_with_object_positioned_by_keyword_location():
+    component = SpecificStructuralObjectsComponent({
+        'placers': [{
+            'num': 1,
+            'placed_object_labels': 'label_1',
+            'existing_object_required': True
+        }]
+    })
+
+    scene, original = create_scene_with_object()
+    original['debug']['positionedBy'] = 'adjacent'
+    original['debug'][DEBUG_FINAL_POSITION_KEY] = True
+    scene = component.update_ile_scene(scene)
+    assert len(scene.objects) == 2
+
+    held_object = scene.objects[0]
+    assert held_object['id'] == original['id']
+
+    placer = scene.objects[1]
+    assert placer['id'].startswith('placer_')
+    assert placer['type'] == 'cylinder'
+
+
+def test_placer_with_object_positioned_by_keyword_location_pickup():
+    component = SpecificStructuralObjectsComponent({
+        'placers': [{
+            'num': 1,
+            'pickup_object': True,
+            'placed_object_labels': 'label_1',
+            'existing_object_required': True
+        }]
+    })
+
+    scene, original = create_scene_with_object()
+    original['debug']['positionedBy'] = 'adjacent'
+    original['debug'][DEBUG_FINAL_POSITION_KEY] = True
+    scene = component.update_ile_scene(scene)
+    assert len(scene.objects) == 2
+
+    held_object = scene.objects[0]
+    assert held_object['id'] == original['id']
+
+    placer = scene.objects[1]
+    assert placer['id'].startswith('placer_')
+    assert placer['type'] == 'cylinder'
+
+
+def test_placer_with_object_positioned_by_keyword_location_move():
+    component = SpecificStructuralObjectsComponent({
+        'placers': [{
+            'num': 1,
+            'move_object': True,
+            'placed_object_labels': 'label_1',
+            'existing_object_required': True
+        }]
+    })
+
+    scene, original = create_scene_with_object()
+    original['debug']['positionedBy'] = 'adjacent'
+    original['debug'][DEBUG_FINAL_POSITION_KEY] = True
+
+    # Delay because object cannot be moved again if in its final position.
+    scene = component.update_ile_scene(scene)
+    assert len(scene.objects) == 1
+    held_object = scene.objects[0]
+    assert held_object['id'] == original['id']
+    assert component.get_num_delayed_actions() == 1
+
+
+def test_placer_with_object_positioned_by_mechanism():
+    component = SpecificStructuralObjectsComponent({
+        'placers': [{
+            'num': 1,
+            'placed_object_labels': 'label_1',
+            'existing_object_required': True
+        }]
+    })
+
+    scene, original = create_scene_with_object()
+    original['debug']['positionedBy'] = 'mechanism'
+    original['debug'][DEBUG_FINAL_POSITION_KEY] = True
+
+    # Delay because object was positioned by another mechanism.
+    scene = component.update_ile_scene(scene)
+    assert len(scene.objects) == 1
+    held_object = scene.objects[0]
+    assert held_object['id'] == original['id']
+    assert component.get_num_delayed_actions() == 1
+
+
+def test_placer_with_object_positioned_by_mechanism_pickup():
+    component = SpecificStructuralObjectsComponent({
+        'placers': [{
+            'num': 1,
+            'pickup_object': True,
+            'placed_object_labels': 'label_1',
+            'existing_object_required': True
+        }]
+    })
+
+    scene, original = create_scene_with_object()
+    original['debug']['positionedBy'] = 'mechanism'
+    original['debug'][DEBUG_FINAL_POSITION_KEY] = True
+
+    # Delay because object was positioned by another mechanism.
+    scene = component.update_ile_scene(scene)
+    assert len(scene.objects) == 1
+    held_object = scene.objects[0]
+    assert held_object['id'] == original['id']
+    assert component.get_num_delayed_actions() == 1
+
+
+def test_placer_randomize_once():
+    object_repository = ObjectRepository.get_instance()
+    definition = create_soccer_ball()
+
+    location_1 = {'position': {'x': 1, 'y': 0, 'z': 1}}
+    instance_1 = instantiate_object(definition, location_1)
+    idl_1 = InstanceDefinitionLocationTuple(instance_1, definition, location_1)
+    object_repository.add_to_labeled_objects(idl_1, 'group_a')
+
+    location_2 = {'position': {'x': 2, 'y': 0, 'z': 2}}
+    instance_2 = instantiate_object(definition, location_2)
+    idl_2 = InstanceDefinitionLocationTuple(instance_2, definition, location_2)
+    object_repository.add_to_labeled_objects(idl_2, 'group_a')
+
+    location_3 = {'position': {'x': -1, 'y': 0, 'z': -1}}
+    instance_3 = instantiate_object(definition, location_3)
+    idl_3 = InstanceDefinitionLocationTuple(instance_3, definition, location_3)
+    object_repository.add_to_labeled_objects(idl_3, 'group_b')
+
+    location_4 = {'position': {'x': -2, 'y': 0, 'z': -2}}
+    instance_4 = instantiate_object(definition, location_4)
+    idl_4 = InstanceDefinitionLocationTuple(instance_4, definition, location_4)
+    object_repository.add_to_labeled_objects(idl_4, 'group_b')
+
+    scene = prior_scene()
+    scene.objects = [instance_1, instance_2, instance_3, instance_4]
+
+    component = SpecificStructuralObjectsComponent({
+        'placers': [{
+            'num': 2,
+            'randomize_once': {
+                'activation_step': [1, 101],
+                'placed_object_labels': ['group_a', 'group_b']
+            }
+        }]
+    })
+
+    assert isinstance(component.placers, List)
+    placer_config = component.placers[0]
+    assert isinstance(placer_config, StructuralPlacerConfig)
+    assert placer_config.num == 2
+    assert placer_config.randomize_once == {
+        'activation_step': [1, 101],
+        'placed_object_labels': ['group_a', 'group_b']
+    }
+
+    scene = component.update_ile_scene(scene)
+    assert len(scene.objects) == 6
+    placer_1 = scene.objects[4]
+    placer_2 = scene.objects[5]
+    assert placer_1['id'].startswith('placer_')
+    assert placer_1['type'] == 'cylinder'
+    assert placer_2['id'].startswith('placer_')
+    assert placer_2['type'] == 'cylinder'
+    assert (
+        placer_1['moves'][0]['stepBegin'] == 1 and
+        placer_2['moves'][0]['stepBegin'] == 1
+    ) or (
+        placer_1['moves'][0]['stepBegin'] == 101 and
+        placer_2['moves'][0]['stepBegin'] == 101
+    )
+    assert (
+        placer_1['debug']['heldObjectId'] == instance_1['id'] and
+        placer_2['debug']['heldObjectId'] == instance_2['id']
+    ) or (
+        placer_1['debug']['heldObjectId'] == instance_2['id'] and
+        placer_2['debug']['heldObjectId'] == instance_1['id']
+    ) or (
+        placer_1['debug']['heldObjectId'] == instance_3['id'] and
+        placer_2['debug']['heldObjectId'] == instance_4['id']
+    ) or (
+        placer_1['debug']['heldObjectId'] == instance_4['id'] and
+        placer_2['debug']['heldObjectId'] == instance_3['id']
+    )
 
 
 def test_door_fully_defined():
