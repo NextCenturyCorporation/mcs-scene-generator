@@ -32,6 +32,7 @@ room_dimensions:
 # Generate one or two independent platforms.
 structural_platforms:
     num: [1, 2]
+    adjacent_to_wall: ['back', 'front', 'left', 'right']
     # Each platform has one or two attached ramps leading up to them.
     attached_ramps: [1, 2]
     # Each platform may or may not have a second level.
@@ -46,6 +47,9 @@ structural_platforms:
         left: true
         right: true
     labels: start_structure
+    # Generate a platform bisecting the room approximately 25% of the time.
+    # Please adjust as desired.
+    long_with_two_ramps: [false, false, false, true]
 
 # Start either on top of a platform (50%) or on the floor (50%) in each scene.
 shortcut_start_on_platform: [true, false]

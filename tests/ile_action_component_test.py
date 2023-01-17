@@ -1,9 +1,15 @@
+import random
+
 import pytest
 
 from ideal_learning_env.actions_component import ActionRestrictionsComponent
 from ideal_learning_env.defs import ILEConfigurationException, ILEException
 
-from .ile_helper import create_test_obj_scene, prior_scene
+from .ile_helper import (
+    create_placers_turntables_scene,
+    create_test_obj_scene,
+    prior_scene
+)
 
 
 def test_action_restrictions_defaults():
@@ -1615,3 +1621,46 @@ def test_action_sidesteps_error():
     assert component.get_num_delayed_actions() == 1
     with pytest.raises(ILEException):
         component.run_delayed_actions(scene)
+
+
+def test_action_freeze_while_moving():
+    labels = ['placers', 'turntables', ['placers', 'turntables']]
+    for label in labels:
+        component = ActionRestrictionsComponent({
+            'freeze_while_moving': label
+        })
+        scene = component.update_ile_scene(create_placers_turntables_scene(
+            random.randint(1, 50), random.randint(1, 50)))
+        freeze_while_moving = component.freeze_while_moving
+        assert (isinstance(freeze_while_moving, str) or
+                isinstance(freeze_while_moving, list))
+        assert freeze_while_moving in labels
+        component.run_actions_at_end_of_scene_generation(scene)
+        # middle objects are the multiple placers
+        moves = \
+            max(scene.objects[1:-1],
+                key=lambda x: 0 if not x.get('moves') else
+                x['moves'][-1]['stepEnd'])['moves'][-1]['stepEnd']
+        # last object is the one turntable
+        rotates = scene.objects[-1]['rotates'][-1]['stepEnd']
+        passes = \
+            [["Pass"]] * (moves if freeze_while_moving == 'placers' else
+                          rotates if freeze_while_moving == 'turntables' else
+                          max(moves, rotates))
+        assert scene.goal['action_list'] == passes
+
+
+def test_action_freeze_while_moving_error():
+    component = ActionRestrictionsComponent({
+        'freezes': [{
+            'end': 5
+        }],
+        'freeze_while_moving': 'placers'
+    })
+    scene = component.update_ile_scene(create_placers_turntables_scene())
+    freeze_while_moving = component.freeze_while_moving
+    assert isinstance(freeze_while_moving, str)
+    freeze_while_moving = component.freeze_while_moving
+    assert freeze_while_moving == 'placers'
+    with pytest.raises(ILEException):
+        component.run_actions_at_end_of_scene_generation(scene)

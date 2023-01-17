@@ -26,6 +26,7 @@ ROLE_DICT = {
     'NON_TARGET': 'non target',
     'OBSTACLE': 'obstacle',
     'OCCLUDER': 'occluder',
+    'PADDLE': 'paddle',
     'STATIC_OBJECT': 'static object',
     'STRUCTURAL': 'structural',
     'TARGET': 'target',

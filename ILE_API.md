@@ -205,6 +205,51 @@ dict, or list of StructuralPlatformConfig dicts): Configurations to
 generate other platforms that may intersect with the bisecting platform.
 Default: No other platforms
 
+#### DoubleDoorConfig
+
+Defines details of the double door shortcut. A wall with 2 doors
+(a.k.a. door occluder, or "door-cluder" or "doorcluder") will bisect the
+room in the perpendicular direction. A platform can be added to the
+middle back wall where the AI will be positioned at the beginning of the
+scene. Lava can be added down the middle of the floor splitting the room
+in half.
+
+- `add_freeze` (bool, or list of bools): If true and 'start_drop_step is'
+greater than 0, the user will be frozen (forced to Pass) until the wall and
+doors are in position.  If the 'start_drop_step' is None or less than 1,
+this value has no effect. Default: True
+- `add_lava` (bool, or list of bools): If true adds lava along the z axis
+of the room. Default: True
+- `add_platform` (bool, or list of bools): If true adds a platform at the
+back of the room where the AI will start on. Default: True
+- `door_material` (string, or list of strings): The material or material
+type for the doors.
+- `occluder_wall_position_z` (float, or list of floats, or
+[MinMaxFloat](#MinMaxFloat) dict: Where the occluder wall will cross the
+z-axis in the room. `performer_distance_from_occluder` will override this
+value. Default: 0 (middle of the room)
+- `occluder_distance_from_performer` (float, or list of floats, or
+[MinMaxFloat](#MinMaxFloat) dict: If there is a platform the, the performer
+will start on top of the platform and the occluder wall will be placed
+this distance (`occluder_distance_from_performer`) from the performer. Must
+be greater than 1 or null
+Default: 6.5
+- `platform_height` (float, or list of floats, or
+[MinMaxFloat](#MinMaxFloat) dict: The height (y scale) of the platform
+Default: 1.5
+- `platform_length` (float, or list of floats, or
+[MinMaxFloat](#MinMaxFloat) dict: The lenth (z scale) of the platform
+Default: 1
+- `platform_width` (float, or list of floats, or
+[MinMaxFloat](#MinMaxFloat) dict: The width (z scale) of the platform
+Default: 1
+- `start_drop_step` (int, or list of ints, or [MinMaxInt](#MinMaxInt) dict,
+or list of MinMaxInt dicts): Step number to start dropping the bisecting
+wall with doors.  If None or less than 1, the wall will start in position.
+Default: None
+- `wall_material` (string, or list of strings): The material or material
+type for the wall.
+
 #### FloorAreaConfig
 
 Defines an area of the floor of the room.  Note: Coordinates must be
@@ -654,7 +699,9 @@ tools, since the lava should extend to the wall in that case.
 Default: Random based on room size and island size
 - `random_performer_position` (bool, or list of bools): If True, the
 performer will be randomly placed in the room. They will not be placed in
-the lava or the island   Default: False
+the lava or the island. If the `tool_type` is inaccessible the performer
+will randomly start on the side of the room where the target is where
+they cannot access the tool. Default: False
 - `tool_rotation` (int, or list of ints, or [MinMaxInt](#MinMaxInt):
 Angle that tool should be rotated out of alignment with target.
 This option cannot be used with `guide_rails`.  Default: 0
@@ -662,13 +709,47 @@ This option cannot be used with `guide_rails`.  Default: 0
 or [MinMaxFloat](#MinMaxFloat): The distance away the performer is from the
 tool at start. The performer will be at random point around a rectangular
 perimeter surrounding the tool. This option cannot be used with
-`random_performer_position`.  Default: Use `random_performer_position`
+`random_performer_position`.  Default: None
+- `tool_offset_backward_from_lava` (
+[RandomizableFloat](#RandomizableFloat)): The vertical offset of tool
+either away from the lava pool. Must be greater than or equal to 0
+Default: 0
+- `tool_horizontal_offset` ([RandomizableFloat](#RandomizableFloat)):
+The horizontal offset of tool either
+left or right from being aligned with the target. If `tool_type` is
+inaccessible this has alternate behavior. See
+`inaccessible_tool_blocking_wall_horizontal_offset` for description.
+Default: 0
+- `inaccessible_tool_blocking_wall_horizontal_offset` (
+[RandomizableFloat](#RandomizableFloat)): The horizontal offset
+of the blocking wall away from the target's horizontal position.
+Must be less than or equal to 0.5 (right side) or greater than or
+equal to 0.5 (left side).
+The performer will spawn on the side with the target. The tool will spawn
+on the opposite side of the wall. Setting `tool_horizontal_offset` has
+alternate behavior when combined with this property.
+`tool_horizontal_offset` will offset the tool from the the blocking
+wall and take the absolute value of the offset. The offset is based
+on the closest edges of the tool and the wall. For example, if the tool
+is rotated 90 degrees and the `tool_horizontal_offset` is 3 while
+`inaccessible_tool_blocking_wall_horizontal_offset` is -2 the the tool's
+closest edge to the wall will be a distance of 3 to the left of the wall
+since the wall has a negative offset to the left.
+Default: None
 - `tool_type` (str, or list of strs): The type of tool to generate, either
-`rectangular` or `hooked`. Note that if `hooked` tools are chosen and lava
-widths are not specified, the room will default to having an island size
-of 1, with lava extending all the way to the walls in both the left and
-right directions. The front and rear lava in the default hooked tool case
-will each have a size of 1. Default: `rectangular`
+`rectangular`, `hooked`, `small`, `broken`, or `inaccessible`.
+If `hooked` tools are chosen and lava widths are not specified,
+the room will default to having an island size of 1, with lava extending
+all the way to the walls in both the left and right directions.
+The front and rear lava in the default hooked tool case will each
+have a size of 1.
+If `small` is chosen the tool will always be a length of 1.
+If `broken` is chosen the tool will be the correct length but have
+scattered positions amd rotations for each individual broken piece.
+The tool will still have an overall rotation if `tool_rotation` is set.
+If `inaccessible` the room will be divided vertically by a blocking wall
+with a short height.
+Default: `rectangular`
 
 #### MinMaxFloat
 
@@ -753,6 +834,17 @@ automatically assigned to the random object.
 that are automatically used by random droppers, placers, and throwers as
 the placed/projectile object labels. Currently ignored by all other
 structural object types.
+
+#### RelativePathConfig
+
+Defines details of an object's movement path as it relates to another
+object, for the moving object to avoid or collide with the other object.
+
+- `labels` (string, or list of strings): The label of the object that the
+moving object should avoid or collide with. Required.
+- `option` (string, or list of strings): Whether the moving object should
+avoid or collide with the other object. Options: `"avoid"`, `"collide"`.
+Default: null
 
 #### RelativePositionConfig
 
@@ -1181,7 +1273,8 @@ Default: 0
 to this object. Always automatically assigned "platforms"
 - `lips` ([StructuralPlatformLipsConfig]
 (#StructuralPlatformLipsConfig), or list of
-StructuralPlatformLipsConfig): The platform's lips. Default: no lips
+StructuralPlatformLipsConfig): The platform's lips. If set, the platform's
+X/Z scales will be increased to 0.8 if lower than 0.8. Default: no lips
 - `material` (string, or list of strings): The structure's material or
 material type.
 - `platform_underneath` (bool or list of bools): If true, add a platform
@@ -1204,6 +1297,28 @@ allowing the performer to always stand on top of a platform. For example,
 a room with a room_dimension_y = 4 and
 auto_adjusted_platforms = True will ensure that all platform heights
 do not exceed 2.75.  Default: False
+- `long_with_two_ramps` (bool or list of bools): If true makes the platform
+extend across the entire length of the room in either the x or z dimension.
+The platform will have lips automatically added on all sides.
+A single ramp will be added on opposite sides of the platform totalling to
+two connected ramps. With larger room sizes the max number of these types
+of platforms is 3 though 1 is recommended for smaller room sizes.
+When combined with `platform_underneath` there will be a smaller platform
+of the same type stacked on top totalling 2 platforms and 4 ramps in the
+scene. Only one instance of a platform combined with `platform_underneath`
+can be added to the scene instead of the 3 allowed without a
+`platform_underneath`. This property will override `attached_ramps`, and
+`platform_underneath_attached_ramps`
+Default: False
+- `adjacent_to_wall` (string or list of strings): Will place the platform
+directly adjacent to a wall or in the corner of the room. Can be combined
+with `platform_underneath` to place a stacked platform adjacent to a wall.
+Multiple platforms can be placed against the same wall or different walls
+but only one platform can be placed in each corner. Setting this will
+override `rotation_y`.
+Options available: 'left', 'right', 'front', 'back', 'front_left_corner',
+'front_right_corner', 'back_left_corner', 'back_right_corner'.
+Default: None
 
 #### StructuralPlatformLipsConfig
 
@@ -1281,6 +1396,10 @@ Default: null
 - `passive_physics_throw_force` (bool, or list of bools): Automatically set
 the `throw_force` to a speed normally used in passive physics non-collision
 scene. If set, overrides the `throw_force`. Default: false
+- `path_relative` ([RelativePathConfig](#PathRelativeConfig) dict):
+Configuration options for rotating this thrower so the thrown object will
+either collide with, or avoid, another object. Overrides the `rotation_y`.
+Default: not used
 - `position_relative` ([RelativePositionConfig](#RelativePositionConfig)
 dict, or list of RelativePositionConfig dicts): Configuration options for
 positioning this object relative to another object, rather than using
@@ -1685,6 +1804,26 @@ doors:
 
 ```
 
+#### excluded_colors
+
+(string, or list of strings): Zero or more color words to exclude from
+being randomly generated as object or room materials. Materials with the
+listed colors can still be generated using specifically set configuration
+options, like the `floor_material` and `wall_material` options, or the
+`material` property in the `specific_interactable_objects` option. Useful
+if you want to avoid generating random objects with the same color as a
+configured object. Default: no excluded colors
+
+Simple Example:
+```
+excluded_colors: null
+```
+
+Advanced Example:
+```
+excluded_colors: "red"
+```
+
 #### excluded_shapes
 
 (string, or list of strings): Zero or more object shapes (types) to exclude
@@ -1772,6 +1911,26 @@ forced_choice_multi_retrieval_target: null
 Advanced Example:
 ```
 forced_choice_multi_retrieval_target: 'soccer_ball'
+```
+
+#### freeze_while_moving
+
+(string or list of strings): Forces the performer to freeze ("Pass") until
+all objects with the given labels complete their last movements and
+rotations. This field must be blank or an empty array if
+`passive_scene` is `true`.
+
+Simple Example:
+```
+freeze_while_moving: null
+```
+
+Advanced Example:
+```
+freezes_while_moving:
+  - [placers, turntables]
+  - [turntables]
+
 ```
 
 #### freezes
@@ -2469,6 +2628,36 @@ shortcut_bisecting_platform:
     has_blocking_wall: False
 ```
 
+#### shortcut_double_door_choice
+
+(bool or [DoubleDoorConfig](#DoubleDoorConfig)):
+Creates a wall with 2 doors, a platform at the back wall and lava down
+the length of the room. (a.k.a. door occluder, or "door-cluder" or
+"doorcluder"). The performer starts on the platform on one end such that
+the performer is forced to make a choice on which door they want to open.
+Default: False
+
+Simple Example:
+```
+shortcut_double_door_choice: True
+```
+
+Advanced Example:
+```
+shortcut_double_door_choice:
+    add_freeze: False
+    start_drop_step:
+        min: 2
+        max: 5
+    occluder_wall_position_z: None
+    occluder_distance_from_performer: 6.5
+    add_platform: True
+    platform_width: 1
+    platform_height: 1.5
+    platform_length: 1
+    add_lava: True
+```
+
 #### shortcut_imitation_task
 
 (bool or [ImitationTaskConfig](#ImitationTaskConfig)):
@@ -2960,6 +3149,8 @@ structural_platforms:
         min: 0.3
         max: 1.3
     auto_adjust_platforms: True
+    long_with_two_ramps: False
+    adjacent_to_wall: ['front_left_corner, 'right']
 ```
 
 #### structural_ramps

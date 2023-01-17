@@ -1,0 +1,89 @@
+# Add a Retrieval goal with a soccer ball as the target object.
+goal:
+    category: retrieval
+    target:
+        - num: 1
+          shape: soccer_ball
+          scale: 2.0
+
+# Use a specific room size for this task.
+room_dimensions:
+    x: 12
+    y: 4
+    z: 24
+
+# Generate an occluding wall containing two doors (called a "door occluder"),
+# a line of lava bisecting the room, and a platform at one side of the room,
+# on which the performer agent will be positioned, looking slightly downward.
+shortcut_double_door_choice:
+    # The door occluder will begin descending in the first 10 steps of the
+    # scene. This may intentionally obstruct your view of the collision step.
+    # If you do not want a door occluder, change "start_drop_step" to a high
+    # number, and set "add_freeze" to "true".
+    start_drop_step:
+        min: 1
+        max: 10
+    occluder_wall_position_z: -5
+    # Allow only one door to be opened in each scene (forced choice).
+    restrict_open_doors: true
+
+# Generate a thrower with the soccer ball target and a straight or angled
+# trajectory. Please note the evaluation scenes will NOT have "bank shots"
+# which collide with the soccer ball after bouncing off a wall of the room.
+structural_throwers:
+    - num: 1
+      # Position the thrower in view along the front wall, just above the
+      # ground, but not above the lava.
+      wall: front
+      position_wall:
+          - min: -5
+            max: -1
+          - min: 1
+            max: 5
+      height: 0
+      # The thrown object is the soccer ball target.
+      projectile_labels: target
+      # The thrower either points directly toward the back wall (50%), angled
+      # to the left (25%), or angled to the right (25%).
+      rotation_y:
+          - 0
+          - 0
+          - 0
+          - 0
+          - 0
+          - 0
+          - 0
+          - 0
+          - 0
+          - 0
+          - 0
+          - 0
+          - 45
+          - 40
+          - 35
+          - 30
+          - 25
+          - 20
+          - -20
+          - -25
+          - -30
+          - -35
+          - -40
+          - -45
+      rotation_z: 0
+      # Roll the soccer ball immediately as the scene begins with strong force.
+      throw_step: 1
+      throw_force:
+          min: 12.5
+          max: 15.0
+
+# Only the thrower's green ball can be green (not the walls or the floor).
+excluded_colors: green
+
+# Override the defaults to avoid randomly generating any other objects besides
+# the objects needed in this specific task. Remove these lines if you want
+# additional randomly generated objects.
+keyword_objects:
+    - num: 0
+random_structural_objects:
+    - num: 0

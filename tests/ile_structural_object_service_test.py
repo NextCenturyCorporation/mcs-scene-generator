@@ -7,7 +7,7 @@ from generator.base_objects import (
     create_soccer_ball,
     create_specific_definition_from_base
 )
-from generator.geometry import ORIGIN_LOCATION
+from generator.geometry import MAX_TRIES, ORIGIN_LOCATION
 from generator.instances import instantiate_object
 from ideal_learning_env.defs import ILEDelayException, ILEException
 from ideal_learning_env.numerics import (
@@ -34,6 +34,7 @@ from ideal_learning_env.structural_object_service import (
     DROPPER_SHAPES,
     PLACER_SHAPES,
     THROWER_SHAPES,
+    WALL_SIDES,
     FloorAreaConfig,
     FloorMaterialConfig,
     StructuralDoorConfig,
@@ -576,7 +577,7 @@ def test_door_creation_reconcile():
     assert -rd.z / 2.0 < r1.position.z < rd.z / 2.0
     assert r1.rotation_y in [0, 90, 180, 270]
     assert r1.wall_material in material_tuple_group_to_string_list(
-        materials.WALL_MATERIALS)
+        materials.ROOM_WALL_MATERIALS)
     assert 2 <= r1.wall_scale_x <= 10
     assert 2 <= r1.wall_scale_y <= 3
 
@@ -648,7 +649,7 @@ def test_floor_material_creation_reconcile():
     assert -rd.x / 2.0 <= r1.position_x <= rd.x / 2.0
     assert -rd.z / 2.0 <= r1.position_z <= rd.z / 2.0
     assert r1.material in material_tuple_group_to_string_list(
-        materials.WALL_MATERIALS)
+        materials.FLOOR_MATERIALS + materials.ROOM_WALL_MATERIALS)
 
     tmp2 = FloorMaterialConfig(
         [2, 3], position_x=[-2, 2],
@@ -1583,7 +1584,7 @@ def test_placer_create():
     pos = show['position']
     rot = show['rotation']
     scale = show['scale']
-    assert pos == {'x': 1.1, 'y': 3.395, 'z': 1.3}
+    assert pos == pytest.approx({'x': 1.1, 'y': 3.32, 'z': 1.3})
     assert rot == {'x': 0, 'y': 0, 'z': 0}
     assert scale == {'x': 0.05, 'y': pytest.approx(0.4), 'z': 0.05}
 
@@ -1602,7 +1603,7 @@ def test_placer_create():
     pos = show['position']
     rot = show['rotation']
     scale = show['scale']
-    assert pos == {'x': 1.1, 'y': 2.885, 'z': 1.3}
+    assert pos == {'x': 1.1, 'y': 2.81, 'z': 1.3}
     assert rot == {'x': 0, 'y': 34, 'z': 0}
 
     move1 = target['moves'][0]
@@ -1634,7 +1635,7 @@ def test_placer_create_with_non_zero_position_y():
     pos = show['position']
     rot = show['rotation']
     scale = show['scale']
-    assert pos == {'x': 1.1, 'y': pytest.approx(2.495), 'z': 1.3}
+    assert pos == {'x': 1.1, 'y': pytest.approx(2.42), 'z': 1.3}
     assert rot == {'x': 0, 'y': 0, 'z': 0}
     assert scale == {'x': 0.05, 'y': 1.3, 'z': 0.05}
 
@@ -1653,7 +1654,7 @@ def test_placer_create_with_non_zero_position_y():
     pos = show['position']
     rot = show['rotation']
     scale = show['scale']
-    assert pos == {'x': 1.1, 'y': pytest.approx(1.085), 'z': 1.3}
+    assert pos == {'x': 1.1, 'y': pytest.approx(1.01), 'z': 1.3}
     assert rot == {'x': 0, 'y': 34, 'z': 0}
 
     move1 = target['moves'][0]
@@ -1689,7 +1690,7 @@ def test_placer_create_container_asymmetric():
     assert container['kinematic']
 
     show = container['shows'][0]
-    assert show['position'] == {'x': 1.1, 'y': pytest.approx(2.155), 'z': 1.3}
+    assert show['position'] == {'x': 1.1, 'y': pytest.approx(2.1), 'z': 1.3}
     assert show['rotation'] == {'x': 0, 'y': 0, 'z': 0}
     assert show['scale'] == {'x': 1.4, 'y': 1.4, 'z': 1.4}
 
@@ -1709,7 +1710,7 @@ def test_placer_create_container_asymmetric():
 
     show = placer['shows'][0]
     assert show['position'] == {
-        'x': pytest.approx(1.66), 'y': pytest.approx(3.135), 'z': 1.3
+        'x': pytest.approx(1.66), 'y': pytest.approx(3.08), 'z': 1.3
     }
     assert show['rotation'] == {'x': 0, 'y': 0, 'z': 0}
     assert show['scale'] == {'x': 0.25, 'y': pytest.approx(0.7), 'z': 0.25}
@@ -1733,7 +1734,7 @@ def test_placer_create_container_asymmetric():
 
     show = placer['shows'][0]
     assert show['position'] == {
-        'x': pytest.approx(0.54), 'y': pytest.approx(3.695), 'z': 1.3
+        'x': pytest.approx(0.54), 'y': pytest.approx(3.64), 'z': 1.3
     }
     assert show['rotation'] == {'x': 0, 'y': 0, 'z': 0}
     assert show['scale'] == {'x': 0.25, 'y': pytest.approx(0.7), 'z': 0.25}
@@ -1777,7 +1778,7 @@ def test_placer_create_container_asymmetric_with_rotation():
     assert container['kinematic']
 
     show = container['shows'][0]
-    assert show['position'] == {'x': 1.1, 'y': pytest.approx(2.155), 'z': 1.3}
+    assert show['position'] == {'x': 1.1, 'y': pytest.approx(2.1), 'z': 1.3}
     assert show['rotation'] == {'x': 0, 'y': 34, 'z': 0}
     assert show['scale'] == {'x': 1.4, 'y': 1.4, 'z': 1.4}
 
@@ -1798,7 +1799,7 @@ def test_placer_create_container_asymmetric_with_rotation():
     show = placer['shows'][0]
     assert show['position'] == {
         'x': pytest.approx(1.564261),
-        'y': pytest.approx(3.135),
+        'y': pytest.approx(3.08),
         'z': pytest.approx(0.986852)
     }
     assert show['rotation'] == {'x': 0, 'y': 0, 'z': 0}
@@ -1824,7 +1825,7 @@ def test_placer_create_container_asymmetric_with_rotation():
     show = placer['shows'][0]
     assert show['position'] == {
         'x': pytest.approx(0.635739),
-        'y': pytest.approx(3.695),
+        'y': pytest.approx(3.64),
         'z': pytest.approx(1.613148)
     }
     assert show['rotation'] == {'x': 0, 'y': 0, 'z': 0}
@@ -2046,6 +2047,62 @@ def test_platform_create_under():
     scale = show['scale']
     assert pos['y'] == pytest.approx(0.6)
     assert scale['y'] == pytest.approx(1.2)
+
+
+def test_platform_create_min_scale_no_lips():
+    scene = prior_scene()
+    config = StructuralPlatformConfig(
+        scale=0.5,
+        lips=StructuralPlatformLipsConfig(False, False, False, False),
+        attached_ramps=0,
+        platform_underneath=False,
+        platform_underneath_attached_ramps=0
+    )
+    service = StructuralPlatformCreationService()
+    objects, _ = service.add_to_scene(scene, config, [])
+    assert len(objects) == 1
+
+    assert objects[0]
+    assert objects[0]['id'].startswith('platform_')
+    assert objects[0]['type'] == 'cube'
+    assert objects[0]['kinematic']
+    assert objects[0]['structure']
+    assert objects[0]['lips'] == {
+        'front': False,
+        'back': False,
+        'left': False,
+        'right': False
+    }
+    # All scales should be as configured.
+    assert objects[0]['shows'][0]['scale'] == {'x': 0.5, 'y': 0.5, 'z': 0.5}
+
+
+def test_platform_create_min_scale_with_lips():
+    scene = prior_scene()
+    config = StructuralPlatformConfig(
+        scale=0.5,
+        lips=StructuralPlatformLipsConfig(True, True, True, True),
+        attached_ramps=0,
+        platform_underneath=False,
+        platform_underneath_attached_ramps=0
+    )
+    service = StructuralPlatformCreationService()
+    objects, _ = service.add_to_scene(scene, config, [])
+    assert len(objects) == 1
+
+    assert objects[0]
+    assert objects[0]['id'].startswith('platform_')
+    assert objects[0]['type'] == 'cube'
+    assert objects[0]['kinematic']
+    assert objects[0]['structure']
+    assert objects[0]['lips'] == {
+        'front': True,
+        'back': True,
+        'left': True,
+        'right': True
+    }
+    # The X and Y scales should be increased to 0.8.
+    assert objects[0]['shows'][0]['scale'] == {'x': 0.8, 'y': 0.5, 'z': 0.8}
 
 
 def test_ramp_create():
@@ -2363,3 +2420,247 @@ def test_turntable_rotation_y_zero_end_after_rotation():
     assert turntable['rotates'][0]['stepBegin'] == 5
     assert turntable['rotates'][0]['stepEnd'] == 5
     assert turntable['rotates'][0]['vector'] == {'x': 0, 'y': 0, 'z': 0}
+
+
+def test_platform_long_with_two_ramps():
+    scene = prior_scene()
+    scene.room_dimensions.x = 10
+    scene.room_dimensions.y = 8
+    scene.room_dimensions.z = 10
+    # lips, attached_ramps, and platform_underneath_attached_ramps
+    # will be overrided
+    temp = StructuralPlatformConfig(
+        num=1,
+        position=VectorFloatConfig(1, 2, 3),
+        rotation_y=0,
+        scale=1,
+        material="AI2-THOR/Materials/Ceramics/BrownMarbleFake 1",
+        lips=StructuralPlatformLipsConfig(False, False, False, False),
+        attached_ramps=1,
+        platform_underneath=False,
+        platform_underneath_attached_ramps=3,
+        long_with_two_ramps=True
+    )
+    platform_two_ramps = StructuralPlatformCreationService(
+    ).create_feature_from_specific_values(scene, temp, None)
+
+    assert len(platform_two_ramps) == 3
+    plat = platform_two_ramps[0]
+    ramp_1 = platform_two_ramps[1]
+    ramp_2 = platform_two_ramps[2]
+    assert plat['id'].startswith('platform_')
+    assert ramp_1['id'].startswith('ramp_')
+    assert ramp_2['id'].startswith('ramp_')
+
+    plat_scale = plat['shows'][0]['scale']
+    plat_pos = plat['shows'][0]['position']
+    long_x = plat_scale['x'] > plat_scale['z']
+    assert (plat_scale['x'] == scene.room_dimensions.x if
+            long_x else plat_scale['x'] == 1)
+    assert (
+        plat_scale['z'] == scene.room_dimensions.z if not
+        long_x else plat_scale['z'] == 1)
+    assert plat_pos['x'] == 0 if long_x else plat_pos['x'] == 1
+    assert plat_pos['z'] == 0 if not long_x else plat_pos['z'] == 3
+
+    lips = plat['lips']
+    assert lips['front'] and lips['back'] and lips['left'] and lips['right']
+    assert (lips['gaps']['front'] and lips['gaps']['back'] if long_x else
+            lips['gaps']['left'] and lips['gaps']['right'])
+
+    ramp_1_pos = ramp_1['shows'][0]['position']
+    ramp_2_pos = ramp_2['shows'][0]['position']
+    assert (
+        round(ramp_1_pos['z']) < round(ramp_2_pos['z']) if long_x else
+        round(ramp_1_pos['x']) < round(ramp_2_pos['x']))
+
+    ramp_1_rot = ramp_1['shows'][0]['rotation']['y']
+    ramp_2_rot = ramp_2['shows'][0]['rotation']['y']
+    assert abs(abs(ramp_1_rot) - abs(ramp_2_rot)) == 180
+
+
+def test_platform_long_with_two_ramps_times_stacked():
+    scene = prior_scene()
+    scene.room_dimensions.x = 25
+    scene.room_dimensions.y = 8
+    scene.room_dimensions.z = 25
+
+    # lips, attached_ramps, and platform_underneath_attached_ramps
+    # will be overrided
+    temp = StructuralPlatformConfig(
+        num=1,
+        position=VectorFloatConfig(1, 2, 3),
+        rotation_y=0,
+        scale=1,
+        material="AI2-THOR/Materials/Ceramics/BrownMarbleFake 1",
+        lips=StructuralPlatformLipsConfig(False, False, False, False),
+        attached_ramps=1,
+        platform_underneath=True,
+        platform_underneath_attached_ramps=3,
+        long_with_two_ramps=True
+    )
+
+    # Sometimes it cannot generate a valid scene when stacking the platforms
+    # but it usually works on the second or third try
+    valid = False
+    for _ in range(MAX_TRIES):
+        try:
+            platform_two_ramps = StructuralPlatformCreationService(
+            ).create_feature_from_specific_values(scene, temp, None)
+        except Exception:
+            continue
+
+        assert len(platform_two_ramps) == 6
+        assert platform_two_ramps[0]['shows'][0]['position']['y'] > \
+            platform_two_ramps[1]['shows'][0]['position']['y']
+        for i in range(2):
+            plat = platform_two_ramps[i]
+            ramp_1 = platform_two_ramps[i * 2 + 2]
+            ramp_2 = platform_two_ramps[i * 2 + 3]
+            assert plat['id'].startswith('platform_')
+            assert ramp_1['id'].startswith('ramp_')
+            assert ramp_2['id'].startswith('ramp_')
+
+            plat_scale = plat['shows'][0]['scale']
+            plat_pos = plat['shows'][0]['position']
+            long_x = plat_scale['x'] > plat_scale['z']
+            assert (plat_scale['x'] == scene.room_dimensions.x if
+                    long_x else plat_scale['x'] == 1 if i == 0 else
+                    plat_scale['x'] > 1)
+            assert (
+                plat_scale['z'] == scene.room_dimensions.z if not
+                long_x else plat_scale['z'] == 1 if i == 0 else
+                plat_scale['z'] > 1)
+            assert plat_pos['x'] == 0 if long_x else plat_pos['x'] == 1
+            assert plat_pos['z'] == 0 if not long_x else plat_pos['z'] == 3
+
+            lips = plat['lips']
+            assert (lips['front'] and lips['back'] and
+                    lips['left'] and lips['right'])
+            assert (lips['gaps']['front'] and lips['gaps']['back'] if
+                    long_x else lips['gaps']['left'] and lips['gaps']['right'])
+
+            ramp_1_pos = ramp_1['shows'][0]['position']
+            ramp_2_pos = ramp_2['shows'][0]['position']
+            assert (
+                round(ramp_1_pos['z']) < round(ramp_2_pos['z']) if long_x else
+                round(ramp_1_pos['x']) < round(ramp_2_pos['x']))
+
+            ramp_1_rot = ramp_1['shows'][0]['rotation']['y']
+            ramp_2_rot = ramp_2['shows'][0]['rotation']['y']
+            assert abs(abs(ramp_1_rot) - abs(ramp_2_rot)) == 180
+        valid = True
+        break
+    assert valid
+
+
+def test_platform_adjacent_to_wall():
+    scene = prior_scene()
+    x = 10
+    z = 8
+    scene.room_dimensions.x = x
+    scene.room_dimensions.y = 4
+    scene.room_dimensions.z = z
+    pos_x = 1
+    pos_z = 3
+    scale = 1
+    half_scale = scale / 2
+    for side in WALL_SIDES:
+        temp = StructuralPlatformConfig(
+            num=1,
+            position=VectorFloatConfig(pos_x, 2, pos_z),
+            rotation_y=0,
+            scale=scale,
+            material="AI2-THOR/Materials/Ceramics/BrownMarbleFake 1",
+            lips=StructuralPlatformLipsConfig(False, False, False, False),
+            attached_ramps=1,
+            platform_underneath=False,
+            platform_underneath_attached_ramps=0,
+            adjacent_to_wall=[side]
+        )
+        platform_adjacent_to_wall = StructuralPlatformCreationService(
+        ).create_feature_from_specific_values(scene, temp, None)
+        side_x = -1 if 'left' in side else 1 if 'right' in side else 0
+        side_z = -1 if 'back' in side else 1 if 'front' in side else 0
+        plat = platform_adjacent_to_wall[0]
+        ramp = platform_adjacent_to_wall[1]
+        plat_pos = plat['shows'][0]['position']
+        ramp_pos = ramp['shows'][0]['position']
+        if side_x:
+            assert plat_pos['x'] == side_x * (x / 2 - half_scale)
+            assert (ramp_pos['x'] > side_x * (x / 2 + half_scale) if
+                    side_x == -1 else
+                    ramp_pos['x'] < side_x * (x / 2 + half_scale))
+            assert ramp['shows'][0]['rotation']['y'] != -side_x * 90
+        else:
+            plat_pos['x'] == pos_x
+        if side_z:
+            assert plat_pos['z'] == side_z * (z / 2 - half_scale)
+            assert (ramp_pos['z'] > side_z * (z / 2 + half_scale) if
+                    side_z == -1 else
+                    ramp_pos['z'] < side_z * (z / 2 + half_scale))
+            assert abs(ramp['shows'][0]['rotation']['y']) != (
+                0 if side_z == -1 else 180)
+        else:
+            plat_pos['z'] == pos_z
+
+
+def test_platform_stacked_adjacent_to_wall():
+    scene = prior_scene()
+    x = 10
+    z = 8
+    scene.room_dimensions.x = x
+    scene.room_dimensions.y = 4
+    scene.room_dimensions.z = z
+    pos_x = 1
+    pos_z = 3
+    scale = 1
+    for side in WALL_SIDES:
+        temp = StructuralPlatformConfig(
+            num=1,
+            position=VectorFloatConfig(pos_x, 2, pos_z),
+            rotation_y=0,
+            scale=scale,
+            material="AI2-THOR/Materials/Ceramics/BrownMarbleFake 1",
+            lips=StructuralPlatformLipsConfig(False, False, False, False),
+            attached_ramps=1,
+            platform_underneath=True,
+            platform_underneath_attached_ramps=1,
+            adjacent_to_wall=[side]
+        )
+        platform_adjacent_to_wall = StructuralPlatformCreationService(
+        ).create_feature_from_specific_values(scene, temp, None)
+        side_x = -1 if 'left' in side else 1 if 'right' in side else 0
+        side_z = -1 if 'back' in side else 1 if 'front' in side else 0
+        for i in range(2):
+            plat = platform_adjacent_to_wall[i]
+            ramp = platform_adjacent_to_wall[i + 2]
+            plat_pos = plat['shows'][0]['position']
+            ramp_pos = ramp['shows'][0]['position']
+            half_scale_x = plat['shows'][0]['scale']['x'] / 2
+            half_scale_z = plat['shows'][0]['scale']['z'] / 2
+            # Check a different scale if the platform is rotated
+            # 90 or 270 degrees
+            scale_check_x = half_scale_z if abs(
+                plat['shows'][0]['rotation']['y']) % 180 != 0 else half_scale_x
+            scale_check_z = half_scale_x if abs(
+                plat['shows'][0]['rotation']['y']) % 180 != 0 else half_scale_z
+            if side_x:
+                assert round(plat_pos['x'], 3) == round(
+                    side_x * (x / 2 - scale_check_x), 3)
+                assert (ramp_pos['x'] > side_x * (x / 2 + scale_check_x) if
+                        side_x == -1 else
+                        ramp_pos['x'] < side_x * (x / 2 + scale_check_x))
+                assert ramp['shows'][0]['rotation']['y'] != -side_x * 90
+            else:
+                plat_pos['x'] == pos_x
+            if side_z:
+                assert round(plat_pos['z'], 2) == round(
+                    side_z * (z / 2 - scale_check_z), 2)
+                assert (ramp_pos['z'] > side_z * (z / 2 + scale_check_z) if
+                        side_z == -1 else
+                        ramp_pos['z'] < side_z * (z / 2 + scale_check_z))
+                assert abs(ramp['shows'][0]['rotation']['y']) != (
+                    0 if side_z == -1 else 180)
+            else:
+                plat_pos['z'] == pos_z

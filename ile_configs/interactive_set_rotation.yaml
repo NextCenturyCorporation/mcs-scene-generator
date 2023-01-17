@@ -11,10 +11,9 @@ performer_start_rotation:
     x: 0
     y: 0
 
-# The performer agent is frozen until the turntable (cog) is finished rotating.
-freezes:
-    - begin: 1
-      end: 155
+# The performer agent is frozen until the turntable is finished rotating and placers are done moving.
+freeze_while_moving: [placers, turntables]
+
 # If desired, force the performer agent to circumnavigate the turntable.
 # You will need to change the "end" in "freezes" to 80 to avoid errors.
 # We also recommend you change the "rotation_y" in "turntable_movement" to 0,

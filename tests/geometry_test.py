@@ -11,7 +11,7 @@ from generator import (
     specific_objects
 )
 from generator.base_objects import create_soccer_ball
-from generator.geometry import calculate_rotations
+from generator.geometry import calculate_rotations, rotate_point_around_origin
 from generator.instances import instantiate_object
 from generator.separating_axis_theorem import sat_entry
 
@@ -3308,17 +3308,30 @@ def test_get_along_wall_xz_fail():
 
 def test_calculate_rotations_no_rounding():
     v1 = Vector3d(x=0, y=0, z=0)
-    assert calculate_rotations(v1, Vector3d(x=0, y=0, z=1), True) == (37, 0)
-    assert calculate_rotations(v1, Vector3d(x=0, y=0, z=2), True) == (21, 0)
-    assert calculate_rotations(v1, Vector3d(x=0, y=0, z=3), True) == (14, 0)
-    assert calculate_rotations(v1, Vector3d(x=0, y=1, z=1), True) == (-13, 0)
-    assert calculate_rotations(v1, Vector3d(x=0, y=0.76, z=1), True) == (0, 0)
-    assert calculate_rotations(v1, Vector3d(x=1, y=0, z=1), True) == (28, 45)
-    assert calculate_rotations(v1, Vector3d(x=1, y=0.76, z=1), True) == (0, 45)
-    assert calculate_rotations(v1, Vector3d(x=2, y=0.76, z=1), True) == (0, 63)
-    assert calculate_rotations(v1, Vector3d(x=2, y=0.76, z=2), True) == (0, 45)
-    assert calculate_rotations(v1, Vector3d(x=-1, y=0.76, z=1), True) == \
-        (0, 315)
+    result = calculate_rotations(v1, Vector3d(x=0, y=0, z=1), True)
+    assert result == pytest.approx((37.3074, 0))
+    result = calculate_rotations(v1, Vector3d(x=0, y=0, z=2), True)
+    assert result == pytest.approx((20.8568, 0))
+    result = calculate_rotations(v1, Vector3d(x=0, y=0, z=3), True)
+    assert result == pytest.approx((14.2517, 0))
+    result = calculate_rotations(v1, Vector3d(x=0, y=1, z=1), True)
+    assert result == pytest.approx((-13.3873, 0))
+    result = calculate_rotations(v1, Vector3d(x=0, y=0.762, z=1), True)
+    assert result == pytest.approx((0, 0))
+    result = calculate_rotations(v1, Vector3d(x=1, y=0, z=1), True)
+    assert result == pytest.approx((28.3165, 45))
+    result = calculate_rotations(v1, Vector3d(x=1, y=0.762, z=1), True)
+    assert result == pytest.approx((0, 45))
+    result = calculate_rotations(v1, Vector3d(x=2, y=0.762, z=1), True)
+    assert result == pytest.approx((0, 63.4349))
+    result = calculate_rotations(v1, Vector3d(x=2, y=0.762, z=2), True)
+    assert result == pytest.approx((0, 45))
+    result = calculate_rotations(v1, Vector3d(x=3, y=0.762, z=2), True)
+    assert result == pytest.approx((0, 56.3099))
+    result = calculate_rotations(v1, Vector3d(x=4, y=0.762, z=2), True)
+    assert result == pytest.approx((0, 63.4349))
+    result = calculate_rotations(v1, Vector3d(x=-1, y=0.762, z=1), True)
+    assert result == pytest.approx((0, 315))
 
 
 def test_calculate_rotations():
@@ -3327,12 +3340,14 @@ def test_calculate_rotations():
     assert calculate_rotations(v1, Vector3d(x=0, y=0, z=2)) == (20, 0)
     assert calculate_rotations(v1, Vector3d(x=0, y=0, z=3)) == (10, 0)
     assert calculate_rotations(v1, Vector3d(x=0, y=1, z=1)) == (-10, 0)
-    assert calculate_rotations(v1, Vector3d(x=0, y=0.76, z=1)) == (0, 0)
+    assert calculate_rotations(v1, Vector3d(x=0, y=0.762, z=1)) == (0, 0)
     assert calculate_rotations(v1, Vector3d(x=1, y=0, z=1)) == (30, 40)
-    assert calculate_rotations(v1, Vector3d(x=1, y=0.76, z=1)) == (0, 40)
-    assert calculate_rotations(v1, Vector3d(x=2, y=0.76, z=1)) == (0, 60)
-    assert calculate_rotations(v1, Vector3d(x=2, y=0.76, z=2)) == (0, 40)
-    assert calculate_rotations(v1, Vector3d(x=-1, y=0.76, z=1)) == (0, 320)
+    assert calculate_rotations(v1, Vector3d(x=1, y=0.762, z=1)) == (0, 40)
+    assert calculate_rotations(v1, Vector3d(x=2, y=0.762, z=1)) == (0, 60)
+    assert calculate_rotations(v1, Vector3d(x=2, y=0.762, z=2)) == (0, 40)
+    assert calculate_rotations(v1, Vector3d(x=3, y=0.762, z=2)) == (0, 60)
+    assert calculate_rotations(v1, Vector3d(x=4, y=0.762, z=2)) == (0, 60)
+    assert calculate_rotations(v1, Vector3d(x=-1, y=0.762, z=1)) == (0, 320)
 
 
 def test_get_magnitudes_of_x_z_dirs_for_rotation_and_move_vector():
@@ -3841,3 +3856,29 @@ def test_generate_location_adjacent_to_with_bounds():
     relative_show = relative_instance_1['shows'][0]
     assert relative_show['position'] == {'x': 1, 'y': 0.11, 'z': 1}
     assert relative_show['rotation'] == {'x': 0, 'y': 0, 'z': 0}
+
+
+def test_rotate_point_around_origin():
+    """
+    X and Z points were calculated beforehand. Testing rotating around in a
+    complete circle starting from (1, -1)
+    """
+    x_points = \
+        [1.0, 0.81, 0.6, 0.37, 0.12, -0.12, -0.37, -0.6, -0.81, -1.0, -1.16,
+         -1.28, -1.37, -1.41, -1.41, -1.37, -1.28, -1.16, -1.0, -0.81, -0.6,
+         -0.37, -0.12, 0.12, 0.37, 0.6, 0.81, 1.0, 1.16, 1.28, 1.37, 1.41,
+         1.41, 1.37, 1.28, 1.16, 1.0]
+    z_points = \
+        [-1.0, -1.16, -1.28, -1.37, -1.41, -1.41, -1.37, -1.28, -1.16,
+         -1.0, -0.81, -0.6, -0.37, -0.12, 0.12, 0.37, 0.6, 0.81, 1.0,
+         1.16, 1.28, 1.37, 1.41, 1.41, 1.37, 1.28, 1.16, 1.0, 0.81, 0.6,
+         0.37, 0.12, -0.12, -0.37, -0.6, -0.81, -1.0]
+    index = 0
+    for i in range(0, 37):
+        x, z = rotate_point_around_origin(
+            origin_x=0, origin_z=0, point_x=1, point_z=-1, rotation=i * 10)
+        x = round(x, 2)
+        z = round(z, 2)
+        assert x == x_points[index]
+        assert z == z_points[index]
+        index += 1

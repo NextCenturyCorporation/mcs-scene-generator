@@ -708,6 +708,18 @@ def place_object(
     )
     # Calculate the Y distance between the object's bottom and the end height.
     move_distance = object_bottom - end_height
+    # Ensure the object will be placed at exactly the end height, so it does
+    # not bounce after being placed. This may mean lowering the object's
+    # starting height a little.
+    if not round(move_distance / PLACER_MOVE_AMOUNT, 4).is_integer():
+        move_distance = (
+            math.floor((object_bottom - end_height) / PLACER_MOVE_AMOUNT) *
+            PLACER_MOVE_AMOUNT
+        )
+        object_bottom = move_distance + end_height
+        instance['shows'][0]['position']['y'] = (
+            object_bottom + instance['debug']['positionY']
+        )
     # Set the scripted downward movement on the object.
     deactivation_step = _set_placer_or_placed_object_movement(
         instance,

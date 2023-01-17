@@ -25,7 +25,10 @@ from generator.mechanisms import create_placer
 from generator.structures import (
     BASE_DOOR_HEIGHT,
     BASE_DOOR_WIDTH,
-    create_guide_rails_around
+    INACCESSIBLE_TOOL_BLOCKING_WALL_MINIMUM_SEPARATION,
+    create_broken_tool,
+    create_guide_rails_around,
+    create_inaccessible_tool
 )
 from ideal_learning_env.action_service import ActionService, TeleportConfig
 from ideal_learning_env.actions_component import StepBeginEnd
@@ -43,6 +46,8 @@ from ideal_learning_env.interactable_object_service import (
 from ideal_learning_env.numerics import (
     MinMaxFloat,
     MinMaxInt,
+    RandomizableFloat,
+    RandomizableInt,
     RandomizableVectorFloat3d,
     VectorFloatConfig,
     VectorIntConfig
@@ -86,6 +91,7 @@ logger = logging.getLogger(__name__)
 
 
 DOOR_OCCLUDER_MIN_ROOM_Y = 5
+TWO_DOOR_OCCLUDER_MIN_ROOM_Y = 4
 
 EXTENSION_LENGTH_MIN = 0.5
 EXTENSION_WIDTH = 1
@@ -113,6 +119,9 @@ MAX_TOOL_LENGTH = 9
 
 TOOL_RECTANGULAR = 'rectangular'
 TOOL_HOOKED = 'hooked'
+TOOL_SMALL = 'small'
+TOOL_BROKEN = 'broken'
+TOOL_INACCESSIBLE = 'inaccessible'
 
 TOOL_LENGTH_TOO_SHORT = 1
 MIN_TOOL_CHOICE_X_DIMENSION = 20
@@ -180,7 +189,9 @@ class LavaTargetToolConfig():
     Default: Random based on room size and island size
     - `random_performer_position` (bool, or list of bools): If True, the
     performer will be randomly placed in the room. They will not be placed in
-    the lava or the island   Default: False
+    the lava or the island. If the `tool_type` is inaccessible the performer
+    will randomly start on the side of the room where the target is where
+    they cannot access the tool. Default: False
     - `tool_rotation` (int, or list of ints, or [MinMaxInt](#MinMaxInt):
     Angle that tool should be rotated out of alignment with target.
     This option cannot be used with `guide_rails`.  Default: 0
@@ -188,13 +199,47 @@ class LavaTargetToolConfig():
     or [MinMaxFloat](#MinMaxFloat): The distance away the performer is from the
     tool at start. The performer will be at random point around a rectangular
     perimeter surrounding the tool. This option cannot be used with
-    `random_performer_position`.  Default: Use `random_performer_position`
+    `random_performer_position`.  Default: None
+    - `tool_offset_backward_from_lava` (
+    [RandomizableFloat](#RandomizableFloat)): The vertical offset of tool
+    either away from the lava pool. Must be greater than or equal to 0
+    Default: 0
+    - `tool_horizontal_offset` ([RandomizableFloat](#RandomizableFloat)):
+    The horizontal offset of tool either
+    left or right from being aligned with the target. If `tool_type` is
+    inaccessible this has alternate behavior. See
+    `inaccessible_tool_blocking_wall_horizontal_offset` for description.
+    Default: 0
+    - `inaccessible_tool_blocking_wall_horizontal_offset` (
+    [RandomizableFloat](#RandomizableFloat)): The horizontal offset
+    of the blocking wall away from the target's horizontal position.
+    Must be less than or equal to 0.5 (right side) or greater than or
+    equal to 0.5 (left side).
+    The performer will spawn on the side with the target. The tool will spawn
+    on the opposite side of the wall. Setting `tool_horizontal_offset` has
+    alternate behavior when combined with this property.
+    `tool_horizontal_offset` will offset the tool from the the blocking
+    wall and take the absolute value of the offset. The offset is based
+    on the closest edges of the tool and the wall. For example, if the tool
+    is rotated 90 degrees and the `tool_horizontal_offset` is 3 while
+    `inaccessible_tool_blocking_wall_horizontal_offset` is -2 the the tool's
+    closest edge to the wall will be a distance of 3 to the left of the wall
+    since the wall has a negative offset to the left.
+    Default: None
     - `tool_type` (str, or list of strs): The type of tool to generate, either
-    `rectangular` or `hooked`. Note that if `hooked` tools are chosen and lava
-    widths are not specified, the room will default to having an island size
-    of 1, with lava extending all the way to the walls in both the left and
-    right directions. The front and rear lava in the default hooked tool case
-    will each have a size of 1. Default: `rectangular`
+    `rectangular`, `hooked`, `small`, `broken`, or `inaccessible`.
+    If `hooked` tools are chosen and lava widths are not specified,
+    the room will default to having an island size of 1, with lava extending
+    all the way to the walls in both the left and right directions.
+    The front and rear lava in the default hooked tool case will each
+    have a size of 1.
+    If `small` is chosen the tool will always be a length of 1.
+    If `broken` is chosen the tool will be the correct length but have
+    scattered positions amd rotations for each individual broken piece.
+    The tool will still have an overall rotation if `tool_rotation` is set.
+    If `inaccessible` the room will be divided vertically by a blocking wall
+    with a short height.
+    Default: `rectangular`
 
     """
     island_size: Union[int, MinMaxInt, List[Union[int, MinMaxInt]]] = None
@@ -209,6 +254,9 @@ class LavaTargetToolConfig():
     distance_between_performer_and_tool: Union[
         float, MinMaxFloat, List[Union[float, MinMaxFloat]]
     ] = None
+    tool_offset_backward_from_lava: RandomizableFloat = 0
+    tool_horizontal_offset: RandomizableFloat = 0
+    inaccessible_tool_blocking_wall_horizontal_offset: RandomizableFloat = None
     tool_type: RandomizableString = TOOL_RECTANGULAR
 
 
@@ -220,6 +268,16 @@ class LavaIslandSizes():
     rear: int = 0
     left: int = 0
     right: int = 0
+
+
+@dataclass
+class InaccessibleToolProperties():
+    # internal class for storing inaccessible tool properties
+    tool: Dict[str, Any] = None
+    wall: Dict[str, Any] = None
+    short_direction: str = None
+    blocking_wall_pos_cutoff: float = None
+    room_wall_pos_cutoff: float = None
 
 
 @dataclass
@@ -281,6 +339,66 @@ class TripleDoorConfig():
         float, MinMaxFloat, List[Union[float, MinMaxFloat]]
     ] = None
     bigger_far_end: Union[bool, List[bool]] = False
+
+
+@dataclass
+class DoubleDoorConfig():
+    """
+    Defines details of the double door shortcut. A wall with 2 doors
+    (a.k.a. door occluder, or "door-cluder" or "doorcluder") will bisect the
+    room in the perpendicular direction. A platform can be added to the
+    middle back wall where the AI will be positioned at the beginning of the
+    scene. Lava can be added down the middle of the floor splitting the room
+    in half.
+
+    - `add_freeze` (bool, or list of bools): If true and 'start_drop_step is'
+    greater than 0, the user will be frozen (forced to Pass) until the wall and
+    doors are in position.  If the 'start_drop_step' is None or less than 1,
+    this value has no effect. Default: True
+    - `add_lava` (bool, or list of bools): If true adds lava along the z axis
+    of the room. Default: True
+    - `add_platform` (bool, or list of bools): If true adds a platform at the
+    back of the room where the AI will start on. Default: True
+    - `door_material` (string, or list of strings): The material or material
+    type for the doors.
+    - `occluder_wall_position_z` (float, or list of floats, or
+    [MinMaxFloat](#MinMaxFloat) dict: Where the occluder wall will cross the
+    z-axis in the room. `performer_distance_from_occluder` will override this
+    value. Default: 0 (middle of the room)
+    - `occluder_distance_from_performer` (float, or list of floats, or
+    [MinMaxFloat](#MinMaxFloat) dict: If there is a platform the, the performer
+    will start on top of the platform and the occluder wall will be placed
+    this distance (`occluder_distance_from_performer`) from the performer. Must
+    be greater than 1 or null
+    Default: 6.5
+    - `platform_height` (float, or list of floats, or
+    [MinMaxFloat](#MinMaxFloat) dict: The height (y scale) of the platform
+    Default: 1.5
+    - `platform_length` (float, or list of floats, or
+    [MinMaxFloat](#MinMaxFloat) dict: The lenth (z scale) of the platform
+    Default: 1
+    - `platform_width` (float, or list of floats, or
+    [MinMaxFloat](#MinMaxFloat) dict: The width (z scale) of the platform
+    Default: 1
+    - `start_drop_step` (int, or list of ints, or [MinMaxInt](#MinMaxInt) dict,
+    or list of MinMaxInt dicts): Step number to start dropping the bisecting
+    wall with doors.  If None or less than 1, the wall will start in position.
+    Default: None
+    - `wall_material` (string, or list of strings): The material or material
+    type for the wall.
+    """
+    add_freeze: RandomizableBool = True
+    add_lava: RandomizableBool = True
+    add_platform: RandomizableBool = True
+    door_material: RandomizableString = None
+    occluder_wall_position_z: RandomizableFloat = None
+    occluder_distance_from_performer: RandomizableFloat = None
+    platform_height: RandomizableFloat = 1.5
+    platform_length: RandomizableFloat = 1
+    platform_width: RandomizableFloat = 1
+    restrict_open_doors: RandomizableBool = True
+    start_drop_step: RandomizableInt = 1
+    wall_material: RandomizableString = None
 
 
 @dataclass
@@ -510,6 +628,37 @@ class ShortcutComponent(ILEComponent):
       add_lips: True
       add_freeze: [True, False]
       restrict_open_doors: True
+    ```
+    """
+
+    shortcut_double_door_choice: Union[bool, DoubleDoorConfig] = False
+    """
+    (bool or [DoubleDoorConfig](#DoubleDoorConfig)):
+    Creates a wall with 2 doors, a platform at the back wall and lava down
+    the length of the room. (a.k.a. door occluder, or "door-cluder" or
+    "doorcluder"). The performer starts on the platform on one end such that
+    the performer is forced to make a choice on which door they want to open.
+    Default: False
+
+    Simple Example:
+    ```
+    shortcut_double_door_choice: True
+    ```
+
+    Advanced Example:
+    ```
+    shortcut_double_door_choice:
+        add_freeze: False
+        start_drop_step:
+            min: 2
+            max: 5
+        occluder_wall_position_z: None
+        occluder_distance_from_performer: 6.5
+        add_platform: True
+        platform_width: 1
+        platform_height: 1.5
+        platform_length: 1
+        add_lava: True
     ```
     """
 
@@ -804,6 +953,41 @@ class ShortcutComponent(ILEComponent):
         config = choose_random(config)
         return config
 
+    @ile_config_setter(validator=ValidateOptions(
+        props=['door_material'],
+        options=(DOOR_MATERIAL_RESTRICTIONS +
+                 ["METAL_MATERIALS", "PLASTIC_MATERIALS", "WOOD_MATERIALS"]
+                 )
+    ))
+    @ile_config_setter(validator=ValidateNumber(
+        props=['occluder_distance_from_performer'], min_value=1,
+        null_ok=True))
+    @ile_config_setter(validator=ValidateNumber(
+        props=['platform_height'], min_value=1))
+    @ile_config_setter(validator=ValidateNumber(
+        props=['platform_length'], min_value=1))
+    @ile_config_setter(validator=ValidateNumber(
+        props=['platform_width'], min_value=1))
+    @ile_config_setter(validator=ValidateNumber(
+        props=['start_drop_step'], min_value=0,
+        null_ok=True))
+    @ile_config_setter(validator=ValidateOptions(
+        props=['wall_material'],
+        options=(materials.ALL_UNRESTRICTED_MATERIAL_LISTS_AND_STRINGS)
+    ))
+    def set_shortcut_double_door_choice(self, data: Any) -> None:
+        self.shortcut_double_door_choice = data
+
+    def get_shortcut_double_door_choice(
+            self) -> Union[bool, DoubleDoorConfig]:
+        if self.shortcut_double_door_choice is False:
+            return False
+        config = self.shortcut_double_door_choice
+        if self.shortcut_double_door_choice is True:
+            config = DoubleDoorConfig()
+        config = choose_random(config)
+        return config
+
     def set_shortcut_start_on_platform(self, data: Any) -> None:
         self.shortcut_start_on_platform = data
 
@@ -945,6 +1129,7 @@ class ShortcutComponent(ILEComponent):
 
         scene = self._add_bisecting_platform(scene, room_dim)
         scene = self._add_triple_door_shortcut(scene, room_dim)
+        scene = self._add_double_door_shortcut(scene, room_dim)
         scene = self._delay_performer_placement(scene, room_dim)
         scene = self._add_lava_shortcut(scene, room_dim)
         scene = self._add_tool_lava_goal(scene, room_dim)
@@ -1016,7 +1201,7 @@ class ShortcutComponent(ILEComponent):
             scale=VectorFloatConfig(
                 scale_x - 0.01,
                 platform_height + 0.25,
-                (scene.room_dimensions.z - 3) if long_blocking_wall else 0.1
+                (scene.room_dimensions.z - 3) if long_blocking_wall else 0.25
             )
         )
 
@@ -1059,6 +1244,13 @@ class ShortcutComponent(ILEComponent):
         if config := self.get_shortcut_triple_door_choice():
             logger.trace("Adding triple door occluding choice shortcut")
             self._do_add_triple_door_shortcut(
+                scene, room_dim, config=config)
+        return scene
+
+    def _add_double_door_shortcut(self, scene, room_dim):
+        if config := self.get_shortcut_double_door_choice():
+            logger.trace("Adding double door occluding choice shortcut")
+            self._do_add_double_door_shortcut(
                 scene, room_dim, config=config)
         return scene
 
@@ -1196,6 +1388,118 @@ class ShortcutComponent(ILEComponent):
         door_objs = FeatureCreationService.create_feature(
             scene, FeatureTypes.DOORS, door_right_template, [])
         doors.append(door_objs[0])
+        door_objs = FeatureCreationService.create_feature(
+            scene, FeatureTypes.DOORS, door_left_template, [])
+        doors.append(door_objs[0])
+        # Override the bounds of all the doors using a smaller Z dimension so
+        # we can position other objects near them. In some scenes we just want
+        # the door opened and an object within reach on the other side.
+        for door in doors:
+            door['shows'][0]['boundingBox'] = geometry.create_bounds(
+                dimensions={
+                    'x': BASE_DOOR_WIDTH,
+                    'y': BASE_DOOR_HEIGHT,
+                    'z': 0.25
+                },
+                offset={'x': 0, 'y': 1, 'z': 0},
+                position=door['shows'][0]['position'],
+                rotation=door['shows'][0]['rotation'],
+                standing_y=0
+            )
+
+        if dropping:
+            self._add_door_drops(scene, config.start_drop_step,
+                                 add_y, door_index)
+            if config.add_freeze:
+                goal = scene.goal or {}
+                step_end = (int)(config.start_drop_step + add_y * 4)
+                freezes = [StepBeginEnd(1, step_end)]
+                ActionService.add_freezes(goal, freezes)
+        scene.restrict_open_doors = config.restrict_open_doors
+
+    def _do_add_double_door_shortcut(
+            self, scene: Scene, room_dim, config: DoubleDoorConfig):
+        if config is None:
+            config = DoubleDoorConfig()
+        dropping = (
+            config.start_drop_step is not None and config.start_drop_step > 0)
+        room_dim.y = max(room_dim.y, TWO_DOOR_OCCLUDER_MIN_ROOM_Y)
+        add_y = room_dim.y if dropping else 0
+        rot_y = 0
+        bounds = find_bounds(scene)
+
+        # Add Lava
+        if config.add_lava:
+            for lava_z in range(-math.floor(room_dim.z / 2),
+                                math.floor(room_dim.z / 2) + 1, 1):
+                # Put laval down the middle along the Z axis
+                lava_template = FloorAreaConfig(
+                    num=1, position_x=0, position_z=lava_z)
+                FeatureCreationService.create_feature(
+                    scene, FeatureTypes.LAVA, lava_template, bounds.copy())
+
+        # Add Platform
+        if config.add_platform:
+            performer_z = (-room_dim.z / 2.0) + 0.5
+            platform_config = StructuralPlatformConfig(
+                num=1, position=VectorFloatConfig(
+                    0,
+                    0,
+                    -(room_dim.z / 2) + (config.platform_length / 2)),
+                rotation_y=0,
+                scale=VectorFloatConfig(
+                    config.platform_width,
+                    config.platform_height, config.platform_length))
+            scene.set_performer_start_position(
+                x=0, y=platform_config.scale.y, z=performer_z)
+            # Performer starts looking down
+            rotation_x = 10
+            scene.set_performer_start_rotation(rotation_x, 0)
+            FeatureCreationService.create_feature(
+                scene,
+                FeatureTypes.PLATFORMS,
+                platform_config,
+                bounds.copy()
+            )[0]
+
+        # occluder wall positioning
+        if config.occluder_distance_from_performer is not None:
+            occluder_position_z = scene.performer_start.position.z + \
+                config.occluder_distance_from_performer
+        elif config.occluder_wall_position_z is not None:
+            occluder_position_z = config.occluder_wall_position_z
+        else:
+            occluder_position_z = 0
+
+        # Add Doors
+        door_index = len(scene.objects)
+        side_wall_scale_x = room_dim.x / 2.0
+        side_wall_position_x = side_wall_scale_x / 2.0
+
+        door_right_template = StructuralDoorConfig(
+            num=1, position=VectorFloatConfig(
+                side_wall_position_x, add_y, occluder_position_z),
+            rotation_y=rot_y,
+            wall_scale_x=side_wall_scale_x,
+            wall_scale_y=room_dim.y,
+            wall_material=config.wall_material,
+            material=config.door_material)
+
+        door_objs = FeatureCreationService.create_feature(
+            scene, FeatureTypes.DOORS, door_right_template, [])
+
+        doors = [door_objs[0]]
+        wall = door_objs[-1]
+        wall_mat = wall['materials'][0]
+
+        door_left_template = StructuralDoorConfig(
+            num=1, position=VectorFloatConfig(
+                -side_wall_position_x, add_y, occluder_position_z),
+            rotation_y=rot_y,
+            wall_scale_x=side_wall_scale_x,
+            wall_scale_y=room_dim.y,
+            wall_material=wall_mat,
+            material=door_objs[0]['materials'][0])
         door_objs = FeatureCreationService.create_feature(
             scene, FeatureTypes.DOORS, door_left_template, [])
         doors.append(door_objs[0])
@@ -1368,11 +1672,35 @@ class ShortcutComponent(ILEComponent):
         num_prev_objs = len(scene.objects)
         num_prev_lava = len(scene.lava)
 
-        if config.guide_rails and config.tool_rotation:
+        if config.guide_rails and (
+            config.tool_rotation or config.tool_type == TOOL_INACCESSIBLE or
+                config.tool_type == TOOL_BROKEN):
             raise ILEException(
-                "Unable to use 'guide_rails' and 'tool_rotation' from "
+                "Unable to use 'guide_rails' and 'tool_rotation' or "
+                "tool_types: 'inaccessible' or 'broken' from "
                 "shortcut_lava_target_tool at the same time")
-
+        if (config.distance_between_performer_and_tool is not None and
+                config.random_performer_position):
+            raise ILEException(
+                "Cannot have distance_between_performer_and_tool "
+                "and random_performer_position"
+            )
+        if (config.distance_between_performer_and_tool is not None and
+                config.tool_type == TOOL_INACCESSIBLE):
+            raise ILEException(
+                "Cannot have distance_between_performer_and_tool "
+                "or random_performer_position with an "
+                "'inaccessible' tool_type"
+            )
+        if (config.inaccessible_tool_blocking_wall_horizontal_offset is not None and  # noqa
+            (abs(config.inaccessible_tool_blocking_wall_horizontal_offset) <
+             INACCESSIBLE_TOOL_BLOCKING_WALL_MINIMUM_SEPARATION)):
+            raise ILEException(
+                "The minimum separation of the inaccessible tool blocking "
+                "wall should always be greater than or equal to "
+                f"{INACCESSIBLE_TOOL_BLOCKING_WALL_MINIMUM_SEPARATION} or "
+                f"less than or equal to "
+                f"-{INACCESSIBLE_TOOL_BLOCKING_WALL_MINIMUM_SEPARATION}")
         if (max(scene.room_dimensions.x, scene.room_dimensions.z) <
                 MIN_LAVA_ISLAND_LONG_ROOM_DIMENSION_LENGTH):
             raise ILEException(
@@ -1421,6 +1749,8 @@ class ShortcutComponent(ILEComponent):
                 if config.tool_type == TOOL_HOOKED:
                     tool_length = random.randint(
                         tool_length + HOOKED_TOOL_BUFFER, MAX_TOOL_LENGTH)
+                if config.tool_type == TOOL_SMALL:
+                    tool_length = 1
 
                 # if size 13, edge is whole tiles at 6, buffer should be 6,
                 # if size 14, edge is half tile at 7, buffer should be 6
@@ -1488,7 +1818,7 @@ class ShortcutComponent(ILEComponent):
                 # Add block tool
                 tool_shape = self._get_tool_shape(
                     tool_length, config.tool_type)
-                self._add_tool(
+                tool = self._add_tool(
                     scene,
                     bounds + [island_bounds],
                     sizes.island_size,
@@ -1500,8 +1830,10 @@ class ShortcutComponent(ILEComponent):
                     long_near_island_coord,
                     config.tool_type,
                     tool_shape,
-                    config.tool_rotation)
-                tool = scene.objects[-1]
+                    config.tool_rotation,
+                    config.tool_horizontal_offset,
+                    config.tool_offset_backward_from_lava,
+                    config.inaccessible_tool_blocking_wall_horizontal_offset)
 
                 if config.guide_rails:
                     self._add_guide_rails(scene, long_key, short_key,
@@ -1521,23 +1853,32 @@ class ShortcutComponent(ILEComponent):
                         )
                         target = scene.objects[-1]
 
-                if (config.distance_between_performer_and_tool is not None and
-                        config.random_performer_position):
-                    raise ILEException(
-                        "Cannot have distance_between_performer_and_tool "
-                        "and random_performer_position"
-                    )
                 if config.random_performer_position:
-                    self._randomize_performer_position(
-                        scene,
-                        long_key, short_key, long_near_island_coord,
-                        long_far_island_coord, sizes)
+                    if config.tool_type == TOOL_INACCESSIBLE:
+                        self._place_performer_in_inaccessible_zone(
+                            scene, short_key, long_key,
+                            long_near_island_coord,
+                            sizes.front,
+                            tool.room_wall_pos_cutoff,
+                            tool.blocking_wall_pos_cutoff)
+                    else:
+                        self._randomize_performer_position(
+                            scene,
+                            long_key, short_key, long_near_island_coord,
+                            long_far_island_coord, sizes)
                 elif config.distance_between_performer_and_tool is not None:
-                    if tool['type'].startswith('tool_hooked'):
+                    if config.tool_type == TOOL_BROKEN:
+                        broken_tool = random.choice(tool)
+                        (x, z) = geometry.get_position_distance_away_from_obj(
+                            scene.room_dimensions, broken_tool,
+                            config.distance_between_performer_and_tool,
+                            bounds + [island_bounds])
+                        scene.set_performer_start_position(x=x, y=None, z=z)
+                    elif config.tool_type == TOOL_HOOKED:
                         (x, z) = geometry.get_position_distance_away_from_hooked_tool(  # noqa
                             scene.room_dimensions, tool,
                             config.distance_between_performer_and_tool,
-                            bounds + [island_bounds])
+                            find_bounds(scene) + [island_bounds])
                     else:
                         (x, z) = geometry.get_position_distance_away_from_obj(
                             scene.room_dimensions, tool,
@@ -1946,6 +2287,49 @@ class ShortcutComponent(ILEComponent):
             return
         raise ILEException("Failed to find random performer location")
 
+    def _place_performer_in_inaccessible_zone(
+            self, scene: Scene, short_key, long_key, near_island_coord,
+            front_lava_width, range_one, range_two):
+        max_pos_touching_lava = (
+            near_island_coord - front_lava_width -
+            0.5 - geometry.PERFORMER_HALF_WIDTH)
+        min_against_wall_pos = (-getattr(scene.room_dimensions, long_key) / 2 +
+                                geometry.PERFORMER_HALF_WIDTH)
+
+        for _ in range(MAX_TRIES):
+            long_pos = round(random.uniform(
+                min_against_wall_pos, max_pos_touching_lava), 2)
+            short_pos = round(random.uniform(range_one, range_two), 2)
+            x = short_pos if short_key == 'x' else long_pos
+            z = short_pos if short_key == 'z' else long_pos
+
+            new_perf_bounds = geometry.create_bounds(
+                dimensions={
+                    "x": geometry.PERFORMER_WIDTH,
+                    "y": geometry.PERFORMER_HEIGHT,
+                    "z": geometry.PERFORMER_WIDTH
+                },
+                offset=None,
+                position=vars(Vector3d(x=x, y=0, z=z)),
+                rotation=vars(scene.performer_start.rotation),
+                standing_y=0
+            )
+
+            valid = geometry.validate_location_rect(
+                location_bounds=new_perf_bounds,
+                performer_start_position=vars(
+                    scene.performer_start.position),
+                bounds_list=find_bounds(scene),
+                room_dimensions=vars(scene.room_dimensions)
+            )
+
+            if valid:
+                scene.set_performer_start_position(x, None, z)
+                return
+        raise ILEException(
+            "Failed to find valid performer location inside "
+            "inaccessible tool zone")
+
     def _add_target_to_lava_island(
             self, scene: Scene, long_key, short_key, short_coord,
             long_far_island_coord, long_near_island_coord):
@@ -1990,7 +2374,10 @@ class ShortcutComponent(ILEComponent):
     def _add_tool(self, scene, bounds, island_size, long_key, short_key,
                   short_coord, front_lava_width, tool_length,
                   long_near_island_coord, tool_type, tool_shape,
-                  tool_rotation=False):
+                  tool_rotation=False,
+                  tool_horizontal_offset=0,
+                  tool_offset_backward_from_lava=0,
+                  blocking_wall_horizontal_offset=None):
         bounds_to_check = bounds
         tool_rot = 0 if long_key == 'z' else 90
         if tool_rotation:
@@ -1998,6 +2385,113 @@ class ShortcutComponent(ILEComponent):
         tool_pos = VectorFloatConfig(y=0)
         long_tool_pos = (long_near_island_coord -
                          front_lava_width - tool_length / 2.0 - 0.5)
+        setattr(tool_pos, short_key, short_coord)
+
+        if tool_type == TOOL_INACCESSIBLE:
+            if not blocking_wall_horizontal_offset:
+                # If no value is setup use the island size to minimum range
+                # as a default offset
+                negative = round(random.uniform(-island_size, -0.5), 2)
+                positive = round(random.uniform(0.5, island_size), 2)
+                blocking_wall_horizontal_offset = \
+                    random.choice([negative, positive])
+            tool_horizontal_offset = abs(tool_horizontal_offset) * \
+                (-1 if blocking_wall_horizontal_offset < 0 else 1)
+            material = random.choice(materials._CUSTOM_WOOD_MATERIALS)
+            (tool, wall, width_direction, blocking_wall_pos_cutoff,
+             room_wall_pos_cutoff) = create_inaccessible_tool(
+                tool_type=tool_shape,
+                long_direction=long_key,
+                short_direction=short_key,
+                original_short_position=short_coord,
+                original_long_position=long_tool_pos,
+                tool_horizontal_offset=tool_horizontal_offset,
+                tool_offset_backward_from_lava=tool_offset_backward_from_lava,
+                blocking_wall_horizontal_offset=blocking_wall_horizontal_offset,  # noqa
+                tool_rotation_y=tool_rot,
+                room_dimension_x=scene.room_dimensions.x,
+                room_dimension_z=scene.room_dimensions.z,
+                blocking_wall_material=material,
+                bounds=None
+            )
+            scene.objects.append(tool)
+            scene.objects.append(wall)
+
+            valid = geometry.validate_location_rect(
+                location_bounds=tool['shows'][0]['boundingBox'],
+                performer_start_position=vars(
+                    scene.performer_start.position),
+                bounds_list=find_bounds(
+                    scene=scene, ignore_ids=tool['id']),
+                room_dimensions=vars(scene.room_dimensions)
+            )
+            if not valid:
+                scene.objects = scene.objects[:-2]
+                raise ILEException(
+                    "Inaccessible tool position is outside of the room "
+                    "or obstructed."
+                )
+            valid = geometry.validate_location_rect(
+                location_bounds=wall['shows'][0]['boundingBox'],
+                performer_start_position=vars(
+                    scene.performer_start.position),
+                bounds_list=find_bounds(
+                    scene=scene, ignore_ground=True, ignore_ids=wall['id']),
+                room_dimensions=vars(scene.room_dimensions)
+            )
+            if not valid:
+                scene.objects = scene.objects[:-2]
+                raise ILEException(
+                    "Inaccessible tool blocking wall position is outside "
+                    "of the room or obstructed."
+                )
+            tool['debug']['length'] = tool_length
+            return InaccessibleToolProperties(
+                tool, wall, width_direction,
+                blocking_wall_pos_cutoff, room_wall_pos_cutoff)
+
+        # Direction left is negative when long direction is on z axis
+        # But positive when long direction is x axis and tool is facing right
+        direction_left = 1 if long_key == 'z' else -1
+        if tool_type == TOOL_BROKEN:
+            max_tool_pos = (
+                long_near_island_coord - front_lava_width - 1 -
+                tool_offset_backward_from_lava)
+            min_tool_pos = (
+                max_tool_pos - tool_length + 1 -
+                tool_offset_backward_from_lava)
+            width_position = (
+                getattr(tool_pos, short_key) + tool_horizontal_offset *
+                direction_left)
+            rotation_for_entire_tool = \
+                tool_rot if long_key == 'z' else tool_rot - 90
+            tools = create_broken_tool(
+                object_type=tool_shape,
+                direction=long_key,
+                width_position=width_position,
+                max_broken_tool_length_pos=max_tool_pos,
+                min_broken_tool_length_pos=min_tool_pos,
+                length=tool_length,
+                rotation_for_entire_tool=rotation_for_entire_tool)
+            scene.objects.extend(tools)
+            for tool in tools:
+                valid = geometry.validate_location_rect(
+                    location_bounds=tool['shows'][0]['boundingBox'],
+                    performer_start_position=vars(
+                        scene.performer_start.position),
+                    bounds_list=find_bounds(
+                        scene=scene, ignore_ids=tool['id']),
+                    room_dimensions=vars(scene.room_dimensions)
+                )
+                if not valid:
+                    scene.objects = scene.objects[:-len(tools)]
+                    raise ILEException(
+                        "A broken tool position is outside of the room "
+                        "or obstructed."
+                    )
+            for tool in tools:
+                tool['debug']['length'] = 1
+            return tools
 
         if(tool_type == TOOL_HOOKED):
             bounds_to_check = []
@@ -2013,8 +2507,10 @@ class ShortcutComponent(ILEComponent):
             long_tool_pos = long_tool_pos + tool_pos_increment
             short_coord = short_coord + (tool_buffer / 2.0)
 
-        setattr(tool_pos, short_key, short_coord)
-        setattr(tool_pos, long_key, long_tool_pos)
+        setattr(tool_pos, short_key,
+                short_coord + tool_horizontal_offset * direction_left)
+        setattr(tool_pos, long_key,
+                long_tool_pos - tool_offset_backward_from_lava)
         tool_template = ToolConfig(
             num=1,
             position=tool_pos,
@@ -2024,10 +2520,13 @@ class ShortcutComponent(ILEComponent):
             scene, FeatureTypes.TOOLS, tool_template, bounds_to_check)
         # helps with distance_between_performer_and_tool calculations for
         # hooked bounding box shapes
+        tool = scene.objects[-1]
         if tool_type == TOOL_HOOKED:
-            tool = scene.objects[-1]
             tool['debug']['tool_thickness'] = tool_width / 3.0
             tool['debug']['length'] = tool_length
+        else:
+            tool['debug']['length'] = tool_length
+        return tool
 
     def _add_asymmetric_lava_around_island(
             self,
@@ -2217,6 +2716,17 @@ class ShortcutComponent(ILEComponent):
             raise e from e
 
     def _get_tool_shape(self, tool_length, tool_type):
+        tools = []
+        tool_type = \
+            TOOL_RECTANGULAR if tool_type == TOOL_INACCESSIBLE else tool_type
+        if tool_type == TOOL_SMALL or tool_type == TOOL_BROKEN:
+            tools = [
+                tool
+                for tool, (_, length) in
+                LARGE_BLOCK_TOOLS_TO_DIMENSIONS.items()
+                if "rect" in tool and length == 1
+            ]
+            return random.choice(tools)
         tools = [
             tool
             for tool, (_, length) in LARGE_BLOCK_TOOLS_TO_DIMENSIONS.items()
@@ -2973,6 +3483,7 @@ class ShortcutComponent(ILEComponent):
                 scale=bin_scale,
                 shape=bin_shape,
                 position=bin_pos['position'],
+                rotation=VectorFloatConfig(x=0, y=0, z=0),
                 labels=bin_pos['label']
             )
 
@@ -2994,7 +3505,8 @@ class ShortcutComponent(ILEComponent):
                     deactivation_step=PLACER_DEACTIVATION_STEP,
                     end_height=end_placer_height,
                     position_relative=relative_bin,
-                    placed_object_labels='target')
+                    placed_object_labels='target',
+                    placed_object_rotation=0)
 
                 FeatureCreationService.create_feature(
                     scene,
@@ -3016,7 +3528,8 @@ class ShortcutComponent(ILEComponent):
                     activation_step=PLACER_ACTIVATION_STEP,
                     deactivation_step=PLACER_DEACTIVATION_STEP,
                     end_height=end_placer_height,
-                    max_height=scene.room_dimensions.y
+                    max_height=scene.room_dimensions.y,
+                    last_step=scene.goal['last_step']
                 )
 
                 scene.objects.append(non_target_placer)
@@ -3025,7 +3538,12 @@ class ShortcutComponent(ILEComponent):
         # Note that soccer ball scale is slightly smaller than usual
         # for this type of task
         target_def = create_soccer_ball(size=0.75)
-        origin_pos = {'position': {'x': 0, 'y': 0, 'z': 0}}
+        origin_pos = {
+            'position': {
+                'x': 0, 'y': 0, 'z': 0},
+            'rotation': {
+                'x': 0, 'y': 0, 'z': 0}
+        }
         target_inst = instances.instantiate_object(target_def, origin_pos)
 
         target_idl = InstanceDefinitionLocationTuple(
@@ -3035,7 +3553,7 @@ class ShortcutComponent(ILEComponent):
         obj_repo = ObjectRepository.get_instance()
         obj_repo.add_to_labeled_objects(target_idl, 'target')
         scene.objects.append(target_inst)
-        total_steps = 100
+        total_steps = 105
 
         scene.goal = {
             'metadata': {
@@ -3093,7 +3611,7 @@ class ShortcutComponent(ILEComponent):
 
         actions = []
         agent_idle_begin = PLACER_ACTIVATION_STEP + 1
-        agent_idle_end = PLACER_DEACTIVATION_STEP + 6
+        agent_idle_end = PLACER_DEACTIVATION_STEP + 11
         agent_idle = AgentActionConfig(
             step_begin=agent_idle_begin,
             step_end=agent_idle_end,

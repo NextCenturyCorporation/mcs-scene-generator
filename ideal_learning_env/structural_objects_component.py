@@ -10,6 +10,7 @@ from ideal_learning_env.structural_object_service import (
     PLACER_SHAPES,
     PLATFORM_SCALE_MIN,
     THROWER_SHAPES,
+    WALL_SIDES,
     BaseFeatureConfig,
     FeatureCreationService,
     FeatureTypes,
@@ -173,6 +174,8 @@ class SpecificStructuralObjectsComponent(ILEComponent):
             min: 0.3
             max: 1.3
         auto_adjust_platforms: True
+        long_with_two_ramps: False
+        adjacent_to_wall: ['front_left_corner, 'right']
     ```
     """
 
@@ -706,6 +709,10 @@ class SpecificStructuralObjectsComponent(ILEComponent):
         props=['scale', 'scale.x', 'scale.y', 'scale.z'],
         min_value=PLATFORM_SCALE_MIN,
         null_ok=True
+    ))
+    @ile_config_setter(validator=ValidateOptions(
+        props=['adjacent_to_wall'],
+        options=(WALL_SIDES)
     ))
     def set_structural_platforms(self, data: Any) -> None:
         self.structural_platforms = data

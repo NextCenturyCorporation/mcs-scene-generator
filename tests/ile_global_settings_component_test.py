@@ -47,6 +47,7 @@ def run_around_test():
 def test_global_settings():
     component = GlobalSettingsComponent({})
     assert component.ceiling_material is None
+    assert component.excluded_colors is None
     assert component.excluded_shapes is None
     assert component.floor_material is None
     assert component.goal is None
@@ -71,6 +72,7 @@ def test_global_settings():
 
     scene = component.update_ile_scene(prior_scene())
     assert isinstance(scene.ceiling_material, str)
+    assert ILESharedConfiguration.get_instance().get_excluded_colors() == []
     assert ILESharedConfiguration.get_instance().get_excluded_shapes() == []
     assert ILESharedConfiguration.get_instance().get_occluder_gap() is None
     assert ILESharedConfiguration.get_instance().get_occluder_gap_viewport() \
@@ -240,6 +242,7 @@ def test_global_settings_start_position_restrictions():
 def test_global_settings_configured():
     component = GlobalSettingsComponent({
         'ceiling_material': 'Custom/Materials/GreyDrywallMCS',
+        'excluded_colors': ['black', 'brown'],
         'excluded_shapes': ['ball', 'pacifier'],
         'floor_material': 'Custom/Materials/GreyCarpetMCS',
         'goal': {
@@ -264,6 +267,7 @@ def test_global_settings_configured():
         'wall_right_material': 'Custom/Materials/RedDrywallMCS'
     })
     assert component.ceiling_material == 'Custom/Materials/GreyDrywallMCS'
+    assert component.excluded_colors == ['black', 'brown']
     assert component.excluded_shapes == ['ball', 'pacifier']
     assert component.floor_material == 'Custom/Materials/GreyCarpetMCS'
     assert component.goal == GoalConfig(
@@ -287,9 +291,9 @@ def test_global_settings_configured():
 
     scene = component.update_ile_scene(prior_scene())
     assert scene.ceiling_material == 'Custom/Materials/GreyDrywallMCS'
-    assert ILESharedConfiguration.get_instance().get_excluded_shapes() == [
-        'ball', 'pacifier'
-    ]
+    shared_config = ILESharedConfiguration.get_instance()
+    assert shared_config.get_excluded_colors() == ['black', 'brown']
+    assert shared_config.get_excluded_shapes() == ['ball', 'pacifier']
     assert scene.floor_material == 'Custom/Materials/GreyCarpetMCS'
     assert scene.floor_properties is None
     assert scene.goal['category'] == 'retrieval'
@@ -319,14 +323,16 @@ def test_global_settings_configured():
     assert scene.objects[0]['type'] == 'soccer_ball'
 
     # Cleanup
-    ILESharedConfiguration.get_instance().set_excluded_shapes([])
-    ILESharedConfiguration.get_instance().set_occluder_gap(None)
-    ILESharedConfiguration.get_instance().set_occluder_gap_viewport(None)
+    shared_config.set_excluded_colors([])
+    shared_config.set_excluded_shapes([])
+    shared_config.set_occluder_gap(None)
+    shared_config.set_occluder_gap_viewport(None)
 
 
 def test_global_settings_passive_physics_scene():
     component = GlobalSettingsComponent({
         'ceiling_material': 'Custom/Materials/GreyDrywallMCS',
+        'excluded_colors': ['black', 'brown'],
         'excluded_shapes': ['ball', 'pacifier'],
         'floor_material': 'Custom/Materials/GreyCarpetMCS',
         # Expect this to be overridden after calling update_ile_scene
@@ -353,6 +359,7 @@ def test_global_settings_passive_physics_scene():
         'wall_right_material': 'Custom/Materials/RedDrywallMCS'
     })
     assert component.ceiling_material == 'Custom/Materials/GreyDrywallMCS'
+    assert component.excluded_colors == ['black', 'brown']
     assert component.excluded_shapes == ['ball', 'pacifier']
     assert component.floor_material == 'Custom/Materials/GreyCarpetMCS'
     assert component.goal == GoalConfig(
@@ -376,9 +383,9 @@ def test_global_settings_passive_physics_scene():
     assert scene.intuitive_physics
     assert scene.version == 3
     assert scene.ceiling_material == 'Custom/Materials/GreyDrywallMCS'
-    assert ILESharedConfiguration.get_instance().get_excluded_shapes() == [
-        'ball', 'pacifier'
-    ]
+    shared_config = ILESharedConfiguration.get_instance()
+    assert shared_config.get_excluded_colors() == ['black', 'brown']
+    assert shared_config.get_excluded_shapes() == ['ball', 'pacifier']
     assert ILESharedConfiguration.get_instance().get_occluder_gap() == 1.0
     assert ILESharedConfiguration.get_instance().get_occluder_gap_viewport() \
         == 1.0
@@ -406,9 +413,10 @@ def test_global_settings_passive_physics_scene():
     }
 
     # Cleanup
-    ILESharedConfiguration.get_instance().set_excluded_shapes([])
-    ILESharedConfiguration.get_instance().set_occluder_gap(None)
-    ILESharedConfiguration.get_instance().set_occluder_gap_viewport(None)
+    shared_config.set_excluded_colors([])
+    shared_config.set_excluded_shapes([])
+    shared_config.set_occluder_gap(None)
+    shared_config.set_occluder_gap_viewport(None)
 
 
 def test_global_settings_side_wall_opposite_colors():

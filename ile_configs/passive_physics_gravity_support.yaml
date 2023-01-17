@@ -65,6 +65,7 @@ placers:
           - sphere
           - square_frustum
           - triangle
+      placed_object_rotation: 0
 
 # Override the defaults to avoid randomly generating any other objects.
 keyword_objects:

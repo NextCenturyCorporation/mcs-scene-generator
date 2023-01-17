@@ -4,11 +4,13 @@ check_valid_path: false
 circles: null
 doors:
     - num: 0
+excluded_colors: null
 excluded_shapes: null
 floor_material: null
 floor_material_override:
     - num: 0
 forced_choice_multi_retrieval_target: null
+freeze_while_moving: null
 freezes: null
 goal: null
 holes:
@@ -36,6 +38,7 @@ room_dimensions: null
 room_shape: null
 shortcut_agent_with_target: False
 shortcut_bisecting_platform: False
+shortcut_double_door_choice: True
 shortcut_imitation_task: False
 shortcut_lava_room: False
 shortcut_lava_target_tool: False

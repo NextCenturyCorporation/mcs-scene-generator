@@ -202,6 +202,10 @@ def test_create_placer():
     assert placer['moves'][1]['stepEnd'] == 42
     assert placer['moves'][1]['vector'] == {'x': 0, 'y': 0.25, 'z': 0}
 
+    assert placer['materials'] == ['Custom/Materials/Magenta']
+    assert len(placer['changeMaterials']) == 1
+    assert placer['changeMaterials'][0]['stepBegin'] == 27
+    assert placer['changeMaterials'][0]['materials'] == ['Custom/Materials/Cyan']  # noqa: E501
     assert placer['states'] == ([['active']] * 26) + [['inactive']]
 
 
@@ -250,6 +254,10 @@ def test_create_placer_with_deactivation_step():
     assert placer['moves'][1]['stepEnd'] == 115
     assert placer['moves'][1]['vector'] == {'x': 0, 'y': 0.25, 'z': 0}
 
+    assert placer['materials'] == ['Custom/Materials/Magenta']
+    assert len(placer['changeMaterials']) == 1
+    assert placer['changeMaterials'][0]['stepBegin'] == 100
+    assert placer['changeMaterials'][0]['materials'] == ['Custom/Materials/Cyan']  # noqa: E501
     assert placer['states'] == ([['active']] * 99) + [['inactive']]
 
 
@@ -297,6 +305,10 @@ def test_create_placer_with_position_y_offset():
     assert placer['moves'][1]['stepEnd'] == 42
     assert placer['moves'][1]['vector'] == {'x': 0, 'y': 0.25, 'z': 0}
 
+    assert placer['materials'] == ['Custom/Materials/Magenta']
+    assert len(placer['changeMaterials']) == 1
+    assert placer['changeMaterials'][0]['stepBegin'] == 27
+    assert placer['changeMaterials'][0]['materials'] == ['Custom/Materials/Cyan']  # noqa: E501
     assert placer['states'] == ([['active']] * 26) + [['inactive']]
 
 
@@ -345,6 +357,10 @@ def test_create_placer_with_placer_offset():
     assert placer['moves'][1]['stepEnd'] == 42
     assert placer['moves'][1]['vector'] == {'x': 0, 'y': 0.25, 'z': 0}
 
+    assert placer['materials'] == ['Custom/Materials/Magenta']
+    assert len(placer['changeMaterials']) == 1
+    assert placer['changeMaterials'][0]['stepBegin'] == 27
+    assert placer['changeMaterials'][0]['materials'] == ['Custom/Materials/Cyan']  # noqa: E501
     assert placer['states'] == ([['active']] * 26) + [['inactive']]
 
 
@@ -393,7 +409,133 @@ def test_create_placer_with_last_step():
     assert placer['moves'][1]['stepEnd'] == 42
     assert placer['moves'][1]['vector'] == {'x': 0, 'y': 0.25, 'z': 0}
 
+    assert placer['materials'] == ['Custom/Materials/Magenta']
+    assert len(placer['changeMaterials']) == 1
+    assert placer['changeMaterials'][0]['stepBegin'] == 27
+    assert placer['changeMaterials'][0]['materials'] == ['Custom/Materials/Cyan']  # noqa: E501
     assert placer['states'] == ([['active']] * 26) + ([['inactive']] * 73)
+
+
+def test_create_placer_pickup_object():
+    placer = mechanisms.create_placer(
+        placed_object_position={'x': 1, 'y': 3, 'z': -1},
+        placed_object_dimensions={'x': 1, 'y': 1, 'z': 1},
+        placed_object_offset_y=0,
+        activation_step=10,
+        end_height=0,
+        max_height=4,
+        is_pickup_obj=True,
+        is_move_obj=False
+    )
+
+    assert placer['id'].startswith('placer_')
+    assert placer['kinematic'] is True
+    assert placer['structure'] is True
+    assert placer['type'] == 'cylinder'
+    assert placer['mass'] == 10
+    assert placer['materials'] == ['Custom/Materials/Cyan']
+    assert placer['debug']['color'] == ['magenta', 'cyan']
+    assert placer['debug']['info'] == [
+        'magenta', 'cyan', 'placer', 'magenta placer', 'cyan placer',
+        'magenta cyan placer'
+    ]
+    assert placer['debug']['shape'] == ['placer']
+
+    assert len(placer['shows']) == 1
+    assert placer['shows'][0]['stepBegin'] == 0
+    assert placer['shows'][0]['position'] == {'x': 1, 'y': 9.75, 'z': -1}
+    assert placer['shows'][0]['rotation'] == {'x': 0, 'y': 0, 'z': 0}
+    assert placer['shows'][0]['scale'] == {'x': 0.2, 'y': 2, 'z': 0.2}
+    placer_bounds = placer['shows'][0]['boundingBox']
+    assert vars(placer_bounds.box_xz[0]) == {'x': 1.1, 'y': 0, 'z': -0.9}
+    assert vars(placer_bounds.box_xz[1]) == {'x': 1.1, 'y': 0, 'z': -1.1}
+    assert vars(placer_bounds.box_xz[2]) == {'x': 0.9, 'y': 0, 'z': -1.1}
+    assert vars(placer_bounds.box_xz[3]) == {'x': 0.9, 'y': 0, 'z': -0.9}
+    assert placer_bounds.max_y == 10.75
+    assert placer_bounds.min_y == 8.75
+
+    assert len(placer['moves']) == 2
+    assert placer['moves'][0]['stepBegin'] == 10
+    assert placer['moves'][0]['stepEnd'] == 24
+    assert placer['moves'][0]['vector'] == {'x': 0, 'y': -0.25, 'z': 0}
+    assert placer['moves'][1]['stepBegin'] == 35
+    assert placer['moves'][1]['stepEnd'] == 48
+    assert placer['moves'][1]['vector'] == {'x': 0, 'y': 0.25, 'z': 0}
+
+    assert placer['materials'] == ['Custom/Materials/Cyan']
+    assert len(placer['changeMaterials']) == 1
+    assert placer['changeMaterials'][0]['stepBegin'] == 30
+    assert placer['changeMaterials'][0]['materials'] == ['Custom/Materials/Magenta']  # noqa: E501
+    assert placer['states'] == ([['inactive']] * 29) + ([['active']])
+
+
+def test_create_placer_move_object():
+    placer = mechanisms.create_placer(
+        placed_object_position={'x': 1, 'y': 3, 'z': -1},
+        placed_object_dimensions={'x': 1, 'y': 1, 'z': 1},
+        placed_object_offset_y=0,
+        activation_step=10,
+        end_height=0,
+        max_height=4,
+        is_pickup_obj=False,
+        is_move_obj=True,
+        move_object_end_position=Vector3d(x=-1, y=3, z=-1),
+        move_object_y=0,
+        move_object_z=2
+    )
+
+    assert placer['id'].startswith('placer_')
+    assert placer['kinematic'] is True
+    assert placer['structure'] is True
+    assert placer['type'] == 'cylinder'
+    assert placer['mass'] == 10
+    assert placer['materials'] == ['Custom/Materials/Cyan']
+    assert placer['debug']['color'] == ['magenta', 'cyan']
+    assert placer['debug']['info'] == [
+        'magenta', 'cyan', 'placer', 'magenta placer', 'cyan placer',
+        'magenta cyan placer'
+    ]
+    assert placer['debug']['shape'] == ['placer']
+
+    assert len(placer['shows']) == 1
+    assert placer['shows'][0]['stepBegin'] == 0
+    assert placer['shows'][0]['position'] == {'x': 1, 'y': 9.75, 'z': -1}
+    assert placer['shows'][0]['rotation'] == {'x': 0, 'y': 0, 'z': 0}
+    assert placer['shows'][0]['scale'] == {'x': 0.2, 'y': 2, 'z': 0.2}
+    placer_bounds = placer['shows'][0]['boundingBox']
+    assert vars(placer_bounds.box_xz[0]) == {'x': 1.1, 'y': 0, 'z': -0.9}
+    assert vars(placer_bounds.box_xz[1]) == {'x': 1.1, 'y': 0, 'z': -1.1}
+    assert vars(placer_bounds.box_xz[2]) == {'x': 0.9, 'y': 0, 'z': -1.1}
+    assert vars(placer_bounds.box_xz[3]) == {'x': 0.9, 'y': 0, 'z': -0.9}
+    assert placer_bounds.max_y == 10.75
+    assert placer_bounds.min_y == 8.75
+
+    assert len(placer['moves']) == 5
+
+    assert placer['moves'][0]['stepBegin'] == 10
+    assert placer['moves'][0]['stepEnd'] == 24
+    assert placer['moves'][0]['vector'] == {'x': 0, 'y': -0.25, 'z': 0}
+    assert placer['moves'][1]['stepBegin'] == 30
+    assert placer['moves'][1]['stepEnd'] == 37
+    assert placer['moves'][1]['vector'] == {'x': 0, 'y': 0, 'z': -0.25}
+    assert placer['moves'][2]['stepBegin'] == 38
+    assert placer['moves'][2]['stepEnd'] == 45
+    assert placer['moves'][2]['vector'] == {'x': -0.25, 'y': 0, 'z': 0}
+    assert placer['moves'][3]['stepBegin'] == 46
+    assert placer['moves'][3]['stepEnd'] == 53
+    assert placer['moves'][3]['vector'] == {'x': 0, 'y': 0, 'z': 0.25}
+    assert placer['moves'][4]['stepBegin'] == 58
+    assert placer['moves'][4]['stepEnd'] == 72
+    assert placer['moves'][4]['vector'] == {'x': 0, 'y': 0.25, 'z': 0}
+
+    assert placer['materials'] == ['Custom/Materials/Cyan']
+    assert len(placer['changeMaterials']) == 2
+    assert placer['changeMaterials'][0]['stepBegin'] == 26
+    assert placer['changeMaterials'][0]['materials'] == ['Custom/Materials/Magenta']  # noqa: E501
+    assert placer['changeMaterials'][1]['stepBegin'] == 55
+    assert placer['changeMaterials'][1]['materials'] == ['Custom/Materials/Cyan']  # noqa: E501
+    assert placer['states'] == ([['inactive']] * 26) + \
+        ([['active']] * 29) + ([['inactive']] * 14)
 
 
 def test_create_throwing_device():
@@ -949,14 +1091,14 @@ def test_place_object_with_start_height():
 
     assert len(mock_instance['shows']) == 1
     assert mock_instance['shows'][0]['position'] == (
-        {'x': 1, 'y': 2.995, 'z': -1}
+        {'x': 1, 'y': 2.75, 'z': -1}
     )
     assert mock_instance['shows'][0]['rotation'] == {'x': 0, 'y': 0, 'z': 0}
     assert mock_instance['shows'][0]['scale'] == {'x': 0.5, 'y': 0.5, 'z': 0.5}
 
     bounds = mock_instance['shows'][0]['boundingBox']
-    assert bounds.max_y == pytest.approx(4.995)
-    assert bounds.min_y == pytest.approx(2.995)
+    assert bounds.max_y == pytest.approx(4.75)
+    assert bounds.min_y == pytest.approx(2.75)
 
     assert len(mock_instance['moves']) == 1
     assert mock_instance['moves'][0]['stepBegin'] == 10
@@ -982,18 +1124,111 @@ def test_place_object_with_start_height_position_y_offset():
 
     assert len(mock_instance['shows']) == 1
     assert mock_instance['shows'][0]['position'] == (
-        {'x': 1, 'y': 3.495, 'z': -1}
+        {'x': 1, 'y': 3.25, 'z': -1}
     )
     assert mock_instance['shows'][0]['rotation'] == {'x': 0, 'y': 0, 'z': 0}
     assert mock_instance['shows'][0]['scale'] == {'x': 0.5, 'y': 0.5, 'z': 0.5}
 
     bounds = mock_instance['shows'][0]['boundingBox']
-    assert bounds.max_y == pytest.approx(4.995)
-    assert bounds.min_y == pytest.approx(2.995)
+    assert bounds.max_y == pytest.approx(4.75)
+    assert bounds.min_y == pytest.approx(2.75)
 
     assert len(mock_instance['moves']) == 1
     assert mock_instance['moves'][0]['stepBegin'] == 10
     assert mock_instance['moves'][0]['stepEnd'] == 20
+    assert mock_instance['moves'][0]['vector'] == {'x': 0, 'y': -0.25, 'z': 0}
+
+
+def test_place_object_position_adjustment():
+    mock_instance = {
+        'shows': [{
+            'position': {'x': 1, 'y': 2.74, 'z': -1},
+            'rotation': {'x': 0, 'y': 0, 'z': 0},
+            'scale': {'x': 0.5, 'y': 0.5, 'z': 0.5}
+        }],
+        'debug': {
+            'dimensions': {'x': 2, 'y': 2, 'z': 2},
+            'positionY': 0
+        }
+    }
+    mechanisms.place_object(mock_instance, 10)
+    assert mock_instance['kinematic']
+    assert mock_instance['togglePhysics'] == [{'stepBegin': 25}]
+
+    assert len(mock_instance['shows']) == 1
+    assert mock_instance['shows'][0]['position'] == {'x': 1, 'y': 2.5, 'z': -1}
+    assert mock_instance['shows'][0]['rotation'] == {'x': 0, 'y': 0, 'z': 0}
+    assert mock_instance['shows'][0]['scale'] == {'x': 0.5, 'y': 0.5, 'z': 0.5}
+
+    bounds = mock_instance['shows'][0]['boundingBox']
+    assert bounds.max_y == pytest.approx(4.5)
+    assert bounds.min_y == pytest.approx(2.5)
+
+    assert len(mock_instance['moves']) == 1
+    assert mock_instance['moves'][0]['stepBegin'] == 10
+    assert mock_instance['moves'][0]['stepEnd'] == 19
+    assert mock_instance['moves'][0]['vector'] == {'x': 0, 'y': -0.25, 'z': 0}
+
+
+def test_place_object_with_end_height_and_position_adjustment():
+    mock_instance = {
+        'shows': [{
+            'position': {'x': 1, 'y': 2.74, 'z': -1},
+            'rotation': {'x': 0, 'y': 0, 'z': 0},
+            'scale': {'x': 0.5, 'y': 0.5, 'z': 0.5}
+        }],
+        'debug': {
+            'dimensions': {'x': 2, 'y': 2, 'z': 2},
+            'positionY': 0
+        }
+    }
+    mechanisms.place_object(mock_instance, 10, end_height=1)
+    assert mock_instance['kinematic']
+    assert mock_instance['togglePhysics'] == [{'stepBegin': 21}]
+
+    assert len(mock_instance['shows']) == 1
+    assert mock_instance['shows'][0]['position'] == {'x': 1, 'y': 2.5, 'z': -1}
+    assert mock_instance['shows'][0]['rotation'] == {'x': 0, 'y': 0, 'z': 0}
+    assert mock_instance['shows'][0]['scale'] == {'x': 0.5, 'y': 0.5, 'z': 0.5}
+
+    bounds = mock_instance['shows'][0]['boundingBox']
+    assert bounds.max_y == pytest.approx(4.5)
+    assert bounds.min_y == pytest.approx(2.5)
+
+    assert len(mock_instance['moves']) == 1
+    assert mock_instance['moves'][0]['stepBegin'] == 10
+    assert mock_instance['moves'][0]['stepEnd'] == 15
+    assert mock_instance['moves'][0]['vector'] == {'x': 0, 'y': -0.25, 'z': 0}
+
+
+def test_place_object_with_start_height_and_position_adjustment():
+    mock_instance = {
+        'shows': [{
+            'position': {'x': 1, 'y': 2.74, 'z': -1},
+            'rotation': {'x': 0, 'y': 0, 'z': 0},
+            'scale': {'x': 0.5, 'y': 0.5, 'z': 0.5}
+        }],
+        'debug': {
+            'dimensions': {'x': 2, 'y': 2, 'z': 2},
+            'positionY': 0
+        }
+    }
+    mechanisms.place_object(mock_instance, 10, start_height=3.74)
+    assert mock_instance['kinematic']
+    assert mock_instance['togglePhysics'] == [{'stepBegin': 21}]
+
+    assert len(mock_instance['shows']) == 1
+    assert mock_instance['shows'][0]['position'] == {'x': 1, 'y': 1.5, 'z': -1}
+    assert mock_instance['shows'][0]['rotation'] == {'x': 0, 'y': 0, 'z': 0}
+    assert mock_instance['shows'][0]['scale'] == {'x': 0.5, 'y': 0.5, 'z': 0.5}
+
+    bounds = mock_instance['shows'][0]['boundingBox']
+    assert bounds.max_y == pytest.approx(3.5)
+    assert bounds.min_y == pytest.approx(1.5)
+
+    assert len(mock_instance['moves']) == 1
+    assert mock_instance['moves'][0]['stepBegin'] == 10
+    assert mock_instance['moves'][0]['stepEnd'] == 15
     assert mock_instance['moves'][0]['vector'] == {'x': 0, 'y': -0.25, 'z': 0}
 
 

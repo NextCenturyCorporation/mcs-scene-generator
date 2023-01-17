@@ -1,9 +1,11 @@
+from random import randint
 from typing import List
 
 import pytest
 
 from generator import materials
 from generator.base_objects import ALL_LARGE_BLOCK_TOOLS, create_soccer_ball
+from generator.geometry import MAX_TRIES
 from generator.instances import instantiate_object
 from ideal_learning_env import (
     TARGET_LABEL,
@@ -25,6 +27,9 @@ from ideal_learning_env.object_services import (
     ObjectRepository
 )
 from ideal_learning_env.structural_object_service import (
+    PLATFORM_SCALE_MAX,
+    PLATFORM_SCALE_MIN,
+    WALL_SIDES,
     StopPositionConfig,
     StructuralObjectMovementConfig,
     ToolConfig
@@ -1326,9 +1331,9 @@ def test_structural_objects_platforms_with_under_platform():
             'rotation_y': 0,
 
             'scale': {
-                'x': .5,
+                'x': PLATFORM_SCALE_MIN,
                 'y': 1,
-                'z': 1
+                'z': PLATFORM_SCALE_MAX
             },
             'platform_underneath': True
         }
@@ -1342,9 +1347,9 @@ def test_structural_objects_platforms_with_under_platform():
     assert pre_plat.rotation_y == 0
     scale = pre_plat.scale
     assert isinstance(scale, VectorFloatConfig)
-    assert scale.x == 0.5
+    assert scale.x == PLATFORM_SCALE_MIN
     assert scale.y == 1
-    assert scale.z == 1
+    assert scale.z == PLATFORM_SCALE_MAX
     assert pre_plat.platform_underneath
     assert not getattr(pre_plat, 'attached_ramps')
     assert not getattr(pre_plat, 'platform_underneath_attached_ramps')
@@ -1367,9 +1372,9 @@ def test_structural_objects_platforms_with_under_platform():
     assert tpos['x'] == 2
     assert tpos['z'] == -2
     assert trot['y'] == 0
-    assert tscale['x'] == 0.5
+    assert tscale['x'] == PLATFORM_SCALE_MIN
     assert tscale['y'] == 1
-    assert tscale['z'] == 1
+    assert tscale['z'] == PLATFORM_SCALE_MAX
     assert ObjectRepository.get_instance().has_label('platforms')
     assert len(ObjectRepository.get_instance(
     ).get_all_from_labeled_objects('platforms')) == 2
@@ -1403,7 +1408,7 @@ def test_structural_objects_platforms_with_under_platform_with_ramps():
 
             'scale': {
                 'x': 1,
-                'y': 0.5,
+                'y': PLATFORM_SCALE_MIN,
                 'z': 1
             },
             'platform_underneath': True,
@@ -1422,7 +1427,7 @@ def test_structural_objects_platforms_with_under_platform_with_ramps():
     scale = pre_plat.scale
     assert isinstance(scale, VectorFloatConfig)
     assert scale.x == 1
-    assert scale.y == 0.5
+    assert scale.y == PLATFORM_SCALE_MIN
     assert scale.z == 1
     assert pre_plat.platform_underneath
     assert pre_plat.attached_ramps == 1
@@ -1445,7 +1450,7 @@ def test_structural_objects_platforms_with_under_platform_with_ramps():
     assert tpos['z'] == -2
     assert trot['y'] == 37
     assert tscale['x'] == 1
-    assert tscale['y'] == 0.5
+    assert tscale['y'] == PLATFORM_SCALE_MIN
     assert tscale['z'] == 1
     assert ObjectRepository.get_instance().has_label('platforms')
     assert len(ObjectRepository.get_instance(
@@ -1466,9 +1471,9 @@ def test_structural_objects_platforms_with_under_platform_with_ramps():
     bscale = show['scale']
     bottom_poly = show['boundingBox'].polygon_xz
     assert brot['y'] == 37
-    assert bpos['y'] == 0.5
+    assert pytest.approx(bpos['y'], 0.5)
     assert bscale['x'] > tscale['x']
-    assert bscale['y'] == 1
+    assert pytest.approx(bscale['y'], 1)
     assert bscale['z'] > tscale['z']
     assert bottom_poly.contains(top_poly)
 
@@ -1530,7 +1535,7 @@ def test_structural_objects_platforms_with_platform_ramps_gaps():
             },
             'scale': {
                 'x': 1,
-                'y': 0.5,
+                'y': PLATFORM_SCALE_MIN,
                 'z': 1
             },
             'platform_underneath': True,
@@ -2843,6 +2848,421 @@ def test_structural_objects_thrower_position_relative_with_adjustment():
 
     assert ObjectRepository.get_instance().has_label('throwers')
     assert ObjectRepository.get_instance().has_label('test_label')
+
+
+def test_structural_objects_thrower_path_relative_avoid():
+    component = SpecificStructuralObjectsComponent({
+        'structural_throwers': {
+            'num': 1,
+            'wall': 'back',
+            # Same X position as target object
+            'position_wall': -1.03,
+            'height': 0,
+            # This rotation_y is intentionally null
+            'rotation_y': None,
+            'rotation_z': 0,
+            'throw_step': 5,
+            'throw_force': 15,
+            'projectile_shape': 'ball',
+            'projectile_scale': 1.5,
+            'path_relative': {
+                'option': 'avoid',
+                'labels': 'target'
+            }
+        }
+    })
+    scene = prior_scene_with_target(add_to_repo=True)
+    scene = component.update_ile_scene(scene)
+    assert len(scene.objects) == 3
+
+    target = scene.objects[0]
+    assert target['type'] == 'soccer_ball'
+    assert target['shows'][0]['position']['x'] == -1.03
+    assert target['shows'][0]['position']['z'] == 4.08
+
+    device = scene.objects[1]
+    assert device['id'].startswith("throwing_device")
+    assert device['type'] == 'tube_wide'
+    assert device['structure']
+    assert device['shows'][0]['position']['x'] == -1.03
+    assert device['shows'][0]['position']['y'] == 0.94
+    assert device['shows'][0]['position']['z'] == -4.25
+    assert device['shows'][0]['rotation']['x'] == 0
+    rotation_y = device['shows'][0]['rotation']['y']
+    # Should be between 225 and 315, but NOT 265, 270, or 275
+    assert rotation_y in [
+        225, 230, 235, 240, 245, 250, 255, 260,
+        280, 285, 290, 295, 300, 305, 310, 315
+    ]
+    assert device['shows'][0]['rotation']['z'] == 90
+
+    ball = scene.objects[2]
+    mass = ball['mass'] or 1
+    assert ball['type'] == 'ball'
+    assert ball['debug']['positionedBy'] == 'mechanism'
+    assert ball['moveable']
+    assert ball['forces'][0]['stepBegin'] == 5
+    assert ball['forces'][0]['stepEnd'] == 5
+    assert ball['forces'][0]['impulse']
+    assert ball['forces'][0]['relative']
+    assert ball['forces'][0]['vector'] == {'x': mass * 15, 'y': 0, 'z': 0}
+    assert ball['shows'][0]['position']['x'] == -1.03
+    assert ball['shows'][0]['position']['y'] == 0.75
+    assert ball['shows'][0]['position']['z'] == -4.25
+    assert ball['shows'][0]['scale']['x'] == 1.5
+    assert ball['shows'][0]['scale']['y'] == 1.5
+    assert ball['shows'][0]['scale']['z'] == 1.5
+    assert ball['shows'][0]['rotation']['x'] == 0
+    assert ball['shows'][0]['rotation']['y'] == rotation_y
+    assert ball['shows'][0]['rotation']['z'] == 0
+
+    ObjectRepository.get_instance().clear()
+    component.structural_throwers.position_wall = 0.5
+    scene = prior_scene_with_target(add_to_repo=True)
+    scene = component.update_ile_scene(scene)
+    assert len(scene.objects) == 3
+    device = scene.objects[1]
+    assert device['shows'][0]['position']['x'] == 0.5
+    assert device['shows'][0]['position']['z'] == -4.25
+    rotation_y = device['shows'][0]['rotation']['y']
+    # Should be between 225 and 315, but NOT 255, 260, or 265
+    assert rotation_y in [
+        225, 230, 235, 240, 245, 250,
+        270, 275, 280, 285, 290, 295, 300, 305, 310, 315
+    ]
+    ball = scene.objects[2]
+    assert ball['shows'][0]['position']['x'] == 0.5
+    assert ball['shows'][0]['position']['z'] == -4.25
+    assert ball['shows'][0]['rotation']['y'] == rotation_y
+
+    ObjectRepository.get_instance().clear()
+    component.structural_throwers.wall = WallSide.RIGHT
+    component.structural_throwers.position_wall = 4.08
+    scene = prior_scene_with_target(add_to_repo=True)
+    scene = component.update_ile_scene(scene)
+    assert len(scene.objects) == 3
+    device = scene.objects[1]
+    assert device['shows'][0]['position']['x'] == 4.25
+    assert device['shows'][0]['position']['z'] == 4.08
+    rotation_y = device['shows'][0]['rotation']['y']
+    # Should be between 135 and 225, but NOT 175, 180, or 185
+    assert rotation_y in [
+        135, 140, 145, 150, 155, 160, 165, 170,
+        190, 195, 200, 205, 210, 215, 220, 225
+    ]
+    ball = scene.objects[2]
+    assert device['shows'][0]['position']['x'] == 4.25
+    assert device['shows'][0]['position']['z'] == 4.08
+    assert ball['shows'][0]['rotation']['y'] == rotation_y
+
+    ObjectRepository.get_instance().clear()
+    component.structural_throwers.wall = WallSide.LEFT
+    component.structural_throwers.position_wall = 4.08
+    scene = prior_scene_with_target(add_to_repo=True)
+    scene = component.update_ile_scene(scene)
+    assert len(scene.objects) == 3
+    device = scene.objects[1]
+    assert device['shows'][0]['position']['x'] == -4.25
+    assert device['shows'][0]['position']['z'] == 4.08
+    rotation_y = device['shows'][0]['rotation']['y']
+    # Should be between -45 and 45, but NOT between -15 and 15
+    assert rotation_y in [315, 320, 325, 330, 335, 340, 20, 25, 30, 35, 40, 45]
+    ball = scene.objects[2]
+    assert device['shows'][0]['position']['x'] == -4.25
+    assert device['shows'][0]['position']['z'] == 4.08
+    assert ball['shows'][0]['rotation']['y'] == rotation_y
+
+
+def test_structural_objects_thrower_path_relative_avoid_with_input():
+    component = SpecificStructuralObjectsComponent({
+        'structural_throwers': {
+            'num': 1,
+            'wall': 'back',
+            # Same X position as target object
+            'position_wall': -1.03,
+            'height': 0,
+            # This rotation_y will be overridden
+            'rotation_y': [0, -12],
+            'rotation_z': 0,
+            'throw_step': 5,
+            'throw_force': 15,
+            'projectile_shape': 'ball',
+            'projectile_scale': 1.5,
+            'path_relative': {
+                'option': 'avoid',
+                'labels': 'target'
+            }
+        }
+    })
+    scene = prior_scene_with_target(add_to_repo=True)
+    scene = component.update_ile_scene(scene)
+    assert len(scene.objects) == 3
+
+    target = scene.objects[0]
+    assert target['type'] == 'soccer_ball'
+    assert target['shows'][0]['position']['x'] == -1.03
+    assert target['shows'][0]['position']['z'] == 4.08
+
+    device = scene.objects[1]
+    assert device['id'].startswith("throwing_device")
+    assert device['type'] == 'tube_wide'
+    assert device['structure']
+    assert device['shows'][0]['position']['x'] == -1.03
+    assert device['shows'][0]['position']['y'] == 0.94
+    assert device['shows'][0]['position']['z'] == -4.25
+    assert device['shows'][0]['rotation']['x'] == 0
+    # Should always be 258 (use the rotation_y of -12)
+    assert device['shows'][0]['rotation']['y'] == 258
+    assert device['shows'][0]['rotation']['z'] == 90
+
+    ball = scene.objects[2]
+    mass = ball['mass'] or 1
+    assert ball['type'] == 'ball'
+    assert ball['debug']['positionedBy'] == 'mechanism'
+    assert ball['moveable']
+    assert ball['forces'][0]['stepBegin'] == 5
+    assert ball['forces'][0]['stepEnd'] == 5
+    assert ball['forces'][0]['impulse']
+    assert ball['forces'][0]['relative']
+    assert ball['forces'][0]['vector'] == {'x': mass * 15, 'y': 0, 'z': 0}
+    assert ball['shows'][0]['position']['x'] == -1.03
+    assert ball['shows'][0]['position']['y'] == 0.75
+    assert ball['shows'][0]['position']['z'] == -4.25
+    assert ball['shows'][0]['scale']['x'] == 1.5
+    assert ball['shows'][0]['scale']['y'] == 1.5
+    assert ball['shows'][0]['scale']['z'] == 1.5
+    assert ball['shows'][0]['rotation']['x'] == 0
+    # Should always be 258 (use the rotation_y of -12)
+    assert ball['shows'][0]['rotation']['y'] == 258
+    assert ball['shows'][0]['rotation']['z'] == 0
+
+    ObjectRepository.get_instance().clear()
+    component.structural_throwers.position_wall = 0.5
+    scene = prior_scene_with_target(add_to_repo=True)
+    scene = component.update_ile_scene(scene)
+    assert len(scene.objects) == 3
+    device = scene.objects[1]
+    assert device['shows'][0]['position']['x'] == 0.5
+    assert device['shows'][0]['position']['z'] == -4.25
+    # Should always be 270 (use the rotation_y of 0)
+    assert device['shows'][0]['rotation']['y'] == 270
+    ball = scene.objects[2]
+    assert ball['shows'][0]['position']['x'] == 0.5
+    assert ball['shows'][0]['position']['z'] == -4.25
+    # Should always be 270 (use the rotation_y of 0)
+    assert ball['shows'][0]['rotation']['y'] == 270
+
+
+def test_structural_objects_thrower_path_relative_avoid_invalid():
+    component = SpecificStructuralObjectsComponent({
+        'structural_throwers': {
+            'num': 1,
+            'wall': 'front',
+            'position_wall': -1.03,
+            'height': 0,
+            # This rotation_y is intentionally null
+            'rotation_y': None,
+            'rotation_z': 0,
+            'throw_step': 5,
+            'throw_force': 15,
+            'projectile_shape': 'ball',
+            'projectile_scale': 1.5,
+            'path_relative': {
+                'option': 'avoid',
+                'labels': 'target'
+            }
+        }
+    })
+    scene = prior_scene_with_target(add_to_repo=True)
+    with pytest.raises(ILEException):
+        # Error because the target is unavoidable in the device's position
+        scene = component.update_ile_scene(scene)
+
+
+def test_structural_objects_thrower_path_relative_avoid_with_input_invalid():
+    component = SpecificStructuralObjectsComponent({
+        'structural_throwers': {
+            'num': 1,
+            'wall': 'back',
+            'position_wall': -1.03,
+            'height': 0,
+            # This rotation_y is specifically configured
+            'rotation_y': [-5, 0, 5],
+            'rotation_z': 0,
+            'throw_step': 5,
+            'throw_force': 15,
+            'projectile_shape': 'ball',
+            'projectile_scale': 1.5,
+            'path_relative': {
+                'option': 'avoid',
+                'labels': 'target'
+            }
+        }
+    })
+    scene = prior_scene_with_target(add_to_repo=True)
+    with pytest.raises(ILEException):
+        # Error because the target is unavoidable with the given rotations
+        scene = component.update_ile_scene(scene)
+
+
+def test_structural_objects_thrower_path_relative_collide():
+    component = SpecificStructuralObjectsComponent({
+        'structural_throwers': {
+            'num': 1,
+            'wall': 'back',
+            # Same X position as target object
+            'position_wall': -1.03,
+            'height': 0,
+            # This rotation_y will be overridden
+            'rotation_y': 45,
+            'rotation_z': 0,
+            'throw_step': 5,
+            'throw_force': 15,
+            'projectile_shape': 'ball',
+            'projectile_scale': 1.5,
+            'path_relative': {
+                'option': 'collide',
+                'labels': 'target'
+            }
+        }
+    })
+    scene = prior_scene_with_target(add_to_repo=True)
+    scene = component.update_ile_scene(scene)
+    assert len(scene.objects) == 3
+
+    target = scene.objects[0]
+    assert target['type'] == 'soccer_ball'
+    assert target['shows'][0]['position']['x'] == -1.03
+    assert target['shows'][0]['position']['z'] == 4.08
+
+    device = scene.objects[1]
+    assert device['id'].startswith("throwing_device")
+    assert device['type'] == 'tube_wide'
+    assert device['structure']
+    assert device['shows'][0]['position']['x'] == -1.03
+    assert device['shows'][0]['position']['y'] == 0.94
+    assert device['shows'][0]['position']['z'] == -4.25
+    assert device['shows'][0]['rotation']['x'] == 0
+    assert device['shows'][0]['rotation']['y'] == 270
+    assert device['shows'][0]['rotation']['z'] == 90
+
+    ball = scene.objects[2]
+    mass = ball['mass'] or 1
+    assert ball['type'] == 'ball'
+    assert ball['debug']['positionedBy'] == 'mechanism'
+    assert ball['moveable']
+    assert ball['forces'][0]['stepBegin'] == 5
+    assert ball['forces'][0]['stepEnd'] == 5
+    assert ball['forces'][0]['impulse']
+    assert ball['forces'][0]['relative']
+    assert ball['forces'][0]['vector'] == {'x': mass * 15, 'y': 0, 'z': 0}
+    assert ball['shows'][0]['position']['x'] == -1.03
+    assert ball['shows'][0]['position']['y'] == 0.75
+    assert ball['shows'][0]['position']['z'] == -4.25
+    assert ball['shows'][0]['scale']['x'] == 1.5
+    assert ball['shows'][0]['scale']['y'] == 1.5
+    assert ball['shows'][0]['scale']['z'] == 1.5
+    assert ball['shows'][0]['rotation']['x'] == 0
+    assert ball['shows'][0]['rotation']['y'] == 270
+    assert ball['shows'][0]['rotation']['z'] == 0
+
+    ObjectRepository.get_instance().clear()
+    component.structural_throwers.position_wall = 0
+    scene = prior_scene_with_target(add_to_repo=True)
+    scene = component.update_ile_scene(scene)
+    assert len(scene.objects) == 3
+    device = scene.objects[1]
+    assert device['shows'][0]['position']['x'] == 0
+    assert device['shows'][0]['position']['z'] == -4.25
+    assert device['shows'][0]['rotation']['y'] == pytest.approx(262.9512)
+    ball = scene.objects[2]
+    assert ball['shows'][0]['position']['x'] == 0
+    assert ball['shows'][0]['position']['z'] == -4.25
+    assert ball['shows'][0]['rotation']['y'] == pytest.approx(262.9512)
+
+    ObjectRepository.get_instance().clear()
+    component.structural_throwers.position_wall = 4
+    scene = prior_scene_with_target(add_to_repo=True)
+    scene = component.update_ile_scene(scene)
+    assert len(scene.objects) == 3
+    device = scene.objects[1]
+    assert device['shows'][0]['position']['x'] == 4
+    assert device['shows'][0]['position']['z'] == -4.25
+    assert device['shows'][0]['rotation']['y'] == pytest.approx(238.8747)
+    ball = scene.objects[2]
+    assert ball['shows'][0]['position']['x'] == 4
+    assert ball['shows'][0]['position']['z'] == -4.25
+    assert ball['shows'][0]['rotation']['y'] == pytest.approx(238.8747)
+
+    ObjectRepository.get_instance().clear()
+    component.structural_throwers.position_wall = -2
+    scene = prior_scene_with_target(add_to_repo=True)
+    scene = component.update_ile_scene(scene)
+    assert len(scene.objects) == 3
+    device = scene.objects[1]
+    assert device['shows'][0]['position']['x'] == -2
+    assert device['shows'][0]['position']['z'] == -4.25
+    assert device['shows'][0]['rotation']['y'] == pytest.approx(276.642)
+    ball = scene.objects[2]
+    assert ball['shows'][0]['position']['x'] == -2
+    assert ball['shows'][0]['position']['z'] == -4.25
+    assert ball['shows'][0]['rotation']['y'] == pytest.approx(276.642)
+
+    ObjectRepository.get_instance().clear()
+    component.structural_throwers.wall = WallSide.RIGHT
+    component.structural_throwers.position_wall = 0
+    scene = prior_scene_with_target(add_to_repo=True)
+    scene = component.update_ile_scene(scene)
+    assert len(scene.objects) == 3
+    device = scene.objects[1]
+    assert device['shows'][0]['position']['x'] == 4.25
+    assert device['shows'][0]['position']['z'] == 0
+    assert device['shows'][0]['rotation']['y'] == pytest.approx(217.6942)
+    ball = scene.objects[2]
+    assert ball['shows'][0]['position']['x'] == 4.25
+    assert ball['shows'][0]['position']['z'] == 0
+    assert ball['shows'][0]['rotation']['y'] == pytest.approx(217.6942)
+
+    ObjectRepository.get_instance().clear()
+    component.structural_throwers.wall = WallSide.LEFT
+    component.structural_throwers.position_wall = 4.08
+    scene = prior_scene_with_target(add_to_repo=True)
+    scene = component.update_ile_scene(scene)
+    assert len(scene.objects) == 3
+    device = scene.objects[1]
+    assert device['shows'][0]['position']['x'] == -4.25
+    assert device['shows'][0]['position']['z'] == 4.08
+    assert device['shows'][0]['rotation']['y'] == 0
+    ball = scene.objects[2]
+    assert ball['shows'][0]['position']['x'] == -4.25
+    assert ball['shows'][0]['position']['z'] == 4.08
+    assert ball['shows'][0]['rotation']['y'] == 0
+
+
+def test_structural_objects_thrower_path_relative_collide_invalid():
+    component = SpecificStructuralObjectsComponent({
+        'structural_throwers': {
+            'num': 1,
+            'wall': 'left',
+            'position_wall': -4,
+            'height': 0,
+            # This rotation_y will be overridden
+            'rotation_y': 45,
+            'rotation_z': 0,
+            'throw_step': 5,
+            'throw_force': 15,
+            'projectile_shape': 'ball',
+            'projectile_scale': 1.5,
+            'path_relative': {
+                'option': 'collide',
+                'labels': 'target'
+            }
+        }
+    })
+    scene = prior_scene_with_target(add_to_repo=True)
+    with pytest.raises(ILEException):
+        # Error because the Y rotation is too big.
+        scene = component.update_ile_scene(scene)
 
 
 def test_structural_objects_thrower_with_used_target():
@@ -5392,10 +5812,15 @@ def test_placer_specific():
     assert placer['structure']
     assert len(placer['moves']) == 2
     assert placer['moves'][0]['stepBegin'] == 5
-    assert placer['moves'][0]['stepEnd'] == 10
-    assert placer['moves'][1]['stepBegin'] == 21
-    assert placer['moves'][1]['stepEnd'] == 25
-    assert placer['changeMaterials'][0]['stepBegin'] == 16
+    assert placer['moves'][0]['stepEnd'] == 9
+    assert placer['moves'][1]['stepBegin'] == 20
+    assert placer['moves'][1]['stepEnd'] == 23
+    assert placer['materials'] == ['Custom/Materials/Magenta']
+    assert placer['changeMaterials'][0]['stepBegin'] == 15
+    assert placer['changeMaterials'][0]['materials'] == [
+        'Custom/Materials/Cyan'
+    ]
+    assert placer['states'] == ([['active']] * 14) + ([['inactive']])
 
     assert ObjectRepository.get_instance().has_label('placers')
     assert ObjectRepository.get_instance().has_label('test_label')
@@ -5430,6 +5855,8 @@ def test_placer_empty_placer():
     # Test that only placer objects are in scene
     for obj in objs:
         assert obj['type'] == 'cylinder'
+        assert obj['states'] == (
+            [['active']] * (len(obj['states']) - 1)) + ([['inactive']])
 
 
 def test_placer_pickup_object():
@@ -5499,7 +5926,10 @@ def test_placer_pickup_object():
     assert placer['moves'][0]['stepEnd'] == 11
     assert placer['moves'][1]['stepBegin'] == 55
     assert placer['moves'][1]['stepEnd'] == 64
+    assert placer['materials'] == ['Custom/Materials/Cyan']
     assert placer['changeMaterials'][0]['stepBegin'] == 50
+    assert placer['changeMaterials'][0]['materials'] == ['Custom/Materials/Magenta']  # noqa: E501
+    assert placer['states'] == ([['inactive']] * 49) + ([['active']])
 
 
 def test_placer_shellgame_move():
@@ -5580,7 +6010,12 @@ def test_placer_shellgame_move():
     assert placer['moves'][1]['stepBegin'] == 17
     assert placer['moves'][1]['stepEnd'] == 22
     assert placer['moves'][1]['vector'] == {'x': 0, 'y': 0, 'z': -0.25}
+    assert placer['materials'] == ['Custom/Materials/Cyan']
+    assert len(placer['changeMaterials']) == 2
     assert placer['changeMaterials'][0]['stepBegin'] == 13
+    assert placer['changeMaterials'][0]['materials'] == ['Custom/Materials/Magenta']  # noqa: E501
+    assert placer['changeMaterials'][1]['stepBegin'] == 54
+    assert placer['changeMaterials'][1]['materials'] == ['Custom/Materials/Cyan']  # noqa: E501
     assert placer['moves'][2]['stepBegin'] == 23
     assert placer['moves'][2]['stepEnd'] == 46
     assert placer['moves'][2]['vector'] == {'x': -0.25, 'y': 0, 'z': 0}
@@ -5590,6 +6025,8 @@ def test_placer_shellgame_move():
     assert placer['moves'][4]['stepBegin'] == 57
     assert placer['moves'][4]['stepEnd'] == 67
     assert placer['moves'][4]['vector'] == {'x': 0, 'y': .25, 'z': 0}
+    assert placer['states'] == ([['inactive']] * 13) + \
+        ([['active']] * 41) + ([['inactive']] * 10)
 
 
 def test_placer_deactivation_step():
@@ -5650,7 +6087,10 @@ def test_placer_deactivation_step():
     assert placer['moves'][0]['stepEnd'] == 7
     assert placer['moves'][1]['stepBegin'] == 55
     assert placer['moves'][1]['stepEnd'] == 60
+    assert placer['materials'] == ['Custom/Materials/Magenta']
     assert placer['changeMaterials'][0]['stepBegin'] == 50
+    assert placer['changeMaterials'][0]['materials'] == ['Custom/Materials/Cyan']  # noqa: E501
+    assert placer['states'] == ([['active']] * 49) + ([['inactive']])
 
     assert ObjectRepository.get_instance().has_label('placers')
     assert ObjectRepository.get_instance().has_label('test_label')
@@ -5717,6 +6157,10 @@ def test_placer_relative_to_x():
     assert placer['structure']
     assert placer['shows'][0]['position']['x'] == -2
     assert placer['shows'][0]['position']['z'] == 2
+    assert placer['materials'] == ['Custom/Materials/Magenta']
+    assert placer['changeMaterials'][0]['stepBegin'] == 13
+    assert placer['changeMaterials'][0]['materials'] == ['Custom/Materials/Cyan']  # noqa: E501
+    assert placer['states'] == ([['active']] * 12) + ([['inactive']])
 
     assert ObjectRepository.get_instance().has_label('placers')
     assert ObjectRepository.get_instance().has_label('test_label')
@@ -5783,6 +6227,10 @@ def test_placer_relative_to_z():
     assert placer['structure']
     assert placer['shows'][0]['position']['x'] == 3
     assert placer['shows'][0]['position']['z'] == 1
+    assert placer['materials'] == ['Custom/Materials/Magenta']
+    assert placer['changeMaterials'][0]['stepBegin'] == 13
+    assert placer['changeMaterials'][0]['materials'] == ['Custom/Materials/Cyan']  # noqa: E501
+    assert placer['states'] == ([['active']] * 12) + ([['inactive']])
 
     assert ObjectRepository.get_instance().has_label('placers')
     assert ObjectRepository.get_instance().has_label('test_label')
@@ -5855,6 +6303,10 @@ def test_placer_relative_with_adjustment():
     assert placer['structure']
     assert placer['shows'][0]['position']['x'] == pytest.approx(-1.88)
     assert placer['shows'][0]['position']['z'] == pytest.approx(0.66)
+    assert placer['materials'] == ['Custom/Materials/Magenta']
+    assert placer['changeMaterials'][0]['stepBegin'] == 13
+    assert placer['changeMaterials'][0]['materials'] == ['Custom/Materials/Cyan']  # noqa: E501
+    assert placer['states'] == ([['active']] * 12) + ([['inactive']])
 
     assert ObjectRepository.get_instance().has_label('placers')
     assert ObjectRepository.get_instance().has_label('test_label')
@@ -5898,7 +6350,7 @@ def test_placer_with_existing_labels():
     assert target['togglePhysics'][0]['stepBegin'] == 17
     assert len(target['shows']) == 1
     assert target['shows'][0]['position'] == pytest.approx(
-        {'x': 3, 'y': 2.885, 'z': 2}
+        {'x': 3, 'y': 2.86, 'z': 2}
     )
     assert target['shows'][0]['rotation'] == {'x': 0, 'y': 27, 'z': 0}
     assert target['shows'][0]['scale'] == {'x': 1, 'y': 1, 'z': 1}
@@ -5914,7 +6366,7 @@ def test_placer_with_existing_labels():
     assert placer['changeMaterials'][0]['stepBegin'] == 17
     assert len(placer['shows']) == 1
     assert placer['shows'][0]['position'] == pytest.approx(
-        {'x': 3, 'y': 4.495, 'z': 2}
+        {'x': 3, 'y': 4.47, 'z': 2}
     )
     assert placer['shows'][0]['rotation'] == {'x': 0, 'y': 0, 'z': 0}
     assert placer['shows'][0]['scale'] == {'x': 0.05, 'y': 1.5, 'z': 0.05}
@@ -5925,6 +6377,11 @@ def test_placer_with_existing_labels():
     assert placer['moves'][1]['stepBegin'] == 22
     assert placer['moves'][1]['stepEnd'] == 31
     assert placer['moves'][1]['vector'] == {'x': 0, 'y': 0.25, 'z': 0}
+    assert placer['materials'] == ['Custom/Materials/Magenta']
+    assert placer['changeMaterials'][0]['stepBegin'] == 17
+    assert placer['changeMaterials'][0]['materials'] == ['Custom/Materials/Cyan']  # noqa: E501
+    # more inactive state properties here due to last_step being set
+    assert placer['states'] == ([['active']] * 16) + ([['inactive']] * 983)
     assert ObjectRepository.get_instance().has_label('placers')
     assert not ObjectRepository.get_instance().has_label('test_label')
 
@@ -6010,7 +6467,7 @@ def test_placer_with_new_labels():
     assert placed_object['togglePhysics'][0]['stepBegin'] == 16
     assert len(placed_object['shows']) == 1
     assert placed_object['shows'][0]['position']['x'] == pytest.approx(3)
-    assert placed_object['shows'][0]['position']['y'] == pytest.approx(2.775)
+    assert placed_object['shows'][0]['position']['y'] == pytest.approx(2.72)
     assert placed_object['shows'][0]['position']['z'] == pytest.approx(2)
     assert placed_object['shows'][0]['rotation'] == {'x': 0, 'y': 27, 'z': 0}
     assert placed_object['shows'][0]['scale'] == {'x': 2, 'y': 2, 'z': 2}
@@ -6026,7 +6483,7 @@ def test_placer_with_new_labels():
     assert placer['changeMaterials'][0]['stepBegin'] == 16
     assert len(placer['shows']) == 1
     assert placer['shows'][0]['position'] == pytest.approx(
-        {'x': 3, 'y': 4.495, 'z': 2}
+        {'x': 3, 'y': 4.44, 'z': 2}
     )
     assert placer['shows'][0]['rotation'] == {'x': 0, 'y': 0, 'z': 0}
     assert placer['shows'][0]['scale'] == {'x': 0.09, 'y': 1.5, 'z': 0.09}
@@ -6037,6 +6494,11 @@ def test_placer_with_new_labels():
     assert placer['moves'][1]['stepBegin'] == 21
     assert placer['moves'][1]['stepEnd'] == 29
     assert placer['moves'][1]['vector'] == {'x': 0, 'y': 0.25, 'z': 0}
+    assert placer['materials'] == ['Custom/Materials/Magenta']
+    assert placer['changeMaterials'][0]['stepBegin'] == 16
+    assert placer['changeMaterials'][0]['materials'] == ['Custom/Materials/Cyan']  # noqa: E501
+    # more inactive state properties here due to last_step being set
+    assert placer['states'] == ([['active']] * 15) + ([['inactive']] * 984)
     assert ObjectRepository.get_instance().has_label('placers')
     assert not ObjectRepository.get_instance().has_label('test_label')
 
@@ -6185,7 +6647,7 @@ def test_placer_container_asymmetric():
     assert container['kinematic']
 
     show = container['shows'][0]
-    assert show['position'] == {'x': 1.1, 'y': pytest.approx(2.155), 'z': 1.3}
+    assert show['position'] == {'x': 1.1, 'y': pytest.approx(2.1), 'z': 1.3}
     assert show['rotation'] == {'x': 0, 'y': 0, 'z': 0}
     assert show['scale'] == {'x': 1.4, 'y': 1.4, 'z': 1.4}
 
@@ -6205,7 +6667,7 @@ def test_placer_container_asymmetric():
 
     show = placer['shows'][0]
     assert show['position'] == {
-        'x': pytest.approx(1.66), 'y': pytest.approx(3.135), 'z': 1.3
+        'x': pytest.approx(1.66), 'y': pytest.approx(3.08), 'z': 1.3
     }
     assert show['rotation'] == {'x': 0, 'y': 0, 'z': 0}
     assert show['scale'] == {'x': 0.25, 'y': pytest.approx(0.7), 'z': 0.25}
@@ -6218,8 +6680,11 @@ def test_placer_container_asymmetric():
     assert placer['moves'][1]['stepEnd'] == 15
     assert placer['moves'][1]['vector'] == {'x': 0, 'y': 0.25, 'z': 0}
 
+    assert placer['materials'] == ['Custom/Materials/Magenta']
     assert len(placer['changeMaterials']) == 1
     assert placer['changeMaterials'][0]['stepBegin'] == 10
+    assert placer['changeMaterials'][0]['materials'] == ['Custom/Materials/Cyan']  # noqa: E501
+    assert placer['states'] == ([['active']] * 9) + ([['inactive']])
 
     placer = scene.objects[2]
     assert placer['id'].startswith('placer_')
@@ -6229,7 +6694,7 @@ def test_placer_container_asymmetric():
 
     show = placer['shows'][0]
     assert show['position'] == {
-        'x': pytest.approx(0.54), 'y': pytest.approx(3.695), 'z': 1.3
+        'x': pytest.approx(0.54), 'y': pytest.approx(3.64), 'z': 1.3
     }
     assert show['rotation'] == {'x': 0, 'y': 0, 'z': 0}
     assert show['scale'] == {'x': 0.25, 'y': pytest.approx(0.7), 'z': 0.25}
@@ -6242,8 +6707,10 @@ def test_placer_container_asymmetric():
     assert placer['moves'][1]['stepEnd'] == 15
     assert placer['moves'][1]['vector'] == {'x': 0, 'y': 0.25, 'z': 0}
 
+    assert placer['materials'] == ['Custom/Materials/Magenta']
     assert len(placer['changeMaterials']) == 1
     assert placer['changeMaterials'][0]['stepBegin'] == 10
+    assert placer['states'] == ([['active']] * 9) + ([['inactive']])
 
     assert ObjectRepository.get_instance().has_label('placers')
     assert ObjectRepository.get_instance().has_label('test_label')
@@ -6288,7 +6755,7 @@ def test_placer_container_asymmetric_with_rotation():
     assert container['kinematic']
 
     show = container['shows'][0]
-    assert show['position'] == {'x': 1.1, 'y': pytest.approx(2.155), 'z': 1.3}
+    assert show['position'] == {'x': 1.1, 'y': pytest.approx(2.1), 'z': 1.3}
     assert show['rotation'] == {'x': 0, 'y': 34, 'z': 0}
     assert show['scale'] == {'x': 1.4, 'y': 1.4, 'z': 1.4}
 
@@ -6309,7 +6776,7 @@ def test_placer_container_asymmetric_with_rotation():
     show = placer['shows'][0]
     assert show['position'] == {
         'x': pytest.approx(1.564261),
-        'y': pytest.approx(3.135),
+        'y': pytest.approx(3.08),
         'z': pytest.approx(0.986852)
     }
     assert show['rotation'] == {'x': 0, 'y': 0, 'z': 0}
@@ -6323,8 +6790,11 @@ def test_placer_container_asymmetric_with_rotation():
     assert placer['moves'][1]['stepEnd'] == 15
     assert placer['moves'][1]['vector'] == {'x': 0, 'y': 0.25, 'z': 0}
 
+    assert placer['materials'] == ['Custom/Materials/Magenta']
     assert len(placer['changeMaterials']) == 1
     assert placer['changeMaterials'][0]['stepBegin'] == 10
+    assert placer['changeMaterials'][0]['materials'] == ['Custom/Materials/Cyan']  # noqa: E501
+    assert placer['states'] == ([['active']] * 9) + ([['inactive']])
 
     placer = scene.objects[2]
     assert placer['id'].startswith('placer_')
@@ -6335,7 +6805,7 @@ def test_placer_container_asymmetric_with_rotation():
     show = placer['shows'][0]
     assert show['position'] == {
         'x': pytest.approx(0.635739),
-        'y': pytest.approx(3.695),
+        'y': pytest.approx(3.64),
         'z': pytest.approx(1.613148)
     }
     assert show['rotation'] == {'x': 0, 'y': 0, 'z': 0}
@@ -6349,8 +6819,11 @@ def test_placer_container_asymmetric_with_rotation():
     assert placer['moves'][1]['stepEnd'] == 15
     assert placer['moves'][1]['vector'] == {'x': 0, 'y': 0.25, 'z': 0}
 
+    assert placer['materials'] == ['Custom/Materials/Magenta']
     assert len(placer['changeMaterials']) == 1
     assert placer['changeMaterials'][0]['stepBegin'] == 10
+    assert placer['changeMaterials'][0]['materials'] == ['Custom/Materials/Cyan']  # noqa: E501
+    assert placer['states'] == ([['active']] * 9) + ([['inactive']])
 
     assert ObjectRepository.get_instance().has_label('placers')
     assert ObjectRepository.get_instance().has_label('test_label')
@@ -6391,6 +6864,8 @@ def test_placer_activate_after():
     assert placer['id'].startswith('placer_')
     assert placer['type'] == 'cylinder'
     assert placer['moves'][0]['stepBegin'] == 51
+    assert placer['states'] == (
+        [['active']] * (len(placer['states']) - 1)) + ([['inactive']])
 
 
 def test_placer_activate_after_delay():
@@ -6450,6 +6925,8 @@ def test_placer_activate_on_start_or_after_after():
     assert placer['id'].startswith('placer_')
     assert placer['type'] == 'cylinder'
     assert placer['moves'][0]['stepBegin'] == 11
+    assert placer['states'] == (
+        [['active']] * (len(placer['states']) - 1)) + ([['inactive']])
 
 
 def test_placer_activate_on_start_or_after_start():
@@ -6487,6 +6964,8 @@ def test_placer_activate_on_start_or_after_start():
     assert placer['id'].startswith('placer_')
     assert placer['type'] == 'cylinder'
     assert placer['moves'][0]['stepBegin'] == 1
+    assert placer['states'] == (
+        [['active']] * (len(placer['states']) - 1)) + ([['inactive']])
 
 
 def test_placer_activate_on_start_or_after_multiple():
@@ -6530,6 +7009,8 @@ def test_placer_activate_on_start_or_after_multiple():
     assert placer['id'].startswith('placer_')
     assert placer['type'] == 'cylinder'
     assert placer['moves'][0]['stepBegin'] == 51
+    assert placer['states'] == (
+        [['active']] * (len(placer['states']) - 1)) + ([['inactive']])
 
 
 def test_placer_activate_on_start_or_after_delay():
@@ -7625,3 +8106,526 @@ def test_structural_ramp_fail_restricted_material():
                 'material': materials.SOFA_1_MATERIALS[0].material
             }]
         })
+
+
+def test_structural_objects_platform_long_with_two_ramps():
+    component = SpecificStructuralObjectsComponent({
+        'structural_platforms': {
+            'num': 3,
+            'long_with_two_ramps': True
+        }
+    })
+    pre_plat = component.structural_platforms
+    assert isinstance(pre_plat, StructuralPlatformConfig)
+    assert pre_plat.num == 3
+    assert pre_plat.long_with_two_ramps
+
+    # Sometimes it cannot generate a valid scene but it usually
+    # works on the second or third try
+    valid = False
+    for _ in range(MAX_TRIES):
+        scene = None
+        try:
+            scene = component.update_ile_scene(prior_scene_custom_size(25, 25))
+        except Exception:
+            continue
+        for i in range(3):
+            assert ObjectRepository.get_instance().has_label('platforms')
+            assert ObjectRepository.get_instance().has_label('ramps')
+            objs = scene.objects
+            assert len(objs) == 9
+            platform_index = i * 3
+            plat = objs[platform_index]
+            ramp_1 = objs[platform_index + 1]
+            ramp_2 = objs[platform_index + 2]
+            assert plat['id'].startswith('platform_')
+            assert ramp_1['id'].startswith('ramp_')
+            assert ramp_2['id'].startswith('ramp_')
+
+            plat_scale = plat['shows'][0]['scale']
+            long_x = plat_scale['x'] > plat_scale['z']
+            assert (
+                plat_scale['x'] == scene.room_dimensions.x if
+                long_x else
+                PLATFORM_SCALE_MIN <= plat_scale['x'] <= PLATFORM_SCALE_MAX)
+            assert (
+                plat_scale['z'] == scene.room_dimensions.z if not
+                long_x else
+                PLATFORM_SCALE_MIN <= plat_scale['z'] <= PLATFORM_SCALE_MAX)
+
+            lips = plat['lips']
+            assert (lips['front'] and lips['back'] and
+                    lips['left'] and lips['right'])
+            assert (lips['gaps']['front'] and lips['gaps']['back'] if
+                    long_x else lips['gaps']['left'] and lips['gaps']['right'])
+
+            ramp_1_pos = ramp_1['shows'][0]['position']
+            ramp_2_pos = ramp_2['shows'][0]['position']
+            assert (
+                round(ramp_1_pos['z']) < round(ramp_2_pos['z']) if long_x else
+                round(ramp_1_pos['x']) < round(ramp_2_pos['x']))
+
+            ramp_1_rot = ramp_1['shows'][0]['rotation']['y']
+            ramp_2_rot = ramp_2['shows'][0]['rotation']['y']
+            assert abs(abs(ramp_1_rot) - abs(ramp_2_rot)) == 180
+        valid = True
+        break
+    assert valid
+
+
+def test_structural_objects_platform_long_with_two_ramps_stacked():
+    component = SpecificStructuralObjectsComponent({
+        'structural_platforms': {
+            'num': 1,
+            'long_with_two_ramps': True,
+            'platform_underneath': True
+        }
+    })
+    pre_plat = component.structural_platforms
+    assert isinstance(pre_plat, StructuralPlatformConfig)
+    assert pre_plat.num == 1
+    assert pre_plat.long_with_two_ramps
+    assert pre_plat.platform_underneath
+
+    # Sometimes it cannot generate a valid scene but it usually
+    # works on the second or third try
+    valid = False
+    for _ in range(MAX_TRIES):
+        scene = None
+        try:
+            scene = component.update_ile_scene(prior_scene_custom_size(25, 25))
+        except Exception:
+            continue
+
+        assert ObjectRepository.get_instance().has_label('platforms')
+        assert ObjectRepository.get_instance().has_label('ramps')
+        objs = scene.objects
+        assert len(objs) == 6
+        assert objs[0]['shows'][0]['position']['y'] > \
+            objs[1]['shows'][0]['position']['y']
+        for i in range(2):
+            plat = objs[i]
+            ramp_1 = objs[i * 2 + 2]
+            ramp_2 = objs[i * 2 + 3]
+            assert plat['id'].startswith('platform_')
+            assert ramp_1['id'].startswith('ramp_')
+            assert ramp_2['id'].startswith('ramp_')
+
+            plat_scale = plat['shows'][0]['scale']
+            long_x = plat_scale['x'] > plat_scale['z']
+            plat_scale = plat['shows'][0]['scale']
+            long_x = plat_scale['x'] > plat_scale['z']
+            assert (
+                plat_scale['x'] == scene.room_dimensions.x if
+                long_x else
+                PLATFORM_SCALE_MIN <= plat_scale['x'] <= PLATFORM_SCALE_MAX if
+                i == 0 else
+                plat_scale['x'] > scene.objects[0]['shows'][0]['scale']['x']
+            )
+            assert (
+                plat_scale['z'] == scene.room_dimensions.z if not
+                long_x else
+                PLATFORM_SCALE_MIN <= plat_scale['z'] <= PLATFORM_SCALE_MAX if
+                i == 0 else
+                plat_scale['z'] > scene.objects[0]['shows'][0]['scale']['z']
+            )
+            lips = plat['lips']
+            assert (lips['front'] and lips['back'] and
+                    lips['left'] and lips['right'])
+            assert (lips['gaps']['front'] and lips['gaps']['back'] if
+                    long_x else lips['gaps']['left'] and lips['gaps']['right'])
+
+            ramp_1_pos = ramp_1['shows'][0]['position']
+            ramp_2_pos = ramp_2['shows'][0]['position']
+            assert (
+                round(ramp_1_pos['z']) < round(ramp_2_pos['z']) if long_x else
+                round(ramp_1_pos['x']) < round(ramp_2_pos['x']))
+
+            ramp_1_rot = ramp_1['shows'][0]['rotation']['y']
+            ramp_2_rot = ramp_2['shows'][0]['rotation']['y']
+            assert abs(abs(ramp_1_rot) - abs(ramp_2_rot)) == 180
+        valid = True
+        break
+    assert valid
+
+
+def test_structural_objects_platform_long_with_two_ramps_errors():
+    component = SpecificStructuralObjectsComponent({
+        'structural_platforms': {
+            'num': 4,
+            'long_with_two_ramps': True
+        }
+    })
+    pre_plat = component.structural_platforms
+    assert isinstance(pre_plat, StructuralPlatformConfig)
+    assert pre_plat.num == 4
+    assert pre_plat.long_with_two_ramps
+    with pytest.raises(ILEException):
+        component.update_ile_scene(prior_scene_custom_size(25, 25))
+
+    component = SpecificStructuralObjectsComponent({
+        'structural_platforms': {
+            'num': 2,
+            'long_with_two_ramps': True,
+            'platform_underneath': True
+        }
+    })
+    pre_plat = component.structural_platforms
+    assert isinstance(pre_plat, StructuralPlatformConfig)
+    assert pre_plat.num == 2
+    assert pre_plat.long_with_two_ramps
+    assert pre_plat.platform_underneath
+    with pytest.raises(ILEException):
+        component.update_ile_scene(prior_scene_custom_size(25, 25))
+
+
+def test_structural_objects_platform_adjacent_to_wall_errors():
+    with pytest.raises(ILEException):
+        component = SpecificStructuralObjectsComponent({
+            'structural_platforms': {
+                'num': 1,
+                'adjacent_to_wall': 'left_front_corner'
+            }
+        })
+
+    component = SpecificStructuralObjectsComponent({
+        'structural_platforms': {
+            'num': 2,
+            'adjacent_to_wall': 'front_left_corner'
+        }
+    })
+    pre_plat = component.structural_platforms
+    assert isinstance(pre_plat, StructuralPlatformConfig)
+    assert pre_plat.num == 2
+    assert pre_plat.adjacent_to_wall
+    with pytest.raises(ILEException):
+        component.update_ile_scene(prior_scene_custom_size(25, 25))
+
+
+def test_structural_objects_platform_adjacent_to_wall():
+    for side in WALL_SIDES:
+        ramp_count = randint(2, 4)
+        component = SpecificStructuralObjectsComponent({
+            'structural_platforms': {
+                'num': 1,
+                'adjacent_to_wall': side,
+                'attached_ramps': ramp_count
+            }
+        })
+        pre_plat = component.structural_platforms
+        assert isinstance(pre_plat, StructuralPlatformConfig)
+        assert pre_plat.num == 1
+        assert pre_plat.adjacent_to_wall == side
+
+        x = randint(10, 25)
+        z = randint(10, 25)
+        scene = component.update_ile_scene(prior_scene_custom_size(x, z))
+
+        assert ObjectRepository.get_instance().has_label('platforms')
+        assert ObjectRepository.get_instance().has_label('ramps')
+        objs = scene.objects
+        assert len(objs) == 1 + ramp_count
+        side_x = -1 if 'left' in side else 1 if 'right' in side else 0
+        side_z = -1 if 'back' in side else 1 if 'front' in side else 0
+        plat = objs[0]
+        ramps = objs[1:]
+        half_scale_x = plat['shows'][0]['scale']['x'] / 2
+        half_scale_z = plat['shows'][0]['scale']['z'] / 2
+        plat_pos = plat['shows'][0]['position']
+        scale_check_x = half_scale_z if abs(
+            plat['shows'][0]['rotation']['y']) % 180 != 0 else half_scale_x
+        scale_check_z = half_scale_x if abs(
+            plat['shows'][0]['rotation']['y']) % 180 != 0 else half_scale_z
+        if side_x:
+            assert plat_pos['x'] == side_x * (x / 2 - scale_check_x)
+            for ramp in ramps:
+                ramp_pos = ramp['shows'][0]['position']
+                assert (ramp_pos['x'] > side_x * (x / 2 + scale_check_x) if
+                        side_x == -1 else
+                        ramp_pos['x'] < side_x * (x / 2 + scale_check_x))
+                assert ramp['shows'][0]['rotation']['y'] != -side_x * 90
+        if side_z:
+            assert plat_pos['z'] == side_z * (z / 2 - scale_check_z)
+            for ramp in ramps:
+                ramp_pos = ramp['shows'][0]['position']
+                assert (ramp_pos['z'] > side_z * (z / 2 + scale_check_z) if
+                        side_z == -1 else
+                        ramp_pos['z'] < side_z * (z / 2 + scale_check_z))
+                assert abs(ramp['shows'][0]['rotation']['y']) != (
+                    0 if side_z == -1 else 180)
+
+
+def test_multiple_platforms_adjacent_to_same_wall():
+    for side in ['left', 'right', 'front', 'back']:
+        platform_count = randint(2, 3)
+        ramp_count = randint(2, 3)
+        scale = randint(1, 2)
+        component = SpecificStructuralObjectsComponent({
+            'structural_platforms': {
+                'num': platform_count,
+                'scale': scale,
+                'adjacent_to_wall': side,
+                'attached_ramps': ramp_count
+            }
+        })
+        pre_plat = component.structural_platforms
+        assert isinstance(pre_plat, StructuralPlatformConfig)
+        assert pre_plat.num == platform_count
+        assert pre_plat.attached_ramps == ramp_count
+        assert pre_plat.adjacent_to_wall == side
+
+        # Need bigger sizes to test this
+        x = randint(50, 55)
+        z = randint(50, 55)
+        scene = component.update_ile_scene(prior_scene_custom_size(x, z))
+
+        assert ObjectRepository.get_instance().has_label('platforms')
+        assert ObjectRepository.get_instance().has_label('ramps')
+        objs = scene.objects
+        assert len(objs) == platform_count + ramp_count * platform_count
+        side_x = -1 if 'left' in side else 1 if 'right' in side else 0
+        side_z = -1 if 'back' in side else 1 if 'front' in side else 0
+        for i in range(platform_count):
+            plat_index = i * (ramp_count + 1)
+            ramp_index = plat_index + 1
+            plat = objs[plat_index]
+            ramps = objs[ramp_index: ramp_index + ramp_count]
+            half_scale_x = plat['shows'][0]['scale']['x'] / 2
+            half_scale_z = plat['shows'][0]['scale']['z'] / 2
+            plat_pos = plat['shows'][0]['position']
+            scale_check_x = half_scale_z if abs(
+                plat['shows'][0]['rotation']['y']) % 180 != 0 else half_scale_x
+            scale_check_z = half_scale_x if abs(
+                plat['shows'][0]['rotation']['y']) % 180 != 0 else half_scale_z
+            if side_x:
+                assert plat_pos['x'] == side_x * (x / 2 - scale_check_x)
+                for ramp in ramps:
+                    ramp_pos = ramp['shows'][0]['position']
+                    assert (ramp_pos['x'] > side_x * (x / 2 + scale_check_x) if
+                            side_x == -1 else
+                            ramp_pos['x'] < side_x * (x / 2 + scale_check_x))
+                    assert ramp['shows'][0]['rotation']['y'] != -side_x * 90
+            if side_z:
+                assert plat_pos['z'] == side_z * (z / 2 - scale_check_z)
+                for ramp in ramps:
+                    ramp_pos = ramp['shows'][0]['position']
+                    assert (ramp_pos['z'] > side_z * (z / 2 + scale_check_z) if
+                            side_z == -1 else
+                            ramp_pos['z'] < side_z * (z / 2 + scale_check_z))
+                    assert abs(ramp['shows'][0]['rotation']['y']) != (
+                        0 if side_z == -1 else 180)
+
+
+def test_multiple_platforms_adjacent_to_all_walls():
+    platform_count = 8
+    ramp_count = randint(2, 3)
+    scale = randint(1, 2)
+    component = SpecificStructuralObjectsComponent({
+        'structural_platforms': {
+            'num': platform_count,
+            'scale': scale,
+            'adjacent_to_wall': WALL_SIDES,
+            'attached_ramps': ramp_count
+        }
+    })
+    pre_plat = component.structural_platforms
+    assert isinstance(pre_plat, StructuralPlatformConfig)
+    assert pre_plat.num == platform_count
+    assert pre_plat.attached_ramps == ramp_count
+    assert pre_plat.adjacent_to_wall == WALL_SIDES
+
+    x = randint(25, 30)
+    z = randint(25, 30)
+    scene = component.update_ile_scene(prior_scene_custom_size(x, z))
+
+    assert ObjectRepository.get_instance().has_label('platforms')
+    assert ObjectRepository.get_instance().has_label('ramps')
+    objs = scene.objects
+    assert len(objs) == platform_count + ramp_count * platform_count
+    for i in range(platform_count):
+        plat_index = i * (ramp_count + 1)
+        ramp_index = plat_index + 1
+        plat = objs[plat_index]
+        ramps = objs[ramp_index: ramp_index + ramp_count]
+        half_scale_x = plat['shows'][0]['scale']['x'] / 2
+        half_scale_z = plat['shows'][0]['scale']['z'] / 2
+        plat_pos = plat['shows'][0]['position']
+        scale_check_x = half_scale_z if abs(
+            plat['shows'][0]['rotation']['y']) % 180 != 0 else half_scale_x
+        scale_check_z = half_scale_x if abs(
+            plat['shows'][0]['rotation']['y']) % 180 != 0 else half_scale_z
+        side = plat['debug']['adjacent_to_wall']
+        side_x = -1 if 'left' in side else 1 if 'right' in side else 0
+        side_z = -1 if 'back' in side else 1 if 'front' in side else 0
+        if side_x:
+            assert plat_pos['x'] == side_x * (x / 2 - scale_check_x)
+            for ramp in ramps:
+                ramp_pos = ramp['shows'][0]['position']
+                assert (ramp_pos['x'] > side_x * (x / 2 + scale_check_x) if
+                        side_x == -1 else
+                        ramp_pos['x'] < side_x * (x / 2 + scale_check_x))
+                assert ramp['shows'][0]['rotation']['y'] != -side_x * 90
+        if side_z:
+            assert plat_pos['z'] == side_z * (z / 2 - scale_check_z)
+            for ramp in ramps:
+                ramp_pos = ramp['shows'][0]['position']
+                assert (ramp_pos['z'] > side_z * (z / 2 + scale_check_z) if
+                        side_z == -1 else
+                        ramp_pos['z'] < side_z * (z / 2 + scale_check_z))
+                assert abs(ramp['shows'][0]['rotation']['y']) != (
+                    0 if side_z == -1 else 180)
+
+
+def test_multiple_platforms_stacked_adjacent_to_same_wall():
+    for side in ['left', 'right', 'front', 'back']:
+        platform_count = randint(2, 3)
+        ramp_count = randint(2, 3)
+        scale = randint(1, 2)
+        component = SpecificStructuralObjectsComponent({
+            'structural_platforms': {
+                'num': platform_count,
+                'scale': scale,
+                'adjacent_to_wall': side,
+                'attached_ramps': ramp_count,
+                'platform_underneath': True,
+                'platform_underneath_attached_ramps': ramp_count
+            }
+        })
+        pre_plat = component.structural_platforms
+        assert isinstance(pre_plat, StructuralPlatformConfig)
+        assert pre_plat.num == platform_count
+        assert pre_plat.attached_ramps == ramp_count
+        assert pre_plat.adjacent_to_wall == side
+
+        # Need bigger sizes to test this
+        x = randint(50, 55)
+        z = randint(50, 55)
+        scene = component.update_ile_scene(prior_scene_custom_size(x, z))
+
+        assert ObjectRepository.get_instance().has_label('platforms')
+        assert ObjectRepository.get_instance().has_label('ramps')
+        objs = scene.objects
+        assert len(objs) == platform_count * 2 + \
+            ramp_count * platform_count * 2
+        side_x = -1 if 'left' in side else 1 if 'right' in side else 0
+        side_z = -1 if 'back' in side else 1 if 'front' in side else 0
+        for i in range(platform_count):
+            platform_index = i * (2 + ramp_count * 2)
+            section = objs[platform_index:platform_index +
+                           platform_count + ramp_count + 2]
+            for j in range(2):
+                plat = section[j]
+                start_ramp_index = j * 2 + 2
+                ramps = section[
+                    start_ramp_index: start_ramp_index + ramp_count]
+                plat_pos = plat['shows'][0]['position']
+                half_scale_x = plat['shows'][0]['scale']['x'] / 2
+                half_scale_z = plat['shows'][0]['scale']['z'] / 2
+                # Check a different scale if the platform is rotated
+                # 90 or 270 degrees
+                scale_check_x = half_scale_z if abs(
+                    plat['shows'][0]['rotation']['y']) % 180 != 0 else \
+                    half_scale_x
+                scale_check_z = half_scale_x if abs(
+                    plat['shows'][0]['rotation']['y']) % 180 != 0 else \
+                    half_scale_z
+                if side_x:
+                    assert round(plat_pos['x'], 3) == round(
+                        side_x * (x / 2 - scale_check_x), 3)
+                    for ramp in ramps:
+                        ramp_pos = ramp['shows'][0]['position']
+                        assert (
+                            ramp_pos['x'] > side_x * (x / 2 + scale_check_x) if
+                            side_x == -1 else
+                            ramp_pos['x'] < side_x * (x / 2 + scale_check_x))
+                        assert ramp['shows'][0]['rotation']['y'] != - \
+                            side_x * 90
+                if side_z:
+                    assert round(plat_pos['z'], 3) == round(
+                        side_z * (z / 2 - scale_check_z), 3)
+                    for ramp in ramps:
+                        ramp_pos = ramp['shows'][0]['position']
+                        assert (
+                            ramp_pos['z'] > side_z * (z / 2 + scale_check_z) if
+                            side_z == -1 else
+                            ramp_pos['z'] < side_z * (z / 2 + scale_check_z))
+                        assert abs(ramp['shows'][0]['rotation']['y']) != (
+                            0 if side_z == -1 else 180)
+
+
+def test_multiple_platforms_stacked_adjacent_to_all_walls():
+    platform_count = 8
+    ramp_count = randint(2, 3)
+    scale = randint(1, 2)
+    ramp_count = randint(2, 3)
+    component = SpecificStructuralObjectsComponent({
+        'structural_platforms': {
+            'num': platform_count,
+            'scale': scale,
+            'adjacent_to_wall': WALL_SIDES,
+            'attached_ramps': ramp_count,
+            'platform_underneath': True,
+            'platform_underneath_attached_ramps': ramp_count
+        }
+    })
+    pre_plat = component.structural_platforms
+    assert isinstance(pre_plat, StructuralPlatformConfig)
+    assert pre_plat.num == platform_count
+    assert pre_plat.attached_ramps == ramp_count
+    assert pre_plat.adjacent_to_wall == WALL_SIDES
+
+    # Need bigger sizes to test this
+    x = randint(50, 55)
+    z = randint(50, 55)
+    scene = component.update_ile_scene(prior_scene_custom_size(x, z))
+
+    assert ObjectRepository.get_instance().has_label('platforms')
+    assert ObjectRepository.get_instance().has_label('ramps')
+    objs = scene.objects
+    assert len(objs) == platform_count * 2 + \
+        ramp_count * platform_count * 2
+    for i in range(platform_count):
+        platform_index = i * (2 + ramp_count * 2)
+        section = objs[platform_index:platform_index +
+                       platform_count + ramp_count + 2]
+        for j in range(2):
+            plat = section[j]
+            start_ramp_index = j * 2 + 2
+            ramps = section[
+                start_ramp_index: start_ramp_index + ramp_count]
+            plat_pos = plat['shows'][0]['position']
+            half_scale_x = plat['shows'][0]['scale']['x'] / 2
+            half_scale_z = plat['shows'][0]['scale']['z'] / 2
+            # Check a different scale if the platform is rotated
+            # 90 or 270 degrees
+            scale_check_x = half_scale_z if abs(
+                plat['shows'][0]['rotation']['y']) % 180 != 0 else \
+                half_scale_x
+            scale_check_z = half_scale_x if abs(
+                plat['shows'][0]['rotation']['y']) % 180 != 0 else \
+                half_scale_z
+            side = plat['debug']['adjacent_to_wall']
+            side_x = -1 if 'left' in side else 1 if 'right' in side else 0
+            side_z = -1 if 'back' in side else 1 if 'front' in side else 0
+            if side_x:
+                assert round(plat_pos['x'], 3) == round(
+                    side_x * (x / 2 - scale_check_x), 3)
+                for ramp in ramps:
+                    ramp_pos = ramp['shows'][0]['position']
+                    assert (
+                        ramp_pos['x'] > side_x * (x / 2 + scale_check_x) if
+                        side_x == -1 else
+                        ramp_pos['x'] < side_x * (x / 2 + scale_check_x))
+                    assert ramp['shows'][0]['rotation']['y'] != - \
+                        side_x * 90
+            if side_z:
+                assert round(plat_pos['z'], 3) == round(
+                    side_z * (z / 2 - scale_check_z), 3)
+                for ramp in ramps:
+                    ramp_pos = ramp['shows'][0]['position']
+                    assert (
+                        ramp_pos['z'] > side_z * (z / 2 + scale_check_z) if
+                        side_z == -1 else
+                        ramp_pos['z'] < side_z * (z / 2 + scale_check_z))
+                    assert abs(ramp['shows'][0]['rotation']['y']) != (
+                        0 if side_z == -1 else 180)

@@ -18,6 +18,7 @@ from hypercube.agent_scene_pair_json_converter import (
     AgentConfig,
     ObjectConfig,
     ObjectConfigWithMaterial,
+    TrueObjectBounds,
     _append_each_show_to_object,
     _choose_config_list,
     _create_action_list,
@@ -35,6 +36,7 @@ from hypercube.agent_scene_pair_json_converter import (
     _create_wall_object_list,
     _fix_key_location,
     _identify_trial_index_starting_step,
+    _make_true_bounds,
     _move_agent_past_lock_location,
     _remove_extraneous_object_show,
     _remove_intersecting_agent_steps,
@@ -44,11 +46,26 @@ from hypercube.agent_scene_pair_json_converter import (
 UNIT_SIZE = [0.025, 0.025]
 
 
-def create_bounds(x1, x2, z1, z2):
-    return ObjectBounds(box_xz=[
-        Vector3d(x=x, y=0, z=z) for x, z in [(x1, z1), (x1, z2),
-                                             (x2, z2), (x2, z1)]
-    ], max_y=0, min_y=0)
+def create_ellipsoidal_bounds(center_x, center_z, radius_x, radius_z):
+    # Just use an arbitrary round shape, Y dimension, rotation, and standing Y.
+    return _make_true_bounds(
+        'cylinder',
+        dimensions={'x': radius_x * 2, 'y': 1, 'z': radius_z * 2},
+        offset=None,
+        position={'x': center_x, 'y': 0, 'z': center_z},
+        rotation={'x': 0, 'y': 0, 'z': 0},
+        standing_y=0
+    )
+
+
+def create_simple_bounds(x1, x2, z1, z2):
+    rect = [(x1, z1), (x1, z2), (x2, z2), (x2, z1)]
+    bounds = ObjectBounds(
+        box_xz=[Vector3d(x=x, y=0, z=z) for x, z in rect],
+        max_y=0,
+        min_y=0
+    )
+    return TrueObjectBounds(bounds=bounds, true_poly=bounds.polygon_xz)
 
 
 def verify_bounds(mcs_object, step, x1, x2, z1, z2):
@@ -255,6 +272,17 @@ def verify_static_wall_list_properties(
             assert 'hides' not in wall_object
 
 
+def wrap_create_bounds(dimensions, offset, position, rotation, standing_y):
+    bounds = geometry.create_bounds(
+        dimensions=dimensions,
+        offset=offset,
+        position=position,
+        rotation=rotation,
+        standing_y=standing_y
+    )
+    return TrueObjectBounds(bounds=bounds, true_poly=bounds.polygon_xz)
+
+
 def test_blobs():
     assert len(AGENT_OBJECT_CONFIG_LIST) > 1
     for config in AGENT_OBJECT_CONFIG_LIST:
@@ -418,8 +446,18 @@ def test_append_each_show_to_object_agent():
     assert result['shows'][3]['boundingBox']
 
 
+def test_append_each_show_to_object_imitated_agent():
+    # TODO
+    pass
+
+
+def test_append_each_show_to_object_paddle():
+    # TODO
+    pass
+
+
 def test_choose_config_list_with_agent():
-    config_object_type_list = ['a', 'b', 'c', 'd']
+    config_object_type_list = ['blob_a', 'blob_b', 'blob_c', 'blob_d']
     config_list = [
         ObjectConfig(object_type, index, index)
         for index, object_type in enumerate(config_object_type_list)
@@ -437,19 +475,19 @@ def test_choose_config_list_with_agent():
     chosen_config_list = _choose_config_list(
         trial_list,
         config_list,
-        [None, None],
+        [None, None, None],
         material_list,
         'agent',
         [],
         []
     )
-    assert len(chosen_config_list) == 2
+    assert len(chosen_config_list) == 3
     assert chosen_config_list[0].object_type in config_object_type_list
     assert chosen_config_list[0].material in material_list
 
 
 def test_choose_config_list_with_agent_in_instrumental_action_task():
-    config_object_type_list = ['cone', 'pyramid', 'a', 'b']
+    config_object_type_list = ['cone', 'pyramid', 'blob_a', 'blob_b', 'blob_c']
     config_list = [
         ObjectConfig(object_type, index, index)
         for index, object_type in enumerate(config_object_type_list)
@@ -468,20 +506,20 @@ def test_choose_config_list_with_agent_in_instrumental_action_task():
     chosen_config_list = _choose_config_list(
         trial_list,
         config_list,
-        [None, None],
+        [None, None, None],
         material_list,
         'agent',
         [],
         []
     )
-    assert len(chosen_config_list) == 2
+    assert len(chosen_config_list) == 3
     assert chosen_config_list[0].object_type != 'cone'
     assert chosen_config_list[0].object_type != 'pyramid'
     assert chosen_config_list[0].material in material_list
 
 
 def test_choose_config_list_with_objects():
-    config_object_type_list = ['a', 'b', 'c', 'd']
+    config_object_type_list = ['cube', 'cylinder', 'hash', 'sphere']
     config_list = [
         ObjectConfig(object_type, index, index)
         for index, object_type in enumerate(config_object_type_list)
@@ -536,7 +574,7 @@ def test_choose_config_list_with_objects():
 
 
 def test_choose_config_list_no_types_same_as_used_types():
-    mock_config_object_type_list = ['a', 'b', 'c', 'd']
+    mock_config_object_type_list = ['cube', 'cylinder', 'hash', 'sphere']
     mock_config_list = [
         ObjectConfig(object_type, index, index)
         for index, object_type in enumerate(mock_config_object_type_list)
@@ -557,15 +595,15 @@ def test_choose_config_list_no_types_same_as_used_types():
         [None, None],
         material_list,
         'objects',
-        ['a', 'b', 'd'],
+        ['cube', 'cylinder', 'hash'],
         []
     )
     assert len(chosen_config_list) == 1
-    assert chosen_config_list[0].object_type == 'c'
+    assert chosen_config_list[0].object_type == 'sphere'
 
 
 def test_choose_config_list_no_types_same_as_used_types_multiple():
-    mock_config_object_type_list = ['a', 'b', 'c', 'd']
+    mock_config_object_type_list = ['cube', 'cylinder', 'hash', 'sphere']
     mock_config_list = [
         ObjectConfig(object_type, index, index)
         for index, object_type in enumerate(mock_config_object_type_list)
@@ -587,7 +625,7 @@ def test_choose_config_list_no_types_same_as_used_types_multiple():
             [None, None],
             material_list,
             'objects',
-            ['a', 'b', 'd'],
+            ['cube', 'cylinder', 'hash'],
             []
         )
 
@@ -722,6 +760,16 @@ def test_create_agent_object_list_rotation_y():
             assert show['rotation']['y'] == rotation_y
 
 
+def test_create_agent_object_list_hide_in_some_trials():
+    # TODO
+    pass
+
+
+def test_create_agent_object_list_imitated_agent():
+    # TODO
+    pass
+
+
 def test_create_fuse_wall_object_list():
     fuse_wall_json_list = create_wall_json_list()
     trial_list = [[
@@ -788,6 +836,10 @@ def test_create_goal_object_list_single_object():
         Vector3d(x=10, y=0, z=10), Vector3d(x=10, y=0, z=12),
         Vector3d(x=12, y=0, z=12), Vector3d(x=12, y=0, z=10)
     ], max_y=0, min_y=0)
+    mock_agent_start_bounds = TrueObjectBounds(
+        bounds=mock_agent_start_bounds,
+        true_poly=mock_agent_start_bounds.polygon_xz
+    )
 
     goal_object_list = _create_goal_object_list(
         trial_list,
@@ -860,6 +912,10 @@ def test_create_goal_object_list_multiple_object():
         Vector3d(x=10, y=0, z=10), Vector3d(x=10, y=0, z=12),
         Vector3d(x=12, y=0, z=12), Vector3d(x=12, y=0, z=10)
     ], max_y=0, min_y=0)
+    mock_agent_start_bounds = TrueObjectBounds(
+        bounds=mock_agent_start_bounds,
+        true_poly=mock_agent_start_bounds.polygon_xz
+    )
 
     goal_object_list = _create_goal_object_list(
         trial_list,
@@ -954,6 +1010,10 @@ def test_create_goal_object_list_multiple_object_swap_icon():
         Vector3d(x=10, y=0, z=10), Vector3d(x=10, y=0, z=12),
         Vector3d(x=12, y=0, z=12), Vector3d(x=12, y=0, z=10)
     ], max_y=0, min_y=0)
+    mock_agent_start_bounds = TrueObjectBounds(
+        bounds=mock_agent_start_bounds,
+        true_poly=mock_agent_start_bounds.polygon_xz
+    )
 
     goal_object_list = _create_goal_object_list(
         trial_list,
@@ -1045,6 +1105,10 @@ def test_create_goal_object_list_single_object_on_home():
         Vector3d(x=-0.25, y=0, z=-0.25), Vector3d(x=-0.25, y=0, z=0.25),
         Vector3d(x=0.25, y=0, z=0.25), Vector3d(x=0.25, y=0, z=-0.25)
     ], max_y=0, min_y=0)
+    agent_start_bounds = TrueObjectBounds(
+        bounds=agent_start_bounds,
+        true_poly=agent_start_bounds.polygon_xz
+    )
 
     with pytest.raises(exceptions.SceneException):
         _create_goal_object_list(
@@ -1079,6 +1143,10 @@ def test_create_goal_object_list_multiple_object_on_home():
         Vector3d(x=-0.25, y=0, z=-0.25), Vector3d(x=-0.25, y=0, z=0.25),
         Vector3d(x=0.25, y=0, z=0.25), Vector3d(x=0.25, y=0, z=-0.25)
     ], max_y=0, min_y=0)
+    agent_start_bounds = TrueObjectBounds(
+        bounds=agent_start_bounds,
+        true_poly=agent_start_bounds.polygon_xz
+    )
 
     with pytest.raises(exceptions.SceneException):
         _create_goal_object_list(
@@ -1568,6 +1636,11 @@ def test_create_object():
     verify_bounds(mcs_object, 0, -0.25, -3.25, 1, -3)
 
 
+def test_create_paddle():
+    # TODO
+    pass
+
+
 def test_create_scene():
     starter_scene = Scene()
     goal_template = hypercubes.initialize_goal(
@@ -1789,6 +1862,11 @@ def test_create_static_wall_object_list_change_in_some_trials():
     verify_static_wall_list_properties(wall_object_list[:5], hidden_step=2)
     verify_static_wall_list_properties(wall_object_list[5:11], hidden_step=4)
     verify_static_wall_list_properties(wall_object_list[11:])
+
+
+def test_create_static_wall_object_list_agent_non_agent_tasks():
+    # TODO
+    pass
 
 
 def test_create_trial_frame_list():
@@ -2311,6 +2389,11 @@ def test_create_wall_object_list_with_fuse_multiple_trials():
     verify_fuse_wall_list_trial_2(wall_object_list[9:])
 
 
+def test_create_wall_object_list_agent_non_agent_tasks():
+    # TODO
+    pass
+
+
 def test_fix_key_location():
     # negative_x
     json_key = [[90, 90], 10, 'triangle0.png']
@@ -2541,12 +2624,17 @@ def test_identify_trial_index_starting_step():
     assert _identify_trial_index_starting_step(2, trial_list_b) == 7
 
 
+def test_move_agent_adjacent_to_goal():
+    # TODO
+    pass
+
+
 def test_move_agent_past_lock_location():
     agent_object = {
         'shows': [{
             'stepBegin': 0,
             'position': {'x': 0, 'y': 0, 'z': 0},
-            'boundingBox': geometry.create_bounds(
+            'boundingBox': wrap_create_bounds(
                 dimensions={'x': 0.2, 'y': 0.2, 'z': 0.2},
                 offset=None,
                 position={'x': 0, 'y': 0, 'z': 0},
@@ -2556,7 +2644,7 @@ def test_move_agent_past_lock_location():
         }, {
             'stepBegin': 1,
             'position': {'x': 0, 'y': 0, 'z': 0.1},
-            'boundingBox': geometry.create_bounds(
+            'boundingBox': wrap_create_bounds(
                 dimensions={'x': 0.2, 'y': 0.2, 'z': 0.2},
                 offset=None,
                 position={'x': 0, 'y': 0, 'z': 0.1},
@@ -2566,7 +2654,7 @@ def test_move_agent_past_lock_location():
         }, {
             'stepBegin': 2,
             'position': {'x': 0, 'y': 0, 'z': 0.2},
-            'boundingBox': geometry.create_bounds(
+            'boundingBox': wrap_create_bounds(
                 dimensions={'x': 0.2, 'y': 0.2, 'z': 0.2},
                 offset=None,
                 position={'x': 0, 'y': 0, 'z': 0.2},
@@ -2576,7 +2664,7 @@ def test_move_agent_past_lock_location():
         }, {
             'stepBegin': 3,
             'position': {'x': 0, 'y': 0, 'z': 0.3},
-            'boundingBox': geometry.create_bounds(
+            'boundingBox': wrap_create_bounds(
                 dimensions={'x': 0.2, 'y': 0.2, 'z': 0.2},
                 offset=None,
                 position={'x': 0, 'y': 0, 'z': 0.3},
@@ -2586,7 +2674,7 @@ def test_move_agent_past_lock_location():
         }, {
             'stepBegin': 4,
             'position': {'x': 0, 'y': 0, 'z': 0.4},
-            'boundingBox': geometry.create_bounds(
+            'boundingBox': wrap_create_bounds(
                 dimensions={'x': 0.2, 'y': 0.2, 'z': 0.2},
                 offset=None,
                 position={'x': 0, 'y': 0, 'z': 0.4},
@@ -2596,7 +2684,7 @@ def test_move_agent_past_lock_location():
         }, {
             'stepBegin': 10,
             'position': {'x': 0, 'y': 0, 'z': 0.8},
-            'boundingBox': geometry.create_bounds(
+            'boundingBox': wrap_create_bounds(
                 dimensions={'x': 0.2, 'y': 0.2, 'z': 0.2},
                 offset=None,
                 position={'x': 0, 'y': 0, 'z': 0.8},
@@ -2606,7 +2694,7 @@ def test_move_agent_past_lock_location():
         }, {
             'stepBegin': 11,
             'position': {'x': 0, 'y': 0, 'z': 0.9},
-            'boundingBox': geometry.create_bounds(
+            'boundingBox': wrap_create_bounds(
                 dimensions={'x': 0.2, 'y': 0.2, 'z': 0.2},
                 offset=None,
                 position={'x': 0, 'y': 0, 'z': 0.9},
@@ -2616,7 +2704,7 @@ def test_move_agent_past_lock_location():
         }, {
             'stepBegin': 12,
             'position': {'x': 0, 'y': 0, 'z': 1},
-            'boundingBox': geometry.create_bounds(
+            'boundingBox': wrap_create_bounds(
                 dimensions={'x': 0.2, 'y': 0.2, 'z': 0.2},
                 offset=None,
                 position={'x': 0, 'y': 0, 'z': 1},
@@ -2626,7 +2714,7 @@ def test_move_agent_past_lock_location():
         }, {
             'stepBegin': 13,
             'position': {'x': 0, 'y': 0, 'z': 1.1},
-            'boundingBox': geometry.create_bounds(
+            'boundingBox': wrap_create_bounds(
                 dimensions={'x': 0.2, 'y': 0.2, 'z': 0.2},
                 offset=None,
                 position={'x': 0, 'y': 0, 'z': 1.1},
@@ -2636,7 +2724,7 @@ def test_move_agent_past_lock_location():
         }, {
             'stepBegin': 14,
             'position': {'x': 0, 'y': 0, 'z': 1.2},
-            'boundingBox': geometry.create_bounds(
+            'boundingBox': wrap_create_bounds(
                 dimensions={'x': 0.2, 'y': 0.2, 'z': 0.2},
                 offset=None,
                 position={'x': 0, 'y': 0, 'z': 1.2},
@@ -2646,7 +2734,7 @@ def test_move_agent_past_lock_location():
         }, {
             'stepBegin': 15,
             'position': {'x': 0, 'y': 0, 'z': 1.3},
-            'boundingBox': geometry.create_bounds(
+            'boundingBox': wrap_create_bounds(
                 dimensions={'x': 0.2, 'y': 0.2, 'z': 0.2},
                 offset=None,
                 position={'x': 0, 'y': 0, 'z': 1.3},
@@ -2656,7 +2744,7 @@ def test_move_agent_past_lock_location():
         }, {
             'stepBegin': 16,
             'position': {'x': 0, 'y': 0, 'z': 1.4},
-            'boundingBox': geometry.create_bounds(
+            'boundingBox': wrap_create_bounds(
                 dimensions={'x': 0.2, 'y': 0.2, 'z': 0.2},
                 offset=None,
                 position={'x': 0, 'y': 0, 'z': 1.4},
@@ -2665,7 +2753,7 @@ def test_move_agent_past_lock_location():
             )
         }]
     }
-    lock_bounds = geometry.create_bounds(
+    lock_bounds = wrap_create_bounds(
         dimensions={'x': 0.5, 'y': 0.5, 'z': 0.5},
         offset=None,
         position={'x': 0, 'y': 0, 'z': 0.8},
@@ -2701,7 +2789,7 @@ def test_move_agent_past_lock_location_move_back():
         'shows': [{
             'stepBegin': 0,
             'position': {'x': 0, 'y': 0, 'z': 0},
-            'boundingBox': geometry.create_bounds(
+            'boundingBox': wrap_create_bounds(
                 dimensions={'x': 0.2, 'y': 0.2, 'z': 0.2},
                 offset=None,
                 position={'x': 0, 'y': 0, 'z': 0},
@@ -2711,7 +2799,7 @@ def test_move_agent_past_lock_location_move_back():
         }, {
             'stepBegin': 1,
             'position': {'x': 0, 'y': 0, 'z': 0.1},
-            'boundingBox': geometry.create_bounds(
+            'boundingBox': wrap_create_bounds(
                 dimensions={'x': 0.2, 'y': 0.2, 'z': 0.2},
                 offset=None,
                 position={'x': 0, 'y': 0, 'z': 0.1},
@@ -2721,7 +2809,7 @@ def test_move_agent_past_lock_location_move_back():
         }, {
             'stepBegin': 2,
             'position': {'x': 0, 'y': 0, 'z': 0.2},
-            'boundingBox': geometry.create_bounds(
+            'boundingBox': wrap_create_bounds(
                 dimensions={'x': 0.2, 'y': 0.2, 'z': 0.2},
                 offset=None,
                 position={'x': 0, 'y': 0, 'z': 0.2},
@@ -2731,7 +2819,7 @@ def test_move_agent_past_lock_location_move_back():
         }, {
             'stepBegin': 3,
             'position': {'x': 0, 'y': 0, 'z': 0.3},
-            'boundingBox': geometry.create_bounds(
+            'boundingBox': wrap_create_bounds(
                 dimensions={'x': 0.2, 'y': 0.2, 'z': 0.2},
                 offset=None,
                 position={'x': 0, 'y': 0, 'z': 0.3},
@@ -2741,7 +2829,7 @@ def test_move_agent_past_lock_location_move_back():
         }, {
             'stepBegin': 4,
             'position': {'x': 0, 'y': 0, 'z': 0.4},
-            'boundingBox': geometry.create_bounds(
+            'boundingBox': wrap_create_bounds(
                 dimensions={'x': 0.2, 'y': 0.2, 'z': 0.2},
                 offset=None,
                 position={'x': 0, 'y': 0, 'z': 0.4},
@@ -2751,7 +2839,7 @@ def test_move_agent_past_lock_location_move_back():
         }, {
             'stepBegin': 10,
             'position': {'x': 0, 'y': 0, 'z': 0.8},
-            'boundingBox': geometry.create_bounds(
+            'boundingBox': wrap_create_bounds(
                 dimensions={'x': 0.2, 'y': 0.2, 'z': 0.2},
                 offset=None,
                 position={'x': 0, 'y': 0, 'z': 0.8},
@@ -2761,7 +2849,7 @@ def test_move_agent_past_lock_location_move_back():
         }, {
             'stepBegin': 11,
             'position': {'x': 0, 'y': 0, 'z': 0.7},
-            'boundingBox': geometry.create_bounds(
+            'boundingBox': wrap_create_bounds(
                 dimensions={'x': 0.2, 'y': 0.2, 'z': 0.2},
                 offset=None,
                 position={'x': 0, 'y': 0, 'z': 0.7},
@@ -2771,7 +2859,7 @@ def test_move_agent_past_lock_location_move_back():
         }, {
             'stepBegin': 12,
             'position': {'x': 0, 'y': 0, 'z': 0.6},
-            'boundingBox': geometry.create_bounds(
+            'boundingBox': wrap_create_bounds(
                 dimensions={'x': 0.2, 'y': 0.2, 'z': 0.2},
                 offset=None,
                 position={'x': 0, 'y': 0, 'z': 0.6},
@@ -2781,7 +2869,7 @@ def test_move_agent_past_lock_location_move_back():
         }, {
             'stepBegin': 13,
             'position': {'x': 0, 'y': 0, 'z': 0.5},
-            'boundingBox': geometry.create_bounds(
+            'boundingBox': wrap_create_bounds(
                 dimensions={'x': 0.2, 'y': 0.2, 'z': 0.2},
                 offset=None,
                 position={'x': 0, 'y': 0, 'z': 0.5},
@@ -2791,7 +2879,7 @@ def test_move_agent_past_lock_location_move_back():
         }, {
             'stepBegin': 14,
             'position': {'x': 0, 'y': 0, 'z': 0.4},
-            'boundingBox': geometry.create_bounds(
+            'boundingBox': wrap_create_bounds(
                 dimensions={'x': 0.2, 'y': 0.2, 'z': 0.2},
                 offset=None,
                 position={'x': 0, 'y': 0, 'z': 0.4},
@@ -2801,7 +2889,7 @@ def test_move_agent_past_lock_location_move_back():
         }, {
             'stepBegin': 15,
             'position': {'x': 0, 'y': 0, 'z': 0.3},
-            'boundingBox': geometry.create_bounds(
+            'boundingBox': wrap_create_bounds(
                 dimensions={'x': 0.2, 'y': 0.2, 'z': 0.2},
                 offset=None,
                 position={'x': 0, 'y': 0, 'z': 0.3},
@@ -2811,7 +2899,7 @@ def test_move_agent_past_lock_location_move_back():
         }, {
             'stepBegin': 16,
             'position': {'x': 0, 'y': 0, 'z': 0.2},
-            'boundingBox': geometry.create_bounds(
+            'boundingBox': wrap_create_bounds(
                 dimensions={'x': 0.2, 'y': 0.2, 'z': 0.2},
                 offset=None,
                 position={'x': 0, 'y': 0, 'z': 0.2},
@@ -2820,7 +2908,7 @@ def test_move_agent_past_lock_location_move_back():
             )
         }]
     }
-    lock_bounds = geometry.create_bounds(
+    lock_bounds = wrap_create_bounds(
         dimensions={'x': 0.5, 'y': 0.5, 'z': 0.5},
         offset=None,
         position={'x': 0, 'y': 0, 'z': 0.8},
@@ -2845,6 +2933,174 @@ def test_move_agent_past_lock_location_move_back():
     verify_show(agent_object, 6, 15, 0, 0, 0.3)
     verify_show(agent_object, 7, 16, 0, 0, 0.2)
     assert len(agent_object['shows']) == 8
+
+
+def test_move_agent_past_lock_location_with_ellipses():
+    agent_object = {
+        'shows': [{
+            'stepBegin': 0,
+            'position': {'x': 0, 'y': 0, 'z': 0},
+            'boundingBox': _make_true_bounds(
+                'blob_01',
+                dimensions={'x': 0.2, 'y': 0.2, 'z': 0.2},
+                offset=None,
+                position={'x': 0, 'y': 0, 'z': 0},
+                rotation={'x': 0, 'y': 0, 'z': 0},
+                standing_y=0
+            )
+        }, {
+            'stepBegin': 1,
+            'position': {'x': 0, 'y': 0, 'z': 0.1},
+            'boundingBox': _make_true_bounds(
+                'blob_01',
+                dimensions={'x': 0.2, 'y': 0.2, 'z': 0.2},
+                offset=None,
+                position={'x': 0, 'y': 0, 'z': 0.1},
+                rotation={'x': 0, 'y': 0, 'z': 0},
+                standing_y=0
+            )
+        }, {
+            'stepBegin': 2,
+            'position': {'x': 0, 'y': 0, 'z': 0.2},
+            'boundingBox': _make_true_bounds(
+                'blob_01',
+                dimensions={'x': 0.2, 'y': 0.2, 'z': 0.2},
+                offset=None,
+                position={'x': 0, 'y': 0, 'z': 0.2},
+                rotation={'x': 0, 'y': 0, 'z': 0},
+                standing_y=0
+            )
+        }, {
+            'stepBegin': 3,
+            'position': {'x': 0, 'y': 0, 'z': 0.3},
+            'boundingBox': _make_true_bounds(
+                'blob_01',
+                dimensions={'x': 0.2, 'y': 0.2, 'z': 0.2},
+                offset=None,
+                position={'x': 0, 'y': 0, 'z': 0.3},
+                rotation={'x': 0, 'y': 0, 'z': 0},
+                standing_y=0
+            )
+        }, {
+            'stepBegin': 4,
+            'position': {'x': 0, 'y': 0, 'z': 0.4},
+            'boundingBox': _make_true_bounds(
+                'blob_01',
+                dimensions={'x': 0.2, 'y': 0.2, 'z': 0.2},
+                offset=None,
+                position={'x': 0, 'y': 0, 'z': 0.4},
+                rotation={'x': 0, 'y': 0, 'z': 0},
+                standing_y=0
+            )
+        }, {
+            'stepBegin': 10,
+            'position': {'x': 0, 'y': 0, 'z': 0.8},
+            'boundingBox': _make_true_bounds(
+                'blob_01',
+                dimensions={'x': 0.2, 'y': 0.2, 'z': 0.2},
+                offset=None,
+                position={'x': 0, 'y': 0, 'z': 0.8},
+                rotation={'x': 0, 'y': 0, 'z': 0},
+                standing_y=0
+            )
+        }, {
+            'stepBegin': 11,
+            'position': {'x': 0, 'y': 0, 'z': 0.9},
+            'boundingBox': _make_true_bounds(
+                'blob_01',
+                dimensions={'x': 0.2, 'y': 0.2, 'z': 0.2},
+                offset=None,
+                position={'x': 0, 'y': 0, 'z': 0.9},
+                rotation={'x': 0, 'y': 0, 'z': 0},
+                standing_y=0
+            )
+        }, {
+            'stepBegin': 12,
+            'position': {'x': 0, 'y': 0, 'z': 1},
+            'boundingBox': _make_true_bounds(
+                'blob_01',
+                dimensions={'x': 0.2, 'y': 0.2, 'z': 0.2},
+                offset=None,
+                position={'x': 0, 'y': 0, 'z': 1},
+                rotation={'x': 0, 'y': 0, 'z': 0},
+                standing_y=0
+            )
+        }, {
+            'stepBegin': 13,
+            'position': {'x': 0, 'y': 0, 'z': 1.1},
+            'boundingBox': _make_true_bounds(
+                'blob_01',
+                dimensions={'x': 0.2, 'y': 0.2, 'z': 0.2},
+                offset=None,
+                position={'x': 0, 'y': 0, 'z': 1.1},
+                rotation={'x': 0, 'y': 0, 'z': 0},
+                standing_y=0
+            )
+        }, {
+            'stepBegin': 14,
+            'position': {'x': 0, 'y': 0, 'z': 1.2},
+            'boundingBox': _make_true_bounds(
+                'blob_01',
+                dimensions={'x': 0.2, 'y': 0.2, 'z': 0.2},
+                offset=None,
+                position={'x': 0, 'y': 0, 'z': 1.2},
+                rotation={'x': 0, 'y': 0, 'z': 0},
+                standing_y=0
+            )
+        }, {
+            'stepBegin': 15,
+            'position': {'x': 0, 'y': 0, 'z': 1.3},
+            'boundingBox': _make_true_bounds(
+                'blob_01',
+                dimensions={'x': 0.2, 'y': 0.2, 'z': 0.2},
+                offset=None,
+                position={'x': 0, 'y': 0, 'z': 1.3},
+                rotation={'x': 0, 'y': 0, 'z': 0},
+                standing_y=0
+            )
+        }, {
+            'stepBegin': 16,
+            'position': {'x': 0, 'y': 0, 'z': 1.4},
+            'boundingBox': _make_true_bounds(
+                'blob_01',
+                dimensions={'x': 0.2, 'y': 0.2, 'z': 0.2},
+                offset=None,
+                position={'x': 0, 'y': 0, 'z': 1.4},
+                rotation={'x': 0, 'y': 0, 'z': 0},
+                standing_y=0
+            )
+        }]
+    }
+    lock_bounds = _make_true_bounds(
+        'lock_wall',
+        dimensions={'x': 0.5, 'y': 0.5, 'z': 0.5},
+        offset=None,
+        position={'x': 0, 'y': 0, 'z': 0.8},
+        rotation={'x': 0, 'y': 0, 'z': 0},
+        standing_y=0
+    )
+    lock_object = {
+        'debug': {
+            'boundsAtStep': ([lock_bounds] * 5) + ([None] * 12)
+        },
+        'hides': [{'stepBegin': 5}]
+    }
+
+    _move_agent_past_lock_location([agent_object], [lock_object])
+
+    verify_show(agent_object, 0, 0, 0, 0, 0)
+    verify_show(agent_object, 1, 1, 0, 0, 0.1)
+    verify_show(agent_object, 2, 2, 0, 0, 0.2)
+    verify_show(agent_object, 3, 3, 0, 0, 0.3)
+    verify_show(agent_object, 4, 4, 0, 0, 0.4)
+    verify_show(agent_object, 5, 10, 0, 0, 0.56)
+    verify_show(agent_object, 6, 11, 0, 0, 0.72)
+    verify_show(agent_object, 7, 12, 0, 0, 0.88)
+    verify_show(agent_object, 8, 13, 0, 0, 1.04)
+    verify_show(agent_object, 9, 14, 0, 0, 1.2)
+    verify_show(agent_object, 10, 15, 0, 0, 1.3)
+    verify_show(agent_object, 11, 16, 0, 0, 1.4)
+    assert len(agent_object['shows']) == 12
 
 
 def test_remove_extraneous_object_show_single_step():
@@ -3037,14 +3293,14 @@ def test_remove_intersecting_agent_steps_with_no_intersection():
     agent_object_list = [{
         'debug': {
             'boundsAtStep': [
-                create_bounds(1, -1, 1, -1),
-                create_bounds(1, -1, 1, -1),
-                create_bounds(1, -1, 1, -1),
-                create_bounds(2, 0, 2, 0),
-                create_bounds(3, 1, 3, 1),
-                create_bounds(4, 2, 4, 2),
-                create_bounds(4, 2, 4, 2),
-                create_bounds(4, 2, 4, 2)
+                create_simple_bounds(1, -1, 1, -1),
+                create_simple_bounds(1, -1, 1, -1),
+                create_simple_bounds(1, -1, 1, -1),
+                create_simple_bounds(2, 0, 2, 0),
+                create_simple_bounds(3, 1, 3, 1),
+                create_simple_bounds(4, 2, 4, 2),
+                create_simple_bounds(4, 2, 4, 2),
+                create_simple_bounds(4, 2, 4, 2)
             ]
         },
         'shows': [
@@ -3057,7 +3313,7 @@ def test_remove_intersecting_agent_steps_with_no_intersection():
 
     goal_object_list = [{
         'debug': {
-            'boundsAtStep': [create_bounds(6.1, 4.1, 6.1, 4.1)] * 8
+            'boundsAtStep': [create_simple_bounds(6.1, 4.1, 6.1, 4.1)] * 8
         }
     }]
 
@@ -3070,20 +3326,20 @@ def test_remove_intersecting_agent_steps_with_intersection():
     agent_object_list = [{
         'debug': {
             'boundsAtStep': [
-                create_bounds(1, -1, 1, -1),
-                create_bounds(1, -1, 1, -1),
-                create_bounds(1, -1, 1, -1),
-                create_bounds(2, 0, 2, 0),
-                create_bounds(3, 1, 3, 1),
-                create_bounds(3, 1, 3, 1),
-                create_bounds(3, 1, 3, 1),
-                create_bounds(1, -1, 1, -1),
-                create_bounds(1, -1, 1, -1),
-                create_bounds(1, -1, 1, -1),
-                create_bounds(0, -2, 0, -2),
-                create_bounds(-1, -3, -1, -3),
-                create_bounds(-1, -3, -1, -3),
-                create_bounds(-1, -3, -1, -3)
+                create_simple_bounds(1, -1, 1, -1),
+                create_simple_bounds(1, -1, 1, -1),
+                create_simple_bounds(1, -1, 1, -1),
+                create_simple_bounds(2, 0, 2, 0),
+                create_simple_bounds(3, 1, 3, 1),
+                create_simple_bounds(3, 1, 3, 1),
+                create_simple_bounds(3, 1, 3, 1),
+                create_simple_bounds(1, -1, 1, -1),
+                create_simple_bounds(1, -1, 1, -1),
+                create_simple_bounds(1, -1, 1, -1),
+                create_simple_bounds(0, -2, 0, -2),
+                create_simple_bounds(-1, -3, -1, -3),
+                create_simple_bounds(-1, -3, -1, -3),
+                create_simple_bounds(-1, -3, -1, -3)
             ]
         },
         'shows': [
@@ -3098,7 +3354,7 @@ def test_remove_intersecting_agent_steps_with_intersection():
 
     goal_object_list = [{
         'debug': {
-            'boundsAtStep': [create_bounds(3.9, 2.9, 3.9, 2.9)] * 14
+            'boundsAtStep': [create_simple_bounds(3.9, 2.9, 3.9, 2.9)] * 14
         }
     }]
 
@@ -3116,20 +3372,20 @@ def test_remove_intersecting_agent_steps_with_multiple_agents():
     agent_object_list = [{
         'debug': {
             'boundsAtStep': [
-                create_bounds(1, -1, 1, -1),
-                create_bounds(1, -1, 1, -1),
-                create_bounds(1, -1, 1, -1),
-                create_bounds(2, 0, 2, 0),
-                create_bounds(3, 1, 3, 1),
-                create_bounds(3, 1, 3, 1),
-                create_bounds(3, 1, 3, 1),
-                create_bounds(1, -1, 1, -1),
-                create_bounds(1, -1, 1, -1),
-                create_bounds(1, -1, 1, -1),
-                create_bounds(0, -2, 0, -2),
-                create_bounds(-1, -3, -1, -3),
-                create_bounds(-1, -3, -1, -3),
-                create_bounds(-1, -3, -1, -3)
+                create_simple_bounds(1, -1, 1, -1),
+                create_simple_bounds(1, -1, 1, -1),
+                create_simple_bounds(1, -1, 1, -1),
+                create_simple_bounds(2, 0, 2, 0),
+                create_simple_bounds(3, 1, 3, 1),
+                create_simple_bounds(3, 1, 3, 1),
+                create_simple_bounds(3, 1, 3, 1),
+                create_simple_bounds(1, -1, 1, -1),
+                create_simple_bounds(1, -1, 1, -1),
+                create_simple_bounds(1, -1, 1, -1),
+                create_simple_bounds(0, -2, 0, -2),
+                create_simple_bounds(-1, -3, -1, -3),
+                create_simple_bounds(-1, -3, -1, -3),
+                create_simple_bounds(-1, -3, -1, -3)
             ]
         },
         'shows': [
@@ -3143,20 +3399,20 @@ def test_remove_intersecting_agent_steps_with_multiple_agents():
     }, {
         'debug': {
             'boundsAtStep': [
-                create_bounds(1, -1, 1, -1),
-                create_bounds(1, -1, 1, -1),
-                create_bounds(1, -1, 1, -1),
-                create_bounds(0, -2, 0, -2),
-                create_bounds(-1, -3, -1, -3),
-                create_bounds(-1, -3, -1, -3),
-                create_bounds(-1, -3, -1, -3),
-                create_bounds(1, -1, 1, -1),
-                create_bounds(1, -1, 1, -1),
-                create_bounds(1, -1, 1, -1),
-                create_bounds(2, 0, 2, 0),
-                create_bounds(3, 1, 3, 1),
-                create_bounds(3, 1, 3, 1),
-                create_bounds(3, 1, 3, 1)
+                create_simple_bounds(1, -1, 1, -1),
+                create_simple_bounds(1, -1, 1, -1),
+                create_simple_bounds(1, -1, 1, -1),
+                create_simple_bounds(0, -2, 0, -2),
+                create_simple_bounds(-1, -3, -1, -3),
+                create_simple_bounds(-1, -3, -1, -3),
+                create_simple_bounds(-1, -3, -1, -3),
+                create_simple_bounds(1, -1, 1, -1),
+                create_simple_bounds(1, -1, 1, -1),
+                create_simple_bounds(1, -1, 1, -1),
+                create_simple_bounds(2, 0, 2, 0),
+                create_simple_bounds(3, 1, 3, 1),
+                create_simple_bounds(3, 1, 3, 1),
+                create_simple_bounds(3, 1, 3, 1)
             ]
         },
         'shows': [
@@ -3171,7 +3427,7 @@ def test_remove_intersecting_agent_steps_with_multiple_agents():
 
     goal_object_list = [{
         'debug': {
-            'boundsAtStep': [create_bounds(3.9, 2.9, 3.9, 2.9)] * 14
+            'boundsAtStep': [create_simple_bounds(3.9, 2.9, 3.9, 2.9)] * 14
         }
     }]
 
@@ -3196,20 +3452,20 @@ def test_remove_intersecting_agent_steps_with_multiple_objects():
     agent_object_list = [{
         'debug': {
             'boundsAtStep': [
-                create_bounds(1, -1, 1, -1),
-                create_bounds(1, -1, 1, -1),
-                create_bounds(1, -1, 1, -1),
-                create_bounds(2, 0, 2, 0),
-                create_bounds(3, 1, 3, 1),
-                create_bounds(3, 1, 3, 1),
-                create_bounds(3, 1, 3, 1),
-                create_bounds(1, -1, 1, -1),
-                create_bounds(1, -1, 1, -1),
-                create_bounds(1, -1, 1, -1),
-                create_bounds(0, -2, 0, -2),
-                create_bounds(-1, -3, -1, -3),
-                create_bounds(-1, -3, -1, -3),
-                create_bounds(-1, -3, -1, -3)
+                create_simple_bounds(1, -1, 1, -1),
+                create_simple_bounds(1, -1, 1, -1),
+                create_simple_bounds(1, -1, 1, -1),
+                create_simple_bounds(2, 0, 2, 0),
+                create_simple_bounds(3, 1, 3, 1),
+                create_simple_bounds(3, 1, 3, 1),
+                create_simple_bounds(3, 1, 3, 1),
+                create_simple_bounds(1, -1, 1, -1),
+                create_simple_bounds(1, -1, 1, -1),
+                create_simple_bounds(1, -1, 1, -1),
+                create_simple_bounds(0, -2, 0, -2),
+                create_simple_bounds(-1, -3, -1, -3),
+                create_simple_bounds(-1, -3, -1, -3),
+                create_simple_bounds(-1, -3, -1, -3)
             ]
         },
         'shows': [
@@ -3224,11 +3480,11 @@ def test_remove_intersecting_agent_steps_with_multiple_objects():
 
     goal_object_list = [{
         'debug': {
-            'boundsAtStep': [create_bounds(2.9, 1.9, 3.9, 2.9)] * 14
+            'boundsAtStep': [create_simple_bounds(2.9, 1.9, 3.9, 2.9)] * 14
         }
     }, {
         'debug': {
-            'boundsAtStep': [create_bounds(-3.9, -2.9, -2.9, -1.9)] * 14
+            'boundsAtStep': [create_simple_bounds(-3.9, -2.9, -2.9, -1.9)] * 14
         }
     }]
 
@@ -3239,6 +3495,40 @@ def test_remove_intersecting_agent_steps_with_multiple_objects():
     assert agent_object_list[0]['shows'][1]['stepBegin'] == 3
     assert agent_object_list[0]['shows'][2]['stepBegin'] == 7
     assert agent_object_list[0]['shows'][3]['stepBegin'] == 10
+
+
+def test_remove_intersecting_agent_steps_with_ellipses():
+    agent_object_list = [{
+        'debug': {
+            'boundsAtStep': [
+                create_ellipsoidal_bounds(0, 0, 0.5, 1),
+                create_ellipsoidal_bounds(0.5, 0.5, 0.5, 1),
+                create_ellipsoidal_bounds(1, 1, 0.5, 1),
+                create_ellipsoidal_bounds(1.5, 1.5, 0.5, 1),
+                create_ellipsoidal_bounds(2, 2, 0.5, 1)
+            ]
+        },
+        'shows': [
+            {'stepBegin': 0},
+            {'stepBegin': 1},
+            {'stepBegin': 2},
+            {'stepBegin': 3},
+            {'stepBegin': 4}
+        ]
+    }]
+
+    goal_object_list = [{
+        'debug': {
+            'boundsAtStep': [create_ellipsoidal_bounds(2, 2, 0.5, 1)] * 5
+        }
+    }]
+
+    _remove_intersecting_agent_steps(agent_object_list, goal_object_list)
+
+    assert len(agent_object_list[0]['shows']) == 3
+    assert agent_object_list[0]['shows'][0]['stepBegin'] == 0
+    assert agent_object_list[0]['shows'][1]['stepBegin'] == 1
+    assert agent_object_list[0]['shows'][2]['stepBegin'] == 2
 
 
 def test_retrieve_unit_size():

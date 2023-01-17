@@ -364,7 +364,7 @@ class Hypercube(ABC):
         pass
 
     @abstractmethod
-    def _get_slices() -> List[str]:
+    def _get_slices(self) -> List[str]:
         """Return all of this hypercube's slices (string tags)."""
         pass
 

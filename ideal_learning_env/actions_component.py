@@ -2,7 +2,10 @@ import logging
 from typing import Any, Dict, List, Union
 
 from generator import tags
-from ideal_learning_env.defs import ILEConfigurationException
+from ideal_learning_env.defs import (
+    ILEConfigurationException,
+    RandomizableString
+)
 
 from .action_service import (
     ActionService,
@@ -75,6 +78,27 @@ class ActionRestrictionsComponent(ILEComponent):
         end:
           min: 16
           max: 26
+
+    ```
+    """
+
+    freeze_while_moving: RandomizableString = None
+    """
+    (string or list of strings): Forces the performer to freeze ("Pass") until
+    all objects with the given labels complete their last movements and
+    rotations. This field must be blank or an empty array if
+    `passive_scene` is `true`.
+
+    Simple Example:
+    ```
+    freeze_while_moving: null
+    ```
+
+    Advanced Example:
+    ```
+    freezes_while_moving:
+      - [placers, turntables]
+      - [turntables]
 
     ```
     """
@@ -201,6 +225,13 @@ class ActionRestrictionsComponent(ILEComponent):
     ]:
         return [choose_random(f) for f in (self.freezes or [])]
 
+    @ile_config_setter()
+    def set_freeze_while_moving(self, data: Any) -> None:
+        self.freeze_while_moving = data
+
+    def get_freeze_while_moving(self) -> List[str]:
+        return self.freeze_while_moving
+
     @ile_config_setter(validator=ValidateNumber(
         props=['begin', 'end'], min_value=1,
         null_ok=True))
@@ -227,7 +258,7 @@ class ActionRestrictionsComponent(ILEComponent):
     def set_sidesteps(self, data: Any) -> None:
         self.sidesteps = data
 
-    def get_sidesteps(self) -> List[TeleportConfig]:
+    def get_sidesteps(self) -> List[SidestepsConfig]:
         return [choose_random(s) for s in (self.sidesteps or [])]
 
     # Override
@@ -238,12 +269,14 @@ class ActionRestrictionsComponent(ILEComponent):
         total_steps = goal.get('last_step')
         circles = sorted(self.get_circles())
         freezes = sorted(self.get_freezes(), key=lambda x: x.begin)
+        freeze_while_moving = self.get_freeze_while_moving()
         swivels = sorted(self.get_swivels(), key=lambda x: x.begin)
         teleports = sorted(self.get_teleports(), key=lambda x: x.step)
         sidesteps = sorted(self.get_sidesteps(), key=lambda x: x.begin)
         self._restriction_validation(
             circles,
             freezes,
+            freeze_while_moving,
             swivels,
             teleports,
             sidesteps,
@@ -251,6 +284,7 @@ class ActionRestrictionsComponent(ILEComponent):
         )
         passive = self.get_passive_scene() or scene.intuitive_physics
         self._delayed_actions = 0
+        self._delayed_sidesteps = None
         if passive:
             goal['category'] = tags.tag_to_label(
                 tags.SCENE.INTUITIVE_PHYSICS)
@@ -262,6 +296,11 @@ class ActionRestrictionsComponent(ILEComponent):
         if freezes:
             ActionService.add_freezes(goal, freezes)
             logger.trace(f'Adding {len(freezes)} freezes to scene')
+        if freeze_while_moving:
+            self.freeze_while_moving = freeze_while_moving
+            logger.trace(
+                f'Adding {len(freeze_while_moving)} '
+                f'freeze_while_moving to scene')
         if swivels:
             ActionService.add_swivels(goal, swivels)
             logger.trace(
@@ -271,7 +310,7 @@ class ActionRestrictionsComponent(ILEComponent):
             logger.trace(f'Adding {len(teleports)} teleports to scene')
         if sidesteps:
             self._delayed_sidesteps = sidesteps
-            self._delayed_actions = 1
+            self._delayed_actions += 1
             logger.trace(f'Adding {len(sidesteps)} teleports to scene')
         return scene
 
@@ -285,8 +324,15 @@ class ActionRestrictionsComponent(ILEComponent):
         self._delayed_actions = 0
         return scene
 
+    def run_actions_at_end_of_scene_generation(
+            self, scene: Dict[str, Any]) -> Dict[str, Any]:
+        if self.freeze_while_moving:
+            ActionService.add_freeze_while_moving(
+                scene.goal, self.freeze_while_moving)
+        return scene
+
     def _restriction_validation(
-            self, circles, freezes, swivels,
+            self, circles, freezes, freeze_while_moving, swivels,
             teleports, sidesteps, total_steps):
         if self.get_passive_scene():
             if not total_steps or total_steps <= 0:

@@ -92,6 +92,11 @@ class AgentHypercube(Hypercube):
         return scenes
 
     # Override
+    def _get_slices(self) -> List[str]:
+        """Return all of this hypercube's slices (string tags)."""
+        return []
+
+    # Override
     def _get_training_scenes(self) -> List[Scene]:
         # Each AgentHypercubeFactory will handle training flag validation.
         return self._scenes

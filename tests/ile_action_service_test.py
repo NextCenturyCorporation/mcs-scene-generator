@@ -8,7 +8,7 @@ from ideal_learning_env.action_service import (
 )
 from ideal_learning_env.defs import ILEException
 
-from .ile_helper import create_test_obj_scene
+from .ile_helper import create_placers_turntables_scene, create_test_obj_scene
 
 
 def test_action_freezes_empty_array():
@@ -966,3 +966,28 @@ def test_action_sidesteps_no_degrees():
             ["RotateRight"],
             ["RotateLeft"]
         ]
+
+
+def test_action_freeze_while_moving_empty_array():
+    goal = {}
+    ActionService.add_freeze_while_moving(goal, [])
+    assert goal['action_list'] == []
+
+
+def test_action_freeze_while_moving():
+    scene = create_placers_turntables_scene(20, 1)
+    goal = {}
+    freeze_while_moving = ['placers', 'turntables']
+    ActionService.add_freeze_while_moving(goal, freeze_while_moving)
+    moves = \
+        max(scene.objects[1:-1],
+            key=lambda x: 0 if not x.get('moves') else
+            x['moves'][-1]['stepEnd'])['moves'][-1]['stepEnd']
+    assert len(goal['action_list']) == moves
+
+    scene = create_placers_turntables_scene(1, 20)
+    goal = {}
+    freeze_while_moving = ['placers', 'turntables']
+    ActionService.add_freeze_while_moving(goal, freeze_while_moving)
+    assert \
+        len(goal['action_list']) == scene.objects[-1]['rotates'][-1]['stepEnd']

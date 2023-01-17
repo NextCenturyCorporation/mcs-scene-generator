@@ -1,4 +1,5 @@
 import copy
+import random
 from typing import List
 
 import pytest
@@ -26,6 +27,7 @@ from ideal_learning_env.shortcut_component import (
     IMITATION_AGENT_START_X,
     IMITATION_TASK_TARGET_SEPARATION,
     LARGE_BLOCK_TOOLS_TO_DIMENSIONS,
+    DoubleDoorConfig,
     TripleDoorConfig
 )
 
@@ -115,7 +117,7 @@ def test_shortcut_bisecting_platform_on():
     show = obj['shows'][0]
     assert show['position'] == {'x': 0, 'y': .625, 'z': -sizez / 2.0 + 1.5}
     assert show['rotation'] == {'x': 0, 'y': 0, 'z': 0}
-    assert show['scale'] == {'x': 0.99, 'y': 1.25, 'z': 0.1}
+    assert show['scale'] == {'x': 0.99, 'y': 1.25, 'z': 0.25}
 
     perf_pos = scene.performer_start.position
     assert perf_pos == Vector3d(x=0, y=1, z=-sizez / 2.0 + 0.5)
@@ -153,7 +155,7 @@ def test_shortcut_bisecting_platform_on_with_blocking_wall_prop():
     show = obj['shows'][0]
     assert show['position'] == {'x': 0, 'y': .625, 'z': -sizez / 2.0 + 1.5}
     assert show['rotation'] == {'x': 0, 'y': 0, 'z': 0}
-    assert show['scale'] == {'x': 0.99, 'y': 1.25, 'z': 0.1}
+    assert show['scale'] == {'x': 0.99, 'y': 1.25, 'z': 0.25}
 
     perf_pos = scene.performer_start.position
     assert perf_pos == Vector3d(x=0, y=1, z=-sizez / 2.0 + 0.5)
@@ -289,7 +291,7 @@ def test_shortcut_bisecting_platform_on_with_other_intersecting_platforms():
     assert wall['structure']
     assert wall['shows'][0]['position'] == {'x': 0, 'y': 0.625, 'z': -3.5}
     assert wall['shows'][0]['rotation'] == {'x': 0, 'y': 0, 'z': 0}
-    assert wall['shows'][0]['scale'] == {'x': 0.99, 'y': 1.25, 'z': 0.1}
+    assert wall['shows'][0]['scale'] == {'x': 0.99, 'y': 1.25, 'z': 0.25}
 
     platform_2 = scene.objects[2]
     assert platform_2['id'].startswith('platform')
@@ -844,6 +846,1047 @@ def test_shortcut_triple_door_with_bigger_far_end():
     assert show['position'] == {'x': 0, 'y': 1, 'z': 0}
     assert show['rotation'] == {'x': 0, 'y': 0, 'z': 0}
     assert show['scale'] == {'x': 1, 'y': 2, 'z': scene.room_dimensions.z}
+
+
+def test_shortcut_double_door():
+    component = ShortcutComponent({
+        'shortcut_double_door_choice': True
+    })
+    assert component.shortcut_double_door_choice
+
+    config = component.get_shortcut_double_door_choice()
+    assert isinstance(config, DoubleDoorConfig)
+
+    scene = prior_scene_custom_size(12, 24)
+    scene.room_dimensions.y = 8
+
+    # Performer is in the way of adding lava down the middle
+    scene.performer_start.position.x = -6
+    scene.performer_start.position.z = -12
+
+    scene = component.update_ile_scene(scene)
+
+    assert scene != prior_scene()
+    assert scene.room_dimensions.y == 8
+
+    # Defaults
+    assert scene.restrict_open_doors
+    assert config.add_freeze
+    assert config.platform_height == 1.5
+    assert config.platform_length == 1
+    assert config.platform_width == 1
+    assert config.start_drop_step == 1
+    assert config.occluder_wall_position_z is None
+    assert config.occluder_distance_from_performer is None
+
+    objs = scene.objects
+
+    assert scene.lava
+    assert scene.lava == [{'x': 0,
+                           'z': -12},
+                          {'x': 0,
+                           'z': -11},
+                          {'x': 0,
+                           'z': -10},
+                          {'x': 0,
+                           'z': -9},
+                          {'x': 0,
+                           'z': -8},
+                          {'x': 0,
+                           'z': -7},
+                          {'x': 0,
+                           'z': -6},
+                          {'x': 0,
+                           'z': -5},
+                          {'x': 0,
+                           'z': -4},
+                          {'x': 0,
+                           'z': -3},
+                          {'x': 0,
+                           'z': -2},
+                          {'x': 0,
+                           'z': -1},
+                          {'x': 0,
+                           'z': 0},
+                          {'x': 0,
+                           'z': 1},
+                          {'x': 0,
+                           'z': 2},
+                          {'x': 0,
+                           'z': 3},
+                          {'x': 0,
+                           'z': 4},
+                          {'x': 0,
+                           'z': 5},
+                          {'x': 0,
+                           'z': 6},
+                          {'x': 0,
+                           'z': 7},
+                          {'x': 0,
+                           'z': 8},
+                          {'x': 0,
+                           'z': 9},
+                          {'x': 0,
+                           'z': 10},
+                          {'x': 0,
+                           'z': 11},
+                          {'x': 0,
+                           'z': 12}]
+
+    sizez = scene.room_dimensions.z
+    assert isinstance(objs, List)
+    assert len(objs) == 9
+
+    counter = 0
+    obj = objs[counter]
+    counter += 1
+    assert obj['id'].startswith('platform')
+    assert obj['type'] == 'cube'
+    assert obj['kinematic']
+    assert obj['structure']
+
+    show = obj['shows'][0]
+    assert show['position'] == {'x': 0, 'y': .75, 'z': -11.5}
+    assert show['rotation'] == {'x': 0, 'y': 0, 'z': 0}
+    assert show['scale'] == {'x': 1, 'y': 1.5, 'z': 1}
+
+    obj = objs[counter]
+    counter += 1
+    assert obj['id'].startswith('door')
+    assert obj['type'] == 'door_4'
+    assert obj['kinematic']
+    assert obj.get('structure') is None
+    show = obj['shows'][0]
+    assert show['position'] == {'x': 3, 'y': 8, 'z': 0}
+    assert show['rotation'] == {'x': 0, 'y': 0, 'z': 0}
+    assert show['scale'] == {'x': 1, 'y': 1, 'z': 1}
+
+    obj = objs[counter]
+    counter += 1
+    assert obj['id'].startswith('wall')
+    assert obj['type'] == 'cube'
+    assert obj['kinematic']
+    assert obj['structure']
+    show = obj['shows'][0]
+    assert show['position'] == {'x': 3, 'y': 13, 'z': 0}
+    assert show['rotation'] == {'x': 0, 'y': 0, 'z': 0}
+    assert show['scale'] == {'x': 6, 'y': 6, 'z': 0.1}
+
+    obj = objs[counter]
+    counter += 1
+    assert obj['id'].startswith('wall')
+    assert obj['type'] == 'cube'
+    assert obj['kinematic']
+    assert obj['structure']
+    show = obj['shows'][0]
+    pos = show['position']
+    assert pos['x'] == pytest.approx(1.29)
+    assert pos['y'] == 9
+    assert pos['z'] == 0
+    assert show['rotation'] == {'x': 0, 'y': 0, 'z': 0}
+    assert show['scale'] == {'x': 2.58, 'y': 2, 'z': 0.1}
+
+    obj = objs[counter]
+    counter += 1
+    assert obj['id'].startswith('wall')
+    assert obj['type'] == 'cube'
+    assert obj['kinematic']
+    assert obj['structure']
+    show = obj['shows'][0]
+    pos = show['position']
+    assert pos['x'] == pytest.approx(4.71)
+    assert pos['y'] == 9
+    assert pos['z'] == 0
+    assert show['rotation'] == {'x': 0, 'y': 0, 'z': 0}
+    assert show['scale'] == {'x': 2.58, 'y': 2, 'z': 0.1}
+
+    obj = objs[counter]
+    counter += 1
+    assert obj['id'].startswith('door')
+    assert obj['type'] == 'door_4'
+    assert obj['kinematic']
+    assert obj.get('structure') is None
+    show = obj['shows'][0]
+    assert show['position'] == {'x': -3, 'y': 8, 'z': 0}
+    assert show['rotation'] == {'x': 0, 'y': 0, 'z': 0}
+    assert show['scale'] == {'x': 1, 'y': 1, 'z': 1}
+
+    obj = objs[counter]
+    counter += 1
+    assert obj['id'].startswith('wall')
+    assert obj['type'] == 'cube'
+    assert obj['kinematic']
+    assert obj['structure']
+    show = obj['shows'][0]
+    assert show['position'] == {'x': -3, 'y': 13, 'z': 0}
+    assert show['rotation'] == {'x': 0, 'y': 0, 'z': 0}
+    assert show['scale'] == {'x': 6, 'y': 6, 'z': 0.1}
+
+    obj = objs[counter]
+    counter += 1
+    assert obj['id'].startswith('wall')
+    assert obj['type'] == 'cube'
+    assert obj['kinematic']
+    assert obj['structure']
+    show = obj['shows'][0]
+    pos = show['position']
+    assert pos['x'] == pytest.approx(-4.71)
+    assert pos['y'] == 9
+    assert pos['z'] == 0
+    assert show['rotation'] == {'x': 0, 'y': 0, 'z': 0}
+    assert show['scale'] == {'x': 2.58, 'y': 2, 'z': 0.1}
+
+    obj = objs[counter]
+    counter += 1
+    assert obj['id'].startswith('wall')
+    assert obj['type'] == 'cube'
+    assert obj['kinematic']
+    assert obj['structure']
+    show = obj['shows'][0]
+    pos = show['position']
+    assert pos['x'] == pytest.approx(-1.29)
+    assert pos['y'] == 9
+    assert pos['z'] == 0
+    assert show['rotation'] == {'x': 0, 'y': 0, 'z': 0}
+    assert show['scale'] == {'x': 2.58, 'y': 2, 'z': 0.1}
+
+    perf_pos = scene.performer_start.position
+    assert perf_pos == Vector3d(x=0, y=1.5, z=-sizez / 2.0 + 0.5)
+
+
+def test_shortcut_double_door_lava_off():
+    component = ShortcutComponent({
+        'shortcut_double_door_choice': {
+            'add_lava': False
+        }
+    })
+    assert component.shortcut_double_door_choice
+    assert component.get_shortcut_double_door_choice() == \
+        DoubleDoorConfig(add_lava=False)
+
+    scene = prior_scene_custom_size(12, 24)
+    scene.room_dimensions.y = 8
+    scene = component.update_ile_scene(scene)
+
+    assert scene != prior_scene()
+    assert scene.room_dimensions.y == 8
+    assert scene.restrict_open_doors
+
+    objs = scene.objects
+
+    assert not scene.lava
+
+    sizez = scene.room_dimensions.z
+    assert isinstance(objs, List)
+    assert len(objs) == 9
+
+    counter = 0
+    obj = objs[counter]
+    counter += 1
+    assert obj['id'].startswith('platform')
+    assert obj['type'] == 'cube'
+    assert obj['kinematic']
+    assert obj['structure']
+
+    show = obj['shows'][0]
+    assert show['position'] == {'x': 0, 'y': .75, 'z': -11.5}
+    assert show['rotation'] == {'x': 0, 'y': 0, 'z': 0}
+    assert show['scale'] == {'x': 1, 'y': 1.5, 'z': 1}
+
+    obj = objs[counter]
+    counter += 1
+    assert obj['id'].startswith('door')
+    assert obj['type'] == 'door_4'
+    assert obj['kinematic']
+    assert obj.get('structure') is None
+    show = obj['shows'][0]
+    assert show['position'] == {'x': 3, 'y': 8, 'z': 0}
+    assert show['rotation'] == {'x': 0, 'y': 0, 'z': 0}
+    assert show['scale'] == {'x': 1, 'y': 1, 'z': 1}
+
+    obj = objs[counter]
+    counter += 1
+    assert obj['id'].startswith('wall')
+    assert obj['type'] == 'cube'
+    assert obj['kinematic']
+    assert obj['structure']
+    show = obj['shows'][0]
+    assert show['position'] == {'x': 3, 'y': 13, 'z': 0}
+    assert show['rotation'] == {'x': 0, 'y': 0, 'z': 0}
+    assert show['scale'] == {'x': 6, 'y': 6, 'z': 0.1}
+
+    obj = objs[counter]
+    counter += 1
+    assert obj['id'].startswith('wall')
+    assert obj['type'] == 'cube'
+    assert obj['kinematic']
+    assert obj['structure']
+    show = obj['shows'][0]
+    pos = show['position']
+    assert pos['x'] == pytest.approx(1.29)
+    assert pos['y'] == 9
+    assert pos['z'] == 0
+    assert show['rotation'] == {'x': 0, 'y': 0, 'z': 0}
+    assert show['scale'] == {'x': 2.58, 'y': 2, 'z': 0.1}
+
+    obj = objs[counter]
+    counter += 1
+    assert obj['id'].startswith('wall')
+    assert obj['type'] == 'cube'
+    assert obj['kinematic']
+    assert obj['structure']
+    show = obj['shows'][0]
+    pos = show['position']
+    assert pos['x'] == pytest.approx(4.71)
+    assert pos['y'] == 9
+    assert pos['z'] == 0
+    assert show['rotation'] == {'x': 0, 'y': 0, 'z': 0}
+    assert show['scale'] == {'x': 2.58, 'y': 2, 'z': 0.1}
+
+    obj = objs[counter]
+    counter += 1
+    assert obj['id'].startswith('door')
+    assert obj['type'] == 'door_4'
+    assert obj['kinematic']
+    assert obj.get('structure') is None
+    show = obj['shows'][0]
+    assert show['position'] == {'x': -3, 'y': 8, 'z': 0}
+    assert show['rotation'] == {'x': 0, 'y': 0, 'z': 0}
+    assert show['scale'] == {'x': 1, 'y': 1, 'z': 1}
+
+    obj = objs[counter]
+    counter += 1
+    assert obj['id'].startswith('wall')
+    assert obj['type'] == 'cube'
+    assert obj['kinematic']
+    assert obj['structure']
+    show = obj['shows'][0]
+    assert show['position'] == {'x': -3, 'y': 13, 'z': 0}
+    assert show['rotation'] == {'x': 0, 'y': 0, 'z': 0}
+    assert show['scale'] == {'x': 6, 'y': 6, 'z': 0.1}
+
+    obj = objs[counter]
+    counter += 1
+    assert obj['id'].startswith('wall')
+    assert obj['type'] == 'cube'
+    assert obj['kinematic']
+    assert obj['structure']
+    show = obj['shows'][0]
+    pos = show['position']
+    assert pos['x'] == pytest.approx(-4.71)
+    assert pos['y'] == 9
+    assert pos['z'] == 0
+    assert show['rotation'] == {'x': 0, 'y': 0, 'z': 0}
+    assert show['scale'] == {'x': 2.58, 'y': 2, 'z': 0.1}
+
+    obj = objs[counter]
+    counter += 1
+    assert obj['id'].startswith('wall')
+    assert obj['type'] == 'cube'
+    assert obj['kinematic']
+    assert obj['structure']
+    show = obj['shows'][0]
+    pos = show['position']
+    assert pos['x'] == pytest.approx(-1.29)
+    assert pos['y'] == 9
+    assert pos['z'] == 0
+    assert show['rotation'] == {'x': 0, 'y': 0, 'z': 0}
+    assert show['scale'] == {'x': 2.58, 'y': 2, 'z': 0.1}
+
+    perf_pos = scene.performer_start.position
+    assert perf_pos == Vector3d(x=0, y=1.5, z=-sizez / 2.0 + 0.5)
+
+
+def test_shortcut_double_door_platform_off():
+    component = ShortcutComponent({
+        'shortcut_double_door_choice': {
+            'add_platform': False
+        }
+    })
+    assert component.shortcut_double_door_choice
+    assert component.get_shortcut_double_door_choice(
+    ) == DoubleDoorConfig(add_platform=False)
+
+    scene = prior_scene_custom_size(12, 24)
+    scene.room_dimensions.y = 8
+
+    # Performer is in the way of adding lava down the middle
+    scene.performer_start.position.x = -6
+    scene.performer_start.position.z = -12
+
+    scene = component.update_ile_scene(scene)
+
+    assert scene != prior_scene()
+    assert scene.room_dimensions.y == 8
+    assert scene.restrict_open_doors
+
+    objs = scene.objects
+
+    assert scene.lava
+
+    assert isinstance(objs, List)
+    assert len(objs) == 8
+
+    counter = 0
+    obj = objs[counter]
+    counter += 1
+    assert obj['id'].startswith('door')
+    assert obj['type'] == 'door_4'
+    assert obj['kinematic']
+    assert obj.get('structure') is None
+    show = obj['shows'][0]
+    assert show['position'] == {'x': 3, 'y': 8, 'z': 0}
+    assert show['rotation'] == {'x': 0, 'y': 0, 'z': 0}
+    assert show['scale'] == {'x': 1, 'y': 1, 'z': 1}
+
+    obj = objs[counter]
+    counter += 1
+    assert obj['id'].startswith('wall')
+    assert obj['type'] == 'cube'
+    assert obj['kinematic']
+    assert obj['structure']
+    show = obj['shows'][0]
+    assert show['position'] == {'x': 3, 'y': 13, 'z': 0}
+    assert show['rotation'] == {'x': 0, 'y': 0, 'z': 0}
+    assert show['scale'] == {'x': 6, 'y': 6, 'z': 0.1}
+
+    obj = objs[counter]
+    counter += 1
+    assert obj['id'].startswith('wall')
+    assert obj['type'] == 'cube'
+    assert obj['kinematic']
+    assert obj['structure']
+    show = obj['shows'][0]
+    pos = show['position']
+    assert pos['x'] == pytest.approx(1.29)
+    assert pos['y'] == 9
+    assert pos['z'] == 0
+    assert show['rotation'] == {'x': 0, 'y': 0, 'z': 0}
+    assert show['scale'] == {'x': 2.58, 'y': 2, 'z': 0.1}
+
+    obj = objs[counter]
+    counter += 1
+    assert obj['id'].startswith('wall')
+    assert obj['type'] == 'cube'
+    assert obj['kinematic']
+    assert obj['structure']
+    show = obj['shows'][0]
+    pos = show['position']
+    assert pos['x'] == pytest.approx(4.71)
+    assert pos['y'] == 9
+    assert pos['z'] == 0
+    assert show['rotation'] == {'x': 0, 'y': 0, 'z': 0}
+    assert show['scale'] == {'x': 2.58, 'y': 2, 'z': 0.1}
+
+    obj = objs[counter]
+    counter += 1
+    assert obj['id'].startswith('door')
+    assert obj['type'] == 'door_4'
+    assert obj['kinematic']
+    assert obj.get('structure') is None
+    show = obj['shows'][0]
+    assert show['position'] == {'x': -3, 'y': 8, 'z': 0}
+    assert show['rotation'] == {'x': 0, 'y': 0, 'z': 0}
+    assert show['scale'] == {'x': 1, 'y': 1, 'z': 1}
+
+    obj = objs[counter]
+    counter += 1
+    assert obj['id'].startswith('wall')
+    assert obj['type'] == 'cube'
+    assert obj['kinematic']
+    assert obj['structure']
+    show = obj['shows'][0]
+    assert show['position'] == {'x': -3, 'y': 13, 'z': 0}
+    assert show['rotation'] == {'x': 0, 'y': 0, 'z': 0}
+    assert show['scale'] == {'x': 6, 'y': 6, 'z': 0.1}
+
+    obj = objs[counter]
+    counter += 1
+    assert obj['id'].startswith('wall')
+    assert obj['type'] == 'cube'
+    assert obj['kinematic']
+    assert obj['structure']
+    show = obj['shows'][0]
+    pos = show['position']
+    assert pos['x'] == pytest.approx(-4.71)
+    assert pos['y'] == 9
+    assert pos['z'] == 0
+    assert show['rotation'] == {'x': 0, 'y': 0, 'z': 0}
+    assert show['scale'] == {'x': 2.58, 'y': 2, 'z': 0.1}
+
+    obj = objs[counter]
+    counter += 1
+    assert obj['id'].startswith('wall')
+    assert obj['type'] == 'cube'
+    assert obj['kinematic']
+    assert obj['structure']
+    show = obj['shows'][0]
+    pos = show['position']
+    assert pos['x'] == pytest.approx(-1.29)
+    assert pos['y'] == 9
+    assert pos['z'] == 0
+    assert show['rotation'] == {'x': 0, 'y': 0, 'z': 0}
+    assert show['scale'] == {'x': 2.58, 'y': 2, 'z': 0.1}
+
+
+def test_shortcut_double_door_other_configs():
+    component = ShortcutComponent({
+        'shortcut_double_door_choice': {
+            'add_freeze': False,
+            'platform_height': 2,
+            'platform_length': 1.5,
+            'platform_width': 1.5,
+            'start_drop_step': 2,
+            'occluder_wall_position_z': None,
+            'occluder_distance_from_performer': 6.5,
+        }
+    })
+    assert component.shortcut_double_door_choice
+    assert component.get_shortcut_double_door_choice(
+    ) == DoubleDoorConfig(add_freeze=False,
+                          platform_height=2,
+                          platform_length=1.5,
+                          platform_width=1.5,
+                          start_drop_step=2,
+                          occluder_wall_position_z=None,
+                          occluder_distance_from_performer=6.5
+                          )
+
+    config = component.get_shortcut_double_door_choice()
+
+    scene = prior_scene_custom_size(12, 24)
+    scene.room_dimensions.y = 8
+
+    # Performer is in the way of adding lava down the middle
+    scene.performer_start.position.x = -6
+    scene.performer_start.position.z = -12
+
+    scene = component.update_ile_scene(scene)
+
+    assert scene != prior_scene()
+    assert scene.room_dimensions.y == 8
+
+    # Defaults
+    assert scene.restrict_open_doors
+    assert not config.add_freeze
+    assert config.platform_height == 2
+    assert config.platform_length == 1.5
+    assert config.platform_width == 1.5
+    assert config.start_drop_step == 2
+    assert config.occluder_wall_position_z is None
+    assert config.occluder_distance_from_performer == 6.5
+
+    objs = scene.objects
+
+    assert scene.lava
+    assert scene.lava == [{'x': 0,
+                           'z': -12},
+                          {'x': 0,
+                           'z': -11},
+                          {'x': 0,
+                           'z': -10},
+                          {'x': 0,
+                           'z': -9},
+                          {'x': 0,
+                           'z': -8},
+                          {'x': 0,
+                           'z': -7},
+                          {'x': 0,
+                           'z': -6},
+                          {'x': 0,
+                           'z': -5},
+                          {'x': 0,
+                           'z': -4},
+                          {'x': 0,
+                           'z': -3},
+                          {'x': 0,
+                           'z': -2},
+                          {'x': 0,
+                           'z': -1},
+                          {'x': 0,
+                           'z': 0},
+                          {'x': 0,
+                           'z': 1},
+                          {'x': 0,
+                           'z': 2},
+                          {'x': 0,
+                           'z': 3},
+                          {'x': 0,
+                           'z': 4},
+                          {'x': 0,
+                           'z': 5},
+                          {'x': 0,
+                           'z': 6},
+                          {'x': 0,
+                           'z': 7},
+                          {'x': 0,
+                           'z': 8},
+                          {'x': 0,
+                           'z': 9},
+                          {'x': 0,
+                           'z': 10},
+                          {'x': 0,
+                           'z': 11},
+                          {'x': 0,
+                           'z': 12}]
+
+    sizez = scene.room_dimensions.z
+    assert isinstance(objs, List)
+    assert len(objs) == 9
+
+    counter = 0
+    obj = objs[counter]
+    counter += 1
+    assert obj['id'].startswith('platform')
+    assert obj['type'] == 'cube'
+    assert obj['kinematic']
+    assert obj['structure']
+
+    show = obj['shows'][0]
+    assert show['position'] == {'x': 0, 'y': 1, 'z': -11.25}
+    assert show['rotation'] == {'x': 0, 'y': 0, 'z': 0}
+    assert show['scale'] == {'x': 1.5, 'y': 2, 'z': 1.5}
+
+    obj = objs[counter]
+    counter += 1
+    assert obj['id'].startswith('door')
+    assert obj['type'] == 'door_4'
+    assert obj['kinematic']
+    assert obj.get('structure') is None
+    show = obj['shows'][0]
+    assert show['position'] == {'x': 3, 'y': 8, 'z': -5}
+    assert show['rotation'] == {'x': 0, 'y': 0, 'z': 0}
+    assert show['scale'] == {'x': 1, 'y': 1, 'z': 1}
+
+    obj = objs[counter]
+    counter += 1
+    assert obj['id'].startswith('wall')
+    assert obj['type'] == 'cube'
+    assert obj['kinematic']
+    assert obj['structure']
+    show = obj['shows'][0]
+    assert show['position'] == {'x': 3, 'y': 13, 'z': -5}
+    assert show['rotation'] == {'x': 0, 'y': 0, 'z': 0}
+    assert show['scale'] == {'x': 6, 'y': 6, 'z': 0.1}
+
+    obj = objs[counter]
+    counter += 1
+    assert obj['id'].startswith('wall')
+    assert obj['type'] == 'cube'
+    assert obj['kinematic']
+    assert obj['structure']
+    show = obj['shows'][0]
+    pos = show['position']
+    assert pos['x'] == pytest.approx(1.29)
+    assert pos['y'] == 9
+    assert pos['z'] == -5
+    assert show['rotation'] == {'x': 0, 'y': 0, 'z': 0}
+    assert show['scale'] == {'x': 2.58, 'y': 2, 'z': 0.1}
+
+    obj = objs[counter]
+    counter += 1
+    assert obj['id'].startswith('wall')
+    assert obj['type'] == 'cube'
+    assert obj['kinematic']
+    assert obj['structure']
+    show = obj['shows'][0]
+    pos = show['position']
+    assert pos['x'] == pytest.approx(4.71)
+    assert pos['y'] == 9
+    assert pos['z'] == -5
+    assert show['rotation'] == {'x': 0, 'y': 0, 'z': 0}
+    assert show['scale'] == {'x': 2.58, 'y': 2, 'z': 0.1}
+
+    obj = objs[counter]
+    counter += 1
+    assert obj['id'].startswith('door')
+    assert obj['type'] == 'door_4'
+    assert obj['kinematic']
+    assert obj.get('structure') is None
+    show = obj['shows'][0]
+    assert show['position'] == {'x': -3, 'y': 8, 'z': -5}
+    assert show['rotation'] == {'x': 0, 'y': 0, 'z': 0}
+    assert show['scale'] == {'x': 1, 'y': 1, 'z': 1}
+
+    obj = objs[counter]
+    counter += 1
+    assert obj['id'].startswith('wall')
+    assert obj['type'] == 'cube'
+    assert obj['kinematic']
+    assert obj['structure']
+    show = obj['shows'][0]
+    assert show['position'] == {'x': -3, 'y': 13, 'z': -5}
+    assert show['rotation'] == {'x': 0, 'y': 0, 'z': 0}
+    assert show['scale'] == {'x': 6, 'y': 6, 'z': 0.1}
+
+    obj = objs[counter]
+    counter += 1
+    assert obj['id'].startswith('wall')
+    assert obj['type'] == 'cube'
+    assert obj['kinematic']
+    assert obj['structure']
+    show = obj['shows'][0]
+    pos = show['position']
+    assert pos['x'] == pytest.approx(-4.71)
+    assert pos['y'] == 9
+    assert pos['z'] == -5
+    assert show['rotation'] == {'x': 0, 'y': 0, 'z': 0}
+    assert show['scale'] == {'x': 2.58, 'y': 2, 'z': 0.1}
+
+    obj = objs[counter]
+    counter += 1
+    assert obj['id'].startswith('wall')
+    assert obj['type'] == 'cube'
+    assert obj['kinematic']
+    assert obj['structure']
+    show = obj['shows'][0]
+    pos = show['position']
+    assert pos['x'] == pytest.approx(-1.29)
+    assert pos['y'] == 9
+    assert pos['z'] == -5
+    assert show['rotation'] == {'x': 0, 'y': 0, 'z': 0}
+    assert show['scale'] == {'x': 2.58, 'y': 2, 'z': 0.1}
+
+    perf_pos = scene.performer_start.position
+    assert perf_pos == Vector3d(x=0, y=2, z=-sizez / 2.0 + 0.5)
+
+
+def test_shortcut_double_door_occluder_wall_position_z():
+    component = ShortcutComponent({
+        'shortcut_double_door_choice': {
+            'add_freeze': False,
+            'platform_height': 2,
+            'platform_length': 1.5,
+            'platform_width': 1.5,
+            'start_drop_step': 2,
+            'occluder_wall_position_z': -5,
+            'occluder_distance_from_performer': None
+        }
+    })
+    assert component.shortcut_double_door_choice
+    assert component.get_shortcut_double_door_choice(
+    ) == DoubleDoorConfig(add_freeze=False,
+                          platform_height=2,
+                          platform_length=1.5,
+                          platform_width=1.5,
+                          start_drop_step=2,
+                          occluder_wall_position_z=-5,
+                          occluder_distance_from_performer=None
+                          )
+
+    config = component.get_shortcut_double_door_choice()
+
+    scene = prior_scene_custom_size(12, 24)
+    scene.room_dimensions.y = 8
+
+    # Performer is in the way of adding lava down the middle
+    scene.performer_start.position.x = -6
+    scene.performer_start.position.z = -12
+
+    scene = component.update_ile_scene(scene)
+
+    assert scene != prior_scene()
+    assert scene.room_dimensions.y == 8
+
+    # Defaults
+    assert scene.restrict_open_doors
+    assert not config.add_freeze
+    assert config.platform_height == 2
+    assert config.platform_length == 1.5
+    assert config.platform_width == 1.5
+    assert config.start_drop_step == 2
+    assert config.occluder_wall_position_z == -5
+
+    objs = scene.objects
+
+    sizez = scene.room_dimensions.z
+    assert isinstance(objs, List)
+    assert len(objs) == 9
+
+    counter = 0
+    obj = objs[counter]
+    counter += 1
+    assert obj['id'].startswith('platform')
+    assert obj['type'] == 'cube'
+    assert obj['kinematic']
+    assert obj['structure']
+
+    show = obj['shows'][0]
+    assert show['position'] == {'x': 0, 'y': 1, 'z': -11.25}
+    assert show['rotation'] == {'x': 0, 'y': 0, 'z': 0}
+    assert show['scale'] == {'x': 1.5, 'y': 2, 'z': 1.5}
+
+    obj = objs[counter]
+    counter += 1
+    assert obj['id'].startswith('door')
+    assert obj['type'] == 'door_4'
+    assert obj['kinematic']
+    assert obj.get('structure') is None
+    show = obj['shows'][0]
+    assert show['position'] == {'x': 3, 'y': 8, 'z': -5}
+    assert show['rotation'] == {'x': 0, 'y': 0, 'z': 0}
+    assert show['scale'] == {'x': 1, 'y': 1, 'z': 1}
+
+    obj = objs[counter]
+    counter += 1
+    assert obj['id'].startswith('wall')
+    assert obj['type'] == 'cube'
+    assert obj['kinematic']
+    assert obj['structure']
+    show = obj['shows'][0]
+    assert show['position'] == {'x': 3, 'y': 13, 'z': -5}
+    assert show['rotation'] == {'x': 0, 'y': 0, 'z': 0}
+    assert show['scale'] == {'x': 6, 'y': 6, 'z': 0.1}
+
+    obj = objs[counter]
+    counter += 1
+    assert obj['id'].startswith('wall')
+    assert obj['type'] == 'cube'
+    assert obj['kinematic']
+    assert obj['structure']
+    show = obj['shows'][0]
+    pos = show['position']
+    assert pos['x'] == pytest.approx(1.29)
+    assert pos['y'] == 9
+    assert pos['z'] == -5
+    assert show['rotation'] == {'x': 0, 'y': 0, 'z': 0}
+    assert show['scale'] == {'x': 2.58, 'y': 2, 'z': 0.1}
+
+    obj = objs[counter]
+    counter += 1
+    assert obj['id'].startswith('wall')
+    assert obj['type'] == 'cube'
+    assert obj['kinematic']
+    assert obj['structure']
+    show = obj['shows'][0]
+    pos = show['position']
+    assert pos['x'] == pytest.approx(4.71)
+    assert pos['y'] == 9
+    assert pos['z'] == -5
+    assert show['rotation'] == {'x': 0, 'y': 0, 'z': 0}
+    assert show['scale'] == {'x': 2.58, 'y': 2, 'z': 0.1}
+
+    obj = objs[counter]
+    counter += 1
+    assert obj['id'].startswith('door')
+    assert obj['type'] == 'door_4'
+    assert obj['kinematic']
+    assert obj.get('structure') is None
+    show = obj['shows'][0]
+    assert show['position'] == {'x': -3, 'y': 8, 'z': -5}
+    assert show['rotation'] == {'x': 0, 'y': 0, 'z': 0}
+    assert show['scale'] == {'x': 1, 'y': 1, 'z': 1}
+
+    obj = objs[counter]
+    counter += 1
+    assert obj['id'].startswith('wall')
+    assert obj['type'] == 'cube'
+    assert obj['kinematic']
+    assert obj['structure']
+    show = obj['shows'][0]
+    assert show['position'] == {'x': -3, 'y': 13, 'z': -5}
+    assert show['rotation'] == {'x': 0, 'y': 0, 'z': 0}
+    assert show['scale'] == {'x': 6, 'y': 6, 'z': 0.1}
+
+    obj = objs[counter]
+    counter += 1
+    assert obj['id'].startswith('wall')
+    assert obj['type'] == 'cube'
+    assert obj['kinematic']
+    assert obj['structure']
+    show = obj['shows'][0]
+    pos = show['position']
+    assert pos['x'] == pytest.approx(-4.71)
+    assert pos['y'] == 9
+    assert pos['z'] == -5
+    assert show['rotation'] == {'x': 0, 'y': 0, 'z': 0}
+    assert show['scale'] == {'x': 2.58, 'y': 2, 'z': 0.1}
+
+    obj = objs[counter]
+    counter += 1
+    assert obj['id'].startswith('wall')
+    assert obj['type'] == 'cube'
+    assert obj['kinematic']
+    assert obj['structure']
+    show = obj['shows'][0]
+    pos = show['position']
+    assert pos['x'] == pytest.approx(-1.29)
+    assert pos['y'] == 9
+    assert pos['z'] == -5
+    assert show['rotation'] == {'x': 0, 'y': 0, 'z': 0}
+    assert show['scale'] == {'x': 2.58, 'y': 2, 'z': 0.1}
+
+    perf_pos = scene.performer_start.position
+    assert perf_pos == Vector3d(x=0, y=2, z=-sizez / 2.0 + 0.5)
+
+
+def test_shortcut_double_door_occluder_distance_from_performer():
+    component = ShortcutComponent({
+        'shortcut_double_door_choice': {
+            'add_freeze': False,
+            'platform_height': 2,
+            'platform_length': 1.5,
+            'platform_width': 1.5,
+            'start_drop_step': 2,
+            'occluder_wall_position_z': -5,
+            'occluder_distance_from_performer': 7.5
+        }
+    })
+    assert component.shortcut_double_door_choice
+    assert component.get_shortcut_double_door_choice(
+    ) == DoubleDoorConfig(add_freeze=False,
+                          platform_height=2,
+                          platform_length=1.5,
+                          platform_width=1.5,
+                          start_drop_step=2,
+                          occluder_wall_position_z=-5,
+                          occluder_distance_from_performer=7.5
+                          )
+
+    config = component.get_shortcut_double_door_choice()
+
+    scene = prior_scene_custom_size(12, 24)
+    scene.room_dimensions.y = 8
+
+    # Performer is in the way of adding lava down the middle
+    scene.performer_start.position.x = -6
+    scene.performer_start.position.z = -12
+
+    scene = component.update_ile_scene(scene)
+
+    assert scene != prior_scene()
+    assert scene.room_dimensions.y == 8
+
+    # Defaults
+    assert scene.restrict_open_doors
+    assert not config.add_freeze
+    assert config.platform_height == 2
+    assert config.platform_length == 1.5
+    assert config.platform_width == 1.5
+    assert config.start_drop_step == 2
+    assert config.occluder_wall_position_z == -5
+
+    objs = scene.objects
+
+    sizez = scene.room_dimensions.z
+    assert isinstance(objs, List)
+    assert len(objs) == 9
+
+    counter = 0
+    obj = objs[counter]
+    counter += 1
+    assert obj['id'].startswith('platform')
+    assert obj['type'] == 'cube'
+    assert obj['kinematic']
+    assert obj['structure']
+
+    show = obj['shows'][0]
+    assert show['position'] == {'x': 0, 'y': 1, 'z': -11.25}
+    assert show['rotation'] == {'x': 0, 'y': 0, 'z': 0}
+    assert show['scale'] == {'x': 1.5, 'y': 2, 'z': 1.5}
+
+    obj = objs[counter]
+    counter += 1
+    assert obj['id'].startswith('door')
+    assert obj['type'] == 'door_4'
+    assert obj['kinematic']
+    assert obj.get('structure') is None
+    show = obj['shows'][0]
+    assert show['position'] == {'x': 3, 'y': 8, 'z': -4}
+    assert show['rotation'] == {'x': 0, 'y': 0, 'z': 0}
+    assert show['scale'] == {'x': 1, 'y': 1, 'z': 1}
+
+    obj = objs[counter]
+    counter += 1
+    assert obj['id'].startswith('wall')
+    assert obj['type'] == 'cube'
+    assert obj['kinematic']
+    assert obj['structure']
+    show = obj['shows'][0]
+    assert show['position'] == {'x': 3, 'y': 13, 'z': -4}
+    assert show['rotation'] == {'x': 0, 'y': 0, 'z': 0}
+    assert show['scale'] == {'x': 6, 'y': 6, 'z': 0.1}
+
+    obj = objs[counter]
+    counter += 1
+    assert obj['id'].startswith('wall')
+    assert obj['type'] == 'cube'
+    assert obj['kinematic']
+    assert obj['structure']
+    show = obj['shows'][0]
+    pos = show['position']
+    assert pos['x'] == pytest.approx(1.29)
+    assert pos['y'] == 9
+    assert pos['z'] == -4
+    assert show['rotation'] == {'x': 0, 'y': 0, 'z': 0}
+    assert show['scale'] == {'x': 2.58, 'y': 2, 'z': 0.1}
+
+    obj = objs[counter]
+    counter += 1
+    assert obj['id'].startswith('wall')
+    assert obj['type'] == 'cube'
+    assert obj['kinematic']
+    assert obj['structure']
+    show = obj['shows'][0]
+    pos = show['position']
+    assert pos['x'] == pytest.approx(4.71)
+    assert pos['y'] == 9
+    assert pos['z'] == -4
+    assert show['rotation'] == {'x': 0, 'y': 0, 'z': 0}
+    assert show['scale'] == {'x': 2.58, 'y': 2, 'z': 0.1}
+
+    obj = objs[counter]
+    counter += 1
+    assert obj['id'].startswith('door')
+    assert obj['type'] == 'door_4'
+    assert obj['kinematic']
+    assert obj.get('structure') is None
+    show = obj['shows'][0]
+    assert show['position'] == {'x': -3, 'y': 8, 'z': -4}
+    assert show['rotation'] == {'x': 0, 'y': 0, 'z': 0}
+    assert show['scale'] == {'x': 1, 'y': 1, 'z': 1}
+
+    obj = objs[counter]
+    counter += 1
+    assert obj['id'].startswith('wall')
+    assert obj['type'] == 'cube'
+    assert obj['kinematic']
+    assert obj['structure']
+    show = obj['shows'][0]
+    assert show['position'] == {'x': -3, 'y': 13, 'z': -4}
+    assert show['rotation'] == {'x': 0, 'y': 0, 'z': 0}
+    assert show['scale'] == {'x': 6, 'y': 6, 'z': 0.1}
+
+    obj = objs[counter]
+    counter += 1
+    assert obj['id'].startswith('wall')
+    assert obj['type'] == 'cube'
+    assert obj['kinematic']
+    assert obj['structure']
+    show = obj['shows'][0]
+    pos = show['position']
+    assert pos['x'] == pytest.approx(-4.71)
+    assert pos['y'] == 9
+    assert pos['z'] == -4
+    assert show['rotation'] == {'x': 0, 'y': 0, 'z': 0}
+    assert show['scale'] == {'x': 2.58, 'y': 2, 'z': 0.1}
+
+    obj = objs[counter]
+    counter += 1
+    assert obj['id'].startswith('wall')
+    assert obj['type'] == 'cube'
+    assert obj['kinematic']
+    assert obj['structure']
+    show = obj['shows'][0]
+    pos = show['position']
+    assert pos['x'] == pytest.approx(-1.29)
+    assert pos['y'] == 9
+    assert pos['z'] == -4
+    assert show['rotation'] == {'x': 0, 'y': 0, 'z': 0}
+    assert show['scale'] == {'x': 2.58, 'y': 2, 'z': 0.1}
+
+    perf_pos = scene.performer_start.position
+    assert perf_pos == Vector3d(x=0, y=2, z=-sizez / 2.0 + 0.5)
 
 
 def test_shortcut_start_on_platform_off():
@@ -4463,6 +5506,908 @@ def test_shortcut_imitation_trigger_order_options():
         assert component.shortcut_imitation_task
 
 
+def test_shortcut_lava_target_tool_offset_rectangular():
+    horizontal = 1
+    backward = 1
+    component = ShortcutComponent({
+        'shortcut_lava_target_tool': {
+            'front_lava_width': 2,
+            'rear_lava_width': 2,
+            'left_lava_width': 2,
+            'right_lava_width': 2,
+            'island_size': 1,
+            'tool_horizontal_offset': horizontal,
+            'tool_offset_backward_from_lava': backward,
+            'tool_type': 'rectangular',
+        }
+    })
+    assert component.shortcut_lava_target_tool
+    assert component.shortcut_lava_target_tool.tool_horizontal_offset == 1
+    assert \
+        component.shortcut_lava_target_tool.tool_offset_backward_from_lava == 1
+    assert component.shortcut_lava_target_tool.tool_type == 'rectangular'
+    assert component.get_shortcut_lava_target_tool()
+    scene = prior_scene_custom_size(15, 20)
+    scene = component.update_ile_scene(scene)
+    objs = scene.objects
+    tool = objs[1]
+    tool_pos = tool['shows'][0]['position']
+    assert tool_pos['x'] == 1
+    assert tool_pos['z'] == 0
+
+    scene = prior_scene_custom_size(20, 15)
+    scene = component.update_ile_scene(scene)
+    objs = scene.objects
+    tool = objs[1]
+    tool_pos = tool['shows'][0]['position']
+    assert tool_pos['x'] == 0
+    assert tool_pos['z'] == -1
+
+    component = ShortcutComponent({
+        'shortcut_lava_target_tool': {
+            'front_lava_width': 2,
+            'rear_lava_width': 2,
+            'left_lava_width': 2,
+            'right_lava_width': 2,
+            'island_size': 1,
+            'tool_horizontal_offset': -1,
+            'tool_offset_backward_from_lava': 1,
+            'tool_type': 'rectangular',
+        }
+    })
+    assert component.shortcut_lava_target_tool
+    assert component.shortcut_lava_target_tool.tool_horizontal_offset == -1
+    assert \
+        component.shortcut_lava_target_tool.tool_offset_backward_from_lava == 1
+    assert component.shortcut_lava_target_tool.tool_type == 'rectangular'
+    assert component.get_shortcut_lava_target_tool()
+    scene = prior_scene_custom_size(15, 20)
+    scene = component.update_ile_scene(scene)
+    objs = scene.objects
+    tool = objs[1]
+    tool_pos = tool['shows'][0]['position']
+    assert tool_pos['x'] == -horizontal
+    assert tool_pos['z'] == 0
+
+    scene = prior_scene_custom_size(20, 15)
+    scene = component.update_ile_scene(scene)
+    objs = scene.objects
+    tool = objs[1]
+    tool_pos = tool['shows'][0]['position']
+    assert tool_pos['x'] == 0
+    assert tool_pos['z'] == horizontal
+
+
+@pytest.mark.slow
+def test_shortcut_lava_target_tool_offset_rectangular_out_of_room():
+    horizontal = 100
+    component = ShortcutComponent({
+        'shortcut_lava_target_tool': {
+            'tool_horizontal_offset': horizontal,
+            'tool_type': 'rectangular'
+        }
+    })
+    assert component.shortcut_lava_target_tool
+    assert component.shortcut_lava_target_tool.tool_horizontal_offset == 100
+    assert component.shortcut_lava_target_tool.tool_type == 'rectangular'
+    assert component.get_shortcut_lava_target_tool()
+    scene = prior_scene_custom_size(15, 20)
+    with pytest.raises(ILEException):
+        scene = component.update_ile_scene(scene)
+    scene = prior_scene_custom_size(20, 15)
+    with pytest.raises(ILEException):
+        scene = component.update_ile_scene(scene)
+
+    horizontal = -100
+    component = ShortcutComponent({
+        'shortcut_lava_target_tool': {
+            'tool_horizontal_offset': horizontal,
+            'tool_type': 'rectangular'
+        }
+    })
+    assert component.shortcut_lava_target_tool
+    assert component.shortcut_lava_target_tool.tool_horizontal_offset == -100
+    assert component.shortcut_lava_target_tool.tool_type == 'rectangular'
+    assert component.get_shortcut_lava_target_tool()
+    scene = prior_scene_custom_size(15, 20)
+    with pytest.raises(ILEException):
+        scene = component.update_ile_scene(scene)
+    scene = prior_scene_custom_size(20, 15)
+    with pytest.raises(ILEException):
+        scene = component.update_ile_scene(scene)
+
+
+def test_shortcut_lava_target_tool_offset_hooked():
+    horizontal = 2
+    backward = 1
+    component = ShortcutComponent({
+        'shortcut_lava_target_tool': {
+            'front_lava_width': 2,
+            'rear_lava_width': 2,
+            'left_lava_width': 2,
+            'right_lava_width': 2,
+            'island_size': 1,
+            'tool_horizontal_offset': horizontal,
+            'tool_offset_backward_from_lava': backward,
+            'tool_type': 'hooked',
+        }
+    })
+    assert component.shortcut_lava_target_tool
+    assert component.shortcut_lava_target_tool.tool_horizontal_offset == 2
+    assert \
+        component.shortcut_lava_target_tool.tool_offset_backward_from_lava == 1
+    assert component.shortcut_lava_target_tool.tool_type == 'hooked'
+    assert component.get_shortcut_lava_target_tool()
+    scene = prior_scene_custom_size(15, 20)
+    scene = component.update_ile_scene(scene)
+    objs = scene.objects
+    tool = objs[1]
+    tool_pos = tool['shows'][0]['position']
+    tool_width = tool['debug']['tool_thickness'] * 3
+    tool_buffer = 1.0 - (tool_width / 3.0)
+    rear_buffer = 1.0
+    lava_front_to_behind_island = rear_buffer + 3
+    tool_pos_increment = lava_front_to_behind_island - tool_buffer
+    island_coord = 7
+    front_lava_width = 2
+    long_tool_pos = (
+        island_coord - front_lava_width - tool['debug']['length'] / 2.0 - 0.5)
+    long_tool_pos = long_tool_pos + tool_pos_increment
+    short_coord = tool_buffer / 2.0
+    assert tool_pos['x'] == short_coord + horizontal
+    assert tool_pos['z'] == long_tool_pos - backward
+
+    scene = prior_scene_custom_size(20, 15)
+    scene = component.update_ile_scene(scene)
+    objs = scene.objects
+    tool = objs[1]
+    tool_pos = tool['shows'][0]['position']
+    tool_width = tool['debug']['tool_thickness'] * 3
+    tool_buffer = 1.0 - (tool_width / 3.0)
+    rear_buffer = 1.0
+    lava_front_to_behind_island = rear_buffer + 3
+    tool_pos_increment = lava_front_to_behind_island - tool_buffer
+    island_coord = 7
+    front_lava_width = 2
+    long_tool_pos = (
+        island_coord - front_lava_width - tool['debug']['length'] / 2.0 - 0.5)
+    long_tool_pos = long_tool_pos + tool_pos_increment
+    short_coord = tool_buffer / 2.0
+    assert tool_pos['z'] == short_coord - horizontal
+    assert tool_pos['x'] == long_tool_pos - backward
+
+
+def test_shortcut_lava_target_tool_small():
+    component = ShortcutComponent({
+        'shortcut_lava_target_tool': {
+            'front_lava_width': 2,
+            'rear_lava_width': 2,
+            'left_lava_width': 2,
+            'right_lava_width': 2,
+            'island_size': 1,
+            'tool_type': 'small'
+        }
+    })
+    assert component.shortcut_lava_target_tool
+    assert component.shortcut_lava_target_tool.tool_type == 'small'
+    assert component.get_shortcut_lava_target_tool()
+    scene = prior_scene_custom_size(15, 20)
+    scene = component.update_ile_scene(scene)
+    objs = scene.objects
+    tool = objs[1]
+    tool_pos = tool['shows'][0]['position']
+    assert tool['type'].startswith('tool_rect')
+    assert tool_pos['x'] == 0
+    assert tool_pos['z'] == 3
+    assert tool['debug']['length'] == 1
+
+    scene = prior_scene_custom_size(20, 15)
+    scene = component.update_ile_scene(scene)
+    objs = scene.objects
+    tool = objs[1]
+    tool_pos = tool['shows'][0]['position']
+    assert tool['type'].startswith('tool_rect')
+    assert tool_pos['x'] == 3
+    assert tool_pos['z'] == 0
+    assert tool['debug']['length'] == 1
+
+
+def test_shortcut_lava_target_tool_offset_small():
+    horizontal = 3
+    backward = 3
+    component = ShortcutComponent({
+        'shortcut_lava_target_tool': {
+            'front_lava_width': 2,
+            'rear_lava_width': 2,
+            'left_lava_width': 2,
+            'right_lava_width': 2,
+            'island_size': 1,
+            'tool_horizontal_offset': horizontal,
+            'tool_offset_backward_from_lava': backward,
+            'tool_type': 'small',
+        }
+    })
+    assert component.shortcut_lava_target_tool
+    assert component.shortcut_lava_target_tool.tool_horizontal_offset == \
+        horizontal
+    assert \
+        component.shortcut_lava_target_tool.tool_offset_backward_from_lava == \
+        backward
+    assert component.shortcut_lava_target_tool.tool_type == 'small'
+    assert component.get_shortcut_lava_target_tool()
+    scene = prior_scene_custom_size(15, 20)
+    scene = component.update_ile_scene(scene)
+    objs = scene.objects
+    tool = objs[1]
+    tool_pos = tool['shows'][0]['position']
+    assert tool_pos['x'] == horizontal
+    assert tool_pos['z'] == 0
+
+    scene = prior_scene_custom_size(20, 15)
+    scene = component.update_ile_scene(scene)
+    objs = scene.objects
+    tool = objs[1]
+    tool_pos = tool['shows'][0]['position']
+    assert tool_pos['x'] == 0
+    assert tool_pos['z'] == -horizontal
+
+    component = ShortcutComponent({
+        'shortcut_lava_target_tool': {
+            'front_lava_width': 2,
+            'rear_lava_width': 2,
+            'left_lava_width': 2,
+            'right_lava_width': 2,
+            'island_size': 1,
+            'tool_horizontal_offset': -horizontal,
+            'tool_offset_backward_from_lava': backward,
+            'tool_type': 'small',
+        }
+    })
+    assert component.shortcut_lava_target_tool
+    assert component.shortcut_lava_target_tool.tool_horizontal_offset == \
+        -horizontal
+    assert \
+        component.shortcut_lava_target_tool.tool_offset_backward_from_lava == \
+        backward
+    assert component.shortcut_lava_target_tool.tool_type == 'small'
+    assert component.get_shortcut_lava_target_tool()
+    scene = prior_scene_custom_size(15, 20)
+    scene = component.update_ile_scene(scene)
+    objs = scene.objects
+    tool = objs[1]
+    tool_pos = tool['shows'][0]['position']
+    assert tool_pos['x'] == -horizontal
+    assert tool_pos['z'] == 0
+    scene = prior_scene_custom_size(20, 15)
+    scene = component.update_ile_scene(scene)
+    objs = scene.objects
+    tool = objs[1]
+    tool_pos = tool['shows'][0]['position']
+    assert tool_pos['x'] == 0
+    assert tool_pos['z'] == horizontal
+
+
+def test_shortcut_lava_target_tool_broken():
+    component = ShortcutComponent({
+        'shortcut_lava_target_tool': {
+            'front_lava_width': 2,
+            'rear_lava_width': 2,
+            'left_lava_width': 2,
+            'right_lava_width': 2,
+            'island_size': 1,
+            'tool_type': 'broken'
+        }
+    })
+    minimum = structures.BROKEN_TOOL_HORIZONTAL_SEPARATION_MIN
+    maximum = structures.BROKEN_TOOL_HORIZONTAL_SEPARATION_MAX
+    assert component.shortcut_lava_target_tool
+    assert component.shortcut_lava_target_tool.tool_type == 'broken'
+    assert component.get_shortcut_lava_target_tool()
+    scene = prior_scene_custom_size(15, 20)
+    scene = component.update_ile_scene(scene)
+    objs = scene.objects
+    tools = objs[1:]
+    assert len(tools) == 5
+    first_tool_pos = tools[0]['shows'][0]['position']
+    last_tool_pos = tools[-1]['shows'][0]['position']
+    assert first_tool_pos['z'] == 3
+    assert last_tool_pos['z'] == round(
+        first_tool_pos['z'] -
+        structures.BROKEN_TOOL_VERTICAL_SEPARATION * (len(tools) - 1), 2)
+    for tool in tools:
+        assert tool['type'].startswith('tool_rect')
+        assert tool['debug']['length'] == 1
+        pos_x = tool['shows'][0]['position']['x']
+        assert \
+            (-maximum <= pos_x <= -minimum) or (minimum <= pos_x <= maximum)
+
+    scene = prior_scene_custom_size(20, 15)
+    scene = component.update_ile_scene(scene)
+    objs = scene.objects
+    tools = objs[1:]
+    assert len(tools) == 5
+    first_tool_pos = tools[0]['shows'][0]['position']
+    last_tool_pos = tools[-1]['shows'][0]['position']
+    assert first_tool_pos['x'] == 3
+    assert last_tool_pos['x'] == round(
+        first_tool_pos['x'] -
+        structures.BROKEN_TOOL_VERTICAL_SEPARATION * (len(tools) - 1), 2)
+    for tool in tools:
+        assert tool['type'].startswith('tool_rect')
+        assert tool['debug']['length'] == 1
+        pos_z = tool['shows'][0]['position']['z']
+        assert \
+            (-maximum <= pos_z <= -minimum) or (minimum <= pos_z <= maximum)
+
+
+def test_shortcut_lava_target_tool_broken_rotated():
+    component = ShortcutComponent({
+        'shortcut_lava_target_tool': {
+            'front_lava_width': 2,
+            'rear_lava_width': 2,
+            'left_lava_width': 2,
+            'right_lava_width': 2,
+            'island_size': 1,
+            'tool_type': 'broken',
+            'tool_rotation': 90
+        }
+    })
+    assert component.shortcut_lava_target_tool
+    assert component.shortcut_lava_target_tool.tool_type == 'broken'
+    assert component.get_shortcut_lava_target_tool()
+    scene = prior_scene_custom_size(15, 20)
+    scene = component.update_ile_scene(scene)
+    objs = scene.objects
+    tools = objs[1:]
+    assert len(tools) == 5
+    first_tool_pos = tools[0]['shows'][0]['position']
+    last_tool_pos = tools[-1]['shows'][0]['position']
+    assert first_tool_pos['x'] == 2
+    assert last_tool_pos['x'] == round(
+        first_tool_pos['x'] -
+        structures.BROKEN_TOOL_VERTICAL_SEPARATION * (len(tools) - 1), 2)
+    center_of_broken_tools = 1
+    positive_x_maximum = center_of_broken_tools + \
+        structures.BROKEN_TOOL_HORIZONTAL_SEPARATION_MAX
+    negative_x_maximum = center_of_broken_tools - \
+        structures.BROKEN_TOOL_HORIZONTAL_SEPARATION_MAX
+    for tool in tools:
+        assert tool['type'].startswith('tool_rect')
+        assert tool['debug']['length'] == 1
+        pos_z = tool['shows'][0]['position']['z']
+        assert negative_x_maximum <= pos_z <= positive_x_maximum
+
+    scene = prior_scene_custom_size(20, 15)
+    scene = component.update_ile_scene(scene)
+    objs = scene.objects
+    tools = objs[1:]
+    assert len(tools) == 5
+    first_tool_pos = tools[0]['shows'][0]['position']
+    last_tool_pos = tools[-1]['shows'][0]['position']
+    assert first_tool_pos['z'] == -2
+    assert last_tool_pos['z'] == round(
+        first_tool_pos['z'] +
+        structures.BROKEN_TOOL_VERTICAL_SEPARATION * (len(tools) - 1), 2)
+    center_of_broken_tools = 1
+    positive_x_maximum = center_of_broken_tools + \
+        structures.BROKEN_TOOL_HORIZONTAL_SEPARATION_MAX
+    negative_x_maximum = center_of_broken_tools - \
+        structures.BROKEN_TOOL_HORIZONTAL_SEPARATION_MAX
+    for tool in tools:
+        assert tool['type'].startswith('tool_rect')
+        assert tool['debug']['length'] == 1
+        pos_x = tool['shows'][0]['position']['x']
+        assert negative_x_maximum <= pos_x <= positive_x_maximum
+
+
+def test_shortcut_lava_target_tool_inaccessible_positive():
+    horizontal = random.choice([-1, 1])
+    backward = 2
+    blocking = 1
+    component = ShortcutComponent({
+        'shortcut_lava_target_tool': {
+            'random_performer_position': True,
+            'front_lava_width': 2,
+            'rear_lava_width': 2,
+            'left_lava_width': 2,
+            'right_lava_width': 2,
+            'island_size': 1,
+            'tool_horizontal_offset': horizontal,
+            'tool_offset_backward_from_lava': backward,
+            'inaccessible_tool_blocking_wall_horizontal_offset': blocking,
+            'tool_type': 'inaccessible',
+            'tool_rotation': 45
+        }
+    })
+
+    assert component.shortcut_lava_target_tool
+    assert component.shortcut_lava_target_tool.tool_type == 'inaccessible'
+    assert component.get_shortcut_lava_target_tool()
+
+    # Z long direction
+    scene = prior_scene_custom_size(15, 20)
+    scene = component.update_ile_scene(scene)
+    objs = scene.objects
+
+    wall = objs[2]
+    wall_pos = wall['shows'][0]['position']
+    assert wall['shows'][0]['scale']['x'] == 0.1
+    assert wall['shows'][0]['scale']['y'] == 0.25
+    assert wall['shows'][0]['scale']['z'] == 20
+    assert wall['shows'][0]['rotation']['y'] == 0
+    assert wall_pos['x'] == 1
+    assert wall_pos['z'] == 0
+
+    tool = objs[1]
+    tool_pos = tool['shows'][0]['position']
+    assert tool['shows'][0]['rotation']['y'] == 45
+    assert tool['type'].startswith('tool_rect')
+    assert tool['debug']['length'] == 5
+    assert tool_pos['z'] == -1
+    minimum_bound = round(
+        min(getattr(pos, 'x')
+            for pos in tool['shows'][0]['boundingBox'].box_xz), 2)
+    assert minimum_bound == \
+        wall_pos['x'] + wall['shows'][0]['scale']['x'] + abs(horizontal)
+
+    assert scene.performer_start.position.x < wall_pos['x'] + \
+        PERFORMER_HALF_WIDTH
+
+    # X long direction
+    scene = prior_scene_custom_size(20, 15)
+    scene = component.update_ile_scene(scene)
+    objs = scene.objects
+
+    wall = objs[2]
+    wall_pos = wall['shows'][0]['position']
+    assert wall['shows'][0]['scale']['x'] == 0.1
+    assert wall['shows'][0]['scale']['y'] == 0.25
+    assert wall['shows'][0]['scale']['z'] == 20
+    assert wall['shows'][0]['rotation']['y'] == 90
+    assert wall_pos['x'] == 0
+    assert wall_pos['z'] == -1
+
+    tool = objs[1]
+    tool_pos = tool['shows'][0]['position']
+    assert tool['shows'][0]['rotation']['y'] == 135
+    assert tool['type'].startswith('tool_rect')
+    assert tool['debug']['length'] == 5
+    assert tool_pos['x'] == -1
+    maximum_bound = round(
+        max(getattr(pos, 'z')
+            for pos in tool['shows'][0]['boundingBox'].box_xz), 2)
+    assert maximum_bound == \
+        wall_pos['z'] - wall['shows'][0]['scale']['x'] - abs(horizontal)
+
+    assert scene.performer_start.position.z > wall_pos['z'] + \
+        PERFORMER_HALF_WIDTH
+
+
+def test_shortcut_lava_target_tool_inaccessible_negative():
+    horizontal = random.choice([-1, 1])
+    backward = 2
+    blocking = -1
+    component = ShortcutComponent({
+        'shortcut_lava_target_tool': {
+            'random_performer_position': True,
+            'front_lava_width': 2,
+            'rear_lava_width': 2,
+            'left_lava_width': 2,
+            'right_lava_width': 2,
+            'island_size': 1,
+            'tool_horizontal_offset': horizontal,
+            'tool_offset_backward_from_lava': backward,
+            'inaccessible_tool_blocking_wall_horizontal_offset': blocking,
+            'tool_type': 'inaccessible',
+            'tool_rotation': 45
+        }
+    })
+
+    assert component.shortcut_lava_target_tool
+    assert component.shortcut_lava_target_tool.tool_type == 'inaccessible'
+    assert component.get_shortcut_lava_target_tool()
+
+    # Z long direction
+    scene = prior_scene_custom_size(15, 20)
+    scene = component.update_ile_scene(scene)
+    objs = scene.objects
+
+    wall = objs[2]
+    wall_pos = wall['shows'][0]['position']
+    assert wall['shows'][0]['scale']['x'] == 0.1
+    assert wall['shows'][0]['scale']['y'] == 0.25
+    assert wall['shows'][0]['scale']['z'] == 20
+    assert wall['shows'][0]['rotation']['y'] == 0
+    assert wall_pos['x'] == -1
+    assert wall_pos['z'] == 0
+
+    tool = objs[1]
+    tool_pos = tool['shows'][0]['position']
+    assert tool['shows'][0]['rotation']['y'] == 45
+    assert tool['type'].startswith('tool_rect')
+    assert tool['debug']['length'] == 5
+    assert tool_pos['z'] == -1
+    maximum_bound = round(
+        max(getattr(pos, 'x')
+            for pos in tool['shows'][0]['boundingBox'].box_xz), 2)
+    assert maximum_bound == \
+        wall_pos['x'] - wall['shows'][0]['scale']['x'] - abs(horizontal)
+
+    assert scene.performer_start.position.x > wall_pos['x'] + \
+        PERFORMER_HALF_WIDTH
+
+    # X long direction
+    scene = prior_scene_custom_size(20, 15)
+    scene = component.update_ile_scene(scene)
+    objs = scene.objects
+
+    wall = objs[2]
+    wall_pos = wall['shows'][0]['position']
+    assert wall['shows'][0]['scale']['x'] == 0.1
+    assert wall['shows'][0]['scale']['y'] == 0.25
+    assert wall['shows'][0]['scale']['z'] == 20
+    assert wall['shows'][0]['rotation']['y'] == 90
+    assert wall_pos['x'] == 0
+    assert wall_pos['z'] == 1
+
+    tool = objs[1]
+    tool_pos = tool['shows'][0]['position']
+    assert tool['shows'][0]['rotation']['y'] == 135
+    assert tool['type'].startswith('tool_rect')
+    assert tool['debug']['length'] == 5
+    assert tool_pos['x'] == -1
+    minimum_bound = round(
+        min(getattr(pos, 'z')
+            for pos in tool['shows'][0]['boundingBox'].box_xz), 2)
+    assert minimum_bound == \
+        wall_pos['z'] + wall['shows'][0]['scale']['x'] + abs(horizontal)
+
+    assert scene.performer_start.position.z < wall_pos['z'] - \
+        PERFORMER_HALF_WIDTH
+
+
+def test_shortcut_lava_target_tool_inaccessible_no_config():
+    component = ShortcutComponent({
+        'shortcut_lava_target_tool': {
+            'random_performer_position': True,
+            'front_lava_width': 2,
+            'rear_lava_width': 2,
+            'left_lava_width': 2,
+            'right_lava_width': 2,
+            'island_size': 1,
+            'tool_type': 'inaccessible',
+            'tool_rotation': 90
+        }
+    })
+
+    assert component.shortcut_lava_target_tool
+    assert component.shortcut_lava_target_tool.tool_type == 'inaccessible'
+    assert component.get_shortcut_lava_target_tool()
+
+    # Z long direction
+    scene = prior_scene_custom_size(15, 20)
+    scene = component.update_ile_scene(scene)
+    objs = scene.objects
+
+    wall = objs[2]
+    wall_pos = wall['shows'][0]['position']
+    assert wall['shows'][0]['scale']['x'] == 0.1
+    assert wall['shows'][0]['scale']['y'] == 0.25
+    assert wall['shows'][0]['scale']['z'] == 20
+    assert wall['shows'][0]['rotation']['y'] == 0
+    assert -1 <= wall_pos['x'] <= -0.5 or 0.5 <= wall_pos['x'] <= 1
+    assert wall_pos['z'] == 0
+
+    tool = objs[1]
+    tool_pos = tool['shows'][0]['position']
+    assert tool['shows'][0]['rotation']['y'] == 90
+    assert tool['type'].startswith('tool_rect')
+    assert tool['debug']['length'] == 5
+    assert tool_pos['z'] == 1
+    maximum_bound = round(
+        max(getattr(pos, 'x')
+            for pos in tool['shows'][0]['boundingBox'].box_xz), 2)
+    minimum_bound = round(
+        min(getattr(pos, 'x')
+            for pos in tool['shows'][0]['boundingBox'].box_xz), 2)
+    wall_scale = wall['shows'][0]['scale']
+    assert (
+        maximum_bound == pytest.approx(wall_pos['x'] - wall_scale['x']) or
+        minimum_bound == pytest.approx(wall_pos['x'] + wall_scale['x'])
+    )
+
+    left_side_wall = wall_pos['x'] <= -0.5
+    assert (
+        scene.performer_start.position.x > wall_pos['x'] +
+        PERFORMER_HALF_WIDTH if left_side_wall else
+        scene.performer_start.position.x < wall_pos['x'] -
+        PERFORMER_HALF_WIDTH
+    )
+
+    # X long direction
+    scene = prior_scene_custom_size(20, 15)
+    scene = component.update_ile_scene(scene)
+    objs = scene.objects
+
+    wall = objs[2]
+    wall_pos = wall['shows'][0]['position']
+    assert wall['shows'][0]['scale']['x'] == 0.1
+    assert wall['shows'][0]['scale']['y'] == 0.25
+    assert wall['shows'][0]['scale']['z'] == 20
+    assert wall['shows'][0]['rotation']['y'] == 90
+    assert wall_pos['x'] == 0
+    assert -1 <= wall_pos['z'] <= -0.5 or 0.5 <= wall_pos['z'] <= 1
+
+    tool = objs[1]
+    tool_pos = tool['shows'][0]['position']
+    assert tool['shows'][0]['rotation']['y'] == 180
+    assert tool['type'].startswith('tool_rect')
+    assert tool['debug']['length'] == 5
+    assert tool_pos['x'] == 1
+    maximum_bound = round(
+        max(getattr(pos, 'z')
+            for pos in tool['shows'][0]['boundingBox'].box_xz), 2)
+    minimum_bound = round(
+        min(getattr(pos, 'z')
+            for pos in tool['shows'][0]['boundingBox'].box_xz), 2)
+    wall_scale = wall['shows'][0]['scale']
+    assert (
+        maximum_bound == pytest.approx(wall_pos['z'] - wall_scale['x']) or
+        minimum_bound == pytest.approx(wall_pos['z'] + wall_scale['x'])
+    )
+
+    left_side_wall = wall_pos['z'] >= -0.5
+    assert (
+        scene.performer_start.position.z < wall_pos['z'] -
+        PERFORMER_HALF_WIDTH if left_side_wall else
+        scene.performer_start.position.z > wall_pos['z'] +
+        PERFORMER_HALF_WIDTH
+    )
+
+
+def test_shortcut_lava_target_tool_inaccessible_no_config_not_random_start():
+    component = ShortcutComponent({
+        'shortcut_lava_target_tool': {
+            'random_performer_position': False,
+            'front_lava_width': 2,
+            'rear_lava_width': 2,
+            'left_lava_width': 2,
+            'right_lava_width': 2,
+            'island_size': 1,
+            'tool_type': 'inaccessible',
+        }
+    })
+    assert component.shortcut_lava_target_tool
+    assert component.shortcut_lava_target_tool.tool_type == 'inaccessible'
+    assert component.get_shortcut_lava_target_tool()
+
+    # Z long direction
+    scene = prior_scene_custom_size(15, 20)
+    scene = component.update_ile_scene(scene)
+    scene.performer_start.position.x == 0
+    scene.performer_start.position.z == -9.5
+
+    # X long direction
+    scene = prior_scene_custom_size(20, 15)
+    scene = component.update_ile_scene(scene)
+    scene.performer_start.position.x == -9.5
+    scene.performer_start.position.z == 0
+
+
+@pytest.mark.slow
+def test_shortcut_lava_target_tool_inaccessible_errors_positive():
+    component = ShortcutComponent({
+        'shortcut_lava_target_tool': {
+            'inaccessible_tool_blocking_wall_horizontal_offset': 100,
+            'tool_type': 'inaccessible'
+        }
+    })
+    assert component.shortcut_lava_target_tool
+    assert component.get_shortcut_lava_target_tool()
+    scene = prior_scene_custom_size(15, 20)
+    with pytest.raises(ILEException):
+        scene = component.update_ile_scene(scene)
+    scene = prior_scene_custom_size(20, 15)
+    with pytest.raises(ILEException):
+        scene = component.update_ile_scene(scene)
+
+    component = ShortcutComponent({
+        'shortcut_lava_target_tool': {
+            'inaccessible_tool_blocking_wall_horizontal_offset': 0.4,
+            'tool_type': 'inaccessible'
+        }
+    })
+    assert component.shortcut_lava_target_tool
+    assert component.get_shortcut_lava_target_tool()
+    scene = prior_scene_custom_size(15, 20)
+    with pytest.raises(ILEException):
+        scene = component.update_ile_scene(scene)
+    scene = prior_scene_custom_size(20, 15)
+    with pytest.raises(ILEException):
+        scene = component.update_ile_scene(scene)
+
+
+@pytest.mark.slow
+def test_shortcut_lava_target_tool_inaccessible_errors_negative():
+    component = ShortcutComponent({
+        'shortcut_lava_target_tool': {
+            'inaccessible_tool_blocking_wall_horizontal_offset': -100,
+            'tool_type': 'inaccessible'
+        }
+    })
+    assert component.shortcut_lava_target_tool
+    assert component.get_shortcut_lava_target_tool()
+    scene = prior_scene_custom_size(15, 20)
+    with pytest.raises(ILEException):
+        scene = component.update_ile_scene(scene)
+    scene = prior_scene_custom_size(20, 15)
+    with pytest.raises(ILEException):
+        scene = component.update_ile_scene(scene)
+
+    component = ShortcutComponent({
+        'shortcut_lava_target_tool': {
+            'inaccessible_tool_blocking_wall_horizontal_offset': -0.4,
+            'tool_type': 'inaccessible'
+        }
+    })
+    assert component.shortcut_lava_target_tool
+    assert component.get_shortcut_lava_target_tool()
+    scene = prior_scene_custom_size(15, 20)
+    with pytest.raises(ILEException):
+        scene = component.update_ile_scene(scene)
+    scene = prior_scene_custom_size(20, 15)
+    with pytest.raises(ILEException):
+        scene = component.update_ile_scene(scene)
+
+
+def test_shortcut_lava_target_tool_no_inaccessible_blocking_wall():
+    separation = 1
+    tool_types = ['rectangular', 'hooked', 'broken', 'small']
+
+    for tool_type in tool_types:
+        component = ShortcutComponent({
+            'shortcut_lava_target_tool': {
+                'inaccessible_tool_blocking_wall_horizontal_offset': separation,  # noqa
+                'tool_type': tool_type
+            }
+        })
+
+        assert component.shortcut_lava_target_tool
+        assert component.shortcut_lava_target_tool.tool_type != 'inaccessible'
+        assert component.get_shortcut_lava_target_tool()
+        scene = prior_scene_custom_size(15, 20)
+        scene = component.update_ile_scene(scene)
+        for obj in scene.objects:
+            assert not obj['id'].startswith('wall')
+
+
+def test_shortcut_lava_target_tool_offset_broken():
+    horizontal = 2
+    backward = 1
+    component = ShortcutComponent({
+        'shortcut_lava_target_tool': {
+            'front_lava_width': 2,
+            'rear_lava_width': 2,
+            'left_lava_width': 2,
+            'right_lava_width': 2,
+            'island_size': 1,
+            'tool_horizontal_offset': horizontal,
+            'tool_offset_backward_from_lava': backward,
+            'tool_type': 'broken',
+            'tool_rotation': 0
+        }
+    })
+    minimum_positive = \
+        structures.BROKEN_TOOL_HORIZONTAL_SEPARATION_MIN + horizontal
+    maximum_positive = \
+        structures.BROKEN_TOOL_HORIZONTAL_SEPARATION_MAX + horizontal
+    minimum_negative = \
+        structures.BROKEN_TOOL_HORIZONTAL_SEPARATION_MIN - horizontal
+    maximum_negative = \
+        structures.BROKEN_TOOL_HORIZONTAL_SEPARATION_MAX - horizontal
+    assert component.shortcut_lava_target_tool
+    assert component.shortcut_lava_target_tool.tool_type == 'broken'
+    assert component.get_shortcut_lava_target_tool()
+    scene = prior_scene_custom_size(15, 20)
+    scene = component.update_ile_scene(scene)
+    objs = scene.objects
+    tools = objs[1:]
+    assert len(tools) == 5
+    first_tool_pos = tools[0]['shows'][0]['position']
+    last_tool_pos = tools[-1]['shows'][0]['position']
+    assert first_tool_pos['z'] == 3 - backward
+    assert last_tool_pos['z'] == round(
+        first_tool_pos['z'] -
+        structures.BROKEN_TOOL_VERTICAL_SEPARATION * (len(tools) - 1), 2)
+    for tool in tools:
+        assert tool['type'].startswith('tool_rect')
+        assert tool['debug']['length'] == 1
+        pos_x = tool['shows'][0]['position']['x']
+        assert \
+            (-maximum_negative <= pos_x <= -
+             minimum_negative) or (
+                 minimum_positive <= pos_x <= maximum_positive)
+
+    scene = prior_scene_custom_size(20, 15)
+    scene = component.update_ile_scene(scene)
+    objs = scene.objects
+    tools = objs[1:]
+    assert len(tools) == 5
+    first_tool_pos = tools[0]['shows'][0]['position']
+    last_tool_pos = tools[-1]['shows'][0]['position']
+    assert first_tool_pos['x'] == 3 - backward
+    assert last_tool_pos['x'] == round(
+        first_tool_pos['x'] -
+        structures.BROKEN_TOOL_VERTICAL_SEPARATION * (len(tools) - 1), 2)
+    for tool in tools:
+        assert tool['type'].startswith('tool_rect')
+        assert tool['debug']['length'] == 1
+        pos_z = tool['shows'][0]['position']['z']
+        assert \
+            (minimum_negative <= pos_z <=
+             maximum_negative) or (
+                -maximum_positive <= pos_z <= -minimum_positive)
+
+
+@pytest.mark.slow
+def test_shortcut_lava_target_tool_distance_between_performer_broken():
+    for distance_away in arange(0.1, 1.1, 0.1):
+        for _ in range(5):
+            distance_away = round(distance_away, 1)
+            ObjectRepository.get_instance().clear()
+            component = ShortcutComponent({
+                'shortcut_lava_target_tool': {
+                    'distance_between_performer_and_tool': distance_away,
+                    'tool_rotation': [0, 15, 30, 45, 60, 75, 90],
+                    'tool_type': 'broken'
+                }
+            })
+            assert component.shortcut_lava_target_tool
+            assert component.shortcut_lava_target_tool.distance_between_performer_and_tool  # noqa
+            assert component.shortcut_lava_target_tool.tool_type == 'broken'
+            scene = prior_scene_custom_size(25, 25)
+            scene = component.update_ile_scene(scene)
+            performer_start = Point(
+                scene.performer_start.position.x,
+                scene.performer_start.position.z)
+            tools = scene.objects[1:]
+            valid = False
+            for tool in tools:
+                bb_boxes = tool['shows'][0]['boundingBox'].box_xz
+                top_right = Point(bb_boxes[0].x, bb_boxes[0].z)
+                bottom_right = Point(bb_boxes[1].x, bb_boxes[1].z)
+                bottom_left = Point(bb_boxes[2].x, bb_boxes[2].z)
+                top_left = Point(bb_boxes[3].x, bb_boxes[3].z)
+                tool_polygon = Polygon([
+                    top_right, bottom_right, bottom_left, top_left])
+                distance = performer_start.distance(tool_polygon)
+                valid = round(
+                    distance,
+                    2) == round(
+                    distance_away +
+                    PERFORMER_HALF_WIDTH,
+                    2)
+                if valid:
+                    break
+            assert valid
+
+
+def test_shortcut_lava_target_tool_distance_between_performer_inaccessible():
+    component = ShortcutComponent({
+        'shortcut_lava_target_tool': {
+            'distance_between_performer_and_tool': 1,
+            'tool_type': 'inaccessible'
+        }
+    })
+    assert component.shortcut_lava_target_tool
+    assert \
+        component.shortcut_lava_target_tool.distance_between_performer_and_tool
+    assert component.shortcut_lava_target_tool.tool_type == 'inaccessible'
+    scene = prior_scene_custom_size(25, 25)
+    with pytest.raises(ILEException):
+        scene = component.update_ile_scene(scene)
+
+
 def test_shortcut_seeing_leads_to_knowing_default():
     component = ShortcutComponent({
         'shortcut_seeing_leads_to_knowing': True
@@ -4498,9 +6443,9 @@ def test_shortcut_seeing_leads_to_knowing_default():
     assert 'targets' not in scene.goal['metadata']
     assert scene.goal['category'] == 'passive'
     assert scene.goal['answer']['choice'] == 'plausible'
-    assert scene.goal['last_step'] == 100
+    assert scene.goal['last_step'] == 105
     assert scene.goal['action_list']
-    assert len(scene.goal['action_list']) == 100
+    assert len(scene.goal['action_list']) == 105
     for action in scene.goal['action_list']:
         assert action == ['Pass']
 
@@ -4510,8 +6455,9 @@ def test_shortcut_seeing_leads_to_knowing_default():
     target_pos = target['shows'][0]['position']
     # target should start in a placer
     assert abs(target_pos['x']) == 1
-    assert target_pos['y'] == 2.9125
+    assert target_pos['y'] == 2.8825
     assert abs(target_pos['z']) == 0.5
+    assert target['shows'][0]['rotation'] == {'x': 0, 'y': 0, 'z': 0}
     assert 'moves' in target
     assert target['moves'] == [
         {'stepBegin': 50, 'stepEnd': 60,
@@ -4562,9 +6508,9 @@ def test_shortcut_seeing_leads_to_knowing_target_behind_agent():
     assert 'targets' not in scene.goal['metadata']
     assert scene.goal['category'] == 'passive'
     assert scene.goal['answer']['choice'] == 'plausible'
-    assert scene.goal['last_step'] == 100
+    assert scene.goal['last_step'] == 105
     assert scene.goal['action_list']
-    assert len(scene.goal['action_list']) == 100
+    assert len(scene.goal['action_list']) == 105
     for action in scene.goal['action_list']:
         assert action == ['Pass']
 
@@ -4574,8 +6520,9 @@ def test_shortcut_seeing_leads_to_knowing_target_behind_agent():
     target_pos = target['shows'][0]['position']
     # target should start in a placer
     assert abs(target_pos['x']) == 1
-    assert target_pos['y'] == 2.9125
+    assert target_pos['y'] == 2.8825
     assert abs(target_pos['z']) == 0.5
+    assert target['shows'][0]['rotation'] == {'x': 0, 'y': 0, 'z': 0}
     assert 'moves' in target
     assert target['moves'] == [
         {'stepBegin': 50, 'stepEnd': 60,
@@ -4633,9 +6580,9 @@ def test_shortcut_seeing_leads_to_knowing_target_ahead_agent():
     assert 'targets' not in scene.goal['metadata']
     assert scene.goal['category'] == 'passive'
     assert scene.goal['answer']['choice'] == 'plausible'
-    assert scene.goal['last_step'] == 100
+    assert scene.goal['last_step'] == 105
     assert scene.goal['action_list']
-    assert len(scene.goal['action_list']) == 100
+    assert len(scene.goal['action_list']) == 105
     for action in scene.goal['action_list']:
         assert action == ['Pass']
 
@@ -4645,8 +6592,9 @@ def test_shortcut_seeing_leads_to_knowing_target_ahead_agent():
     target_pos = target['shows'][0]['position']
     # target should start in a placer
     assert abs(target_pos['x']) == 1
-    assert target_pos['y'] == 2.9125
+    assert target_pos['y'] == 2.8825
     assert abs(target_pos['z']) == 0.5
+    assert target['shows'][0]['rotation'] == {'x': 0, 'y': 0, 'z': 0}
     assert 'moves' in target
     assert target['moves'] == [
         {'stepBegin': 50, 'stepEnd': 60,
@@ -4677,7 +6625,7 @@ def check_shortcut_seeing_leads_to_knowing_agent(agent):
     assert 'actions' in agent
     assert agent['actions'] == [
         {'id': 'TPM_idle1', 'stepBegin': 51,
-         'isLoopAnimation': True, 'stepEnd': 71}]
+         'isLoopAnimation': True, 'stepEnd': 76}]
     assert 'agentMovement' in agent
     assert 'sequence' in agent['agentMovement']
     assert len(agent['agentMovement']['sequence']) == 2
@@ -4701,21 +6649,25 @@ def check_shortcut_seeing_leads_to_knowing_bins_placers(objs):
 
     assert bins[0]['shows'][0]['position']['x'] == -1
     assert bins[0]['shows'][0]['position']['z'] == 0.5
+    assert bins[0]['shows'][0]['rotation'] == {'x': 0, 'y': 0, 'z': 0}
     assert placers[0]['shows'][0]['position']['x'] == -1
     assert placers[0]['shows'][0]['position']['z'] == 0.5
 
     assert bins[1]['shows'][0]['position']['x'] == -1
     assert bins[1]['shows'][0]['position']['z'] == -0.5
+    assert bins[1]['shows'][0]['rotation'] == {'x': 0, 'y': 0, 'z': 0}
     assert placers[1]['shows'][0]['position']['x'] == -1
     assert placers[1]['shows'][0]['position']['z'] == -0.5
 
     assert bins[2]['shows'][0]['position']['x'] == 1
     assert bins[2]['shows'][0]['position']['z'] == 0.5
+    assert bins[2]['shows'][0]['rotation'] == {'x': 0, 'y': 0, 'z': 0}
     assert placers[2]['shows'][0]['position']['x'] == 1
     assert placers[2]['shows'][0]['position']['z'] == 0.5
 
     assert bins[3]['shows'][0]['position']['x'] == 1
     assert bins[3]['shows'][0]['position']['z'] == -0.5
+    assert bins[3]['shows'][0]['rotation'] == {'x': 0, 'y': 0, 'z': 0}
     assert placers[3]['shows'][0]['position']['x'] == 1
     assert placers[3]['shows'][0]['position']['z'] == -0.5
 
@@ -4724,6 +6676,7 @@ def check_shortcut_seeing_leads_to_knowing_bins_placers(objs):
         assert bin_object['materials'] == bin_material
 
     for placer in placers:
+        assert placer['materials'] == ['Custom/Materials/Magenta']
         assert 'moves' in placer
         assert len(placer['moves']) == 2
         assert placer['moves'][0] == {
@@ -4732,3 +6685,8 @@ def check_shortcut_seeing_leads_to_knowing_bins_placers(objs):
         assert placer['moves'][1] == {
             'stepBegin': 70, 'stepEnd': 79, 'vector': {
                 'x': 0, 'y': 0.25, 'z': 0}}
+        assert len(placer['changeMaterials']) == 1
+        assert placer['changeMaterials'][0]['stepBegin'] == 65
+        assert placer['changeMaterials'][0]['materials'] == [
+            'Custom/Materials/Cyan']
+        assert placer['states'] == ([['active']] * 64) + ([['inactive']] * 40)

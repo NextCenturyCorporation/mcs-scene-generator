@@ -1300,7 +1300,7 @@ def calculate_rotations(
     one: Vector3d,
     two: Vector3d,
     no_rounding_to_tens: bool = False
-) -> Tuple[int, int]:
+) -> Tuple[float, float]:
     """Calculates and returns the X and Y rotations for the performer agent in
     position one to look at the object centered in position two. By default,
     will round to nearest 10 (because Rotate actions are in increments of 10)
@@ -1311,9 +1311,8 @@ def calculate_rotations(
     rotation_y = math.degrees(math.atan2(float(dx), dz))
     rotation_x = math.degrees(math.atan2(dy, math.sqrt(dx * dx + dz * dz)))
     if not no_rounding_to_tens:
-        rotation_y = round(rotation_y, -1)
-        rotation_x = round(rotation_x, -1)
-    return int(round(rotation_x)), int(round(rotation_y)) % 360
+        return int(round(rotation_x, -1)), int(round(rotation_y, -1)) % 360
+    return round(rotation_x, 4), round(rotation_y, 4) % 360
 
 
 def get_magnitudes_of_x_z_dirs_for_rotation_and_move_vector(

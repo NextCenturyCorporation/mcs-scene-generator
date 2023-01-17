@@ -79,6 +79,21 @@ python ile.py -c ile_config.yaml -n 10 -p scene
 
 ### Latest Release Notes
 
+#### Release 1.8
+
+Changelog:
+- Added `ile_configs/interactive_collision.yaml` and `ile_configs/interactive_trajectory.yaml` to generate training data for the Interactive Collision and Interactive Trajectory tasks.
+- Fixed a bug with open-topped buckets/containers accidentally falling over in some scenes.
+- Fixed a bug with placers sometimes releasing an object too far above the ground (or platform), unintentionally causing the object to bounce.
+- Fixed minor bugs in Seeing Leads to Knowing ILE scenes: ensure the placers exit your viewport before the agent begins moving toward a container; ensure the containers all have the same rotation.
+- Fixed the width of the "blocking wall" used in some ILE scenes.
+- Implemented a two-door-occluder (`shortcut_double_door_choice`) for the interactive collision and trajectory tasks.
+- Implemented the `adjacent_to_wall` config property for `structural_platforms` to always position them next to a room wall. Updated the "ramps" example config file to use this option.
+- Implemented the `freeze_while_moving` config option to "freeze" the performer agent until one or more specified objects are completely finished moving (like placers and turntables). Updated the Arithmetic, Set Rotation, and Shell Game example config files to use this option.
+- Implemented the `long_with_two_ramps` config property for `structural_platforms` to generate a platform bisecting the room. Updated the "ramps" example config file to use this option.
+- Implemented support for "broken" and "inaccessible" as the `tool_type` of the `shortcut_lava_target_tool` config option. Added new shortcut sub-properties to control the position of the tool.
+- Randomly colored walls will no longer be assigned the same colors used for placers (cyan/magenta).
+
 #### Release 1.7
 
 Changelog:
@@ -362,6 +377,7 @@ Eval 6 Tasks:
 | Eval 6 Task | MCS Core Domains | Example Config Files |
 | --- | --- | --- |
 | Arithmetic (Interactive) | O7 | [interactive_arithmetic.yaml](./ile_configs/interactive_arithmetic.yaml) |
+| Collisions (Interactive) | O2 | [interactive_collision.yaml](./ile_configs/interactive_collision.yaml) |
 | Imitation (Interactive) | A7 | [interactive_imitation.yaml](./ile_configs/interactive_imitation.yaml) |
 | Navigation: Holes (Interactive) | P7 | New variations with agents; see the Eval 5 Tasks above |
 | Navigation: Lava (Interactive) | P7 | New variations with agents; see the Eval 5 Tasks above |
@@ -372,18 +388,21 @@ Eval 6 Tasks:
 | Shell Game (Interactive) | P5 | [interactive_shell_game.yaml](./ile_configs/interactive_shell_game.yaml) |
 | Spatial Reference (Interactive) | A7 | [interactive_spatial_reference.yaml](./ile_configs/interactive_spatial_reference.yaml) |
 | Spatial Reorientation (Interactive) | P2, P3 | [interactive_spatial_reorientation.yaml](./ile_configs/interactive_spatial_reorientation.yaml) |
+| Trajectory (Interactive) | O2 | [interactive_trajectory.yaml](./ile_configs/interactive_trajectory.yaml) |
 | Tool Choice (Interactive) | O5 | [interactive_tool_choice.yaml](./ile_configs/interactive_tool_choice.yaml) |
 | Tool Use (Interactive) | O5 | New variations with asymmetric (hooked) tools; see the Eval 5 Tasks above |
 
 List of example ILE configuration files for generating scenes similar to specific evaluation tasks:
 
 - [interactive_arithmetic.yaml](./ile_configs/interactive_arithmetic.yaml) Generates scenes similar to the interactive arithmetic (addition/subtraction) eval tasks: start on a platform bisecting the room; zero or more soccer balls are positioned on each side of the room; one or more soccer balls are either added to, or removed from, the same side of the room; pick up all of the soccer balls on the side of the room containing the most soccer balls; sometimes occluders descend to obstrct your view of the final number of soccer balls.
+- [interactive_collision.yaml](./ile_configs/interactive_collision.yaml) Generates scenes similar to the interactive collision eval tasks: start on a platform, with lava bisecting the room; a thrower rolls a green ball that may or may not collide with a soccer ball; a two-door-occluder descends from the ceiling to obstruct your view of the collision/trajectory; you can only open one door and must determine which side of the room contains the soccer ball.
 - [interactive_imitation.yaml](./ile_configs/interactive_imitation.yaml) Generates scenes similar to the interactive imitation eval tasks. See the config file for details.
 - [interactive_number_comparison.yaml](./ile_configs/interactive_number_comparison.yaml) Generates scenes similar to the interactive number comparison eval tasks: start on a platform bisecting the room; one or more soccer ball multi-retrieval targets on one side; fewer soccer balls on the other side.
 - [interactive_set_rotation.yaml](./ile_configs/interactive_set_rotation.yaml) Generates scenes similar to the interactive set rotation eval tasks: start in a room with one or more identical containers positioned on top of a turntable (giant cog); a soccer ball retrieval target is placed inside a container; lids are placed on all containers; the turntable rotates between 90 and 360 degrees.
 - [interactive_shell_game.yaml](./ile_configs/interactive_shell_game.yaml) Generates scenes similar to the interactive shell game eval tasks: start in a room with one or more identical containers; a soccer ball retrieval target is placed inside a container; lids are placed on all containers; a placer drags the target's container to a new location.
 - [interactive_spatial_reference.yaml](./ile_configs/interactive_spatial_reference.yaml) Generates scenes similar to the interactive spatial reference eval tasks: start on a platform bisecting the room; identical closed containers on both sides; an agent walks and points at the container hiding the soccer ball retrieval target; a turntable (giant cog) rotates a non-agent object so it "points" at a container, which may be the same container, or the opposite container.
 - [interactive_spatial_reorientation.yaml](./ile_configs/interactive_spatial_reorientation.yaml) Generates scenes similar to the interactive spatial reorientation eval tasks: start on a platform bisecting the room; identical bins on either side of the room; a placer drops a soccer ball retrieval target into one bin; the performer agent is kidnapped and sometimes teleported to the other side of the room; sometimes one room wall is a different color, and/or the room is trapezoidal.
+- [interactive_trajectory.yaml](./ile_configs/interactive_trajectory.yaml) Generates scenes similar to the interactive trajectory eval tasks: start on a platform, with lava bisecting the room; a thrower rolls the soccer ball; a two-door-occluder descends from the ceiling to obstruct your view of the full trajectory; you can only open one door and must determine which side of the room contains the soccer ball.
 - [interactive_tool_choice.yaml](./ile_configs/interactive_tool_choice.yaml) Generates scenes similar to the interactive tool choice eval tasks: start on a platform bisecting the room; soccer balls surrounded by lava on both sides; one side has a useful tool, but the other side does not have a tool, or has a tool that is too small to use.
 - [passive_seeing_leads_to_knowing.yaml](./ile_configs/passive_seeing_leads_to_knowing.yaml) Generates scenes similar to the passive seeing leads to knowing eval tasks. See the config file for details.
 

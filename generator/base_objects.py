@@ -1522,6 +1522,12 @@ _PRIMITIVE_ON_GROUND_SIZE = ObjectBaseSize(
     offset=Vector3d(x=0, y=0.5, z=0),
     positionY=0
 )
+_PRIMITIVE_TALL_SIZE = ObjectBaseSize(
+    dimensions=Vector3d(x=1, y=2, z=1),
+    mass=1,
+    offset=Vector3d(x=0, y=1, z=0),
+    positionY=1
+)
 _PRIMITIVE_TALL_NARROW_SIZE = ObjectBaseSize(
     dimensions=Vector3d(x=0.5, y=1, z=0.5),
     mass=1,
@@ -2785,7 +2791,8 @@ def _create_bowl_3(args: _FunctionArgs) -> ObjectDefinition:
         chooseMaterialList=[item.copy() for item in args.chosen_material_list],
         chooseSizeList=[
             _BOWL_3_SIZE.make(size) for size in args.size_multiplier_list
-        ]
+        ],
+        massMultiplier=3 if args.type.endswith('static') else 1
     )
 
 
@@ -2801,7 +2808,8 @@ def _create_bowl_4(args: _FunctionArgs) -> ObjectDefinition:
         chooseMaterialList=[item.copy() for item in args.chosen_material_list],
         chooseSizeList=[
             _BOWL_4_SIZE.make(size) for size in args.size_multiplier_list
-        ]
+        ],
+        massMultiplier=3 if args.type.endswith('static') else 1
     )
 
 
@@ -2817,7 +2825,8 @@ def _create_bowl_6(args: _FunctionArgs) -> ObjectDefinition:
         chooseMaterialList=[item.copy() for item in args.chosen_material_list],
         chooseSizeList=[
             _BOWL_6_SIZE.make(size) for size in args.size_multiplier_list
-        ]
+        ],
+        massMultiplier=3 if args.type.endswith('static') else 1
     )
 
 
@@ -3663,7 +3672,8 @@ def _create_cup_2(args: _FunctionArgs) -> ObjectDefinition:
         chooseMaterialList=[item.copy() for item in args.chosen_material_list],
         chooseSizeList=[
             _CUP_2_SIZE.make(size) for size in args.size_multiplier_list
-        ]
+        ],
+        massMultiplier=3
     )
 
 
@@ -3679,7 +3689,8 @@ def _create_cup_3(args: _FunctionArgs) -> ObjectDefinition:
         chooseMaterialList=[item.copy() for item in args.chosen_material_list],
         chooseSizeList=[
             _CUP_3_SIZE.make(size) for size in args.size_multiplier_list
-        ]
+        ],
+        massMultiplier=3
     )
 
 
@@ -3695,7 +3706,8 @@ def _create_cup_6(args: _FunctionArgs) -> ObjectDefinition:
         chooseMaterialList=[item.copy() for item in args.chosen_material_list],
         chooseSizeList=[
             _CUP_6_SIZE.make(size) for size in args.size_multiplier_list
-        ]
+        ],
+        massMultiplier=3
     )
 
 
@@ -4026,6 +4038,12 @@ def _create_primitive_on_ground(args: _FunctionArgs) -> ObjectDefinition:
     return _create_primitive_helper(args, [
         _PRIMITIVE_ON_GROUND_SIZE.make(size)
         for size in args.size_multiplier_list
+    ])
+
+
+def _create_primitive_tall(args: _FunctionArgs) -> ObjectDefinition:
+    return _create_primitive_helper(args, [
+        _PRIMITIVE_TALL_SIZE.make(size) for size in args.size_multiplier_list
     ])
 
 
@@ -5744,7 +5762,9 @@ for tool_type in LARGE_BLOCK_TOOLS_TO_DIMENSIONS.keys():
 
 _PRIMITIVE_TUPLES = [
     ('circle_frustum', _create_primitive_non_cylinder),
+    ('circle_frustum_with_base', _create_primitive_tall),
     ('cone', _create_primitive_non_cylinder),
+    ('cone_with_base', _create_primitive_tall),
     ('cube', _create_primitive_non_cylinder),
     ('cube_hollow_narrow', _create_primitive_on_ground),
     ('cube_hollow_wide', _create_primitive_on_ground),
@@ -5763,12 +5783,14 @@ _PRIMITIVE_TUPLES = [
     ('letter_x', _create_primitive_on_ground),
     ('lock_wall', _create_primitive_non_cylinder),
     ('pyramid', _create_primitive_non_cylinder),
+    ('pyramid_with_base', _create_primitive_tall),
     ('rollable_1', _create_primitive_non_cylinder),
     ('rollable_2', _create_primitive_non_cylinder),
     ('rollable_3', _create_primitive_non_cylinder),
     ('rollable_4', _create_primitive_non_cylinder),
     ('sphere', _create_primitive_non_cylinder),
     ('square_frustum', _create_primitive_non_cylinder),
+    ('square_frustum_with_base', _create_primitive_tall),
     ('tie_fighter', _create_primitive_non_cylinder),
     ('triangle', _create_primitive_triangle),
     ('tube_narrow', _create_primitive_non_cylinder),

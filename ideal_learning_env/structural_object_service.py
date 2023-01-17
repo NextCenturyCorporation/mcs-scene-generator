@@ -112,6 +112,7 @@ logger = logging.getLogger(__name__)
 # Magic numbers used to create ranges for size, location, scale etc for objects
 PLATFORM_SCALE_MIN = 0.5
 PLATFORM_SCALE_MAX = 3
+PLATFORM_WITH_LIPS_SCALE_MIN = 0.8
 RAMP_WIDTH_PERCENT_MIN = 0.05
 RAMP_WIDTH_PERCENT_MAX = 0.5
 RAMP_LENGTH_PERCENT_MIN = 0.05
@@ -175,6 +176,9 @@ BOTTOM_PLATFORM_SCALE_BUFFER_MAX = 5
 # locations are valid later.
 DEFAULT_AVAIABLE_LENGTHS = (10, 10, 10, 10)
 RAMP_ROTATIONS = (90, 180, -90, 0)
+
+WALL_SIDES = ['left', 'right', 'front', 'back', 'back_left_corner',
+              'back_right_corner', 'front_left_corner', 'front_right_corner']
 
 # Labels for platforms/ramps
 LABEL_PLATFORM = "platforms"
@@ -332,6 +336,7 @@ class StructuralWallCreationService(
 
     def __init__(self):
         self._default_template = DEFAULT_TEMPLATE_WALL
+        self._material_tuple = None
         self._type = FeatureTypes.WALLS
 
     def create_feature_from_specific_values(
@@ -341,13 +346,16 @@ class StructuralWallCreationService(
         specific values."""
         room_height = (
             scene.room_dimensions.y or geometry.DEFAULT_ROOM_DIMENSIONS['y'])
+        if not self._material_tuple:
+            self._material_tuple = choose_material_tuple_from_material(
+                reconciled.material
+            )
         args = {
             'position_x': reconciled.position.x,
             'position_y_modifier': reconciled.position.y,
             'position_z': reconciled.position.z,
             'rotation_y': reconciled.rotation_y,
-            'material_tuple':
-                choose_material_tuple_from_material(reconciled.material),
+            'material_tuple': self._material_tuple,
             'width': reconciled.width,
             'height': room_height
         }
@@ -360,21 +368,27 @@ class StructuralWallCreationService(
         return new_obj
 
     def _handle_dependent_defaults(
-            self, scene: Scene, template: StructuralWallConfig, source_template
+            self, scene: Scene, reconciled: StructuralWallConfig,
+            source_template
     ) -> StructuralWallConfig:
-        template = _handle_position_material_defaults(scene, template)
-        _, max_room_dim = _get_room_min_max_dimensions(scene)
-        template.rotation_y = (
-            random.choice([0, 90, 180, 270])
-            if template.rotation_y is None else
-            template.rotation_y
+        reconciled = _handle_position_defaults(scene, reconciled)
+        self._material_tuple = _reconcile_material(
+            source_template.material,
+            materials.ROOM_WALL_MATERIALS
         )
-        template.position.y = 0
-        template.width = (MinMaxFloat(
+        reconciled.material = self._material_tuple.material
+        _, max_room_dim = _get_room_min_max_dimensions(scene)
+        reconciled.rotation_y = (
+            random.choice([0, 90, 180, 270])
+            if reconciled.rotation_y is None else
+            reconciled.rotation_y
+        )
+        reconciled.position.y = 0
+        reconciled.width = (MinMaxFloat(
             max_room_dim * WALL_WIDTH_PERCENT_MIN,
             max_room_dim * WALL_WIDTH_PERCENT_MAX).convert_value()
-            if template.width is None else template.width)
-        return template
+            if reconciled.width is None else reconciled.width)
+        return reconciled
 
     def is_valid(self, scene, new_obj, bounds, try_num, retries):
         valid = (not is_wall_too_close(new_obj[0]))
@@ -387,6 +401,7 @@ class StructuralPlatformCreationService(
 
     def __init__(self):
         self._default_template = DEFAULT_TEMPLATE_PLATFORM
+        self._material_tuple = None
         self._type = FeatureTypes.PLATFORMS
 
     def create_feature_from_specific_values(
@@ -394,7 +409,29 @@ class StructuralPlatformCreationService(
             source_template: StructuralPlatformConfig):
         """Creates a platform from the given template with
         specific values."""
+        # position
+        pos_x = reconciled.position.x
+        pos_z = reconciled.position.z
+        use_long_x = random.choice([True, False])
+        if reconciled.long_with_two_ramps:
+            if reconciled.num > 3 and not reconciled.platform_underneath:
+                raise ILEException(
+                    "Cannot have more than 3 instances of platforms using "
+                    "'long_with_two_ramps' property."
+                )
+            if reconciled.num > 1 and reconciled.platform_underneath:
+                raise ILEException(
+                    "Cannot have more than 1 instance of a double level "
+                    "platform using 'long_with_two_ramps' and "
+                    "'platform_underneath' properties."
+                )
+            reconciled.rotation_y = 0
+            pos_x = 0 if use_long_x else reconciled.position.x
+            pos_z = 0 if not use_long_x else reconciled.position.z
+        # scale
         x = (
+            scene.room_dimensions.x if reconciled.long_with_two_ramps and
+            use_long_x else
             reconciled.scale.x if isinstance(
                 reconciled.scale,
                 (Vector3d, VectorFloatConfig)) else reconciled.scale)
@@ -403,17 +440,44 @@ class StructuralPlatformCreationService(
                 reconciled.scale,
                 (Vector3d, VectorFloatConfig)) else reconciled.scale)
         z = (
+            scene.room_dimensions.z if reconciled.long_with_two_ramps and not
+            use_long_x else
             reconciled.scale.z if isinstance(
                 reconciled.scale,
                 (Vector3d, VectorFloatConfig)) else reconciled.scale)
+        if not self._material_tuple:
+            self._material_tuple = choose_material_tuple_from_material(
+                reconciled.material
+            )
+
+        # Need to calculate a unique position based on the scale
+        # if using adjacent_to_wall
+        adj = reconciled.adjacent_to_wall
+        if adj:
+            if isinstance(adj, list):
+                adj = adj[0]
+            pos_x, pos_z = _calculate_adjacent_to_wall_pos(
+                scene.room_dimensions.x, scene.room_dimensions.z,
+                adj, pos_x, pos_z, x, z)
+            # These rotations optimize ramp placement for stacked platforms
+            # so we don't generate unecessary scenes that will fail.
+            # Not really sure why these rotations work though
+            if adj == 'left' or adj == 'right':
+                reconciled.rotation_y = 0
+            if adj == 'back_right_corner' or adj == 'front_left_corner':
+                reconciled.rotation_y = 90
+            if adj == 'front' or adj == 'back':
+                reconciled.rotation_y = 180
+            if adj == 'back_left_corner' or adj == 'front_right_corner':
+                reconciled.rotation_y = 270
         args = {
-            'position_x': reconciled.position.x,
+            'position_x': pos_x,
             'position_y_modifier': reconciled.position.y,
-            'position_z': reconciled.position.z,
+            'position_z': pos_z,
             'rotation_y': reconciled.rotation_y,
-            'material_tuple':
-                choose_material_tuple_from_material(reconciled.material),
-            'lips': reconciled.lips,
+            'material_tuple': self._material_tuple,
+            'lips': (reconciled.lips if not reconciled.long_with_two_ramps else
+                     ALL_LIPS),
             'scale_x': x,
             'scale_y': y,
             'scale_z': z,
@@ -425,13 +489,20 @@ class StructuralPlatformCreationService(
         new_obj = [structures.create_platform(**args)]
         new_obj = _post_instance(
             scene, new_obj, reconciled, source_template, self._get_type())
+        if adj:
+            new_obj[0]['debug']['adjacent_to_wall'] = adj
         return new_obj
 
     def _handle_dependent_defaults(
             self, scene: Scene, reconciled: StructuralPlatformConfig,
             source_template
     ) -> StructuralPlatformConfig:
-        reconciled = _handle_position_material_defaults(scene, reconciled)
+        reconciled = _handle_position_defaults(scene, reconciled)
+        self._material_tuple = _reconcile_material(
+            source_template.material,
+            materials.ROOM_WALL_MATERIALS
+        )
+        reconciled.material = self._material_tuple.material
         room_height = (
             scene.room_dimensions.y or geometry.DEFAULT_ROOM_DIMENSIONS['y'])
         # Wall height always equals room height.
@@ -447,6 +518,10 @@ class StructuralPlatformCreationService(
             # Restrict max height to room height.
             scale.y = min(reconciled.scale, room_height)
             scale.z = reconciled.scale
+        if reconciled.lips and (reconciled.lips.right or reconciled.lips.left):
+            scale.x = max(scale.x, PLATFORM_WITH_LIPS_SCALE_MIN)
+        if reconciled.lips and (reconciled.lips.front or reconciled.lips.back):
+            scale.z = max(scale.z, PLATFORM_WITH_LIPS_SCALE_MIN)
         reconciled.scale = scale
         return reconciled
 
@@ -456,6 +531,7 @@ class StructuralRampCreationService(
 
     def __init__(self):
         self._default_template = DEFAULT_TEMPLATE_RAMP
+        self._material_tuple = None
         self._type = FeatureTypes.RAMPS
 
     def create_feature_from_specific_values(
@@ -463,13 +539,16 @@ class StructuralRampCreationService(
             source_template: StructuralRampConfig):
         """Creates a ramp from the given template with
         specific values."""
+        if not self._material_tuple:
+            self._material_tuple = choose_material_tuple_from_material(
+                reconciled.material
+            )
         args = {
             'position_x': reconciled.position.x,
             'position_y_modifier': reconciled.position.y,
             'position_z': reconciled.position.z,
             'rotation_y': reconciled.rotation_y,
-            'material_tuple':
-                choose_material_tuple_from_material(reconciled.material),
+            'material_tuple': self._material_tuple,
             'angle': reconciled.angle,
             'width': reconciled.width,
             'length': reconciled.length
@@ -485,7 +564,12 @@ class StructuralRampCreationService(
             self, scene: Scene, reconciled: StructuralRampConfig,
             source_template
     ) -> StructuralRampConfig:
-        reconciled = _handle_position_material_defaults(scene, reconciled)
+        reconciled = _handle_position_defaults(scene, reconciled)
+        self._material_tuple = _reconcile_material(
+            source_template.material,
+            materials.ROOM_WALL_MATERIALS
+        )
+        reconciled.material = self._material_tuple.material
         room_height = (
             scene.room_dimensions.y or geometry.DEFAULT_ROOM_DIMENSIONS['y'])
         min_room_dim, _ = _get_room_min_max_dimensions(scene)
@@ -510,6 +594,7 @@ class StructuralLOccluderCreationService(
 
     def __init__(self):
         self._default_template = DEFAULT_TEMPLATE_L_OCCLUDER
+        self._material_tuple = None
         self._type = FeatureTypes.L_OCCLUDERS
 
     def create_feature_from_specific_values(
@@ -517,14 +602,17 @@ class StructuralLOccluderCreationService(
             source_template: StructuralLOccluderConfig):
         """Attempts to adds an L occluder from the given template with
         specific values."""
+        if not self._material_tuple:
+            self._material_tuple = choose_material_tuple_from_material(
+                reconciled.material
+            )
         args = {
             'flip': reconciled.backwards,
             'position_x': reconciled.position.x,
             'position_y_modifier': reconciled.position.y,
             'position_z': reconciled.position.z,
             'rotation_y': reconciled.rotation_y,
-            'material_tuple':
-                choose_material_tuple_from_material(reconciled.material),
+            'material_tuple': self._material_tuple,
             'scale_front_x': reconciled.scale_front_x,
             'scale_front_z': reconciled.scale_front_z,
             'scale_side_x': reconciled.scale_side_x,
@@ -543,7 +631,12 @@ class StructuralLOccluderCreationService(
             self, scene: Scene, reconciled: StructuralLOccluderConfig,
             source_template
     ) -> StructuralLOccluderConfig:
-        reconciled = _handle_position_material_defaults(scene, reconciled)
+        reconciled = _handle_position_defaults(scene, reconciled)
+        self._material_tuple = _reconcile_material(
+            source_template.material,
+            materials.ROOM_WALL_MATERIALS
+        )
+        reconciled.material = self._material_tuple.material
         room_height = (
             scene.room_dimensions.y or geometry.DEFAULT_ROOM_DIMENSIONS['y'])
         reconciled.scale_y = min(reconciled.scale_y, room_height)
@@ -672,6 +765,7 @@ class StructuralThrowerCreationService(
 
     def __init__(self):
         self._default_template = DEFAULT_TEMPLATE_THROWER
+        self._path_relative_object = None
         self._type = FeatureTypes.THROWERS
 
     def create_feature_from_specific_values(
@@ -699,7 +793,8 @@ class StructuralThrowerCreationService(
             WallSide.LEFT.value: 0,
             WallSide.RIGHT: 180,
             WallSide.FRONT: 90,
-            WallSide.BACK: 270}
+            WallSide.BACK: 270
+        }
         projectile_dimensions = vars(self.target.definition.dimensions)
         max_scale = max(projectile_dimensions['x'], projectile_dimensions['z'])
 
@@ -762,11 +857,87 @@ class StructuralThrowerCreationService(
                 pos_x = round(retrieve_off_screen_position_x(pos_z), 4)
                 pos_x *= (-1 if reconciled.wall == WallSide.LEFT else 1)
 
+        rotation_y = wall_rot[reconciled.wall] + reconciled.rotation_y
+        if self._path_relative_object:
+            if reconciled.path_relative.option == 'collide':
+                pointing_at_vector = Vector3d(
+                    x=self._path_relative_object['shows'][0]['position']['x'],
+                    y=self._path_relative_object['shows'][0]['position']['y'],
+                    z=self._path_relative_object['shows'][0]['position']['z']
+                )
+                _, rotation_y = geometry.calculate_rotations(
+                    Vector3d(x=pos_x, y=reconciled.height, z=pos_z),
+                    pointing_at_vector,
+                    no_rounding_to_tens=True
+                )
+                # Convert the performer agent rotation into thrower rotation.
+                rotation_y = (rotation_y - 90) % 360
+                # Throwers should not have Y rotation outside 90 deg arc.
+                if abs(rotation_y - wall_rot[reconciled.wall]) > 45:
+                    raise ILEException(
+                        f'Throwing device on {reconciled.wall} wall with '
+                        f'"path_relative" set to collide with '
+                        f'{reconciled.path_relative.labels} must '
+                        f'have calculated Y rotation between '
+                        f'{wall_rot[reconciled.wall] - 45} and '
+                        f'{wall_rot[reconciled.wall] + 45} but was '
+                        f'{rotation_y}'
+                    )
+            elif reconciled.path_relative.option == 'avoid':
+                # Create a line the length of the room.
+                path = shapely.geometry.LineString([
+                    [0, 0], [0, max(room_dim.x, room_dim.z)]
+                ])
+                # Ensure the line is the width of the thrown object.
+                target_width = self.target.instance['debug']['dimensions']['x']
+                path = path.buffer(target_width / 2.0)
+                # Retrieve all possible rotations for the throwing device.
+                rotation_y_list = return_list(source_template.rotation_y)
+                if not rotation_y_list:
+                    # Default between -45 and 45 degrees.
+                    rotation_y_list = list(range(-45, 50, 5))
+                # Randomize them.
+                random.shuffle(rotation_y_list)
+
+                bounds = self._path_relative_object['shows'][0]['boundingBox']
+                successful = False
+                # Loop over all the possible Y rotation values...
+                for rotation_y_option in rotation_y_list:
+                    # Override the existing rotation_y here.
+                    rotation_y = (
+                        wall_rot[reconciled.wall] + rotation_y_option
+                    ) % 360
+                    # Rotate and translate the line appropriately.
+                    rotated_path = shapely.affinity.rotate(
+                        path,
+                        # Add 90 here to convert the performer agent rotation
+                        # into thrower rotation.
+                        -(rotation_y + 90),
+                        origin=(0, 0)
+                    )
+                    rotated_path = shapely.affinity.translate(
+                        rotated_path,
+                        pos_x,
+                        pos_z
+                    )
+                    # If the line does not intersect with the relative object,
+                    # then this Y rotation is valid.
+                    if not rotated_path.intersects(bounds.polygon_xz):
+                        successful = True
+                        break
+                # If all possible rotations are invalid, then raise an error.
+                if not successful:
+                    raise ILEException(
+                        f'Cannot assign a Y rotation for a throwing device to '
+                        f'ensure a thrown object will avoid object '
+                        f'{self._path_relative_object["id"]}'
+                    )
+
         args = {
             'position_x': pos_x,
             'position_y': reconciled.height,
             'position_z': pos_z,
-            'rotation_y': wall_rot[reconciled.wall] + reconciled.rotation_y,
+            'rotation_y': rotation_y,
             'rotation_z': reconciled.rotation_z,
             'object_dimensions': projectile_dimensions,
             'object_rotation_y': self.target.definition.rotation.y,
@@ -775,9 +946,7 @@ class StructuralThrowerCreationService(
             'is_round': ('ball' in self.target.definition.shape)
         }
         logger.trace(f'Creating thrower:\nINPUT = {args}')
-        new_obj = [
-            mechanisms.create_throwing_device(
-                **args)]
+        new_obj = [mechanisms.create_throwing_device(**args)]
         self.thrower = new_obj[0]
         if not self.target_exists:
             new_obj.append(self.target.instance)
@@ -823,6 +992,23 @@ class StructuralThrowerCreationService(
                 reconciled.position_wall = position_x
             if on_side_wall and position_z is not None:
                 reconciled.position_wall = position_z
+
+        self._path_relative_object = None
+        object_repo = ObjectRepository.get_instance()
+        avoid = reconciled.path_relative.option == 'avoid'
+        collide = reconciled.path_relative.option == 'collide'
+        if avoid or collide:
+            for label in return_list(reconciled.path_relative.labels):
+                idl = object_repo.get_one_from_labeled_objects(label)
+                if idl:
+                    self._path_relative_object = idl.instance
+                    break
+            if not idl:
+                raise ILEDelayException(
+                    f'Cannot find object with one of the following labels for '
+                    f'thrown object to {"collide" if collide else "avoid"}: '
+                    f'{reconciled.path_relative.labels}'
+                )
 
         # Save the projectile labels from the source template.
         self._target_labels = source_template.projectile_labels
@@ -1140,6 +1326,8 @@ class StructuralMovingOccluderCreationService(
     def __init__(self):
         self._default_template = DEFAULT_TEMPLATE_MOVING_OCCLUDER
         self._type = FeatureTypes.MOVING_OCCLUDERS
+        self._pole_material_tuple = None
+        self._wall_material_tuple = None
 
     def create_feature_from_specific_values(
             self, scene: Scene, reconciled: StructuralMovingOccluderConfig,
@@ -1156,11 +1344,17 @@ class StructuralMovingOccluderCreationService(
                      not reconciled.repeat_movement) else
             reconciled.repeat_interval
         )
+        if not self._pole_material_tuple:
+            self._pole_material_tuple = choose_material_tuple_from_material(
+                reconciled.pole_material
+            )
+        if not self._wall_material_tuple:
+            self._wall_material_tuple = choose_material_tuple_from_material(
+                reconciled.wall_material
+            )
         args = {
-            'wall_material':
-                choose_material_tuple_from_material(reconciled.wall_material),
-            'pole_material':
-                choose_material_tuple_from_material(reconciled.pole_material),
+            'wall_material': self._wall_material_tuple,
+            'pole_material': self._pole_material_tuple,
             'x_position': reconciled.position_x,
             'occluder_width': reconciled.occluder_width,
             'occluder_height': reconciled.occluder_height,
@@ -1214,14 +1408,16 @@ class StructuralMovingOccluderCreationService(
             else random.uniform(-limit_z, limit_z))
         reconciled.occluder_height = min(
             reconciled.occluder_height, room_dim.y)
-        reconciled.wall_material = _reconcile_material(
-            reconciled.wall_material,
+        self._wall_material_tuple = _reconcile_material(
+            source_template.wall_material,
             materials.ROOM_WALL_MATERIALS
         )
-        reconciled.pole_material = _reconcile_material(
-            reconciled.pole_material,
+        reconciled.wall_material = self._wall_material_tuple.material
+        self._pole_material_tuple = _reconcile_material(
+            source_template.pole_material,
             materials.METAL_MATERIALS
         )
+        reconciled.pole_material = self._pole_material_tuple.material
         return reconciled
 
     def _on_valid_instances(self, scene, reconciled_template, new_obj):
@@ -1362,9 +1558,9 @@ class StructuralFloorMaterialsCreationService(
     ) -> FloorMaterialConfig:
         _add_floor_dependent_defaults(scene, reconciled)
         reconciled.material = _reconcile_material(
-            reconciled.material,
-            materials.WALL_MATERIALS
-        )
+            source_template.material if source_template else None,
+            materials.FLOOR_MATERIALS + materials.ROOM_WALL_MATERIALS
+        ).material
         return reconciled
 
     def is_valid(self, scene: Scene, objs: List, bounds, try_num, retries):
@@ -1414,45 +1610,45 @@ class StructuralOccludingWallsCreationService(
         self._type = FeatureTypes.OCCLUDING_WALLS
 
     def create_feature_from_specific_values(
-            self, scene: Scene, template: StructuralOccludingWallConfig,
+            self, scene: Scene, reconciled: StructuralOccludingWallConfig,
             source_template: StructuralOccludingWallConfig):
         """Not currently implemented.  This creation service overrides
         add_to_scene itself for now."""
         room_dim = scene.room_dimensions
-        defn = _get_occluding_wall_definition(template)
-        if (template.keyword_location is not None):
+        defn = _get_occluding_wall_definition(reconciled)
+        if (reconciled.keyword_location is not None):
             # setup keyword location
             idl = KeywordLocation.get_keyword_location_object_tuple(
-                template.keyword_location,
+                reconciled.keyword_location,
                 source_template.keyword_location,
                 defn,
                 scene.performer_start,
                 self.bounds,
                 room_dim
             )
-            idl.instance['id'] = f"{template.type}-{idl.instance['id']}"
+            idl.instance['id'] = f"{reconciled.type}-{idl.instance['id']}"
             result = _modify_for_hole(
-                template.type, idl.instance, self.target_dim)
+                reconciled.type, idl.instance, self.target_dim)
         else:
             # setup x, z location
-            defn.scale = template.scale
+            defn.scale = reconciled.scale
 
             location = {
                 'position': {
-                    'x': template.position.x,
-                    'y': template.scale.y / 2.0,
-                    'z': template.position.z
+                    'x': reconciled.position.x,
+                    'y': reconciled.scale.y / 2.0,
+                    'z': reconciled.position.z
                 },
                 'rotation': {
                     'x': 0,
-                    'y': template.rotation_y,
+                    'y': reconciled.rotation_y,
                     'z': 0
                 }
             }
             inst = instances.instantiate_object(defn, location)
             inst = structures.finalize_structural_object([inst])[0]
-            inst['id'] = f"{template.type}-{inst['id']}"
-            result = _modify_for_hole(template.type, inst, self.target_dim)
+            inst['id'] = f"{reconciled.type}-{inst['id']}"
+            result = _modify_for_hole(reconciled.type, inst, self.target_dim)
         add_random_placement_tag(result, source_template)
         return result
 
@@ -1461,12 +1657,10 @@ class StructuralOccludingWallsCreationService(
             source_template: StructuralOccludingWallConfig
     ) -> StructuralOccludingWallConfig:
         obj_repo = ObjectRepository.get_instance()
-
         reconciled.material = _reconcile_material(
-            reconciled.material,
+            source_template.material,
             materials.ROOM_WALL_MATERIALS
-        )
-
+        ).material
         if (
             reconciled.keyword_location is None and
             reconciled.position.x is None and
@@ -2114,23 +2308,31 @@ class StructuralDoorsCreationService(
     def __init__(self):
         self._type = FeatureTypes.DOORS
         self._default_template = DEFAULT_TEMPLATE_DOOR
+        self._door_material_tuple = None
+        self._wall_material_tuple = None
 
     def create_feature_from_specific_values(
             self, scene: Scene, reconciled: StructuralDoorConfig,
             source_template: StructuralDoorConfig):
         """Creates a door from the given template with
         specific values."""
+        if not self._door_material_tuple:
+            self._door_material_tuple = choose_material_tuple_from_material(
+                reconciled.material
+            )
+        if not self._wall_material_tuple:
+            self._wall_material_tuple = choose_material_tuple_from_material(
+                reconciled.wall_material
+            )
         args = {
             'position_x': reconciled.position.x,
             'position_y': reconciled.position.y,
             'position_z': reconciled.position.z,
             'rotation_y': reconciled.rotation_y,
-            'material_tuple':
-                choose_material_tuple_from_material(reconciled.material),
+            'material_tuple': self._door_material_tuple,
             'wall_scale_x': reconciled.wall_scale_x,
             'wall_scale_y': reconciled.wall_scale_y,
-            'wall_material_tuple':
-                choose_material_tuple_from_material(reconciled.wall_material)
+            'wall_material_tuple': self._wall_material_tuple
 
         }
         logger.trace(f'Creating door:\nINPUT = {args}')
@@ -2153,13 +2355,19 @@ class StructuralDoorsCreationService(
         def_dim = geometry.DEFAULT_ROOM_DIMENSIONS
         room_width = room_dim.x or def_dim['x']
         room_length = room_dim.z or def_dim['z']
-        reconciled.wall_material = _reconcile_material(
-            reconciled.wall_material, [
-                materials.METAL_MATERIALS,
-                materials.PLASTIC_MATERIALS,
-                materials.WOOD_MATERIALS,
-            ]
+        self._door_material_tuple = _reconcile_material(
+            source_template.material,
+            materials.METAL_MATERIALS + materials.PLASTIC_MATERIALS +
+            materials.WOOD_MATERIALS,
         )
+        reconciled.material = self._door_material_tuple.material
+        self._wall_material_tuple = _reconcile_material(
+            source_template.wall_material,
+            materials.ROOM_WALL_MATERIALS,
+            # Do not use exactly the same material as the door, if possible.
+            prohibited_material=reconciled.material
+        )
+        reconciled.wall_material = self._wall_material_tuple.material
         reconciled.position.x = choose_random(
             MinMaxFloat(-room_width / 2.0, room_width / 2.0)
             if reconciled.position.x is None else reconciled.position.x
@@ -2193,19 +2401,23 @@ class StructuralTurntableCreationService(
     def __init__(self):
         self._type = FeatureTypes.TURNTABLES
         self._default_template = DEFAULT_TEMPLATE_TURNTABLE
+        self._material_tuple = None
 
     def create_feature_from_specific_values(
             self, scene: Scene, reconciled: StructuralTurntableConfig,
             source_template: StructuralTurntableConfig):
         """Creates a turntable from the given template with
         specific values."""
+        if not self._material_tuple:
+            self._material_tuple = choose_material_tuple_from_material(
+                reconciled.material
+            )
         args = {
             'position_x': reconciled.position.x,
             'position_y_modifier': reconciled.position.y,
             'position_z': reconciled.position.z,
             'rotation_y': reconciled.rotation_y,
-            'material_tuple':
-                choose_material_tuple_from_material(reconciled.material),
+            'material_tuple': self._material_tuple,
             'radius': reconciled.turntable_radius,
             'height': reconciled.turntable_height,
             'step_begin': reconciled.turntable_movement.step_begin,
@@ -2234,7 +2446,12 @@ class StructuralTurntableCreationService(
         def_dim = geometry.DEFAULT_ROOM_DIMENSIONS
         room_width = room_dim.x or def_dim['x']
         room_length = room_dim.z or def_dim['z']
-        reconciled = _handle_position_material_defaults(scene, reconciled)
+        reconciled = _handle_position_defaults(scene, reconciled)
+        self._material_tuple = _reconcile_material(
+            source_template.material,
+            materials.ROOM_WALL_MATERIALS
+        )
+        reconciled.material = self._material_tuple.material
 
         reconciled.position.x = choose_random(
             MinMaxFloat(-room_width / 2.0, room_width / 2.0)
@@ -2405,7 +2622,8 @@ class StructuralPlatformConfig(PositionableStructuralObjectsConfig):
     to this object. Always automatically assigned "platforms"
     - `lips` ([StructuralPlatformLipsConfig]
     (#StructuralPlatformLipsConfig), or list of
-    StructuralPlatformLipsConfig): The platform's lips. Default: no lips
+    StructuralPlatformLipsConfig): The platform's lips. If set, the platform's
+    X/Z scales will be increased to 0.8 if lower than 0.8. Default: no lips
     - `material` (string, or list of strings): The structure's material or
     material type.
     - `platform_underneath` (bool or list of bools): If true, add a platform
@@ -2428,6 +2646,28 @@ class StructuralPlatformConfig(PositionableStructuralObjectsConfig):
     a room with a room_dimension_y = 4 and
     auto_adjusted_platforms = True will ensure that all platform heights
     do not exceed 2.75.  Default: False
+    - `long_with_two_ramps` (bool or list of bools): If true makes the platform
+    extend across the entire length of the room in either the x or z dimension.
+    The platform will have lips automatically added on all sides.
+    A single ramp will be added on opposite sides of the platform totalling to
+    two connected ramps. With larger room sizes the max number of these types
+    of platforms is 3 though 1 is recommended for smaller room sizes.
+    When combined with `platform_underneath` there will be a smaller platform
+    of the same type stacked on top totalling 2 platforms and 4 ramps in the
+    scene. Only one instance of a platform combined with `platform_underneath`
+    can be added to the scene instead of the 3 allowed without a
+    `platform_underneath`. This property will override `attached_ramps`, and
+    `platform_underneath_attached_ramps`
+    Default: False
+    - `adjacent_to_wall` (string or list of strings): Will place the platform
+    directly adjacent to a wall or in the corner of the room. Can be combined
+    with `platform_underneath` to place a stacked platform adjacent to a wall.
+    Multiple platforms can be placed against the same wall or different walls
+    but only one platform can be placed in each corner. Setting this will
+    override `rotation_y`.
+    Options available: 'left', 'right', 'front', 'back', 'front_left_corner',
+    'front_right_corner', 'back_left_corner', 'back_right_corner'.
+    Default: None
     """
     lips: Union[StructuralPlatformLipsConfig,
                 List[StructuralPlatformLipsConfig]] = None
@@ -2437,6 +2677,8 @@ class StructuralPlatformConfig(PositionableStructuralObjectsConfig):
     platform_underneath: RandomizableBool = None
     platform_underneath_attached_ramps: RandomizableInt = None  # noqa
     auto_adjust_platforms: RandomizableBool = False
+    long_with_two_ramps: RandomizableBool = False
+    adjacent_to_wall: RandomizableString = None
 
 
 @dataclass
@@ -2600,6 +2842,22 @@ class StopPositionConfig():
 
 
 @dataclass
+class RelativePathConfig():
+    """
+    Defines details of an object's movement path as it relates to another
+    object, for the moving object to avoid or collide with the other object.
+
+    - `labels` (string, or list of strings): The label of the object that the
+    moving object should avoid or collide with. Required.
+    - `option` (string, or list of strings): Whether the moving object should
+    avoid or collide with the other object. Options: `"avoid"`, `"collide"`.
+    Default: null
+    """
+    option: RandomizableString = None
+    labels: RandomizableString = None
+
+
+@dataclass
 class StructuralThrowerConfig(BaseFeatureConfig):
     """
     Defines details of a structural dropper and its thrown projectile.
@@ -2636,6 +2894,10 @@ class StructuralThrowerConfig(BaseFeatureConfig):
     - `passive_physics_throw_force` (bool, or list of bools): Automatically set
     the `throw_force` to a speed normally used in passive physics non-collision
     scene. If set, overrides the `throw_force`. Default: false
+    - `path_relative` ([RelativePathConfig](#PathRelativeConfig) dict):
+    Configuration options for rotating this thrower so the thrown object will
+    either collide with, or avoid, another object. Overrides the `rotation_y`.
+    Default: not used
     - `position_relative` ([RelativePositionConfig](#RelativePositionConfig)
     dict, or list of RelativePositionConfig dicts): Configuration options for
     positioning this object relative to another object, rather than using
@@ -2716,6 +2978,7 @@ class StructuralThrowerConfig(BaseFeatureConfig):
     passive_physics_setup: RandomizableString = None
     passive_physics_throw_force: RandomizableBool = False
     stop_position: Union[StopPositionConfig, List[StopPositionConfig]] = None
+    path_relative: RelativePathConfig = None
 
 
 @dataclass
@@ -3177,7 +3440,8 @@ DEFAULT_TEMPLATE_THROWER = StructuralThrowerConfig(
     rotation_z=[0, MinMaxInt(0, 15)],
     projectile_shape=THROWER_SHAPES,
     position_relative=None,
-    stop_position=None
+    stop_position=None,
+    path_relative=RelativePathConfig()
 )
 DEFAULT_THROW_FORCE_IMPULSE = MinMaxInt(5, 20)
 DEFAULT_THROW_FORCE_NON_IMPULSE = MinMaxInt(500, 2000)
@@ -3209,6 +3473,8 @@ DEFAULT_TEMPLATE_MOVING_OCCLUDER = StructuralMovingOccluderConfig(
     repeat_interval=MinMaxInt(DEFAULT_MOVING_OCCLUDER_REPEAT_MIN,
                               DEFAULT_MOVING_OCCLUDER_REPEAT_MAX))
 
+ALL_LIPS = StructuralPlatformLipsConfig(True, True, True, True)
+
 DEFAULT_TEMPLATE_PLATFORM = StructuralPlatformConfig(
     num=0,
     lips=StructuralPlatformLipsConfig(False, False, False, False),
@@ -3239,9 +3505,9 @@ DEFAULT_TEMPLATE_L_OCCLUDER = StructuralLOccluderConfig(
     scale_y=MinMaxFloat(L_OCCLUDER_SCALE_MIN, L_OCCLUDER_SCALE_MAX),
     backwards=[True, False])
 
-DEFAULT_TEMPLATE_HOLES_LAVA = FloorAreaConfig(0)
+DEFAULT_TEMPLATE_HOLES_LAVA = FloorAreaConfig()
 
-DEFAULT_TEMPLATE_FLOOR_MATERIALS = FloorMaterialConfig(0)
+DEFAULT_TEMPLATE_FLOOR_MATERIALS = FloorMaterialConfig()
 
 DEFAULT_TEMPLATE_OCCLUDING_WALL = StructuralOccludingWallConfig(
     num=0,
@@ -3249,7 +3515,7 @@ DEFAULT_TEMPLATE_OCCLUDING_WALL = StructuralOccludingWallConfig(
     keyword_location=None,
     scale=None, rotation_y=MinMaxFloat(
         DEFAULT_OCCLUDER_ROTATION_MIN, DEFAULT_OCCLUDER_ROTATION_MAX),
-    material=[mat[0] for mat in materials.WALL_MATERIALS],
+    material=[mat[0] for mat in materials.ROOM_WALL_MATERIALS],
     position=VectorFloatConfig(None, None, None))
 
 DEFAULT_TEMPLATE_PLACER = StructuralPlacerConfig(
@@ -3278,7 +3544,7 @@ DEFAULT_TEMPLATE_DOOR = StructuralDoorConfig(
     num=0, position=VectorFloatConfig(None, None, None),
     rotation_y=[0, 90, 180, 270],
     material=DOOR_MATERIAL_RESTRICTIONS,
-    wall_material=materials.WALL_MATERIALS,
+    wall_material=materials.ROOM_WALL_MATERIALS,
     wall_scale_x=None, wall_scale_y=None)
 
 DEFAULT_TEMPLATE_STRUCT_OBJ_MOVEMENT = StructuralObjectMovementConfig(
@@ -3318,8 +3584,8 @@ def _post_instance(scene, new_obj, template, source_template, type):
             extra_labels, list) else [extra_labels]
         obj['debug']['labels'] = (
             [type.lower()] + (extra_labels))
-    if plat_under or getattr(
-            template, 'attached_ramps', None):
+    if plat_under or getattr(template, 'attached_ramps', None) or getattr(
+            template, 'long_with_two_ramps', None):
         if (new_obj and new_obj["debug"]["labels"] is not None):
             new_obj["debug"]["labels"].append(LABEL_CONNECTED_TO_RAMP)
         else:
@@ -3329,9 +3595,9 @@ def _post_instance(scene, new_obj, template, source_template, type):
     return new_objs
 
 
-def _handle_position_material_defaults(
-        scene: Scene,
-        template: BaseFeatureConfig
+def _handle_position_defaults(
+    scene: Scene,
+    reconciled: BaseFeatureConfig
 ) -> BaseFeatureConfig:
     """Convenience method for many of the structural objects"""
     room_dim = scene.room_dimensions or {}
@@ -3339,40 +3605,37 @@ def _handle_position_material_defaults(
     room_width = room_dim.x or def_dim['x']
     room_length = room_dim.z or def_dim['z']
 
-    template.position = (
+    reconciled.position = (
         VectorFloatConfig(None, None, None)
-        if template.position is None else template.position)
-    template.position.x = (
+        if reconciled.position is None else reconciled.position)
+    reconciled.position.x = (
         MinMaxFloat(-room_width / 2.0, room_width / 2.0).convert_value()
-        if template.position.x is None else template.position.x
+        if reconciled.position.x is None else reconciled.position.x
     )
-    template.position.z = (
+    reconciled.position.z = (
         MinMaxFloat(-room_length / 2.0, room_length / 2.0).convert_value()
-        if template.position.z is None else template.position.z
+        if reconciled.position.z is None else reconciled.position.z
     )
-    template.rot = (geometry.random_rotation()
-                    if template.rotation_y is None
-                    else template.rotation_y)
-    template.material = _reconcile_material(
-        template.material, materials.ROOM_WALL_MATERIALS
-    )
+    reconciled.rot = (geometry.random_rotation()
+                      if reconciled.rotation_y is None
+                      else reconciled.rotation_y)
 
-    plat_under = getattr(template, 'platform_underneath', None)
-    if template.position.y == 0 and plat_under:
+    plat_under = getattr(reconciled, 'platform_underneath', None)
+    if reconciled.position.y == 0 and plat_under:
         # this assumes we never want to put these structures in holes
         raise ILEException("Cannot put platform underneath structural "
                            "object with y position less than 0")
 
     room_height = room_dim.y or def_dim['y']
-    if template.position.y is None:
+    if reconciled.position.y is None:
         if plat_under:
             # what should the default be?
-            template.position.y = MinMaxFloat(
+            reconciled.position.y = MinMaxFloat(
                 TOP_PLATFORM_POSITION_MIN,
                 room_height - geometry.PERFORMER_HEIGHT).convert_value()
         else:
-            template.position.y = 0
-    return template
+            reconciled.position.y = 0
+    return reconciled
 
 
 def _is_valid_floor(
@@ -3460,12 +3723,17 @@ def _add_platform_attached_objects(
     rotation_y = obj['shows'][0]['rotation']['y']
     below_pre_rot_pos = None
 
+    attached_ramps = getattr(orig_template, 'attached_ramps', None)
+    long_with_two_ramps = getattr(orig_template, 'long_with_two_ramps', None)
     if getattr(orig_template, 'platform_underneath', None):
         new_platform, below_pre_rot_pos = _add_platform_below(
             scene, obj, rotation_point, orig_template)
         objs += [new_platform]
         below_scale = new_platform['shows'][0]['scale']
-    if getattr(orig_template, 'attached_ramps', None):
+        if orig_template.adjacent_to_wall:
+            new_platform['debug']['adjacent_to_wall'] = \
+                orig_template.adjacent_to_wall
+    if attached_ramps or long_with_two_ramps:
         # These values are just large to tell the system they have
         # essentially unlimited space for ramps when we don't know.
         # We can't determine exactly how much space when the base flooring
@@ -3480,7 +3748,17 @@ def _add_platform_attached_objects(
 
         # Attach ramps
         gaps = []
-        for i in range(orig_template.attached_ramps):
+        ramps_to_add = 0
+        short_scales = None
+        if attached_ramps:
+            ramps_to_add += attached_ramps
+        if long_with_two_ramps:
+            ramps_to_add = 2
+            scale = obj['shows'][0]['scale']
+            short_scales = \
+                ['x-', 'x+'] if scale['x'] < scale['z'] else ['z-', 'z+']
+
+        for i in range(ramps_to_add):
             logger.trace(
                 f"Attempting to attach ramp {i}/"
                 f"{orig_template.attached_ramps} to platform.")
@@ -3492,14 +3770,25 @@ def _add_platform_attached_objects(
                 rotation_point=rotation_point,
                 material=mat,
                 max_angle=45,
-                available_lengths=available_lengths)
+                available_lengths=available_lengths,
+                short_scale_long_with_two_ramps=(None if not short_scales else short_scales[i])  # noqa
+            )
             gaps.append(gap)
         _add_gaps_to_object(gaps, obj)
 
-    if getattr(orig_template, 'platform_underneath_attached_ramps',
-               None) and new_platform:
+    if (getattr(orig_template, 'platform_underneath_attached_ramps',
+                None) or long_with_two_ramps) and new_platform:
         gaps = []
-        for i in range(orig_template.platform_underneath_attached_ramps):
+        ramps_to_add = 0
+        short_scales = None
+        if orig_template.platform_underneath_attached_ramps:
+            ramps_to_add += orig_template.platform_underneath_attached_ramps
+        if long_with_two_ramps:
+            ramps_to_add = 2
+            scale = obj['shows'][0]['scale']
+            short_scales = \
+                ['x-', 'x+'] if scale['x'] < scale['z'] else ['z-', 'z+']
+        for i in range(ramps_to_add):
             logger.trace(
                 f"Attempting to attach ramp {i}/"
                 f"{orig_template.platform_underneath_attached_ramps} to "
@@ -3513,7 +3802,9 @@ def _add_platform_attached_objects(
                 rotation_point=rotation_point,
                 material=new_mat,
                 max_angle=45,
-                available_lengths=DEFAULT_AVAIABLE_LENGTHS)
+                available_lengths=DEFAULT_AVAIABLE_LENGTHS,
+                short_scale_long_with_two_ramps=(None if not short_scales else short_scales[i])  # noqa
+            )
             gaps.append(gap)
         _add_gaps_to_object(gaps, new_platform)
     return objs
@@ -3545,6 +3836,24 @@ def _add_gaps_to_dict(gaps_dict, side, gap_to_copy):
     gaps_dict[side] = gaps
 
 
+def _calculate_adjacent_to_wall_pos(
+        room_dim_x, room_dim_z, adjacent_to_wall,
+        pos_x, pos_z, scale_x, scale_z):
+    if isinstance(adjacent_to_wall, list):
+        adjacent_to_wall = adjacent_to_wall[0]
+    x_side = (
+        1 if 'right' in adjacent_to_wall else
+        (-1) if 'left' in adjacent_to_wall else None)
+    z_side = (
+        1 if 'front' in adjacent_to_wall else
+        (-1) if 'back' in adjacent_to_wall else None)
+    if x_side:
+        pos_x = (room_dim_x / 2 * x_side) + (scale_x / 2 * -x_side)
+    if z_side:
+        pos_z = (room_dim_z / 2 * z_side) + (scale_z / 2 * -z_side)
+    return pos_x, pos_z
+
+
 def _add_platform_below(scene, obj, rotation_point, top_template):
     show = obj['shows'][0]
     scale = show['scale']
@@ -3558,7 +3867,12 @@ def _add_platform_below(scene, obj, rotation_point, top_template):
             scene.room_dimensions.x,
             scene.room_dimensions.z)
         x0, z0, scale_x, scale_z = _get_under_platform_position_scale(
-            scale, pos, max_room_dim)
+            scale, pos, max_room_dim, top_template.long_with_two_ramps)
+
+        if top_template.adjacent_to_wall:
+            x0, z0 = _calculate_adjacent_to_wall_pos(
+                scene.room_dimensions.x, scene.room_dimensions.z,
+                top_template.adjacent_to_wall, x0, z0, scale_x, scale_z)
 
         # rotation around arbitrary center is:
         # x1 = (x0 -xc) cos(theta) - (z0 -zc)sin(theta) + xc
@@ -3589,7 +3903,8 @@ def _add_platform_below(scene, obj, rotation_point, top_template):
                 scale_x,
                 min_y,
                 scale_z),
-            lips=top_template.lips,
+            lips=(top_template.lips if not
+                  top_template.long_with_two_ramps else ALL_LIPS),
             labels=labels_to_use)
         srv = StructuralPlatformCreationService()
         reconciled = srv.reconcile(scene, new_template)
@@ -3603,7 +3918,8 @@ def _add_platform_below(scene, obj, rotation_point, top_template):
     raise ILEException("Failed to add platform under existing platform.")
 
 
-def _get_under_platform_position_scale(top_scale, top_position, max_room_dim):
+def _get_under_platform_position_scale(
+        top_scale, top_position, max_room_dim, long_with_two_ramps=None):
     # How do we want to determine the position and scale of the platform below?
     # This has a range which is determined based on the top objects scale.
     # We then choose a random position where the top object entirely fits on
@@ -3619,20 +3935,29 @@ def _get_under_platform_position_scale(top_scale, top_position, max_room_dim):
         min(top_scale['x'], top_scale['z']),
         top_scale['y'] +
         BOTTOM_PLATFORM_SCALE_BUFFER_MAX)
-    scale_x = MinMaxFloat(
-        # Note: top_scale
-        top_scale['x'] + scale_min_buffer,
-        top_scale['x'] + scale_max_buffer
-    ).convert_value()
-    scale_z = MinMaxFloat(
-        top_scale['z'] + scale_min_buffer,
-        top_scale['z'] + scale_max_buffer
-    ).convert_value()
+    scale_x = (
+        top_scale['x'] if long_with_two_ramps and
+        top_scale['x'] > top_scale['z'] else
+        MinMaxFloat(
+            top_scale['x'] + scale_min_buffer,
+            top_scale['x'] + scale_max_buffer
+        ).convert_value())
+    scale_z = (
+        top_scale['z'] if long_with_two_ramps and
+        top_scale['z'] > top_scale['x'] else
+        MinMaxFloat(
+            top_scale['z'] + scale_min_buffer,
+            top_scale['z'] + scale_max_buffer
+        ).convert_value())
 
     top_pos_x = _get_pre_rotate_under_position(
         top_scale, top_position, scale_x, 'x')
     top_pos_z = _get_pre_rotate_under_position(
         top_scale, top_position, scale_z, 'z')
+
+    if long_with_two_ramps:
+        top_pos_x = top_position['x']
+        top_pos_z = top_position['z']
 
     return top_pos_x, top_pos_z, scale_x, scale_z
 
@@ -3652,7 +3977,8 @@ def _add_valid_ramp_with_retries(
         scene, objs, bounds,
         pre_rot_pos, scale, rotation_y,
         rotation_point, material,
-        max_angle, available_lengths):
+        max_angle, available_lengths,
+        short_scale_long_with_two_ramps=None):
     """ Returns gap location"""
     for i in range(MAX_TRIES):
         logger.trace(f"attempting to find ramp, try #{i}")
@@ -3663,7 +3989,8 @@ def _add_valid_ramp_with_retries(
             rotation_point=rotation_point,
             material=material,
             available_lengths=available_lengths,
-            max_angle=max_angle)
+            max_angle=max_angle,
+            short_scale_long_with_two_ramps=short_scale_long_with_two_ramps)
         if validate_all_locations_and_update_bounds(
                 [ramp], scene, bounds):
             objs.append(ramp)
@@ -3675,7 +4002,7 @@ def _add_valid_ramp_with_retries(
 
 def _get_attached_ramp(scene: Scene, pre_rot_pos: dict, scale: dict,
                        rotation_y, rotation_point, material, available_lengths,
-                       max_angle=89,
+                       max_angle=89, short_scale_long_with_two_ramps=None
                        ):
     ppx = pre_rot_pos['x']
     ppy = pre_rot_pos['y']
@@ -3689,8 +4016,15 @@ def _get_attached_ramp(scene: Scene, pre_rot_pos: dict, scale: dict,
 
     performer_buffer = geometry.PERFORMER_HALF_WIDTH * 2
     # then randomize which edge we choose first
-    edge_choices = [0, 1, 2, 3]
-    random.shuffle(edge_choices)
+
+    if not short_scale_long_with_two_ramps:
+        edge_choices = [0, 1, 2, 3]  # left, front, right, back
+        random.shuffle(edge_choices)
+    else:
+        edge_choices = (
+            [0] if short_scale_long_with_two_ramps == 'x-' else [2] if
+            short_scale_long_with_two_ramps == 'x+' else
+            [3] if short_scale_long_with_two_ramps == 'z-' else [1])
 
     # get how much room we have for a ramp in this edge if on top of
     # another platform
@@ -3714,9 +4048,9 @@ def _get_attached_ramp(scene: Scene, pre_rot_pos: dict, scale: dict,
             ATTACHED_RAMP_MAX_WIDTH,
             psz if edge %
             2 == 0 else psx)
-        if (angle_needed <= max_angle and angle_needed >=
-                0 and max_ramp_length > min_ramp_length and
-                ramp_width_max >= ATTACHED_RAMP_MIN_WIDTH):
+        if ((angle_needed <= max_angle and angle_needed >=
+                0) and (max_ramp_length > min_ramp_length) and
+                (ramp_width_max >= ATTACHED_RAMP_MIN_WIDTH)):
             scale = VectorFloatConfig(
                 MinMaxFloat(ATTACHED_RAMP_MIN_WIDTH, ramp_width_max),
                 psy,
@@ -3928,21 +4262,25 @@ def _get_room_min_max_dimensions(scene):
     return min_room_dim, max_room_dim
 
 
-def _reconcile_material(material_choice, default_material_lists):
-    material = material_choice
-    if material:
-        if isinstance(material, str):
-            # This handles groups like CERAMIC_MATERIALS
-            material = choose_material_tuple_from_material(material_choice)
-    else:
-        material = default_material_lists
-        while (isinstance(material, list)):
-            material = random.choice(material)
-
-    if isinstance(material, MaterialTuple):
-        return material[0]
-    else:
-        return material
+def _reconcile_material(
+    material_choice: Union[MaterialTuple, str, List[str]],
+    default_materials: List[MaterialTuple],
+    prohibited_material: str = None
+) -> MaterialTuple:
+    if isinstance(material_choice, MaterialTuple):
+        return material_choice
+    output = None
+    if material_choice:
+        output = choose_material_tuple_from_material(
+            material_choice,
+            prohibited_material
+        )
+    if not output:
+        output = choose_material_tuple_from_material(
+            [item.material for item in default_materials],
+            prohibited_material
+        )
+    return output
 
 
 def _modify_for_hole(type, base, target_dimensions):

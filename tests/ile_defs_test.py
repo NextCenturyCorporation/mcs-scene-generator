@@ -20,12 +20,14 @@ from ideal_learning_env.defs import (
 @pytest.fixture(autouse=True)
 def run_around_test():
     # Prepare test
+    ILESharedConfiguration.get_instance().set_excluded_colors([])
     ILESharedConfiguration.get_instance().set_excluded_shapes([])
 
     # Run test
     yield
 
     # Cleanup
+    ILESharedConfiguration.get_instance().set_excluded_colors([])
     ILESharedConfiguration.get_instance().set_excluded_shapes([])
 
 

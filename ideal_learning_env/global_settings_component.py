@@ -35,7 +35,8 @@ from .defs import (
     ILEException,
     ILESharedConfiguration,
     RandomizableBool,
-    find_bounds
+    find_bounds,
+    return_list
 )
 from .goal_services import GoalConfig, GoalServices
 from .object_services import (
@@ -166,6 +167,27 @@ class GlobalSettingsComponent(ILEComponent):
     Advanced Example:
     ```
     ceiling_material: "Custom/Materials/GreyDrywallMCS"
+    ```
+    """
+
+    excluded_colors: Union[str, List[str]] = None
+    """
+    (string, or list of strings): Zero or more color words to exclude from
+    being randomly generated as object or room materials. Materials with the
+    listed colors can still be generated using specifically set configuration
+    options, like the `floor_material` and `wall_material` options, or the
+    `material` property in the `specific_interactable_objects` option. Useful
+    if you want to avoid generating random objects with the same color as a
+    configured object. Default: no excluded colors
+
+    Simple Example:
+    ```
+    excluded_colors: null
+    ```
+
+    Advanced Example:
+    ```
+    excluded_colors: "red"
     ```
     """
 
@@ -724,22 +746,23 @@ class GlobalSettingsComponent(ILEComponent):
                 'staticFriction': 0.1
             }
 
+        shared_config = ILESharedConfiguration.get_instance()
+
         occluder_gap = self.get_occluder_gap()
-        ILESharedConfiguration.get_instance().set_occluder_gap(
-            occluder_gap
-        )
+        shared_config.set_occluder_gap(occluder_gap)
 
         occluder_gap_viewport = self.get_occluder_gap_viewport()
-        ILESharedConfiguration.get_instance().set_occluder_gap_viewport(
-            occluder_gap_viewport
-        )
+        shared_config.set_occluder_gap_viewport(occluder_gap_viewport)
 
-        excluded_shapes = self.get_excluded_shapes()
-        ILESharedConfiguration.get_instance().set_excluded_shapes(
-            excluded_shapes
-        )
+        excluded_colors = return_list(self.excluded_colors, [])
+        shared_config.set_excluded_colors(excluded_colors)
+        if excluded_colors:
+            logger.trace(f'Setting excluded colors = {excluded_colors}')
 
-        logger.trace(f'Setting excluded shapes = {excluded_shapes}')
+        excluded_shapes = return_list(self.excluded_shapes, [])
+        shared_config.set_excluded_shapes(excluded_shapes)
+        if excluded_shapes:
+            logger.trace(f'Setting excluded shapes = {excluded_shapes}')
 
         scene.room_dimensions = self.get_room_dimensions()
         logger.trace(f'Setting room dimensions = {scene.room_dimensions}')
@@ -876,10 +899,8 @@ class GlobalSettingsComponent(ILEComponent):
             self._delayed_goal_reason = e
 
     def get_ceiling_material(self) -> MaterialTuple:
-        return (
-            choose_random(self.ceiling_material, MaterialTuple)
-            if self.ceiling_material else
-            random.choice(materials.CEILING_MATERIALS)
+        return choose_material_tuple_from_material(
+            self.ceiling_material or materials.CEILING_MATERIALS
         )
 
     @ile_config_setter(validator=ValidateOptions(
@@ -888,20 +909,17 @@ class GlobalSettingsComponent(ILEComponent):
     def set_ceiling_material(self, data: Any) -> None:
         self.ceiling_material = data
 
-    def get_excluded_shapes(self) -> List[str]:
-        return (
-            self.excluded_shapes if isinstance(self.excluded_shapes, list) else
-            [self.excluded_shapes]
-        ) if self.excluded_shapes else []
+    @ile_config_setter()
+    def set_excluded_colors(self, data: Any) -> None:
+        self.excluded_colors = data
 
     @ile_config_setter()
     def set_excluded_shapes(self, data: Any) -> None:
         self.excluded_shapes = data
 
     def get_floor_material(self) -> MaterialTuple:
-        return choose_random(
-            self.floor_material or materials.FLOOR_MATERIALS,
-            MaterialTuple
+        return choose_material_tuple_from_material(
+            self.floor_material or materials.FLOOR_MATERIALS
         )
 
     @ile_config_setter(validator=ValidateOptions(
@@ -1236,7 +1254,9 @@ class GlobalSettingsComponent(ILEComponent):
 
     def get_wall_material_data(self) -> Dict[str, MaterialTuple]:
         if self.side_wall_opposite_colors:
-            material_choice = random.choice(materials.OPPOSITE_MATERIALS)
+            material_choice = choose_material_tuple_from_material(
+                materials.OPPOSITE_MATERIALS
+            )
             data = {
                 'back': material_choice,
                 'front': material_choice,

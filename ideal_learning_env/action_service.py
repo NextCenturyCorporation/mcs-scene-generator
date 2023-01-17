@@ -172,6 +172,39 @@ class ActionService():
             limit = f.end
 
     @staticmethod
+    def add_freeze_while_moving(goal: dict, freeze_while_moving):
+        """Adds freeze while moving"""
+        goal['action_list'] = goal.get('action_list', [])
+        al = goal['action_list']
+        # Must be the first action
+        if len(al) > 0:
+            raise ILEException(
+                "The 'Pass' actions from freeze_while_moving must be the "
+                "first actions in the action_list. Any additional actions "
+                "must be after.")
+        last_move = 0
+        last_rotate = 0
+        if isinstance(freeze_while_moving, str):
+            freeze_while_moving = [freeze_while_moving]
+        for label in freeze_while_moving:
+            obj_repo = ObjectRepository.get_instance()
+            instances = obj_repo.get_all_from_labeled_objects(label)
+            if instances is None or len(instances) == 0:
+                raise ILEException(
+                    "No valid objects matching 'freeze_while_moving' "
+                    f"label': {label}"
+                )
+            objects = [instance.instance for instance in instances]
+            for object in objects:
+                moves = object.get("moves")
+                rotates = object.get("rotates")
+                if moves:
+                    last_move = max(moves[-1]['stepEnd'], last_move)
+                if rotates:
+                    last_rotate = max(rotates[-1]['stepEnd'], last_rotate)
+        al += ([['Pass']] * (max(last_move, last_rotate)))
+
+    @staticmethod
     def add_teleports(
         goal: dict,
         teleports: List[TeleportConfig],

@@ -13,6 +13,9 @@ from ideal_learning_env.object_services import (
     InstanceDefinitionLocationTuple,
     ObjectRepository
 )
+from ideal_learning_env.structural_objects_component import (
+    SpecificStructuralObjectsComponent
+)
 
 
 def prior_scene(last_step: int = None):
@@ -196,7 +199,7 @@ def create_test_obj_scene(
         perf_start_x=0, perf_start_z=3,
         object_start_x=0, object_start_z=0):
     """This creates a scene with a small object in the room.
-    This is mostly useful for 'sidesteps' testing which requires
+    This is mostly useful for `sidesteps` testing which requires
     an object already being in the scene for the performer to sidestep.
     """
     scene = prior_scene_custom_start(
@@ -213,3 +216,37 @@ def create_test_obj_scene(
         }]
     })
     return object_component.update_ile_scene(scene)
+
+
+def create_placers_turntables_scene(
+        placer_start_step=1, turntable_start_step=1):
+    """This creates a scene with a turntable and placer useful for
+    `freeze_while_moving` testing.
+    """
+    scene = prior_scene_custom(10, 10, 0, 4)
+    structural_component = SpecificStructuralObjectsComponent({
+        'structural_turntables': [{
+            'num': 1,
+            'position': {
+                'x': 0,
+                'y': 0,
+                'z': 0
+            },
+            'rotation_y': 0,
+            'turntable_radius': 2,
+            'turntable_movement': {
+                'step_begin': turntable_start_step,
+                'step_end': turntable_start_step + 10,
+                'rotation_y': 5,
+            }
+        }],
+        'placers': [{
+            'num': 1,
+            'activation_step': placer_start_step,
+            "deactivation_step": placer_start_step + 10,
+            'end_height': 0
+        }]
+    })
+    ObjectRepository.get_instance().clear()
+    scene = structural_component.update_ile_scene(scene)
+    return scene

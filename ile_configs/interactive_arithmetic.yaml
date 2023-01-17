@@ -18,10 +18,8 @@ room_dimensions:
 shortcut_bisecting_platform:
     is_short: true
 
-# The performer agent is frozen until all the objects are finished moving.
-freezes:
-    - begin: 1
-      end: 75
+# The performer agent is frozen until all the objects placers and moving_occluders are finished moving.
+freeze_while_moving: [placers, moving_occluders]
 
 # Generate two occluding walls that descend at the beginning of the scene to
 # completely occlude the objects positioned on each side of the room.

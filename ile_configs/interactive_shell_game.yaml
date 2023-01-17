@@ -12,9 +12,7 @@ performer_start_rotation:
     y: 0
 
 # The performer agent is frozen until all the placers are finished moving.
-freezes:
-    - begin: 1
-      end: 150
+freeze_while_moving: placers
 
 # Add a Retrieval goal with a soccer ball as the target object.
 goal:

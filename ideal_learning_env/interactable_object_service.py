@@ -457,6 +457,11 @@ class InteractableObjectCreationService(BaseObjectCreationService):
         lid['lidAttachment']['stepBegin'] = placer['moves'][0]['stepEnd']
         container['debug']['lidPlacerId'] = placer['id']
         scene.objects.append(placer)
+        object_repo = ObjectRepository.get_instance()
+        object_repo.add_to_labeled_objects(
+            InstanceDefinitionLocationTuple(placer, None, None),
+            FeatureTypes.PLACERS.name.lower()
+        )
 
     def _attach_location(
         self,

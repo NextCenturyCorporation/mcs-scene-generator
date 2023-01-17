@@ -46,11 +46,7 @@ OPPOSITE_MATERIALS = [
     AZURE,
     BLUE,
     CHARTREUSE,
-    CYAN,
-    LIME,
-    MAGENTA,
     ORANGE,
-    RED,
     ROSE,
     SPRINGGREEN,
     VIOLET,
@@ -62,18 +58,14 @@ OPPOSITE_SETS = {
     "Custom/Materials/Black": WHITE,
     "Custom/Materials/Blue": YELLOW,
     "Custom/Materials/Chartreuse": VIOLET,
-    "Custom/Materials/Cyan": RED,
     "Custom/Materials/Goldenrod": INDIGO,  # Not an official opposite
     "Custom/Materials/Green": PURPLE,
     "Custom/Materials/Indigo": GOLDENROD,  # Not an official opposite
-    "Custom/Materials/Lime": MAGENTA,
-    "Custom/Materials/Magenta": LIME,
     "Custom/Materials/Maroon": TEAL,
     "Custom/Materials/Navy": OLIVE,
     "Custom/Materials/Olive": NAVY,
     "Custom/Materials/Orange": AZURE,
     "Custom/Materials/Purple": GREEN,
-    "Custom/Materials/Red": CYAN,
     "Custom/Materials/Rose": SPRINGGREEN,
     "Custom/Materials/SpringGreen": ROSE,
     "Custom/Materials/Teal": MAROON,
@@ -190,12 +182,12 @@ _CUSTOM_CARPET_MATERIALS = [
 
 _CUSTOM_DRYWALL_MATERIALS = [
     MaterialTuple(item.material + 'DrywallMCS', item.color)
-    for item in _CUSTOM_MATERIALS
+    for item in _CUSTOM_MATERIALS if item not in [CYAN, MAGENTA]
 ]
 
 _CUSTOM_WOOD_MATERIALS = [
     MaterialTuple(item.material + 'WoodMCS', item.color)
-    for item in _CUSTOM_MATERIALS
+    for item in _CUSTOM_MATERIALS if item not in [CYAN, MAGENTA]
 ]
 
 BLOCK_BLANK_MATERIALS = [

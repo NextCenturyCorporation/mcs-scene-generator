@@ -5,7 +5,8 @@ import random
 import uuid
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
-from shapely import ops
+import shapely
+from machine_common_sense.config_manager import Vector3d
 
 from generator import (
     MaterialTuple,
@@ -17,7 +18,6 @@ from generator import (
     structures,
     tags
 )
-from generator.separating_axis_theorem import sat_entry
 
 from .hypercubes import update_scene_objects
 
@@ -99,8 +99,32 @@ class ObjectConfigWithMaterial(ObjectConfig):
         self.material = material
 
 
+class TrueObjectBounds(ObjectBounds):
+    """Subclass of ObjectBounds that correctly represents the polygons for
+    circular and triangular shapes."""
+    true_poly: shapely.geometry.Polygon = None
+
+    def __init__(
+        self,
+        bounds: ObjectBounds,
+        true_poly: shapely.geometry.Polygon
+    ):
+        super().__init__(
+            box_xz=bounds.box_xz,
+            max_y=bounds.max_y,
+            min_y=bounds.min_y
+        )
+        self.true_poly = true_poly
+
+    def get_true_poly_points(self) -> List[Vector3d]:
+        return [
+            Vector3d(x=point[0], y=0, z=point[1]) for point in
+            self.true_poly.exterior.coords
+        ]
+
+
 # Debug logging
-SAVE_TRIALS_TO_FILE = False
+SAVE_TRIALS_TO_FILE = True
 TRIALS_SUFFIX = '_trials.txt'
 
 EXPECTED = 'expected'
@@ -134,8 +158,9 @@ OBJECT_DIMENSIONS = {
     'blob_08': ObjectDimensions('blob_08', 0.27, 0.62, 0.15),
     'blob_09': ObjectDimensions('blob_09', 0.33, 0.78, 0.44),
     'blob_10': ObjectDimensions('blob_10', 0.24, 0.5, 0.24),
-    'circle_frustum': ObjectDimensions('circle_frustum', 1, 1, 1),
-    'cone': ObjectDimensions('cone', 1, 1, 1),
+    'circle_frustum_with_base': ObjectDimensions(
+        'circle_frustum_with_base', 1, 2, 1),
+    'cone_with_base': ObjectDimensions('cone_with_base', 1, 2, 1),
     'cube': ObjectDimensions('cube', 1, 1, 1),
     'cube_hollow_narrow': ObjectDimensions('cube_hollow_narrow', 1, 1, 1, 0),
     'cube_hollow_wide': ObjectDimensions('cube_hollow_wide', 1, 1, 1, 0),
@@ -143,14 +168,24 @@ OBJECT_DIMENSIONS = {
     'hash': ObjectDimensions('hash', 1, 1, 1, 0),
     'letter_x': ObjectDimensions('letter_x', 1, 1, 1, 0),
     'lock_wall': ObjectDimensions('lock_wall', 1, 1, 1),
-    'pyramid': ObjectDimensions('pyramid', 1, 1, 1),
-    'semi_sphere': ObjectDimensions('semi_sphere', 1, 1, 1, 0.25),
+    'pyramid_with_base': ObjectDimensions('pyramid_with_base', 1, 2, 1),
+    'semi_sphere_with_base': ObjectDimensions(
+        'semi_sphere_with_base', 1, 2, 1),
     'sphere': ObjectDimensions('sphere', 1, 1, 1),
-    'square_frustum': ObjectDimensions('square_frustum', 1, 1, 1),
+    'square_frustum_with_base': ObjectDimensions(
+        'square_frustum_with_base', 1, 2, 1),
     'triangle': ObjectDimensions('triangle', 1, 1, 1),
     'tube_narrow': ObjectDimensions('tube_narrow', 1, 1, 1),
     'tube_wide': ObjectDimensions('tube_wide', 1, 1, 1),
 }
+
+ROUND_TYPES = [
+    'blob_01', 'blob_02', 'blob_03', 'blob_04', 'blob_05',
+    'blob_06', 'blob_07', 'blob_08', 'blob_09', 'blob_10',
+    'circle_frustum', 'circle_frustum_with_base', 'cone', 'cone_with_base',
+    'cylinder', 'semi_sphere', 'semi_sphere_with_base', 'sphere',
+    'tube_narrow', 'tube_wide'
+]
 
 AGENT_OBJECT_CONFIG_LIST = [
     # Scaled to ensure that each agent's max X/Z dimension is 1
@@ -175,17 +210,19 @@ AGENT_OBJECT_MATERIAL_LIST = [
 
 GOAL_OBJECT_CONFIG_LIST = [
     # Scaled to ensure that each object's max X/Z dimension is 1
-    ObjectConfig('circle_frustum', 1, 1),
+    ObjectConfig('circle_frustum_with_base', 1, 0.5),
+    ObjectConfig('cone_with_base', 1, 0.5),
     ObjectConfig('cube', 1, 1),
     ObjectConfig('cube_hollow_narrow', 1, 1),
     ObjectConfig('cube_hollow_wide', 1, 1),
     ObjectConfig('cylinder', 1, 0.5),
-    ObjectConfig('letter_x', 1, 1),
-    ObjectConfig('hash', 1, 1),
-    ObjectConfig('pyramid', 1, 1),
-    ObjectConfig('semi_sphere', 1, 1),
+    # TODO MCS-1614 Replace these types with square or cylindrical versions.
+    # ObjectConfig('hash', 1, 1),
+    # ObjectConfig('letter_x', 1, 1),
+    ObjectConfig('pyramid_with_base', 1, 0.5),
+    # ObjectConfig('semi_sphere_with_base', 1, 0.5),
     ObjectConfig('sphere', 1, 1),
-    ObjectConfig('square_frustum', 1, 1),
+    ObjectConfig('square_frustum_with_base', 1, 0.5),
     ObjectConfig('tube_narrow', 1, 1),
     ObjectConfig('tube_wide', 1, 1),
 ]
@@ -260,6 +297,11 @@ LOCK_WALL_OBJECT_HEIGHT = FUSE_WALL_OBJECT_HEIGHT
 LOCK_WALL_OBJECT_MATERIAL = FUSE_WALL_OBJECT_MATERIAL
 LOCK_WALL_OBJECT_SIZE = FUSE_WALL_OBJECT_SIZE
 
+PADDLE_OBJECT_HEIGHT = [0.25, 0.5]
+PADDLE_OBJECT_MATERIAL = MaterialTuple('Custom/Materials/Black', ['black'])
+PADDLE_OBJECT_SIZE = [0.25, 1]
+PADDLE_OBJECT_TYPE = 'cube'
+
 # The floor and room walls should have bland colors and simple textures.
 CEILING_MATERIAL = MaterialTuple("AI2-THOR/Materials/Walls/Drywall", ["white"])
 FLOOR_OR_WALL_MATERIALS = [
@@ -303,7 +345,8 @@ def _append_each_show_to_object(
     json_property: str,
     unit_size: Tuple[float, float],
     on_step_callback: Callable = None,
-    rotation_y: int = 0
+    rotation_y: int = 0,
+    json_index: int = 0
 ) -> Dict[str, Any]:
     """Append a "shows" array element to the given moving object for each step
     in the given trial list."""
@@ -315,11 +358,19 @@ def _append_each_show_to_object(
         # (Sometimes the key is not in some trials.)
         if json_object:
             json_object = (
-                json_object if json_property == 'agent' else json_object[0]
+                json_object if json_property in ['agent', 'paddle'] else
+                json_object[json_index]
             )
             json_coords = json_object[0]
-            json_radius = json_object[1]
-            json_size = [json_radius * 2, json_radius * 2]
+            if json_property == 'paddle':
+                # The json_size isn't needed because the paddle's coordinates
+                # are already centered.
+                json_size = [0, 0]
+                json_rotation = 360 - json_object[2]
+            else:
+                json_radius = json_object[1]
+                json_size = [json_radius * 2, json_radius * 2]
+                json_rotation = rotation_y
             # Move the object to its new position for the step.
             mcs_show = _create_show(
                 step,
@@ -329,7 +380,7 @@ def _append_each_show_to_object(
                 json_coords,
                 json_size,
                 unit_size,
-                rotation_y
+                json_rotation
             )
             mcs_object['shows'].append(mcs_show)
             if on_step_callback:
@@ -375,12 +426,12 @@ def _choose_config_list(
     # Retrieve the relevant data from the first frame of the first trial.
     # Assume the number of objects will never change across trials, and
     # objects will never change shape/color across trials/frames.
-    object_count = len(trial_list[0][0][json_property])
+    object_count = len(trial_list[0][0].get(json_property, []))
 
-    # Always return two agent configs, since doing so is trivial. We can just
-    # ignore the 2nd if it's not needed.
+    # Always return three agent configs, since doing so is trivial. We can just
+    # ignore ones that aren't needed.
     if json_property == 'agent':
-        object_count = 2
+        object_count = 3
         # Remove agent objects with pointy tops (e.g. cones, pyramids) from
         # scenes with keys (e.g. instrumental action) as requested by NYU.
         # Old prop: 'key' ... New prop: 'pin'
@@ -407,6 +458,22 @@ def _choose_config_list(
             config for config in filtered_config_list
             if config.object_type not in used_type_list
         ]
+
+        # If the first goal object is a round shape, then the second goal
+        # object should not also be a round shape, and visa-versa.
+        if json_property == 'objects':
+            used_goal_type_list = [
+                used_type for used_type in used_type_list
+                if not used_type.startswith('blob')
+            ]
+            if len(used_goal_type_list) == 1:
+                filtered_config_list = [
+                    config for config in filtered_config_list if (
+                        (config.object_type in ROUND_TYPES) !=
+                        (used_goal_type_list[0] in ROUND_TYPES)
+                    )
+                ]
+
         if not filtered_config_list:
             raise SceneException(
                 f'No more available {json_property} types: {used_type_list=}'
@@ -471,20 +538,31 @@ def _create_agent_object_list(
     trial list from the JSON file data."""
 
     agent_object_list = []
-    mcs_agent_collection = {}
+    mcs_agents_unique = {}
 
     # Retrieve the agent data for each trial from the trial's first frame.
-    # Assume one agent per trial and it will never change shape/color.
-    json_agent_collection = {}
-    for trial in trial_list:
-        json_agent = trial[0]['agent']
-        json_icon = json_agent[2]
-        if json_icon not in json_agent_collection:
-            json_agent_collection[json_icon] = json_agent
+    # Assume each agent will never change shape/color.
+    json_agents_unique = {}
+    for trial_index, trial in enumerate(trial_list):
+        for json_property in ['agent', 'imitated_agent']:
+            json_agents = trial[0].get(json_property, [])
+            # Assume a single 'agent' per trial.
+            # Assume multiple 'imitated_agent' per trial.
+            if json_property == 'agent':
+                json_agents = [json_agents]
+            for agent_index, json_agent in enumerate(json_agents):
+                json_icon = json_agent[2]
+                if not json_icon:
+                    raise Exception(
+                        f'Missing agent icon {trial_index=} frame_index=0: '
+                        f'{json_agent}'
+                    )
+                if json_icon not in json_agents_unique:
+                    json_agents_unique[json_icon] = (json_agent, json_property)
 
     # Create each unique agent using its corresponding data from the JSON file.
-    for index, json_icon in enumerate(list(json_agent_collection.keys())):
-        json_agent = json_agent_collection[json_icon]
+    for index, json_icon in enumerate(list(json_agents_unique.keys())):
+        json_agent, json_property = json_agents_unique[json_icon]
         json_coords = json_agent[0]
         json_radius = json_agent[1]
         json_size = [json_radius * 2, json_radius * 2]
@@ -498,7 +576,7 @@ def _create_agent_object_list(
         scale_y = config_with_material.scale_y * factor
         center_y = dimensions.center_y * config_with_material.scale_y * factor
         agent_object = _create_object(
-            'agent_',
+            f'{json_property}_',
             config_with_material.object_type,
             config_with_material.material,
             [center_y, scale_y],
@@ -526,31 +604,46 @@ def _create_agent_object_list(
 
         # Link the agent and its icon so we can update its movement across each
         # frame in the next code block.
-        mcs_agent_collection[json_icon] = agent_object
+        mcs_agents_unique[json_icon] = agent_object
 
     # Update each MCS agent object with its movement in each trials' frames.
     for trial_index, trial in enumerate(trial_list):
-        trial_json_agent = trial[0]['agent']
-        trial_json_icon = trial_json_agent[2]
         step = _identify_trial_index_starting_step(trial_index, trial_list)
-        for json_icon, mcs_agent in mcs_agent_collection.items():
-            # If the current agent is in this trial, then update its movement.
-            if json_icon == trial_json_icon:
-                _append_each_show_to_object(
-                    mcs_agent,
-                    trial,
-                    step,
-                    'agent',
-                    unit_size,
-                    rotation_y=mcs_agent['debug']['configRotation']
-                )
+        found_in_trial = {}
+        for json_property in ['agent', 'imitated_agent']:
+            trial_json_agents = trial[0].get(json_property, [])
+            if json_property == 'agent':
+                trial_json_agents = [trial_json_agents]
+            for agent_index, trial_json_agent in enumerate(trial_json_agents):
+                trial_json_icon = trial_json_agent[2]
+                if not trial_json_icon:
+                    raise Exception(
+                        f'Missing agent icon {trial_index=} frame_index=0: '
+                        f'{json_agent}'
+                    )
+                found_in_trial[trial_json_icon] = True
+                for json_icon, mcs_agent in mcs_agents_unique.items():
+                    if json_icon == trial_json_icon:
+                        # If the current agent is in this trial, then update
+                        # its movement.
+                        _append_each_show_to_object(
+                            mcs_agent,
+                            trial,
+                            step,
+                            json_property,
+                            unit_size,
+                            rotation_y=mcs_agent['debug']['configRotation'],
+                            json_index=agent_index
+                        )
+        for json_icon, mcs_agent in mcs_agents_unique.items():
+            if found_in_trial.get(json_icon):
+                continue
             # Else, hide the current agent during this trial.
-            else:
-                mcs_agent['hides'].append({
-                    'stepBegin': step
-                })
-                for _ in range(len(trial) + 1):
-                    mcs_agent['debug']['boundsAtStep'].append(None)
+            mcs_agent['hides'].append({
+                'stepBegin': step
+            })
+            for _ in range(len(trial) + 1):
+                mcs_agent['debug']['boundsAtStep'].append(None)
 
     return agent_object_list
 
@@ -653,7 +746,7 @@ def _create_goal_object_list(
     # Retrieve the objects data from the first frame of the first trial.
     # Assume the number of objects will never change, and the objects will
     # never change shape/color.
-    for index, json_object in enumerate(trial_list[0][0]['objects']):
+    for index, json_object in enumerate(trial_list[0][0].get('objects', [])):
         json_coords = json_object[0]
         json_radius = json_object[1]
         json_icon = json_object[2]
@@ -676,11 +769,12 @@ def _create_goal_object_list(
             [scale_xz, scale_xz],
             json_coords,
             json_size,
-            unit_size
+            unit_size,
+            rotation_y=config_with_material.rotation_y
         )
         # Set kinematic to avoid awkward shifting due to collision issues.
         goal_object['kinematic'] = True
-        # Set physics so this goal's info is returned in the oracle metadata.
+        # Set physics so this object's info is returned in the oracle metadata.
         goal_object['physics'] = True
         goal_object['debug'][
             tags.SCENE.UNTRAINED_SHAPE
@@ -700,7 +794,7 @@ def _create_goal_object_list(
     # Add data for each object's new position to each trial's start step.
     # Assume objects only change in position across trials (not frames).
     for trial in trial_list[1:]:
-        for json_object in trial[0]['objects']:
+        for json_object in trial[0].get('objects', []):
             json_coords = json_object[0]
             json_radius = json_object[1]
             json_icon = json_object[2]
@@ -732,9 +826,9 @@ def _create_goal_object_list(
             # We can't have the object's position on top of the agent's start
             # position or the agent and object will collide. This can happen
             # if the 2D icons overlap themselves in the original data.
-            if sat_entry(
-                agent_start_bounds.box_xz,
-                show['boundingBox'].box_xz
+            if _do_objects_intersect(
+                agent_start_bounds,
+                show['boundingBox']
             ):
                 raise SceneException(
                     f'Cannot convert {filename_prefix} because an object is '
@@ -756,7 +850,9 @@ def _create_home_object(
 
     # Retrieve the home data from the first frame of the first trial.
     # Assume only one home and the home will never change.
-    json_home = trial_list[0][0]['home']
+    json_home = trial_list[0][0].get('home')
+    if not json_home:
+        return None
     json_coords = json_home[0]
     json_radius = json_home[1]
     json_size = [json_radius * 2, json_radius * 2]
@@ -838,7 +934,7 @@ def _create_key_object(
 
     # Set kinematic to avoid awkward shifting due to collision issues.
     key_object['kinematic'] = True
-    # Set physics so this key's info is returned in the oracle metadata.
+    # Set physics so this object's info is returned in the oracle metadata.
     key_object['physics'] = True
 
     key_object['hides'] = []
@@ -1001,6 +1097,69 @@ def _create_object(
     return mcs_object
 
 
+def _create_paddle_object(
+    trial_list: List[List[Dict[str, Any]]],
+    unit_size: Tuple[float, float]
+) -> Optional[Dict[str, Any]]:
+    """Create and return the MCS scene's paddle object using the given trial
+    list from the JSON file data."""
+
+    # Retrieve the paddle data from the first frame of the first trial.
+    # Assume the number of paddles will never change, and the paddles will
+    # never change shape/color.
+    json_paddle = trial_list[0][0].get('paddle')
+    if not json_paddle:
+        return None
+    json_coords = json_paddle[0]
+    # The json_size isn't needed because the paddle's coordinates are already
+    # centered.
+    json_size = [0, 0]
+    json_rotation = 360 - json_paddle[2]
+
+    # Create the MCS paddle object.
+    paddle_object = _create_object(
+        'paddle_',
+        PADDLE_OBJECT_TYPE,
+        PADDLE_OBJECT_MATERIAL,
+        PADDLE_OBJECT_HEIGHT,
+        PADDLE_OBJECT_SIZE,
+        json_coords,
+        json_size,
+        unit_size,
+        rotation_y=json_rotation
+    )
+
+    # Remove the object's first appearance (we will override it later).
+    paddle_object['shows'] = []
+    paddle_object['hides'] = []
+    paddle_object['debug']['boundsAtStep'] = []
+
+    # Move the paddle on each step as needed.
+    for trial_index, trial in enumerate(trial_list):
+        _append_each_show_to_object(
+            paddle_object,
+            trial,
+            _identify_trial_index_starting_step(trial_index, trial_list),
+            'paddle',
+            unit_size
+        )
+        if not trial[0].get('paddle'):
+            # Hide the paddle if it's not shown in this trial.
+            step = _identify_trial_index_starting_step(trial_index, trial_list)
+            paddle_object['hides'].append({
+                'stepBegin': step
+            })
+            for _ in range(len(trial) + 1):
+                paddle_object['debug']['boundsAtStep'].append(None)
+
+    # Set kinematic to avoid awkward shifting due to collision issues.
+    paddle_object['kinematic'] = True
+    # Set physics so this object's info is returned in the oracle metadata.
+    paddle_object['physics'] = True
+
+    return paddle_object
+
+
 def _create_scene(
     starter_scene: Scene,
     goal_template: Dict[str, Any],
@@ -1022,6 +1181,7 @@ def _create_scene(
     scene.goal['action_list'] = _create_action_list(trial_list)
     scene.goal['habituation_total'] = len(trial_list) - 1
     scene.goal['last_step'] = len(scene.goal['action_list'])
+    scene.goal['metadata'] = {'target': {}}
     scene.goal['answer'] = {
         'choice': EXPECTED if is_expected else UNEXPECTED
     }
@@ -1053,10 +1213,9 @@ def _create_scene(
         key_object,
         unit_size
     )
-    target, non_target_list = _identify_target_object(
-        trial_list,
-        goal_object_list
-    )
+    paddle_object = _create_paddle_object(trial_list, unit_size)
+    target_list = goal_object_list[:1]
+    non_target_list = goal_object_list[1:]
 
     _remove_intersecting_agent_steps(
         agent_object_list,
@@ -1098,8 +1257,8 @@ def _create_scene(
 
     # Round object float properties to reduce the size of output scene files.
     for mcs_object in (
-        agent_object_list + ([key_object] if key_object else []) + [target] +
-        non_target_list
+        agent_object_list + ([key_object] if key_object else []) +
+        target_list + non_target_list
     ):
         for mcs_show in mcs_object['shows']:
             for a in ['x', 'y', 'z']:
@@ -1109,9 +1268,9 @@ def _create_scene(
         position_x=4,
         position_z=-4,
         rotation_y=0,
-        scale_x=0.75,
+        scale_x=0.5,
         scale_y=3,
-        scale_z=0.75,
+        scale_z=0.5,
         room_dimension_y=10,
         material_tuple=platform_material
     )
@@ -1139,11 +1298,14 @@ def _create_scene(
 
     role_to_object_list = {}
     role_to_object_list[tags.ROLES.AGENT] = agent_object_list
-    role_to_object_list[tags.ROLES.HOME] = [home_object]
+    role_to_object_list[tags.ROLES.HOME] = [home_object] if home_object else []
     role_to_object_list[tags.ROLES.KEY] = [key_object] if key_object else []
+    role_to_object_list[tags.ROLES.PADDLE] = (
+        [paddle_object] if paddle_object else []
+    )
     role_to_object_list[tags.ROLES.NON_TARGET] = non_target_list
     role_to_object_list[tags.ROLES.STRUCTURAL] = [platform]
-    role_to_object_list[tags.ROLES.TARGET] = [target]
+    role_to_object_list[tags.ROLES.TARGET] = target_list
     role_to_object_list[tags.ROLES.WALL] = wall_object_list + lock_wall_list
 
     scene = update_scene_objects(scene, role_to_object_list)
@@ -1181,7 +1343,8 @@ def _create_show(
         }
     }
     dimensions = OBJECT_DIMENSIONS[object_type]
-    mcs_show['boundingBox'] = geometry.create_bounds(
+    mcs_show['boundingBox'] = _make_true_bounds(
+        object_type=object_type,
         dimensions={
             'x': mcs_show['scale']['x'] * dimensions.x,
             'y': mcs_show['scale']['y'] * dimensions.y,
@@ -1225,8 +1388,10 @@ def _create_static_wall_object_list(
                 json_coords = json_wall[0]
                 json_size = json_wall[1]
 
-                # Ignore each part of border wall (we make it automatically).
-                if (
+                # Ignore each part of border wall (we make it automatically)...
+                # EXCEPT in agent/non-agent scenes with paddles, since part of
+                # a border wall is removed in the final trial.
+                if (trial[0].get('paddle') is None) and (
                     json_coords[0] == JSON_BORDER_WALL_MIN_X or
                     json_coords[0] == JSON_BORDER_WALL_MAX_X or
                     json_coords[1] == JSON_BORDER_WALL_MIN_Z or
@@ -1267,7 +1432,9 @@ def _create_trial_frame_list(
     frame_list = []
     starting_coords = {}
     previous_coords = {}
-    json_property_list = ['agent', 'fuse_walls', 'key', 'lock', 'pin']
+    json_property_list = [
+        'agent', 'fuse_walls', 'imitated_agent', 'key', 'lock', 'paddle', 'pin'
+    ]
     for json_property in json_property_list:
         starting_coords[json_property] = trial[0].get(json_property)
         previous_coords[json_property] = trial[0].get(json_property)
@@ -1282,7 +1449,10 @@ def _create_trial_frame_list(
         for json_property in json_property_list:
             coords[json_property] = frame.get(json_property)
         # Only keep a specific number of the trial's starting frames.
-        if coords['agent'] == starting_coords['agent']:
+        if all([
+            coords[json_property] == starting_coords[json_property]
+            for json_property in ['agent', 'imitated_agent', 'paddle']
+        ]):
             if starting_frame_count > 0:
                 frame_list.append(frame)
                 starting_frame_count -= 1
@@ -1293,15 +1463,14 @@ def _create_trial_frame_list(
             for json_property in json_property_list:
                 if coords[json_property] != previous_coords[json_property]:
                     is_repeated = False
-                    break
+                    if json_property not in ['imitated_agent', 'paddle']:
+                        skip_next = False
             # If a separate object is changing, don't skip this frame.
             if is_repeated:
                 if paused_frame_count > 0:
                     frame_list.append(frame)
                     paused_frame_count -= 1
                 continue
-            else:
-                skip_next = False
         # Reset the paused frame count if an object moves again.
         paused_frame_count = PAUSED_STEP_WAIT_TIME
         if coords['fuse_walls'] != previous_coords['fuse_walls']:
@@ -1349,52 +1518,65 @@ def _create_wall_object_list(
     trial list from the JSON file data."""
     fuse_wall_list = _create_fuse_wall_object_list(trial_list, unit_size)
     static_wall_list = _create_static_wall_object_list(trial_list, unit_size)
-    for name, position, size in [
-        ('wall_front', (0, 2.25), (5, WALL_OBJECT_SIZE[1])),
-        ('wall_back', (0, -2.25), (5, WALL_OBJECT_SIZE[1])),
-        ('wall_left', (-2.25, 0), (WALL_OBJECT_SIZE[0], 4)),
-        ('wall_right', (2.25, 0), (WALL_OBJECT_SIZE[0], 4))
-    ]:
-        wall_object = {
-            'id': name,
-            'type': 'cube',
-            'materials': [WALL_OBJECT_MATERIAL[0]],
-            'shows': [{
-                'stepBegin': 0,
-                'position': {
-                    'x': position[0],
-                    'y': WALL_OBJECT_HEIGHT[0],
-                    'z': position[1]
-                },
-                'rotation': {
-                    'x': 0,
-                    'y': 0,
-                    'z': 0
-                },
-                'scale': {
-                    'x': size[0],
-                    'y': WALL_OBJECT_HEIGHT[1],
-                    'z': size[1]
+    # Create four static black border walls... EXCEPT in agent/non-agent scenes
+    # with paddles, because they will be generated individually.
+    if trial_list[0][0].get('paddle') is None:
+        for name, position, size in [
+            ('wall_front', (0, 2.25), (5, WALL_OBJECT_SIZE[1])),
+            ('wall_back', (0, -2.25), (5, WALL_OBJECT_SIZE[1])),
+            ('wall_left', (-2.25, 0), (WALL_OBJECT_SIZE[0], 4)),
+            ('wall_right', (2.25, 0), (WALL_OBJECT_SIZE[0], 4))
+        ]:
+            wall_object = {
+                'id': name,
+                'type': 'cube',
+                'materials': [WALL_OBJECT_MATERIAL[0]],
+                'shows': [{
+                    'stepBegin': 0,
+                    'position': {
+                        'x': position[0],
+                        'y': WALL_OBJECT_HEIGHT[0],
+                        'z': position[1]
+                    },
+                    'rotation': {
+                        'x': 0,
+                        'y': 0,
+                        'z': 0
+                    },
+                    'scale': {
+                        'x': size[0],
+                        'y': WALL_OBJECT_HEIGHT[1],
+                        'z': size[1]
+                    }
+                }],
+                'kinematic': True,
+                'structure': True,
+                'debug': {
+                    'info': WALL_OBJECT_MATERIAL[1] + ['cube'],
                 }
-            }],
-            'kinematic': True,
-            'structure': True,
-            'debug': {
-                'info': WALL_OBJECT_MATERIAL[1] + ['cube'],
             }
-        }
-        wall_object['debug']['info'].append(
-            ' '.join(wall_object['debug']['info'])
-        )
-        wall_object['shows'][0]['boundingBox'] = geometry.create_bounds(
-            dimensions=wall_object['shows'][0]['scale'],
-            offset={'x': 0, 'y': 0, 'z': 0},
-            position=wall_object['shows'][0]['position'],
-            rotation=wall_object['shows'][0]['rotation'],
-            standing_y=(wall_object['shows'][0]['scale']['y'] / 2.0)
-        )
-        static_wall_list.append(wall_object)
+            wall_object['debug']['info'].append(
+                ' '.join(wall_object['debug']['info'])
+            )
+            wall_object['shows'][0]['boundingBox'] = _make_true_bounds(
+                object_type='cube',
+                dimensions=wall_object['shows'][0]['scale'],
+                offset={'x': 0, 'y': 0, 'z': 0},
+                position=wall_object['shows'][0]['position'],
+                rotation=wall_object['shows'][0]['rotation'],
+                standing_y=(wall_object['shows'][0]['scale']['y'] / 2.0)
+            )
+            static_wall_list.append(wall_object)
     return static_wall_list + fuse_wall_list
+
+
+def _do_objects_intersect(
+    bounds_1: TrueObjectBounds,
+    bounds_2: TrueObjectBounds
+) -> bool:
+    """Returns whether the two objects represented by the given "true bounds"
+    intersect using their corresponding "true_poly" properties."""
+    return bounds_1.true_poly.intersects(bounds_2.true_poly)
 
 
 def _fix_key_location(
@@ -1438,7 +1620,8 @@ def _fix_key_location(
     )
     dimensions_x = KEY_OBJECT_ROTATION_Y[rotation_property]['dimensions_x']
     dimensions_z = KEY_OBJECT_ROTATION_Y[rotation_property]['dimensions_z']
-    this_show['boundingBox'] = geometry.create_bounds(
+    this_show['boundingBox'] = _make_true_bounds(
+        object_type=KEY_OBJECT_TYPE,
         dimensions={
             'x': dimensions_x,
             'y': KEY_OBJECT_HEIGHT[1],
@@ -1468,15 +1651,6 @@ def _fix_key_location(
     return key_object
 
 
-def _identify_target_object(
-    trial_list: List[List[Dict[str, Any]]],
-    object_list: List[Dict[str, Any]]
-) -> Tuple[Dict[str, Any], List[Dict[str, Any]]]:
-    # TODO
-    # return target, non_target_list
-    return object_list[0], object_list[1:]
-
-
 def _identify_trial_index_starting_step(
     index: int,
     trial_list: List[List[Dict[str, Any]]]
@@ -1488,6 +1662,60 @@ def _identify_trial_index_starting_step(
         # Add 1 for the EndHabituation action step at the end of the trial.
         step += len(trial_list[prior_index]) + 1
     return step
+
+
+def _make_true_bounds(
+    object_type: str,
+    # TODO MCS-697 MCS-698 Use Vector3d instead of Dict
+    dimensions: Dict[str, float],
+    offset: Optional[Dict[str, float]],
+    position: Dict[str, float],
+    rotation: Dict[str, float],
+    standing_y: float
+) -> TrueObjectBounds:
+    """Create and return the "true bounds" for the instantiated object
+    represented by the given arguments. The returned bounds will include a
+    "true_poly" property which may be circular or triangular if appropriate
+    based on the object's
+    type."""
+    bounds = geometry.create_bounds(
+        dimensions=dimensions,
+        offset=offset,
+        position=position,
+        rotation=rotation,
+        standing_y=standing_y
+    )
+    true_poly = bounds.polygon_xz
+    # Agents and "goal" objects may be circular rather than square.
+    if object_type in ROUND_TYPES:
+        center = shapely.geometry.Point(position['x'], position['z'])
+        circle = center.buffer(1.0)
+        true_poly = shapely.affinity.scale(
+            circle,
+            (dimensions['x'] / 2.0),
+            (dimensions['z'] / 2.0)
+        )
+        true_poly = shapely.affinity.rotate(
+            true_poly,
+            -rotation['y'],
+            origin=(position['x'], position['z'])
+        )
+    # Currently only "key" objects are triangles.
+    if object_type == 'triangle':
+        back = position['z'] - (dimensions['z'] / 2.0)
+        front = position['z'] + (dimensions['z'] / 2.0)
+        left = position['x'] - (dimensions['x'] / 2.0)
+        right = position['x'] + (dimensions['x'] / 2.0)
+        # Assume that the triangle's Z rotation is 90, and its X rotation is 0.
+        true_poly = shapely.geometry.Polygon([
+            (left, front), (right, front), (right, back)
+        ])
+        true_poly = shapely.affinity.rotate(
+            true_poly,
+            -rotation['y'],
+            origin=(position['x'], position['z'])
+        )
+    return TrueObjectBounds(bounds=bounds, true_poly=true_poly)
 
 
 def _move_agent_past_lock_location(
@@ -1517,9 +1745,9 @@ def _move_agent_past_lock_location(
             lock_object['hides'][0]['stepBegin'] - 1
         ]
         for index_2, target_show in enumerate(agent_object['shows'][(index):]):
-            if sat_entry(
-                target_show['boundingBox'].box_xz,
-                lock_bounds.box_xz
+            if _do_objects_intersect(
+                target_show['boundingBox'],
+                lock_bounds
             ):
                 remove_list.append(index + index_2)
             else:
@@ -1591,7 +1819,7 @@ def _move_agent_adjacent_to_goal(
             if not agent_show:
                 continue
 
-            agent_poly = agent_show['boundingBox'].polygon_xz
+            agent_poly = agent_show['boundingBox'].true_poly
 
             # Calculate the distance from the agent to each goal object.
             goals_with_distances = []
@@ -1609,7 +1837,7 @@ def _move_agent_adjacent_to_goal(
                     continue
 
                 # If the agent's too far away from this goal object, skip it.
-                poly = goal_show['boundingBox'].polygon_xz
+                poly = goal_show['boundingBox'].true_poly
                 distance = agent_poly.distance(poly)
                 if distance > 0.5:
                     continue
@@ -1620,10 +1848,13 @@ def _move_agent_adjacent_to_goal(
                 continue
 
             goal_show = sorted(goals_with_distances, key=lambda x: x[0])[0][1]
-            goal_poly = goal_show['boundingBox'].polygon_xz
+            goal_poly = goal_show['boundingBox'].true_poly
 
             # Find the nearest distance from the agent to the goal.
-            agent_point, goal_point = ops.nearest_points(agent_poly, goal_poly)
+            agent_point, goal_point = shapely.ops.nearest_points(
+                agent_poly,
+                goal_poly
+            )
             diff_x = goal_point.coords[0][0] - agent_point.coords[0][0]
             diff_z = goal_point.coords[0][1] - agent_point.coords[0][1]
 
@@ -1631,7 +1862,8 @@ def _move_agent_adjacent_to_goal(
             agent_show['position']['x'] += diff_x
             agent_show['position']['z'] += diff_z
             agent_dimensions = agent_object['debug']['dimensions']
-            agent_show['boundingBox'] = geometry.create_bounds(
+            agent_show['boundingBox'] = _make_true_bounds(
+                object_type=agent_object['type'],
                 dimensions={
                     'x': agent_dimensions['x'],
                     'y': agent_dimensions['y'],
@@ -1701,9 +1933,9 @@ def _remove_intersecting_agent_steps(
                 continue
             for other_object in other_object_list:
                 object_bounds = other_object['debug']['boundsAtStep'][step]
-                if object_bounds and sat_entry(
-                    agent_bounds.box_xz,
-                    object_bounds.box_xz
+                if object_bounds and _do_objects_intersect(
+                    agent_bounds,
+                    object_bounds
                 ):
                     remove_step_list.append(step)
         agent_object['shows'] = [
@@ -1732,12 +1964,16 @@ def _save_trials(trial_list: List[List[Dict[str, Any]]], filename_prefix: str):
             output_file.write(f'TRIAL {trial_index + 1} STEP {step}\n\n')
             for frame_index, frame in enumerate(trial):
                 output_file.write(f'FRAME {frame_index + 1}\n')
-                output_file.write(f'AGENT {frame["agent"]}\n')
+                output_file.write(f'AGENT {frame.get("agent")}\n')
                 output_file.write(f'FUSE_WALLS {frame.get("fuse_walls")}\n')
+                output_file.write(
+                    f'IMITATED AGENT {frame.get("imitated_agent")}\n'
+                )
                 output_file.write(f'KEY {frame.get("key")}\n')
                 output_file.write(f'LOCK {frame.get("lock")}\n')
+                output_file.write(f'PADDLE {frame.get("paddle")}\n')
                 output_file.write(f'PIN {frame.get("pin")}\n')
-                output_file.write(f'OBJECTS {frame["objects"]}\n')
+                output_file.write(f'OBJECTS {frame.get("objects")}\n')
                 output_file.write('\n')
 
 
@@ -1755,6 +1991,33 @@ def convert_scene_pair(
 
     # Ignore untrained for now.
     untrained = False
+
+    # Sometimes frames (which are supposed to be dicts) are accidentally lists
+    # of frames instead, so just add all the nested frames to the trial.
+    for trial_list, suffix in [(trial_list_expected, 'e')] + (
+        [(trial_list_unexpected, 'u')] if trial_list_unexpected else []
+    ):
+        for trial_index, trial in enumerate(trial_list):
+            new_trial = []
+            for frame_index, frame in enumerate(trial):
+                if isinstance(frame, dict):
+                    new_trial.append(frame)
+                elif isinstance(frame, list):
+                    logger.warn(
+                        f'FRAME IS LIST {filename_prefix}{suffix} '
+                        f'trial={trial_index} frame={frame_index}/'
+                        f'{len(trial)}'
+                    )
+                    new_trial.extend(frame)
+                else:
+                    # If it's not a dict or a list, something's wrong...
+                    raise Exception(
+                        f'FRAME IS {type(frame).__name__.upper()} '
+                        f'{filename_prefix}{suffix} '
+                        f'trial={trial_index} frame={frame_index}/'
+                        f'{len(trial)}'
+                    )
+            trial_list[trial_index] = new_trial
 
     # Create the converted trial lists for both of the scenes. This will
     # remove extraneous frames from all of the trials.
@@ -1776,7 +2039,11 @@ def convert_scene_pair(
             config for config in AGENT_OBJECT_CONFIG_LIST
             if config.untrained == untrained
         ],
-        [role_to_type[tags.ROLES.AGENT], role_to_type['second agent']],
+        [
+            role_to_type[tags.ROLES.AGENT],
+            role_to_type['second agent'],
+            None
+        ],
         AGENT_OBJECT_MATERIAL_LIST,
         'agent',
         [],
@@ -1828,10 +2095,10 @@ def convert_scene_pair(
             is_expected=False
         )
         # Ensure the two scenes have exactly the same room materials.
-        for prop in ['ceilingMaterial', 'floorMaterial', 'wallMaterial']:
-            scene_unexpected[prop] = scene_expected[prop]
+        for prop in ['ceiling_material', 'floor_material', 'wall_material']:
+            setattr(scene_unexpected, prop, getattr(scene_expected, prop))
         for prop in ['floorColors', 'wallColors']:
-            scene_unexpected['debug'][prop] = scene_expected['debug'][prop]
+            scene_unexpected.debug[prop] = scene_expected.debug[prop]
         scenes.append(scene_unexpected)
 
     return scenes

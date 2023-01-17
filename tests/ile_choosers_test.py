@@ -17,7 +17,7 @@ from ideal_learning_env import (
     choose_scale
 )
 from ideal_learning_env.choosers import choose_shape_material
-from ideal_learning_env.defs import ILEException
+from ideal_learning_env.defs import ILEException, ILESharedConfiguration
 from ideal_learning_env.mock_component import MockClass
 
 
@@ -28,11 +28,13 @@ def run_before_and_after_tests():
     saved_type_list = copy.deepcopy(base_objects.FULL_TYPE_LIST)
     saved_material_restrictions = copy.deepcopy(base_objects._TYPES_TO_DETAILS)
     saved_all_types = base_objects._MATERIAL_TO_VALID_TYPE["_all_types"]
+    ILESharedConfiguration.get_instance().set_excluded_colors([])
     yield  # this is where the testing happens
     # Teardown : fill with any logic you want
     base_objects.FULL_TYPE_LIST = saved_type_list
     base_objects._TYPES_TO_DETAILS = saved_material_restrictions
     base_objects._MATERIAL_TO_VALID_TYPE["_all_types"] = saved_all_types
+    ILESharedConfiguration.get_instance().set_excluded_colors([])
 
 
 def test_choose_counts():
@@ -691,3 +693,113 @@ def test_choose_shape_material_category_prohibited_colors():
     assert shape == "sphere"
     assert mat.material != prohibited
     assert "brown" not in mat.color
+
+
+def test_choose_shape_material_no_shape_or_material_with_excluded_colors():
+    ILESharedConfiguration.get_instance().set_excluded_colors(['brown'])
+    # Really just make sure this does not throw an error
+    shape, mat = choose_shape_material(None, None)
+    assert shape
+    # Some shapes do not have an assigned material
+    if mat:
+        assert mat.material
+        assert 'brown' not in mat.color
+
+
+def test_choose_shape_material_with_excluded_colors():
+    shape_input = 'sphere'
+    mat_input = [
+        'AI2-THOR/Materials/Wood/BlackWood',
+        'AI2-THOR/Materials/Wood/WoodGrain_Brown',
+        'AI2-THOR/Materials/Wood/WoodGrain_Tan'
+    ]
+    ILESharedConfiguration.get_instance().set_excluded_colors(['brown'])
+    shape, mat = choose_shape_material(shape_input, mat_input)
+    assert shape == 'sphere'
+    assert mat.material == 'AI2-THOR/Materials/Wood/BlackWood'
+    assert mat.color == ['black']
+
+
+def test_choose_shape_material_no_shape_with_excluded_colors():
+    mat_input = [
+        'AI2-THOR/Materials/Wood/BlackWood',
+        'AI2-THOR/Materials/Wood/WoodGrain_Brown',
+        'AI2-THOR/Materials/Wood/WoodGrain_Tan'
+    ]
+    ILESharedConfiguration.get_instance().set_excluded_colors(['brown'])
+    shape, mat = choose_shape_material(None, mat_input)
+    assert shape
+    assert mat.material == 'AI2-THOR/Materials/Wood/BlackWood'
+    assert mat.color == ['black']
+
+
+def test_choose_shape_material_no_material_with_excluded_colors():
+    shape_input = 'sphere'
+    ILESharedConfiguration.get_instance().set_excluded_colors(['brown'])
+    shape, mat = choose_shape_material(shape_input, None)
+    assert shape == 'sphere'
+    assert mat.material
+    assert 'brown' not in mat.color
+
+
+def test_choose_shape_material_category_with_excluded_colors():
+    shape_input = 'sphere'
+    mat_input = 'WOOD_MATERIALS'
+    ILESharedConfiguration.get_instance().set_excluded_colors(['brown'])
+    shape, mat = choose_shape_material(shape_input, mat_input)
+    assert shape == 'sphere'
+    assert mat.material
+    assert 'brown' not in mat.color
+
+
+def test_choose_shape_material_restricted_material_with_excluded_colors():
+    mat_input = [
+        'AI2-THOR/Materials/Fabrics/Sofa1_Brown',
+        'AI2-THOR/Materials/Fabrics/Sofa1_Red'
+    ]
+    ILESharedConfiguration.get_instance().set_excluded_colors(['brown'])
+    shape, mat = choose_shape_material(None, mat_input)
+    assert shape == 'sofa_1'
+    assert mat.material == 'AI2-THOR/Materials/Fabrics/Sofa1_Red'
+    assert 'brown' not in mat.color
+
+
+def test_choose_shape_material_restricted_shape_with_excluded_colors():
+    shape_input = 'sofa_1'
+    ILESharedConfiguration.get_instance().set_excluded_colors(['brown'])
+    shape, mat = choose_shape_material(shape_input, None)
+    assert shape == 'sofa_1'
+    assert mat.material
+    assert 'brown' not in mat.color
+
+
+def test_choose_shape_material_restricted_with_excluded_colors():
+    shape_input = 'sofa_1'
+    mat_input = [
+        'AI2-THOR/Materials/Fabrics/Sofa1_Brown',
+        'AI2-THOR/Materials/Fabrics/Sofa1_Red'
+    ]
+    ILESharedConfiguration.get_instance().set_excluded_colors(['brown'])
+    shape, mat = choose_shape_material(shape_input, mat_input)
+    assert shape == 'sofa_1'
+    assert mat.material == 'AI2-THOR/Materials/Fabrics/Sofa1_Red'
+    assert mat.color == ['red']
+
+
+def test_choose_shape_material_with_excluded_colors_override():
+    shape_input = 'sphere'
+    mat_input = 'Custom/Materials/BrownWoodMCS'
+    ILESharedConfiguration.get_instance().set_excluded_colors(['brown'])
+    shape, mat = choose_shape_material(shape_input, mat_input)
+    assert shape == 'sphere'
+    assert mat.material == 'Custom/Materials/BrownWoodMCS'
+    assert mat.color == ['brown']
+
+
+def test_choose_shape_material_no_shape_with_excluded_colors_override():
+    mat_input = 'Custom/Materials/BrownWoodMCS'
+    ILESharedConfiguration.get_instance().set_excluded_colors(['brown'])
+    shape, mat = choose_shape_material(None, mat_input)
+    assert shape
+    assert mat.material == 'Custom/Materials/BrownWoodMCS'
+    assert mat.color == ['brown']

@@ -13,6 +13,7 @@ from generator import (
 
 from .defs import ILEException, ILESharedConfiguration
 from .defs import choose_random as _choose_random
+from .defs import return_list
 from .numerics import MinMaxFloat, VectorFloatConfig, VectorIntConfig
 
 SOCCER_BALL_SCALE_MAX = 3
@@ -228,33 +229,58 @@ def choose_material_tuple_from_material(
 ) -> MaterialTuple:
     """Return a MaterialTuple chosen randomly from the given materials that can
     either be specific materials or names of lists in materials.py."""
-    material_or_category = (
-        material_or_category if isinstance(material_or_category, List) else
-        [material_or_category]
-    )
+    material_or_category_list = return_list(material_or_category)
+    # If only one material is set, ignore the excluded and prohibitied colors.
+    if len(material_or_category_list) == 1:
+        if isinstance(material_or_category_list[0], MaterialTuple):
+            return material_or_category_list[0]
+        if isinstance(material_or_category_list[0], str) and (
+            not hasattr(materials, material_or_category_list[0])
+        ):
+            mat = material_or_category_list[0]
+            return MaterialTuple(mat, materials.find_colors(mat, []))
+
+    # Cannot choose a material with an excluded color, or with a color in the
+    # prohibited material.
+    shared_config = ILESharedConfiguration.get_instance()
+    excluded_colors = shared_config.get_excluded_colors()
     prohibited_colors = materials.find_colors(prohibited_material, [])
-    available_materials = []
-    for item in material_or_category:
+    cannot_be_colors = excluded_colors + prohibited_colors
+
+    unprohibited_material_list: List[List[MaterialTuple]] = []
+    for item in material_or_category_list:
+        # Ignore the prohibited material.
         if item == prohibited_material:
             continue
-        if hasattr(materials, str(item)):
-            available_materials.append(item)
+        # For a material category string, like "WOOD_MATERIALS"...
+        if isinstance(item, str) and hasattr(materials, item):
+            # Retrieve all the unprohibited materials for the category...
+            nested_list = [
+                material_tuple for material_tuple in getattr(materials, item)
+                if not any([
+                    color in cannot_be_colors for color in material_tuple.color
+                ])
+            ]
+            # And retain the array, if it still has any materials in it.
+            if nested_list:
+                unprohibited_material_list.append(nested_list)
             continue
-        colors = materials.find_colors(str(item), [])
-        if any([color in prohibited_colors for color in colors]):
+        # Otherwise assume the item is a single material.
+        material_tuple = item if isinstance(item, MaterialTuple) else (
+            MaterialTuple(item, materials.find_colors(item, []))
+        )
+        # Ignore the material if it has a color matching a prohibited color.
+        if any([color in cannot_be_colors for color in material_tuple.color]):
             continue
-        available_materials.append(item)
-    mat = choose_random(available_materials)
-    if hasattr(materials, str(mat)):
-        return random.choice([
-            material_tuple for material_tuple in getattr(materials, mat)
-            if material_tuple.material != prohibited_material and all([
-                color not in prohibited_colors
-                for color in material_tuple.color
-            ])
-        ])
-    colors = materials.find_colors(mat, [])
-    return MaterialTuple(mat, colors)
+        # Retain the material, but as an array with one element.
+        unprohibited_material_list.append([material_tuple])
+
+    if not unprohibited_material_list:
+        raise ILEException(
+            f'Failed to find a valid material with prohibited material = '
+            f'{prohibited_material} and excluded colors: {excluded_colors}'
+        )
+    return random.choice(random.choice(unprohibited_material_list))
 
 
 def _filter_scale_soccer_ball(
