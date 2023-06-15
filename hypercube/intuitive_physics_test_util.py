@@ -1,5 +1,7 @@
 import math
 
+from machine_common_sense.config_manager import Goal
+
 from generator import (
     Scene,
     definitions,
@@ -12,7 +14,7 @@ from generator import (
 from . import intuitive_physics_hypercubes
 
 OPPOSITE_MATERIAL_STRING_LIST = [
-    item[0] for item in materials.OPPOSITE_MATERIALS
+    item.material for item in materials.OBJECT_OPPOSITE_MATERIALS
 ]
 
 
@@ -26,28 +28,28 @@ def verify_scene(
     assert scene.intuitive_physics
     assert scene.version == 3
     assert scene.debug['evaluationOnly'] == (eval_only or implausible)
-    assert scene.goal['answer']['choice'] == (
+    assert scene.goal.answer['choice'] == (
         'implausible' if implausible else 'plausible'
     )
 
     if is_move_across:
-        assert scene.goal['last_step'] == (last_step if last_step else 200)
+        assert scene.goal.last_step == (last_step if last_step else 200)
     else:
-        assert scene.goal['last_step'] == (last_step if last_step else 160)
-    assert scene.goal['action_list'] == (
-        [['Pass']] * scene.goal['last_step']
+        assert scene.goal.last_step == (last_step if last_step else 160)
+    assert scene.goal.action_list == (
+        [['Pass']] * scene.goal.last_step
     )
-    assert scene.goal['category'] == 'intuitive physics'
-    assert scene.goal['sceneInfo']['primaryType'] == 'passive'
-    assert scene.goal['sceneInfo']['secondaryType'] == 'intuitive physics'
-    assert scene.goal['sceneInfo']['quaternaryType'] == 'action none'
+    assert scene.goal.category == 'intuitive physics'
+    assert scene.goal.scene_info['primaryType'] == 'passive'
+    assert scene.goal.scene_info['secondaryType'] == 'intuitive physics'
+    assert scene.goal.scene_info['quaternaryType'] == 'action none'
 
     if is_move_across:
-        assert scene.goal['sceneInfo']['moveAcross']
-        assert 'move across' == scene.goal['sceneInfo']['sceneSetup']
+        assert scene.goal.scene_info['moveAcross']
+        assert 'move across' == scene.goal.scene_info['sceneSetup']
     else:
-        assert scene.goal['sceneInfo']['fallDown']
-        assert 'fall down' == scene.goal['sceneInfo']['sceneSetup']
+        assert scene.goal.scene_info['fallDown']
+        assert 'fall down' == scene.goal.scene_info['sceneSetup']
 
 
 def verify_hypercube(object_dict, room_wall_material):
@@ -93,9 +95,9 @@ def verify_hypercube(object_dict, room_wall_material):
 def verify_object_tags(scene, object_list, role_info, role_prop):
     for instance in object_list:
         for info in instance['debug']['info']:
-            assert info in scene.goal['objectsInfo']['all']
+            assert info in scene.goal.objects_info['all']
             if info != role_info:
-                assert info in scene.goal['objectsInfo'][role_prop]
+                assert info in scene.goal.objects_info[role_prop]
     return True
 
 
@@ -459,9 +461,9 @@ def verify_object_fall_down_position(instance, name, bigger=False):
             intuitive_physics_hypercubes.retrieve_off_screen_position_y(
                 z_position
             )
-        )
-        # Y position may be adjusted by up to 0.5 by placer function.
-        if y_position < (y_expected - 0.5):
+        ) + instance['debug']['positionY']
+        # Y position may be adjusted by up to 0.25 by placer function.
+        if y_position < (y_expected - 0.25):
             print(f'[ERROR] {name} Y POSITION SHOULD BE GREATER THAN '
                   f'{y_expected} BUT WAS {y_position}\n{name}={instance}')
             return False
@@ -950,8 +952,8 @@ def create_goal_template(task_type):
     scene_info[tags.SCENE.QUATERNARY] = tags.tag_to_label(
         tags.SCENE.ACTION_NONE
     )
-    return {
-        'category': tags.tag_to_label(tags.SCENE.INTUITIVE_PHYSICS),
-        'domainsInfo': {},
-        'sceneInfo': scene_info
-    }
+    return Goal(
+        category=tags.tag_to_label(tags.SCENE.INTUITIVE_PHYSICS),
+        domains_info={},
+        scene_info=scene_info
+    )

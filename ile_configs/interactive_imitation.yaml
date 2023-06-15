@@ -34,12 +34,18 @@ shortcut_imitation_task:
     # the other agent is moved out of the way.
     kidnap_option:
         - agent_only
-        # The containers are repositioned, but still in the same order.
+        # The containers are repositioned and rotated
         - containers
-        # The containers are repositioned AND rotated.
-        - containers_rotate
         # The performer agent is repositioned, but still faces the containers.
         - performer
+    # Relative clockwise rotation containers will rotate if the kidnap option
+    # is containers.
+    # Options for RIGHT SIDE: [45, 135, 225, 270, 315]
+    # Options for LEFT SIDE: [45, 90, 135, 225, 315]
+    relative_container_rotation: [45, 90, 135, 225, 270, 315]
+    # Global absolute rotation containers will rotate if the kidnap option
+    # is containers. Will override `relative_container_rotation`.
+    global_container_rotation: [45, 135, 180, 225, 315]
 
 # Override the defaults to avoid randomly generating any other objects besides
 # the ones required for the Imitation task. Remove these lines if you want

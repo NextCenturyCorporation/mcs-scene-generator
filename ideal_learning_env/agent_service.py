@@ -8,6 +8,7 @@ from typing import Any, Dict, List, Union
 from machine_common_sense.config_manager import Vector3d
 from shapely.geometry import Point, Polygon
 
+from generator import SceneObject
 from generator.agents import (
     AGENT_DIMENSIONS,
     AGENT_TYPES,
@@ -15,7 +16,8 @@ from generator.agents import (
     add_agent_movement,
     add_agent_pointing,
     create_agent,
-    estimate_move_step_length
+    estimate_move_step_length,
+    get_random_agent_settings
 )
 from generator.geometry import (
     MAX_TRIES,
@@ -25,39 +27,35 @@ from generator.geometry import (
     validate_location_rect
 )
 from generator.scene import Scene
-from ideal_learning_env.defs import (
+
+from .choosers import choose_position, choose_random
+from .defs import (
+    ILEConfigurationException,
     ILEDelayException,
     ILEException,
+    RandomizableBool,
+    RandomizableString,
     find_bounds
 )
-from ideal_learning_env.feature_creation_service import (
+from .feature_creation_service import (
     BaseFeatureConfig,
     BaseObjectCreationService,
     FeatureCreationService,
     FeatureTypes
 )
-from ideal_learning_env.interactable_object_service import (
-    KeywordLocationConfig
+from .interactable_object_service import KeywordLocationConfig
+from .numerics import (
+    MinMaxFloat,
+    MinMaxInt,
+    RandomizableFloat,
+    RandomizableInt,
+    RandomizableVectorFloat3d
 )
-from ideal_learning_env.object_services import (
+from .object_services import (
     KeywordLocation,
     ObjectRepository,
     add_random_placement_tag,
     reconcile_template
-)
-
-from .choosers import choose_position, choose_random
-from .defs import (
-    ILEConfigurationException,
-    RandomizableBool,
-    RandomizableString
-)
-from .numerics import (
-    MinMaxInt,
-    RandomizableFloat,
-    RandomizableInt,
-    RandomizableVectorFloat3d,
-    VectorFloatConfig
 )
 
 logger = logging.getLogger(__name__)
@@ -173,28 +171,29 @@ class AgentSettings():
     - `tie` (int, or list of ints)
     - `tieMaterial` (int, or list of ints)
     """
-    chest: RandomizableInt = 0
-    chestMaterial: RandomizableInt = 0
-    eyes: RandomizableInt = 0
-    feet: RandomizableInt = 0
-    feetMaterial: RandomizableInt = 0
-    glasses: RandomizableInt = 0
-    hair: RandomizableInt = 0
-    hairMaterial: RandomizableInt = 0
-    hatMaterial: RandomizableInt = 0
-    hideHair: RandomizableBool = False
-    isElder: RandomizableBool = False
-    jacket: RandomizableInt = 0
-    jacketMaterial: RandomizableInt = 0
-    legs: RandomizableInt = 0
-    legsMaterial: RandomizableInt = 0
-    showBeard: RandomizableBool = False
-    showGlasses: RandomizableBool = False
-    showJacket: RandomizableBool = False
-    showTie: RandomizableBool = False
-    skin: RandomizableInt = 0
-    tie: RandomizableInt = 0
-    tieMaterial: RandomizableInt = 0
+    # All default values should be None!
+    chest: RandomizableInt = None
+    chestMaterial: RandomizableInt = None
+    eyes: RandomizableInt = None
+    feet: RandomizableInt = None
+    feetMaterial: RandomizableInt = None
+    glasses: RandomizableInt = None
+    hair: RandomizableInt = None
+    hairMaterial: RandomizableInt = None
+    hatMaterial: RandomizableInt = None
+    hideHair: RandomizableBool = None
+    isElder: RandomizableBool = None
+    jacket: RandomizableInt = None
+    jacketMaterial: RandomizableInt = None
+    legs: RandomizableInt = None
+    legsMaterial: RandomizableInt = None
+    showBeard: RandomizableBool = None
+    showGlasses: RandomizableBool = None
+    showJacket: RandomizableBool = None
+    showTie: RandomizableBool = None
+    skin: RandomizableInt = None
+    tie: RandomizableInt = None
+    tieMaterial: RandomizableInt = None
 
 
 @dataclass
@@ -231,9 +230,9 @@ class AgentConfig(BaseFeatureConfig):
     VectorFloatConfig dicts): The position of this agent in each scene. If
     configured as a list, a new position will be randomly chosen for each
     scene. Default: random
-    - `rotation_y` (int, or [MinMaxInt](#MinMaxInt) dict, or list of ints
-    and/or MinMaxInt dicts): The rotation of this agent in each scene. If
-    configured as a list, a new rotation will be randomly chosen for each
+    - `rotation_y` (float, or [MinMaxFloat](#MinMaxFloat) dict, or list of
+    floats and/or MinMaxFloat dicts): The rotation of this agent in each scene.
+    If configured as a list, a new rotation will be randomly chosen for each
     scene. Default: random
     - `type` (string, or list of strings) The model ("type") of the agent.
     Please see the list in our [schema doc](
@@ -260,10 +259,10 @@ class AgentConfig(BaseFeatureConfig):
       is_loop_animation: [True, False]
     ```
     """
-    type: Union[str, List[str]] = None
+    type: RandomizableString = None
     agent_settings: Union[AgentSettings, List[AgentSettings]] = None
-    position: Union[VectorFloatConfig, List[VectorFloatConfig]] = None
-    rotation_y: Union[int, MinMaxInt, List[Union[int, MinMaxInt]]] = None
+    position: RandomizableVectorFloat3d = None
+    rotation_y: RandomizableFloat = None
     actions: List[AgentActionConfig] = None
     movement: Union[
         bool,
@@ -272,38 +271,13 @@ class AgentConfig(BaseFeatureConfig):
     ] = None
     keyword_location: KeywordLocationConfig = None
     pointing: Union[AgentPointingConfig, List[AgentPointingConfig]] = None
-
-
-def get_default_agent_settings():
-    return AgentSettings(
-        chest=MinMaxInt(0, 8),
-        chestMaterial=MinMaxInt(0, 14),
-        eyes=MinMaxInt(0, 3),
-        feet=MinMaxInt(0, 2),
-        feetMaterial=MinMaxInt(0, 11),
-        glasses=MinMaxInt(0, 10),
-        hair=MinMaxInt(0, 9),
-        hairMaterial=MinMaxInt(0, 9),
-        hatMaterial=MinMaxInt(0, 11),
-        hideHair=[True, False, False, False, False],
-        isElder=[True, False, False, False, False],
-        jacket=0,
-        jacketMaterial=0,
-        legs=MinMaxInt(0, 3),
-        legsMaterial=MinMaxInt(0, 14),
-        showBeard=False,
-        showGlasses=False,
-        showJacket=False,
-        showTie=[True, False],
-        skin=MinMaxInt(0, 3),
-        tie=MinMaxInt(0, 2),
-        tieMaterial=MinMaxInt(0, 9)
-    )
+    labels: RandomizableString = None
 
 
 DEFAULT_TEMPLATE_AGENT = AgentConfig(
-    num=0, type=AGENT_TYPES, agent_settings=get_default_agent_settings(),
-    position=None, actions=None, rotation_y=MinMaxInt(0, 359), pointing=None)
+    num=0, type=AGENT_TYPES, agent_settings=None,
+    position=None, actions=None, rotation_y=MinMaxFloat(0, 359),
+    pointing=None, labels=None)
 
 DEFAULT_TEMPLATE_AGENT_MOVEMENT = AgentMovementConfig(
     animation=['TPM_walk', 'TPM_run'], step_begin=MinMaxInt(0, 20),
@@ -365,13 +339,21 @@ class AgentCreationService(BaseObjectCreationService):
             source_template: AgentConfig):
         logger.trace(f"Creating agent:\n{source_template=}\n{reconciled=}")
 
+        reconciled_settings = reconciled.agent_settings or AgentSettings()
+        full_settings = get_random_agent_settings(
+            reconciled.type,
+            settings=vars(reconciled_settings)
+        )
+        logger.trace(f"Agent settings: {full_settings}")
+
         agent = create_agent(
             type=reconciled.type,
             position_x=reconciled.position.x,
             position_z=reconciled.position.z,
             rotation_y=reconciled.rotation_y,
-            settings=vars(reconciled.agent_settings),
-            position_y_modifier=reconciled.position.y)
+            settings=full_settings,
+            position_y_modifier=reconciled.position.y
+        )
 
         if reconciled.keyword_location:
             if source_template.position:
@@ -508,7 +490,7 @@ class AgentCreationService(BaseObjectCreationService):
             },
             'rotation': {
                 'x': 0,
-                'y': (agent['shows'][0]['rotation']['y'] + 180) % 360,
+                'y': round(agent['shows'][0]['rotation']['y'] + 180, 2) % 360,
                 'z': 0
             }
         })
@@ -553,7 +535,7 @@ class AgentCreationService(BaseObjectCreationService):
 
     @staticmethod
     def add_random_agent_movement(
-            scene: Scene, agent: dict, config: AgentMovementConfig):
+            scene: Scene, agent: SceneObject, config: AgentMovementConfig):
         logger.trace(f"Adding random agent movement:\n{config=}")
         def_temp: AgentMovementConfig = choose_random(
             DEFAULT_TEMPLATE_AGENT_MOVEMENT)

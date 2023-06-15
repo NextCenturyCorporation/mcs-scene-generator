@@ -1,5 +1,6 @@
 import pytest
 
+from generator import SceneException, geometry
 from ideal_learning_env import (
     ILEDelayException,
     ILEException,
@@ -8,9 +9,12 @@ from ideal_learning_env import (
     ObjectRepository
 )
 from ideal_learning_env.object_services import (
+    calculate_rotated_position,
     get_step_after_movement,
     get_step_after_movement_or_start
 )
+
+from .ile_helper import prior_scene
 
 
 @pytest.fixture(autouse=True)
@@ -311,3 +315,380 @@ def test_get_step_after_movement_or_start_delay():
     with pytest.raises(ILEDelayException):
         # Error because no objects with this label are in the ObjectRepository
         get_step_after_movement_or_start(['label_1'])
+
+
+def test_calculate_rotated_position():
+    container_position = {'x': 1, 'y': 0.5, 'z': 0}
+    container_dimensions = {'x': 1, 'y': 1, 'z': 1}
+    mock_container = {
+        'id': 'container_1234',
+        'debug': {
+            'dimensions': container_dimensions,
+            'isRotatedBy': 'turntable_5678',
+            'positionY': 0
+        },
+        'shows': [{
+            'boundingBox': geometry.create_bounds(
+                container_dimensions,
+                None,
+                container_position,
+                {'x': 0, 'y': 0, 'z': 0},
+                0
+            ),
+            'position': container_position
+        }]
+    }
+    mock_turntable = {
+        'id': 'turntable_5678',
+        'rotates': [{
+            'stepBegin': 1,
+            'stepEnd': None,
+            'vector': {'x': 0, 'y': 5, 'z': 0}
+        }],
+        'shows': [{
+            'position': {'x': 0, 'y': 0, 'z': 0}
+        }]
+    }
+    scene = prior_scene()
+    scene.objects.append(mock_turntable)
+
+    # Test: clockwise rotation, varying degrees.
+    for step_end, expected_x, expected_z in [
+        (9, 0.70710678, -0.70710678), (18, 0, -1),
+        (27, -0.70710678, -0.70710678), (36, -1, 0),
+        (45, -0.70710678, 0.70710678), (54, 0, 1),
+        (63, 0.70710678, 0.70710678), (72, 1, 0)
+    ]:
+        mock_turntable['rotates'][0]['stepEnd'] = step_end
+        actual = calculate_rotated_position(
+            scene,
+            step_end + 10,
+            mock_container
+        )
+        expected = {'x': expected_x, 'y': 0.5, 'z': expected_z}
+        if actual != pytest.approx(expected):
+            print(f'{step_end=} {expected_x=} {expected_z=}')
+        assert actual == pytest.approx(expected)
+
+    # Adjustments for next test...
+    mock_turntable['rotates'][0]['vector']['y'] = -5
+
+    # Test: counterclockwise rotation, varying degrees.
+    for step_end, expected_x, expected_z in [
+        (9, 0.70710678, 0.70710678), (18, 0, 1),
+        (27, -0.70710678, 0.70710678), (36, -1, 0),
+        (45, -0.70710678, -0.70710678), (54, 0, -1),
+        (63, 0.70710678, -0.70710678), (72, 1, 0)
+    ]:
+        mock_turntable['rotates'][0]['stepEnd'] = step_end
+        actual = calculate_rotated_position(
+            scene,
+            step_end + 10,
+            mock_container
+        )
+        expected = {'x': expected_x, 'y': 0.5, 'z': expected_z}
+        if actual != pytest.approx(expected):
+            print(f'{step_end=} {expected_x=} {expected_z=}')
+        assert actual == pytest.approx(expected)
+
+    # Adjustments for next test...
+    container_position = {'x': 2, 'y': 0.5, 'z': 1}
+    mock_container['shows'][0]['position'] = container_position
+    mock_container['shows'][0]['boundingBox'] = geometry.create_bounds(
+        container_dimensions,
+        None,
+        container_position,
+        {'x': 0, 'y': 0, 'z': 0},
+        0
+    )
+    mock_turntable['shows'][0]['position'] = {'x': 1, 'y': 0, 'z': 1}
+    mock_turntable['rotates'][0]['vector']['y'] = 5
+
+    # Test: non-zero turntable position.
+    for step_end, expected_x, expected_z in [
+        (9, 1.70710678, 0.29289322), (18, 1, 0),
+        (27, 0.29289322, 0.29289322), (36, 0, 1),
+        (45, 0.29289322, 1.70710678), (54, 1, 2),
+        (63, 1.70710678, 1.70710678), (72, 2, 1)
+    ]:
+        mock_turntable['rotates'][0]['stepEnd'] = step_end
+        actual = calculate_rotated_position(
+            scene,
+            step_end + 10,
+            mock_container
+        )
+        expected = {'x': expected_x, 'y': 0.5, 'z': expected_z}
+        if actual != pytest.approx(expected):
+            print(f'{step_end=} {expected_x=} {expected_z=}')
+        assert actual == pytest.approx(expected)
+
+
+def test_calculate_rotated_position_return_none():
+    container_position = {'x': 1, 'y': 0.5, 'z': 0}
+    container_dimensions = {'x': 1, 'y': 1, 'z': 1}
+    mock_container = {
+        'id': 'container_1234',
+        'debug': {
+            'dimensions': container_dimensions,
+            'isRotatedBy': None,
+            'positionY': 0
+        },
+        'shows': [{
+            'boundingBox': geometry.create_bounds(
+                container_dimensions,
+                None,
+                container_position,
+                {'x': 0, 'y': 0, 'z': 0},
+                0
+            ),
+            'position': container_position
+        }]
+    }
+    scene = prior_scene()
+
+    # Test: container does not have isRotatedBy property.
+    actual = calculate_rotated_position(
+        scene,
+        20,
+        mock_container
+    )
+    assert actual is None
+
+    mock_container['debug']['isRotatedBy'] = 'turntable_5678'
+    mock_turntable = {
+        'id': 'turntable_5678',
+        'shows': [{
+            'position': {'x': 0, 'y': 0, 'z': 0}
+        }]
+    }
+    scene.objects.append(mock_turntable)
+
+    # Test: turntable does not rotate.
+    actual = calculate_rotated_position(
+        scene,
+        20,
+        mock_container
+    )
+    assert actual is None
+
+    mock_turntable['rotates'] = [{
+        'stepBegin': 1,
+        'stepEnd': 9,
+        'vector': {'x': 0, 'y': 5, 'z': 0}
+    }]
+
+    # Test: container starts with lid already on placed it (lid_step_begin=0).
+    actual = calculate_rotated_position(
+        scene,
+        0,
+        mock_container
+    )
+    assert actual is None
+
+    mock_turntable['rotates'] = [{
+        'stepBegin': 21,
+        'stepEnd': 29,
+        'vector': {'x': 0, 'y': 5, 'z': 0}
+    }]
+
+    # Test: container lid is placed before turntable starts rotating.
+    actual = calculate_rotated_position(
+        scene,
+        1,
+        mock_container
+    )
+    assert actual is None
+
+
+def test_calculate_rotated_position_error_placed_during_rotation():
+    container_position = {'x': 1, 'y': 0.5, 'z': 0}
+    container_dimensions = {'x': 1, 'y': 1, 'z': 1}
+    mock_container = {
+        'id': 'container_1234',
+        'debug': {
+            'dimensions': container_dimensions,
+            'isRotatedBy': 'turntable_5678',
+            'positionY': 0
+        },
+        'shows': [{
+            'boundingBox': geometry.create_bounds(
+                container_dimensions,
+                None,
+                container_position,
+                {'x': 0, 'y': 0, 'z': 0},
+                0
+            ),
+            'position': container_position
+        }]
+    }
+    mock_turntable = {
+        'id': 'turntable_5678',
+        'rotates': [{
+            'stepBegin': 2,
+            'stepEnd': 100,
+            'vector': {'x': 0, 'y': 5, 'z': 0}
+        }],
+        'shows': [{
+            'position': {'x': 0, 'y': 0, 'z': 0}
+        }]
+    }
+    scene = prior_scene()
+    scene.objects.append(mock_turntable)
+
+    # Test: container lid is placed as turntable is rotating.
+    with pytest.raises(SceneException):
+        calculate_rotated_position(
+            scene,
+            1,
+            mock_container
+        )
+
+
+def test_calculate_rotated_position_error_placed_step_begin():
+    # Assume our function will resolve its placer_steps to to following value:
+    placer_steps = 6
+
+    container_position = {'x': 1, 'y': 0.5, 'z': 0}
+    container_dimensions = {'x': 1, 'y': 1, 'z': 1}
+    mock_container = {
+        'id': 'container_1234',
+        'debug': {
+            'dimensions': container_dimensions,
+            'isRotatedBy': 'turntable_5678',
+            'positionY': 0
+        },
+        'shows': [{
+            'boundingBox': geometry.create_bounds(
+                container_dimensions,
+                None,
+                container_position,
+                {'x': 0, 'y': 0, 'z': 0},
+                0
+            ),
+            'position': container_position
+        }]
+    }
+    mock_turntable = {
+        'id': 'turntable_5678',
+        'rotates': [{
+            'stepBegin': 1 + placer_steps,
+            'stepEnd': 18 + placer_steps,
+            'vector': {'x': 0, 'y': 5, 'z': 0}
+        }],
+        'shows': [{
+            'position': {'x': 0, 'y': 0, 'z': 0}
+        }]
+    }
+    scene = prior_scene()
+    scene.objects.append(mock_turntable)
+
+    # Test: container lid is placed on same step turntable starts rotating.
+    with pytest.raises(SceneException):
+        calculate_rotated_position(
+            scene,
+            1,
+            mock_container
+        )
+
+
+def test_calculate_rotated_position_error_placed_step_end():
+    # Assume our function will resolve its placer_steps to to following value:
+    placer_steps = 6
+
+    container_position = {'x': 1, 'y': 0.5, 'z': 0}
+    container_dimensions = {'x': 1, 'y': 1, 'z': 1}
+    mock_container = {
+        'id': 'container_1234',
+        'debug': {
+            'dimensions': container_dimensions,
+            'isRotatedBy': 'turntable_5678',
+            'positionY': 0
+        },
+        'shows': [{
+            'boundingBox': geometry.create_bounds(
+                container_dimensions,
+                None,
+                container_position,
+                {'x': 0, 'y': 0, 'z': 0},
+                0
+            ),
+            'position': container_position
+        }]
+    }
+    mock_turntable = {
+        'id': 'turntable_5678',
+        'rotates': [{
+            'stepBegin': 1,
+            'stepEnd': 18,
+            'vector': {'x': 0, 'y': 5, 'z': 0}
+        }],
+        'shows': [{
+            'position': {'x': 0, 'y': 0, 'z': 0}
+        }]
+    }
+    scene = prior_scene()
+    scene.objects.append(mock_turntable)
+
+    # Test: container lid is placed on same step turntable finishes rotating.
+    with pytest.raises(SceneException):
+        calculate_rotated_position(
+            scene,
+            18 - placer_steps,
+            mock_container
+        )
+
+
+def test_calculate_rotated_position_edge_case():
+    container_position = {'x': 1, 'y': 0.5, 'z': 0}
+    container_dimensions = {'x': 1, 'y': 1, 'z': 1}
+    mock_container = {
+        'id': 'container_1234',
+        'debug': {
+            'dimensions': container_dimensions,
+            'isRotatedBy': 'turntable_5678',
+            'positionY': 0
+        },
+        'shows': [{
+            'boundingBox': geometry.create_bounds(
+                container_dimensions,
+                None,
+                container_position,
+                {'x': 0, 'y': 0, 'z': 0},
+                0
+            ),
+            'position': container_position
+        }]
+    }
+    mock_turntable = {
+        'id': 'turntable_5678',
+        'rotates': [{
+            'stepBegin': 1,
+            'stepEnd': 18,
+            'vector': {'x': 0, 'y': 5, 'z': 0}
+        }],
+        'shows': [{
+            'position': {'x': 0, 'y': 0, 'z': 0}
+        }]
+    }
+    scene = prior_scene()
+    scene.objects.append(mock_turntable)
+
+    # Assume our function will resolve its placer_steps to to following value:
+    placer_steps = 6
+
+    # Test: container lid is placed on step turntable finishes rotating.
+    actual = calculate_rotated_position(
+        scene,
+        19 - placer_steps,
+        mock_container
+    )
+    assert actual == pytest.approx({'x': 0, 'y': 0.5, 'z': -1})
+
+    # Test: container places its lid the step the turntable starts rotating.
+    mock_turntable['rotates'][0]['stepEnd'] = placer_steps
+    actual = calculate_rotated_position(
+        scene,
+        1,
+        mock_container
+    )
+    assert actual == pytest.approx({'x': 0.866025, 'y': 0.5, 'z': -0.5})

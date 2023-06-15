@@ -1,0 +1,77 @@
+# Add a Retrieval goal with a soccer ball as the target object.
+goal:
+    category: retrieval
+    target:
+        shape: soccer_ball
+        scale:
+            min: 1.0
+            max: 3.0
+        # The soccer ball is always positioned in a corner of the room.
+        keyword_location:
+            keyword: adjacent_corner
+            adjacent_distance:
+                x: 3
+                y: 0
+                z: 3
+        # The soccer ball is always surrounded by lava of size 3 to ensure the
+        # rectangular tool alone cannot be used to retrieve it.
+        surrounded_by_lava: true
+        surrounding_lava_size: 3
+
+# 1. Generate a hooked tool in the middle of the room and surrounded by lava.
+# 2. Generate a rectangular tool of length 3 aligned with the hooked tool.
+tools:
+    - num: 1
+      # Adjust the tool_type, position, and/or rotation as desired.
+      tool_type: [hooked, isosceles]
+      position:
+          x:
+              min: -3.0
+              max: 3.0
+          y: 0
+          z:
+              min: -3.0
+              max: 3.0
+      rotation_y: [0, 45, 90, 135, 180, 225, 270, 315]
+      surrounded_by_lava: true
+      labels: hooked_tool
+    - num: 1
+      shape:
+        - tool_rect_0_50_x_3_00
+        - tool_rect_0_75_x_3_00
+        - tool_rect_1_00_x_3_00
+      align_with: hooked_tool
+      # Starting distance between the rectangular tool and the hooked tool.
+      align_distance:
+          min: 1.0
+          max: 2.0
+      labels: rect_tool
+
+# The performer agent always starts near and looking at the rectangular tool.
+# Remove these two options if you want to be randomly positioned in the room.
+performer_look_at: rect_tool
+performer_starts_near:
+    label: rect_tool
+    distance:
+        min: 0.5
+        max: 1.0
+
+# Only generate medium or large rooms.
+room_dimensions:
+    x:
+        min: 15
+        max: 30
+    y: 3
+    z:
+        min: 15
+        max: 30
+room_shape: square
+
+# Only the target can be a soccer ball.
+excluded_shapes: soccer_ball
+
+# Override the defaults to avoid randomly generating any other objects.
+keyword_objects:
+    - num: 0
+random_structural_objects:
+    - num: 0

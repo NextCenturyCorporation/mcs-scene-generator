@@ -15,14 +15,14 @@ def test_getters_reuse_immutable_dataset():
 
 
 def validate_datasets(dataset, no_untrained_shape=False):
-    definitions = dataset.definitions()
+    definitions = dataset.definitions_unique_shape_scale()
     assert len(definitions) > 0
     assert isinstance(definitions[0], ObjectDefinition)
     trained_dataset = dataset.filter_on_trained()
-    assert len(trained_dataset.definitions()) > 0
+    assert len(trained_dataset.definitions_unique_shape_scale()) > 0
     if not no_untrained_shape:
         untrained_dataset = dataset.filter_on_untrained('untrainedShape')
-        assert len(untrained_dataset.definitions()) > 0
+        assert len(untrained_dataset.definitions_unique_shape_scale()) > 0
 
 
 @pytest.mark.slow

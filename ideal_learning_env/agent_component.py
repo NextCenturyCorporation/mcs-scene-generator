@@ -7,20 +7,14 @@ from generator.agents import (
     AGENT_MOVEMENT_ANIMATIONS,
     AGENT_TYPES
 )
-from ideal_learning_env.agent_service import (
-    DEFAULT_TEMPLATE_AGENT_MOVEMENT,
-    AgentConfig
-)
-from ideal_learning_env.defs import ILEDelayException, find_bounds, return_list
-from ideal_learning_env.feature_creation_service import (
-    FeatureCreationService,
-    FeatureTypes
-)
-from ideal_learning_env.numerics import MinMaxInt
 
+from .agent_service import DEFAULT_TEMPLATE_AGENT_MOVEMENT, AgentConfig
 from .choosers import choose_counts, choose_random
 from .components import ILEComponent
 from .decorators import ile_config_setter
+from .defs import ILEDelayException, find_bounds, return_list
+from .feature_creation_service import FeatureCreationService, FeatureTypes
+from .numerics import RandomizableInt
 from .validators import ValidateNumber, ValidateOptions
 
 logger = logging.getLogger(__name__)
@@ -138,8 +132,7 @@ MOVEMENT_CHANCE = 0.5
 
 
 class RandomAgentComponent(ILEComponent):
-    num_random_agents: Union[int, MinMaxInt,
-                             List[Union[int, MinMaxInt]]] = False
+    num_random_agents: RandomizableInt = False
 
     """
     (int, or [MinMaxInt](#MinMaxInt) dict, or list of ints or

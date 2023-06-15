@@ -62,6 +62,8 @@ structural_ramps:
   num: 0
 structural_throwers:
   num: 0
+structural_tube_occluders:
+    - num: 0
 structural_turntables:
     - num: 0
 structural_walls:

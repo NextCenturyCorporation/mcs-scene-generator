@@ -8,31 +8,41 @@ from typing import (
     Dict,
     List,
     NamedTuple,
+    Optional,
     Tuple,
     TypeVar,
     Union
 )
 
 from machine_common_sense.config_manager import PerformerStart, Vector3d
+from shapely import affinity
 
 from generator import (
     ObjectBounds,
     ObjectDefinition,
+    Scene,
+    SceneException,
+    SceneObject,
     base_objects,
     containers,
     geometry,
     instances
 )
-from ideal_learning_env.choosers import choose_random
-from ideal_learning_env.defs import (
+
+from .choosers import choose_random
+from .defs import (
     ILEConfigurationException,
     ILEDelayException,
     ILEException,
+    RandomizableBool,
     RandomizableString,
     return_list
 )
-
-from .numerics import MinMaxFloat, VectorFloatConfig, VectorIntConfig
+from .numerics import (
+    RandomizableFloat,
+    RandomizableVectorFloat3d,
+    VectorFloatConfig
+)
 
 logger = logging.getLogger(__name__)
 
@@ -48,6 +58,12 @@ class KeywordLocationConfig():
         - `adjacent` - The object will be placed near another object. The other
         object must be referenced by the 'relative_object_label' field, and the
         distance away from the relative object must be set by the
+        `adjacent_distance` field.
+        - `adjacent_corner` - The object will be placed near the corner
+        referenced by the 'relative_object_label' field.  The corner labels
+        are 'front_left' (-X, +Z), 'front_right' (+X, +Z),
+        'back_left' (-X, -Z), and 'back_right' (+X, -Z).  The
+        distance away from the corner will be determined by the
         `adjacent_distance` field.
         - `adjacent_performer` - The object will be placed next to the
         performer.  The object can be placed in 'front', 'back', left, or
@@ -117,9 +133,13 @@ class KeywordLocationConfig():
         provided, a wall will be chosen at random.
     - `adjacent_distance` (VectorFloatConfig, or list of VectorFloatConfigs):
     The X/Z distance in global coordinates between this object's position and
-    the relative object's position. Only usable with the `adjacent` `keyword`.
-    By default, this object will be positioned 0.1 away from the relative
-    object in a random, valid direction.
+    the relative object's (or corner's) position. Only usable with the
+    `adjacent` or `adjacent_corner` keyword. By default, this object will be
+    positioned 0.1 away from the relative object (or corner) in a random,
+    valid direction.  Note that if using this for a corner with the
+    `surrounded_by_lava` property, you'll need to use the same dimensions for
+    x/z and that they're divisible by 0.5 to make sure they line up correctly
+    with the lava island.
     - `container_label` (string, or list of strings): The label of a container
     object that already exists in your configuration. Only required by some
     keyword locations.
@@ -135,25 +155,23 @@ class KeywordLocationConfig():
     relative object has a rectangular boundary.
 
     """
-    keyword: Union[str, List[str]] = None
-    container_label: Union[str, List[str]] = None
-    relative_object_label: Union[str, List[str]] = None
-    distance: Union[str, List[str]] = None
-    direction: Union[str, List[str]] = None
-    position_relative_to_start: Union[VectorFloatConfig,
-                                      List[VectorFloatConfig]] = None
-    adjacent_distance: Union[VectorFloatConfig, List[VectorFloatConfig]] = None
-    rotation: Union[VectorIntConfig, List[VectorIntConfig]] = None
+    keyword: RandomizableString = None
+    container_label: RandomizableString = None
+    relative_object_label: RandomizableString = None
+    distance: RandomizableString = None
+    direction: RandomizableString = None
+    position_relative_to_start: RandomizableVectorFloat3d = None
+    adjacent_distance: RandomizableVectorFloat3d = None
+    rotation: RandomizableVectorFloat3d = None
 
 
 class InstanceDefinitionLocationTuple(NamedTuple):
     """Object that is stored in the object repository.
     """
-    # TODO MCS-697 turn into class
-    instance: dict
+    instance: SceneObject
     definition: ObjectDefinition
     # TODO MCS-698 turn into class
-    location: dict
+    location: Dict[str, Any]
 
 
 class ObjectRepository():
@@ -191,7 +209,7 @@ class ObjectRepository():
     def add_to_labeled_objects(
             self,
             obj_defn_loc_tuple: InstanceDefinitionLocationTuple,
-            labels: Union[str, List[str]]):
+            labels: RandomizableString):
         """Adds an object instance, definition, and location to a single or
         multiple labels.
         """
@@ -255,6 +273,7 @@ class KeywordLocation():
     OPPOSITE_X = "opposite_x"
     OPPOSITE_Z = "opposite_z"
     ALONG_WALL = "along_wall"
+    ADJACENT_TO_CORNER = "adjacent_corner"
 
     ADJACENT_TO_PERFORMER_FRONT = "front"
     ADJACENT_TO_PERFORMER_BACK = "back"
@@ -340,7 +359,7 @@ class KeywordLocation():
     def move_to_keyword_location(
         reconciled: KeywordLocationConfig,
         source: KeywordLocationConfig,
-        instance: Dict[str, Any],
+        instance: SceneObject,
         performer_start: PerformerStart,
         bounds: List[ObjectBounds],
         room_dimensions: Vector3d,
@@ -403,6 +422,39 @@ class KeywordLocation():
             wall = random.choice(wall)
             location = geometry.get_location_along_wall(
                 performer_start, wall, instance, room_dimensions)
+            return KeywordLocation._move_instance_or_raise_error(
+                instance, location, keyword)
+
+        if keyword == KeywordLocation.ADJACENT_TO_CORNER:
+            # Choose a random corner to use if one isn't specified
+            corners = obj_tag or [
+                geometry.FRONT_LEFT_CORNER,
+                geometry.FRONT_RIGHT_CORNER,
+                geometry.BACK_LEFT_CORNER,
+                geometry.BACK_RIGHT_CORNER]
+            corners = corners if isinstance(corners, list) else [corners]
+            random.shuffle(corners)
+
+            # Use all of the configured distances (if any) from the source
+            # template, rather than the single randomly chosen distance that
+            # will be in the reconciled template.
+            distances = return_list(source.adjacent_distance)
+            if not distances:
+                # By default, position the object 0.1 away from the relative
+                # corner in the x or z direction.
+                distances = [
+                    Vector3d(x=0.1, y=0, z=0.1)
+                ]
+            # Loop over each configured (or default) distance in a random order
+            # and use the first valid adjacent location that's found.
+            random.shuffle(distances)
+            for distance in distances:
+                for corner in corners:
+                    location = geometry.get_location_adjacent_to_corner(
+                        performer_start, instance, room_dimensions,
+                        distance_from_corner=distance, corner_label=corner)
+                    if location:
+                        break
             return KeywordLocation._move_instance_or_raise_error(
                 instance, location, keyword)
 
@@ -492,7 +544,7 @@ class KeywordLocation():
                 relative_instance['debug']['positionY']
             )
             # Mirror the object's rotation.
-            mirrored_rotation = (-location['rotation']['y']) % 360
+            mirrored_rotation = round(-location['rotation']['y'], 2) % 360
             location['rotation']['y'] = (
                 mirrored_rotation +
                 # Add the configured rotation, if any.
@@ -545,14 +597,18 @@ class KeywordLocation():
                         'relative_label'
                     )
                     relative_instance['debug'][DEBUG_FINAL_POSITION_KEY] = True
-                except Exception:
+                    if relative_instance['type'] == 'rotating_cog':
+                        relative_id = relative_instance['id']
+                        instance['debug']['isRotatedBy'] = relative_id
+                except Exception as e:
                     attempts += 1
                     if attempts == len(all_idls):
                         # If the object is too big to be on top of all
                         # relative objects, retry generating the scene
                         raise ILEException(
                             'Object on top too big for object underneath.'
-                            'Retrying...')
+                            'Retrying...'
+                        ) from e
                     # If the object is too big to be on top of the relative
                     # object, retry with another realtive object in the scene
                     continue
@@ -588,8 +644,8 @@ class KeywordLocation():
                 # in the future.
                 positioned_by = con_inst['debug'].get('positionedBy', None)
 
-                if(positioned_by == 'mechanism' and
-                   con_inst.get('moves') is not None):
+                if (positioned_by == 'mechanism' and
+                        con_inst.get('moves') is not None):
                     ctr_moves = con_inst.get('moves')
                     moves = instance.get('moves', [])
                     for ctr_move in ctr_moves:
@@ -597,7 +653,7 @@ class KeywordLocation():
 
                     instance['moves'] = moves
                     instance['kinematic'] = con_inst['kinematic']
-                    if(con_inst.get('togglePhysics') is not None):
+                    if (con_inst.get('togglePhysics') is not None):
                         ctr_tog_list = con_inst.get('togglePhysics')
                         tog_list = instance.get('togglePhysics', [])
                         for ctr_tog in ctr_tog_list:
@@ -656,7 +712,7 @@ class KeywordLocation():
 
     @staticmethod
     def _move_instance_or_raise_error(
-        instance: Dict[str, Any],
+        instance: SceneObject,
         location: Dict[str, Any],
         keyword: str
     ) -> Dict[str, Any]:
@@ -716,7 +772,7 @@ def reconcile_template(default_template: T, source_template: T) -> T:
     return obj_values
 
 
-def add_random_placement_tag(objs: Union[list, dict],
+def add_random_placement_tag(objs: Union[SceneObject, List[SceneObject]],
                              template) -> None:
     random = True
     if hasattr(template, 'position'):
@@ -768,16 +824,12 @@ class RelativePositionConfig():
     position and the relative object's position. Useful for positioning objects
     behind occluders (especially in the passive physics tasks).
     """
-    add_x: Union[
-        float, MinMaxFloat, List[Union[float, MinMaxFloat]]
-    ] = None
-    add_z: Union[
-        float, MinMaxFloat, List[Union[float, MinMaxFloat]]
-    ] = None
-    label: Union[str, List[str]] = None
-    use_x: Union[bool, List[bool]] = None
-    use_z: Union[bool, List[bool]] = None
-    view_angle_x: Union[bool, List[bool]] = None
+    add_x: RandomizableFloat = None
+    add_z: RandomizableFloat = None
+    label: RandomizableString = None
+    use_x: RandomizableBool = None
+    use_z: RandomizableBool = None
+    view_angle_x: RandomizableBool = None
 
 
 def get_step_after_movement(labels: RandomizableString) -> int:
@@ -827,3 +879,75 @@ def get_step_after_movement_or_start(labels: RandomizableString) -> int:
             if step > last_step:
                 last_step = step
     return (last_step + 1) if earliest_step == 1 else 1
+
+
+def calculate_rotated_position(
+    scene: Scene,
+    lid_step_begin: int,
+    container: SceneObject
+) -> Optional[Dict[str, float]]:
+    """Calculate and return the position for the given object at the given
+    step, assuming that the object is on top of a rotating turntable."""
+
+    # Assumes the container was positioned using the "on_center" or
+    # "on_top" keyword location, which would set isRotatedBy
+    # (see KeywordLocation.move_to_keyword_location)
+    if not container['debug'].get('isRotatedBy'):
+        return None
+
+    turntable = scene.get_object_by_id(container['debug']['isRotatedBy'])
+    if not turntable.get('rotates') or not turntable['rotates'][0]:
+        return None
+
+    # Estimate the number of steps it will take for the lid placer to move.
+    container_position_y = container['shows'][0]['position']['y']
+    container_dimensions_y = container['debug']['dimensions']['y']
+    container_standing_y = container['debug']['positionY']
+    container_top = (
+        container_position_y + container_dimensions_y -
+        container_standing_y
+    )
+    placer_steps = (scene.room_dimensions.y - container_top) / 0.25
+
+    # Placing the lid during rotation is currently unsupported.
+    rotate = turntable['rotates'][0]
+    if (
+        lid_step_begin > 0 and
+        rotate['stepBegin'] <= (lid_step_begin + placer_steps) and
+        rotate['stepEnd'] >= (lid_step_begin + placer_steps)
+    ):
+        raise SceneException(
+            f'Cannot place separate lid at step {lid_step_begin} '
+            f'and estimated placer movement steps {placer_steps} '
+            f'because container {container["id"]} is on top '
+            f'of turntable {turntable["id"]} which is rotating '
+            f'between steps {rotate["stepBegin"]} and '
+            f'{rotate["stepEnd"]}'
+        )
+
+    # If the lid will be placed after the turntable completely finishes
+    # rotating, then calculate the new position for the container.
+    turntable_position = turntable['shows'][0]['position']
+    turntable_x = turntable_position['x']
+    turntable_z = turntable_position['z']
+    if (
+        lid_step_begin > 0 and
+        (lid_step_begin + placer_steps) > rotate['stepEnd']
+    ):
+        rotate_steps = rotate['stepEnd'] - rotate['stepBegin'] + 1
+        rotate_degrees = rotate['vector']['y'] * rotate_steps
+        rotated_polygon = affinity.rotate(
+            container['shows'][0]['boundingBox'].polygon_xz,
+            -rotate_degrees,
+            origin=(turntable_x, turntable_z)
+        )
+        rotated_point = rotated_polygon.centroid.coords[0]
+        container_position = {
+            'x': rotated_point[0],
+            'y': container_position_y,
+            'z': rotated_point[1]
+        }
+        return container_position
+
+    # Otherwise, no new position is needed.
+    return None

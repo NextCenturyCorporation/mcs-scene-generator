@@ -1,6 +1,13 @@
 import pytest
+from machine_common_sense.config_manager import Vector2dInt
 
-from generator import FULL_TYPE_LIST, definitions, geometry, materials
+from generator import (
+    FULL_TYPE_LIST,
+    base_objects,
+    definitions,
+    geometry,
+    materials
+)
 from ideal_learning_env import (
     ILEException,
     ILESharedConfiguration,
@@ -10,7 +17,8 @@ from ideal_learning_env import (
     ObjectRepository,
     RandomInteractableObjectsComponent,
     RandomKeywordObjectsComponent,
-    SpecificInteractableObjectsComponent
+    SpecificInteractableObjectsComponent,
+    ToolConfig
 )
 from ideal_learning_env.numerics import VectorFloatConfig
 
@@ -85,7 +93,7 @@ def test_specific_objects_on_lava_fail():
         }
     })
     scene = prior_scene()
-    scene.lava = [{'x': 2, 'z': 2}]
+    scene.lava = [Vector2dInt(x=2, z=2)]
     with pytest.raises(ILEException):
         component.update_ile_scene(scene)
 
@@ -101,7 +109,7 @@ def test_specific_objects_on_holes_fail():
         }
     })
     scene = prior_scene()
-    scene.holes = [{'x': 1, 'z': -3}]
+    scene.holes = [Vector2dInt(x=1, z=-3)]
     with pytest.raises(ILEException):
         component.update_ile_scene(scene)
 
@@ -1180,7 +1188,10 @@ def test_random_keyword_objects_types_bin_containers():
     assert len(objs) == 6
     for obj in objs:
         assert (
-            obj['type'].startswith('bowl_') or obj['type'].startswith('cup_')
+            obj['type'].startswith('bin_') or
+            obj['type'].startswith('bowl_') or
+            obj['type'].startswith('crate_open_topped_') or
+            obj['type'].startswith('cup_')
         )
         assert obj['receptacle']
         assert obj['debug']['random_position']
@@ -1210,7 +1221,9 @@ def test_random_keyword_objects_types_open_topped_containers():
     assert len(objs) == 6
     for obj in objs:
         assert (
+            obj['type'].startswith('bin_') or
             obj['type'].startswith('bowl_') or
+            obj['type'].startswith('crate_open_topped_') or
             obj['type'].startswith('cup_') or
             obj['type'].startswith('container_asymmetric_') or
             obj['type'].startswith('container_symmetric_')
@@ -1767,6 +1780,7 @@ def test_specific_objects_delayed_action():
     assert len(objects) == 0
     assert len(component._delayed_templates) == 1
     assert len(component._delayed_separate_lids) == 0
+    assert len(component._delayed_tools) == 0
 
 
 def test_specific_objects_delayed_action_adjacent():
@@ -1787,6 +1801,7 @@ def test_specific_objects_delayed_action_adjacent():
     assert len(objects) == 1
     assert len(component._delayed_templates) == 1
     assert len(component._delayed_separate_lids) == 0
+    assert len(component._delayed_tools) == 0
 
     scene = component.run_delayed_actions(scene)
     objects = scene.objects
@@ -1794,6 +1809,7 @@ def test_specific_objects_delayed_action_adjacent():
     assert len(objects) == 2
     assert len(component._delayed_templates) == 0
     assert len(component._delayed_separate_lids) == 0
+    assert len(component._delayed_tools) == 0
 
 
 def test_specific_objects_delayed_action_in():
@@ -1816,6 +1832,7 @@ def test_specific_objects_delayed_action_in():
     assert len(objects) == 1
     assert len(component._delayed_templates) == 1
     assert len(component._delayed_separate_lids) == 0
+    assert len(component._delayed_tools) == 0
 
     scene = component.run_delayed_actions(scene)
     objects = scene.objects
@@ -1823,6 +1840,7 @@ def test_specific_objects_delayed_action_in():
     assert len(objects) == 2
     assert len(component._delayed_templates) == 0
     assert len(component._delayed_separate_lids) == 0
+    assert len(component._delayed_tools) == 0
     assert objects[1]['locationParent'] == objects[0]['id']
 
 
@@ -1837,6 +1855,7 @@ def test_specific_objects_delayed_action_identical_to():
     assert len(scene.objects) == 0
     assert len(component._delayed_templates) == 1
     assert len(component._delayed_separate_lids) == 0
+    assert len(component._delayed_tools) == 0
 
 
 def test_specific_objects_delayed_action_identical_except_color():
@@ -1850,6 +1869,7 @@ def test_specific_objects_delayed_action_identical_except_color():
     assert len(scene.objects) == 0
     assert len(component._delayed_templates) == 1
     assert len(component._delayed_separate_lids) == 0
+    assert len(component._delayed_tools) == 0
 
 
 def test_specific_objects_delayed_action_position_relative():
@@ -1865,6 +1885,7 @@ def test_specific_objects_delayed_action_position_relative():
     assert len(scene.objects) == 0
     assert len(component._delayed_templates) == 1
     assert len(component._delayed_separate_lids) == 0
+    assert len(component._delayed_tools) == 0
 
 
 def test_specific_objects_separate_container_no_lid():
@@ -2021,6 +2042,7 @@ def test_specific_objects_separate_container_lid_placer_delay():
     assert scene.objects[0]['type'] == 'separate_container'
     assert len(component._delayed_templates) == 0
     assert len(component._delayed_separate_lids) == 1
+    assert len(component._delayed_tools) == 0
 
 
 def test_run_actions_at_end_of_scene_generation_separate_container_with_lid_placer_and_moves():  # noqa
@@ -2111,3 +2133,104 @@ def test_run_actions_at_end_of_scene_generation_separate_container_with_lid_plac
     assert lid['shows'][0]['position']['z'] == pytest.approx(end_z, 1e-2)
     assert placer['shows'][0]['position']['z'] == pytest.approx(end_z, 1e-2)
     assert placer['shows'][0]['position']['z'] == pytest.approx(end_z, 1e-2)
+
+
+def test_tools_random():
+    component = SpecificInteractableObjectsComponent({
+        'tools': [{
+            'num': 1
+        }]
+    })
+
+    assert isinstance(component.tools, list)
+    pre = component.tools[0]
+    assert isinstance(pre, ToolConfig)
+    assert pre.num == 1
+    assert pre.labels is None
+    assert pre.position is None
+    assert pre.rotation_y is None
+    assert pre.shape is None
+
+    scene = component.update_ile_scene(prior_scene())
+    assert isinstance(scene.objects, list)
+
+    objs = scene.objects
+    assert isinstance(objs, list)
+    obj = objs[0]
+    assert obj['id'].startswith('tool_')
+    assert obj['type'] in base_objects.ALL_LARGE_BLOCK_TOOLS
+    assert not obj.get('kinematic')
+    assert not obj.get('structure')
+    assert not obj.get('mass')
+    show = obj['shows'][0]
+    scale = show['scale']
+    assert scale['x'] == 1
+    assert scale['y'] == 1
+    assert scale['z'] == 1
+
+    assert ObjectRepository.get_instance().has_label('tools')
+    assert not ObjectRepository.get_instance().has_label('test_label')
+
+
+def test_tools_full():
+    component = SpecificInteractableObjectsComponent({
+        'tools': [{
+            'num': 1,
+            'labels': 'test_label',
+            'position': {
+                'x': -1.5,
+                'y': 0,
+                'z': 1
+            },
+            'rotation_y': 67,
+            'shape': 'tool_rect_1_00_x_4_00'
+        }]
+    })
+
+    assert isinstance(component.tools, list)
+    pre = component.tools[0]
+    assert isinstance(pre, ToolConfig)
+    assert pre.num == 1
+    assert pre.position == VectorFloatConfig(-1.5, 0, 1)
+    assert pre.rotation_y == 67
+    assert pre.shape == 'tool_rect_1_00_x_4_00'
+
+    scene = component.update_ile_scene(prior_scene())
+    assert isinstance(scene.objects, list)
+
+    objs = scene.objects
+    assert isinstance(objs, list)
+    obj = objs[0]
+    assert obj['id'].startswith('tool_')
+    assert obj['type'] in base_objects.ALL_LARGE_BLOCK_TOOLS
+    assert not obj.get('kinematic')
+    assert not obj.get('structure')
+    assert not obj.get('mass')
+    show = obj['shows'][0]
+    pos = show['position']
+    scale = show['scale']
+    assert pos['x'] == -1.5
+    assert pos['y'] == 0.15
+    assert pos['z'] == 1
+    assert scale['x'] == 1
+    assert scale['y'] == 1
+    assert scale['z'] == 1
+    assert show['rotation']['y'] == 67
+
+    assert ObjectRepository.get_instance().has_label('tools')
+    assert ObjectRepository.get_instance().has_label('test_label')
+
+
+def test_tools_delay_align_with():
+    component = SpecificInteractableObjectsComponent({
+        'tools': [{
+            'num': 1,
+            'align_with': 'object_does_not_exist'
+        }]
+    })
+
+    scene = component.update_ile_scene(prior_scene())
+    assert len(scene.objects) == 0
+    assert len(component._delayed_templates) == 0
+    assert len(component._delayed_separate_lids) == 0
+    assert len(component._delayed_tools) == 1

@@ -38,6 +38,26 @@ Winter 2020 Evaluation/Testing:
 - [agents_evaluation_multiple_agents.zip](https://nyu-datasets.s3.amazonaws.com/agents_evaluation_multiple_agents.zip)
 - [agents_evaluation_object_preference_eval_4.zip](https://nyu-datasets.s3.amazonaws.com/agents_evaluation_object_preference_eval_4.zip)
 
+Spring 2023 Background/Training:
+
+* Please note: The format for some of these scene files has changed, so some datasets may no longer work properly. If you have trouble with them, use the evaluation/testing datasets instead, or ask NYU for more background/training data if necessary. *
+
+- [agents_background_agent_one_goal.zip](https://nyu-datasets.s3.amazonaws.com/agents_background_agent_one_goal.zip)
+- [agents_background_agent_preference.zip](https://nyu-datasets.s3.amazonaws.com/agents_background_agent_preference.zip)
+- [agents_background_collect.zip](https://nyu-datasets.s3.amazonaws.com/agents_background_collect.zip)
+- [agents_background_instrumental_approach.zip](https://nyu-datasets.s3.amazonaws.com/agents_background_instrumental_approach.zip)
+- [agents_background_instrumental_imitation.zip](https://nyu-datasets.s3.amazonaws.com/agents_background_instrumental_imitation.zip) * Please note: Scene 000000iie.json is a bad file! Ignore it. *
+- [agents_background_non_agent_one_goal.zip](https://nyu-datasets.s3.amazonaws.com/agents_background_non_agent_one_goal.zip)
+- [agents_background_non_agent_preference.zip](https://nyu-datasets.s3.amazonaws.com/agents_background_non_agent_preference.zip)
+- [agents_background_social_approach.zip](https://nyu-datasets.s3.amazonaws.com/agents_background_social_approach.zip)
+- [agents_background_social_imitation.zip](https://nyu-datasets.s3.amazonaws.com/agents_background_social_imitation.zip)
+
+Spring 2023 Evaluation/Testing:
+
+- [agents_evaluation_approach.zip](https://nyu-datasets.s3.amazonaws.com/agents_evaluation_approach.zip)
+- [agents_evaluation_imitation.zip](https://nyu-datasets.s3.amazonaws.com/agents_evaluation_imitation.zip)
+- [agents_evaluation_non_agent.zip](https://nyu-datasets.s3.amazonaws.com/agents_evaluation_non_agent.zip)
+
 Unzipping each bundle should extract a corresponding folder (containing the JSON files) nested within this folder, with a name like "agents_background_object_preference".
 
 Now you can generate the MCS agent scene JSON files, converted from the NYU JSON files.

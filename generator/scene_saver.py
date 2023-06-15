@@ -11,6 +11,7 @@ from typing import Any, Dict, List, Tuple
 sys.path.insert(1, '../pretty_json')
 from pretty_json import PrettyJsonEncoder, PrettyJsonNoIndent
 
+from .objects import SceneObject
 from .scene import Scene
 
 
@@ -46,17 +47,19 @@ def _json_no_indent(data: Dict[str, Any], prop_list: List[str]) -> None:
             data[prop] = PrettyJsonNoIndent(data[prop])
 
 
-def _strip_debug_data(scene: Scene) -> None:
+def _strip_debug_data(scene_dict: Dict[str, Any]) -> Dict[str, Any]:
     """Remove internal debug data that should only be in debug files."""
-    scene.debug = None
-    for instance in scene.objects:
+    del scene_dict['debug']
+    for instance in scene_dict['objects']:
         _strip_debug_object_data(instance)
     for goal_key in ('answer', 'domainsInfo', 'objectsInfo', 'sceneInfo'):
-        scene.goal.pop(goal_key, None)
-    if 'metadata' in scene.goal:
+        if goal_key in scene_dict['goal']:
+            del scene_dict['goal'][goal_key]
+    if scene_dict['goal']['metadata']:
         for target_key in ['target', 'target_1', 'target_2']:
-            if scene.goal['metadata'].get(target_key, None):
-                scene.goal['metadata'][target_key].pop('info', None)
+            if scene_dict['goal']['metadata'].get(target_key, None):
+                scene_dict['goal']['metadata'][target_key].pop('info', None)
+    return scene_dict
 
 
 def _strip_debug_misleading_data(scene: Scene) -> None:
@@ -76,7 +79,7 @@ def _strip_debug_misleading_data(scene: Scene) -> None:
                         )
 
 
-def _strip_debug_object_data(instance: Dict[str, Any]) -> None:
+def _strip_debug_object_data(instance: SceneObject) -> None:
     """Remove internal debug data from the given object."""
     instance.pop('debug', None)
     if 'shows' in instance:
@@ -106,10 +109,10 @@ def _truncate_floats_in_list(data: List[Any]) -> None:
             _truncate_floats_in_dict(data[i])
 
 
-def _ready_scene_for_writing(scene: Scene) -> None:
+def _ready_scene_for_writing(scene: Scene) -> Dict[str, Any]:
     _strip_debug_misleading_data(scene)
     _convert_non_serializable_data(scene)
-    scene_dict = vars(scene)
+    scene_dict = scene.to_dict()
     _truncate_floats_in_dict(scene_dict)
 
     # Use PrettyJsonNoIndent on some of the lists and dicts in the
@@ -129,8 +132,10 @@ def _ready_scene_for_writing(scene: Scene) -> None:
         if 'debug' in instance:
             _json_no_indent(instance['debug'], 'info')
 
+    return scene_dict
 
-def _write_scene_file(filename: str, scene: Scene) -> None:
+
+def _write_scene_file(filename: str, scene_dict: Dict[str, Any]) -> None:
     # If the filename contains a directory, ensure that directory exists.
     path = Path(filename)
     path.parents[0].mkdir(parents=True, exist_ok=True)
@@ -140,11 +145,11 @@ def _write_scene_file(filename: str, scene: Scene) -> None:
         try:
             out.write(
                 json.dumps(
-                    scene.to_dict(),
+                    scene_dict,
                     cls=PrettyJsonEncoder,
                     indent=2))
         except Exception as e:
-            logging.error(scene, e)
+            logging.error(scene_dict, e)
             raise e from e
 
 
@@ -175,7 +180,7 @@ def save_scene_files(
     """Save the given scene as a normal JSON file and a debug JSON file."""
 
     # The debug scene filename has the scene ID for debugging.
-    scene_id = scene.goal.get('sceneInfo', {}).get('id', [None])[0]
+    scene_id = (scene.goal.scene_info or {}).get('id', [None])[0]
     debug_filename = (
         scene_filename if (no_scene_id or not scene_id) else
         f'{scene_filename}_{scene_id}'
@@ -184,11 +189,11 @@ def save_scene_files(
     # Ensure that the scene's 'name' property doesn't have a directory.
     scene_copy = copy.deepcopy(scene)
     scene_copy.name = Path(scene_filename).name
-    _ready_scene_for_writing(scene_copy)
+    scene_dict = _ready_scene_for_writing(scene_copy)
 
     # Save the scene as both normal and debug JSON files.
     if not no_debug_file:
-        _write_scene_file(debug_filename + '_debug.json', scene_copy)
-    _strip_debug_data(scene_copy)
+        _write_scene_file(debug_filename + '_debug.json', scene_dict)
+    scene_dict = _strip_debug_data(scene_dict)
     if not only_debug_file:
-        _write_scene_file(scene_filename + '.json', scene_copy)
+        _write_scene_file(scene_filename + '.json', scene_dict)

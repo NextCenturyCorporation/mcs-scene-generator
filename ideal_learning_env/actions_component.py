@@ -1,11 +1,9 @@
 import logging
-from typing import Any, Dict, List, Union
+from typing import Any, List, Union
 
-from generator import tags
-from ideal_learning_env.defs import (
-    ILEConfigurationException,
-    RandomizableString
-)
+from machine_common_sense.config_manager import Goal
+
+from generator import Scene, tags
 
 from .action_service import (
     ActionService,
@@ -16,7 +14,8 @@ from .action_service import (
 from .choosers import choose_random
 from .components import ILEComponent
 from .decorators import ile_config_setter
-from .numerics import MinMaxInt
+from .defs import ILEConfigurationException, RandomizableString
+from .numerics import RandomizableInt
 from .validators import ValidateNumber, ValidateOptions
 
 logger = logging.getLogger(__name__)
@@ -33,7 +32,7 @@ class ActionRestrictionsComponent(ILEComponent):
     Default: `false`
     """
 
-    circles: List[Union[int, MinMaxInt, List[Union[int, MinMaxInt]]]] = None
+    circles: List[RandomizableInt] = None
     """
     (list of either ints, or lists of ints, or [MinMaxInt](#MinMaxInt) dicts,
     or lists of MinMaxInt dicts): When the AI should be forced to rotate in a
@@ -262,11 +261,11 @@ class ActionRestrictionsComponent(ILEComponent):
         return [choose_random(s) for s in (self.sidesteps or [])]
 
     # Override
-    def update_ile_scene(self, scene: Dict[str, Any]) -> Dict[str, Any]:
+    def update_ile_scene(self, scene: Scene) -> Scene:
         logger.info('Configuring action restrictions for the scene...')
 
-        goal = scene.goal or {}
-        total_steps = goal.get('last_step')
+        goal = scene.goal or Goal()
+        total_steps = goal.last_step
         circles = sorted(self.get_circles())
         freezes = sorted(self.get_freezes(), key=lambda x: x.begin)
         freeze_while_moving = self.get_freeze_while_moving()
@@ -286,9 +285,9 @@ class ActionRestrictionsComponent(ILEComponent):
         self._delayed_actions = 0
         self._delayed_sidesteps = None
         if passive:
-            goal['category'] = tags.tag_to_label(
+            goal.category = tags.tag_to_label(
                 tags.SCENE.INTUITIVE_PHYSICS)
-            goal['action_list'] = [['Pass']] * total_steps
+            goal.action_list = [['Pass']] * total_steps
             logger.trace('Setting whole scene as passive')
         if circles:
             ActionService.add_circles(goal, circles)
@@ -317,7 +316,10 @@ class ActionRestrictionsComponent(ILEComponent):
     def get_num_delayed_actions(self) -> int:
         return self._delayed_actions
 
-    def run_delayed_actions(self, scene: Dict[str, Any]) -> Dict[str, Any]:
+    def get_delayed_action_error_strings(self) -> List[str]:
+        return ['Configured sidesteps'] if self._delayed_actions > 0 else []
+
+    def run_delayed_actions(self, scene: Scene) -> Scene:
         if self._delayed_sidesteps:
             ActionService.add_sidesteps(
                 scene.goal, self._delayed_sidesteps, scene)
@@ -325,7 +327,7 @@ class ActionRestrictionsComponent(ILEComponent):
         return scene
 
     def run_actions_at_end_of_scene_generation(
-            self, scene: Dict[str, Any]) -> Dict[str, Any]:
+            self, scene: Scene) -> Scene:
         if self.freeze_while_moving:
             ActionService.add_freeze_while_moving(
                 scene.goal, self.freeze_while_moving)

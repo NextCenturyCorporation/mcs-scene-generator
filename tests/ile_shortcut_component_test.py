@@ -3,16 +3,34 @@ import random
 from typing import List
 
 import pytest
-from machine_common_sense.config_manager import Vector3d
+from machine_common_sense.config_manager import Vector2dInt, Vector3d
 from numpy import arange
 from shapely.geometry import Point, Polygon
 
-from generator import agents, base_objects, instances, materials, structures
+from generator import (
+    agents,
+    base_objects,
+    instances,
+    materials,
+    structures,
+    tools
+)
 from generator.geometry import (
     PERFORMER_HALF_WIDTH,
     PERFORMER_WIDTH,
     calculate_rotations,
+    get_magnitudes_of_x_z_dirs_for_rotation_and_move_vector,
     get_normalized_vector_from_two_points
+)
+from generator.imitation import (
+    IMITATION_AGENT_END_X,
+    IMITATION_AGENT_START_X,
+    IMITATION_CONTAINER_SEPARATION,
+    IMITATION_CONTAINER_TELEPORT_ROTATIONS_GLOBAL,
+    IMITATION_CONTAINER_TELEPORT_ROTATIONS_LEFT_SIDE,
+    IMITATION_CONTAINER_TELEPORT_ROTATIONS_RIGHT_SIDE,
+    IMITATION_CONTAINER_TELEPORT_X_POS_RANGE,
+    IMITATION_TASK_TARGET_SEPARATION
 )
 from generator.scene import PartitionFloor, Scene
 from ideal_learning_env import (
@@ -23,9 +41,6 @@ from ideal_learning_env import (
 )
 from ideal_learning_env.defs import ILEException
 from ideal_learning_env.shortcut_component import (
-    IMITATION_AGENT_END_X,
-    IMITATION_AGENT_START_X,
-    IMITATION_TASK_TARGET_SEPARATION,
     LARGE_BLOCK_TOOLS_TO_DIMENSIONS,
     DoubleDoorConfig,
     TripleDoorConfig
@@ -110,7 +125,7 @@ def test_shortcut_bisecting_platform_on():
     assert show['scale'] == {'x': 1, 'y': 1, 'z': sizez}
 
     obj = objs[1]
-    assert obj['id'].startswith('platform')
+    assert obj['id'].startswith('blocking_wall')
     assert obj['type'] == 'cube'
     assert obj['kinematic']
     assert obj['structure']
@@ -148,7 +163,7 @@ def test_shortcut_bisecting_platform_on_with_blocking_wall_prop():
     assert show['scale'] == {'x': 1, 'y': 1, 'z': sizez}
 
     obj = objs[1]
-    assert obj['id'].startswith('platform')
+    assert obj['id'].startswith('blocking_wall')
     assert obj['type'] == 'cube'
     assert obj['kinematic']
     assert obj['structure']
@@ -189,6 +204,23 @@ def test_shortcut_bisecting_platform_on_no_blocking_wall():
     assert perf_pos == Vector3d(x=0, y=1, z=-sizez / 2.0 + 0.5)
 
 
+def test_shortcut_bisecting_platform_position_z():
+    component = ShortcutComponent({
+        'shortcut_bisecting_platform': {
+            'position_z': -4.25
+        }
+    })
+    assert component.shortcut_bisecting_platform
+    assert component.get_shortcut_bisecting_platform()
+    scene = component.update_ile_scene(prior_scene())
+    assert scene != prior_scene()
+    objs = scene.objects
+    assert isinstance(objs, List)
+    assert len(objs) == 2
+    perf_pos = scene.performer_start.position
+    assert perf_pos == Vector3d(x=0, y=1, z=-4.25)
+
+
 def test_shortcut_bisecting_platform_on_with_long_blocking_wall():
     component = ShortcutComponent({
         'shortcut_bisecting_platform': {
@@ -214,7 +246,7 @@ def test_shortcut_bisecting_platform_on_with_long_blocking_wall():
     assert show['scale'] == {'x': 1, 'y': 1, 'z': sizez}
 
     obj = objs[1]
-    assert obj['id'].startswith('platform')
+    assert obj['id'].startswith('blocking_wall')
     assert obj['type'] == 'cube'
     assert obj['kinematic']
     assert obj['structure']
@@ -222,6 +254,54 @@ def test_shortcut_bisecting_platform_on_with_long_blocking_wall():
     assert show['position'] == {'x': 0, 'y': 0.625, 'z': 0}
     assert show['rotation'] == {'x': 0, 'y': 0, 'z': 0}
     assert show['scale'] == {'x': 0.99, 'y': 1.25, 'z': sizez - 3}
+
+    perf_pos = scene.performer_start.position
+    assert perf_pos == Vector3d(x=0, y=1, z=-sizez / 2.0 + 0.5)
+
+
+def test_shortcut_bisecting_platform_on_with_double_blocking_wall():
+    component = ShortcutComponent({
+        'shortcut_bisecting_platform': {
+            'has_double_blocking_wall': True
+        }
+    })
+    assert component.shortcut_bisecting_platform
+    assert component.get_shortcut_bisecting_platform()
+    scene = component.update_ile_scene(prior_scene())
+    assert scene != prior_scene()
+    objs = scene.objects
+    sizez = scene.room_dimensions.z
+    assert isinstance(objs, List)
+    assert len(objs) == 3
+    obj = objs[0]
+    assert obj['id'].startswith('platform')
+    assert obj['type'] == 'cube'
+    assert obj['kinematic']
+    assert obj['structure']
+    show = obj['shows'][0]
+    assert show['position'] == {'x': 0, 'y': 0.5, 'z': 0}
+    assert show['rotation'] == {'x': 0, 'y': 0, 'z': 0}
+    assert show['scale'] == {'x': 1, 'y': 1, 'z': sizez}
+
+    obj = objs[1]
+    assert obj['id'].startswith('blocking_wall')
+    assert obj['type'] == 'cube'
+    assert obj['kinematic']
+    assert obj['structure']
+    show = obj['shows'][0]
+    assert show['position'] == {'x': 0, 'y': 0.625, 'z': -(sizez / 2.0) + 3}
+    assert show['rotation'] == {'x': 0, 'y': 0, 'z': 0}
+    assert show['scale'] == {'x': 0.99, 'y': 1.25, 'z': 0.25}
+
+    obj = objs[2]
+    assert obj['id'].startswith('blocking_wall')
+    assert obj['type'] == 'cube'
+    assert obj['kinematic']
+    assert obj['structure']
+    show = obj['shows'][0]
+    assert show['position'] == {'x': 0, 'y': 0.625, 'z': (sizez / 2.0) - 3}
+    assert show['rotation'] == {'x': 0, 'y': 0, 'z': 0}
+    assert show['scale'] == {'x': 0.99, 'y': 1.25, 'z': 0.25}
 
     perf_pos = scene.performer_start.position
     assert perf_pos == Vector3d(x=0, y=1, z=-sizez / 2.0 + 0.5)
@@ -324,7 +404,7 @@ def test_shortcut_triple_door_on():
     scene = component.update_ile_scene(prior_scene())
     assert scene != prior_scene()
     assert scene.room_dimensions.y == 5
-    assert not scene.goal.get('action_list')
+    assert not scene.goal.action_list
     assert scene.restrict_open_doors
     objs = scene.objects
     sizez = scene.room_dimensions.z
@@ -508,7 +588,7 @@ def test_shortcut_triple_door_drop_on_step_1():
     sizez = scene.room_dimensions.z
     assert scene != prior_scene()
     assert scene.room_dimensions.y == 5
-    assert scene.goal['action_list'] == (
+    assert scene.goal.action_list == (
         [['Pass']] * (scene.room_dimensions.y * 4)
     )
     assert scene.restrict_open_doors
@@ -603,7 +683,7 @@ def test_shortcut_triple_door_config():
     sizez = scene.room_dimensions.z
     assert scene != prior_scene()
     assert scene.room_dimensions.y == 5
-    assert not scene.goal.get('action_list')
+    assert not scene.goal.action_list
     assert not scene.restrict_open_doors
     objs = scene.objects
     assert isinstance(objs, List)
@@ -729,7 +809,7 @@ def test_shortcut_triple_door_with_extension():
     scene = component.update_ile_scene(prior_scene())
     assert scene != prior_scene()
     assert scene.room_dimensions.y == 5
-    assert scene.goal['action_list'] == (
+    assert scene.goal.action_list == (
         [['Pass']] * (scene.room_dimensions.y * 4 + 29)
     )
     assert scene.restrict_open_doors
@@ -806,7 +886,7 @@ def test_shortcut_triple_door_with_bigger_far_end():
     scene = component.update_ile_scene(prior_scene())
     assert scene != prior_scene()
     assert scene.room_dimensions.y == 5
-    assert scene.goal['action_list'] == (
+    assert scene.goal.action_list == (
         [['Pass']] * (scene.room_dimensions.y * 4 + 29)
     )
     assert scene.restrict_open_doors
@@ -848,6 +928,48 @@ def test_shortcut_triple_door_with_bigger_far_end():
     assert show['scale'] == {'x': 1, 'y': 2, 'z': scene.room_dimensions.z}
 
 
+def test_shortcut_triple_door_colors():
+    configurations = [
+        (None, None, "None"),
+        ('AI2-THOR/Materials/Metals/Brass 1', None, "Door"),
+        (None, 'AI2-THOR/Materials/Metals/Brass 1', "Wall"),
+        ('AI2-THOR/Materials/Metals/Brass 1',
+         'AI2-THOR/Materials/Metals/Brass 1', "Both")
+    ]
+
+    for door_material, wall_material, label in configurations:
+        shortcut_triple_door_choice = {
+            'start_drop_step': {'min': 1, 'max': 10}
+        }
+        if isinstance(door_material, str):
+            shortcut_triple_door_choice['door_material'] = door_material
+        if isinstance(wall_material, str):
+            shortcut_triple_door_choice['wall_material'] = wall_material
+
+        for _ in range(10):
+            component = ShortcutComponent(
+                {'shortcut_triple_door_choice': shortcut_triple_door_choice})
+            assert component.shortcut_triple_door_choice
+            scene = component.update_ile_scene(prior_scene())
+
+            door_colors = [
+                obj['debug']['color'] for obj in scene.objects if
+                obj["id"].startswith("door")]
+            wall_colors = [
+                obj['debug']['color'] for obj in scene.objects if
+                obj["id"].startswith("wall")]
+            door_colors_set = set(
+                x for sublist in door_colors for x in sublist)
+            wall_colors_set = set(
+                x for sublist in wall_colors for x in sublist)
+
+            intersection = door_colors_set.intersection(wall_colors_set)
+            if label == "Both":
+                assert len(intersection) == 2
+            else:
+                assert len(intersection) == 0
+
+
 def test_shortcut_double_door():
     component = ShortcutComponent({
         'shortcut_double_door_choice': True
@@ -881,57 +1003,7 @@ def test_shortcut_double_door():
 
     objs = scene.objects
 
-    assert scene.lava
-    assert scene.lava == [{'x': 0,
-                           'z': -12},
-                          {'x': 0,
-                           'z': -11},
-                          {'x': 0,
-                           'z': -10},
-                          {'x': 0,
-                           'z': -9},
-                          {'x': 0,
-                           'z': -8},
-                          {'x': 0,
-                           'z': -7},
-                          {'x': 0,
-                           'z': -6},
-                          {'x': 0,
-                           'z': -5},
-                          {'x': 0,
-                           'z': -4},
-                          {'x': 0,
-                           'z': -3},
-                          {'x': 0,
-                           'z': -2},
-                          {'x': 0,
-                           'z': -1},
-                          {'x': 0,
-                           'z': 0},
-                          {'x': 0,
-                           'z': 1},
-                          {'x': 0,
-                           'z': 2},
-                          {'x': 0,
-                           'z': 3},
-                          {'x': 0,
-                           'z': 4},
-                          {'x': 0,
-                           'z': 5},
-                          {'x': 0,
-                           'z': 6},
-                          {'x': 0,
-                           'z': 7},
-                          {'x': 0,
-                           'z': 8},
-                          {'x': 0,
-                           'z': 9},
-                          {'x': 0,
-                           'z': 10},
-                          {'x': 0,
-                           'z': 11},
-                          {'x': 0,
-                           'z': 12}]
+    assert scene.lava == [Vector2dInt(x=0, z=z) for z in range(-12, 13)]
 
     sizez = scene.room_dimensions.z
     assert isinstance(objs, List)
@@ -1378,57 +1450,7 @@ def test_shortcut_double_door_other_configs():
 
     objs = scene.objects
 
-    assert scene.lava
-    assert scene.lava == [{'x': 0,
-                           'z': -12},
-                          {'x': 0,
-                           'z': -11},
-                          {'x': 0,
-                           'z': -10},
-                          {'x': 0,
-                           'z': -9},
-                          {'x': 0,
-                           'z': -8},
-                          {'x': 0,
-                           'z': -7},
-                          {'x': 0,
-                           'z': -6},
-                          {'x': 0,
-                           'z': -5},
-                          {'x': 0,
-                           'z': -4},
-                          {'x': 0,
-                           'z': -3},
-                          {'x': 0,
-                           'z': -2},
-                          {'x': 0,
-                           'z': -1},
-                          {'x': 0,
-                           'z': 0},
-                          {'x': 0,
-                           'z': 1},
-                          {'x': 0,
-                           'z': 2},
-                          {'x': 0,
-                           'z': 3},
-                          {'x': 0,
-                           'z': 4},
-                          {'x': 0,
-                           'z': 5},
-                          {'x': 0,
-                           'z': 6},
-                          {'x': 0,
-                           'z': 7},
-                          {'x': 0,
-                           'z': 8},
-                          {'x': 0,
-                           'z': 9},
-                          {'x': 0,
-                           'z': 10},
-                          {'x': 0,
-                           'z': 11},
-                          {'x': 0,
-                           'z': 12}]
+    assert scene.lava == [Vector2dInt(x=0, z=z) for z in range(-12, 13)]
 
     sizez = scene.room_dimensions.z
     assert isinstance(objs, List)
@@ -1889,6 +1911,49 @@ def test_shortcut_double_door_occluder_distance_from_performer():
     assert perf_pos == Vector3d(x=0, y=2, z=-sizez / 2.0 + 0.5)
 
 
+def test_shortcut_double_door_colors():
+    configurations = [
+        (None, None, "None"),
+        ('AI2-THOR/Materials/Metals/Brass 1', None, "Door"),
+        (None, 'AI2-THOR/Materials/Metals/Brass 1', "Wall"),
+        ('AI2-THOR/Materials/Metals/Brass 1',
+         'AI2-THOR/Materials/Metals/Brass 1', "Both")
+    ]
+
+    for door_material, wall_material, label in configurations:
+        shortcut_double_door_choice = {
+            'start_drop_step': {'min': 1, 'max': 10},
+            'add_lava': False
+        }
+        if isinstance(door_material, str):
+            shortcut_double_door_choice['door_material'] = door_material
+        if isinstance(wall_material, str):
+            shortcut_double_door_choice['wall_material'] = wall_material
+
+        for _ in range(10):
+            component = ShortcutComponent(
+                {'shortcut_double_door_choice': shortcut_double_door_choice})
+            assert component.shortcut_double_door_choice
+            scene = component.update_ile_scene(prior_scene())
+
+            door_colors = [
+                obj['debug']['color'] for obj in scene.objects if
+                obj["id"].startswith("door")]
+            wall_colors = [
+                obj['debug']['color'] for obj in scene.objects if
+                obj["id"].startswith("wall")]
+            door_colors_set = set(
+                x for sublist in door_colors for x in sublist)
+            wall_colors_set = set(
+                x for sublist in wall_colors for x in sublist)
+
+            intersection = door_colors_set.intersection(wall_colors_set)
+            if label == "Both":
+                assert len(intersection) == 2
+            else:
+                assert len(intersection) == 0
+
+
 def test_shortcut_start_on_platform_off():
     component = ShortcutComponent({
         'shortcut_start_on_platform': False
@@ -2195,8 +2260,8 @@ def test_shortcut_lava_island_min_size():
     for x in range(-2, 3):
         for z in range(1, 6):
             if x != 0 and z != 4:
-                assert {'x': x, 'z': z} in lavas
-                assert {'x': z, 'z': x} in lavas_switched
+                assert Vector2dInt(x=x, z=z) in lavas
+                assert Vector2dInt(x=z, z=x) in lavas_switched
 
     objs = scene.objects
     assert len(objs) == 2
@@ -2238,8 +2303,8 @@ def test_shortcut_lava_island_min_size_plus_one():
     for x in range(-2, 3):
         for z in range(1, 6):
             if x != 0 and z != 4:
-                assert {'x': x, 'z': z} in lavas
-                assert {'x': z, 'z': x} in lavas_switched
+                assert Vector2dInt(x=x, z=z) in lavas
+                assert Vector2dInt(x=z, z=x) in lavas_switched
 
     objs = scene.objects
     assert len(objs) == 2
@@ -2316,8 +2381,8 @@ def test_shortcut_lava_island_guide_rail():
     for x in range(-2, 3):
         for z in range(1, 6):
             if x != 0 and z != 4:
-                assert {'x': x, 'z': z} in lavas
-                assert {'x': z, 'z': x} in lavas_switched
+                assert Vector2dInt(x=x, z=z) in lavas
+                assert Vector2dInt(x=z, z=x) in lavas_switched
 
     objs = scene.objects
     assert len(objs) == 4
@@ -2530,8 +2595,8 @@ def test_shortcut_lava_island_random_target_position():
     for x in range(-2, 3):
         for z in range(1, 6):
             if x != 0 and z != 4:
-                assert {'x': x, 'z': z} in lavas
-                assert {'x': z, 'z': x} in lavas_switched
+                assert Vector2dInt(x=x, z=z) in lavas
+                assert Vector2dInt(x=z, z=x) in lavas_switched
 
     objs = scene.objects
     assert len(objs) == 2
@@ -2571,16 +2636,16 @@ def test_shortcut_lava_island_left_right():
 
     scene = component.update_ile_scene(scene)
     lavas = scene.lava
-    lava_island_x_min = lavas[0]['x'] + 2
-    lava_island_x_max = lavas[-1]['x'] - 3
+    lava_island_x_min = lavas[0].x + 2
+    lava_island_x_max = lavas[-1].x - 3
     left_count = 0
     right_count = 0
-    min_z = lavas[0]['z']
-    max_z = lavas[-1]['z']
+    min_z = lavas[0].z
+    max_z = lavas[-1].z
     for lava in lavas:
-        if lava['x'] < lava_island_x_min:
+        if lava.x < lava_island_x_min:
             left_count += 1
-        if lava['x'] > lava_island_x_max:
+        if lava.x > lava_island_x_max:
             right_count += 1
     front_rear_width = abs(max_z - min_z) + 1
     left_count /= front_rear_width
@@ -2706,16 +2771,16 @@ def test_shortcut_lava_island_front_rear():
 
     scene = component.update_ile_scene(scene)
     lavas = scene.lava
-    lava_island_z_min = lavas[0]['z'] + 3
-    lava_island_z_max = lavas[-1]['z'] - 2
+    lava_island_z_min = lavas[0].z + 3
+    lava_island_z_max = lavas[-1].z - 2
     front_count = 0
     rear_count = 0
-    min_x = lavas[0]['x']
-    max_x = lavas[-1]['x']
+    min_x = lavas[0].x
+    max_x = lavas[-1].x
     for lava in lavas:
-        if lava['z'] < lava_island_z_min:
+        if lava.z < lava_island_z_min:
             front_count += 1
-        if lava['z'] > lava_island_z_max:
+        if lava.z > lava_island_z_max:
             rear_count += 1
     left_right_width = abs(max_x - min_x) + 1
     front_count /= left_right_width
@@ -2743,29 +2808,30 @@ def test_shortcut_lava_island_front_rear_left_right():
 
     scene = component.update_ile_scene(scene)
     lavas = scene.lava
-    lava_island_front_min = lavas[0]['z'] + 3
-    lava_island_rear_max = lavas[-1]['z'] - 5
-    lava_island_left_min = lavas[0]['x'] + 2
-    lava_island_right_max = lavas[-1]['x'] - 4
+    lava_island_front_min = lavas[0].z + 3
+    lava_island_rear_max = lavas[-1].z - 5
+    lava_island_left_min = lavas[0].x + 2
+    lava_island_right_max = lavas[-1].x - 4
     front_count = 0
     rear_count = 0
     left_count = 0
     right_count = 0
-    min_left = lavas[0]['x']
-    max_right = lavas[-1]['x']
-    min_front = lavas[0]['z']
-    max_rear = lavas[-1]['z']
+    min_left = lavas[0].x
+    max_right = lavas[-1].x
+    min_front = lavas[0].z
+    max_rear = lavas[-1].z
     for lava in lavas:
-        if lava['z'] < lava_island_front_min:
+        if lava.z < lava_island_front_min:
             front_count += 1
-        if lava['z'] > lava_island_rear_max:
+        if lava.z > lava_island_rear_max:
             rear_count += 1
-        if lava['x'] < lava_island_left_min:
+        if lava.x < lava_island_left_min:
             left_count += 1
-        if lava['x'] > lava_island_right_max:
+        if lava.x > lava_island_right_max:
             right_count += 1
     assert front_count / (abs(max_right - min_left) + 1) == 3
-    assert rear_count / (abs(max_right - min_left) + 1) == 5
+    assert rear_count / (abs(max_right - min_left) +
+                         1) == 5
     assert left_count / (abs(max_rear - min_front) + 1) == 2
     assert right_count / (abs(max_rear - min_front) + 1) == 4
 
@@ -2791,31 +2857,32 @@ def test_shortcut_lava_island_front_rear_left_right_long_x_dimension():
     lavas = scene.lava
     # everything needs to rotate 90 degrees
     # so x is z
-    lava_island_front_min = lavas[0]['x'] + 3
-    lava_island_rear_max = lavas[-1]['x'] - 5
-    lava_island_left_min = lavas[0]['z'] + 2
-    lava_island_right_max = lavas[-1]['z'] - 4
+    lava_island_front_min = lavas[0].x + 3
+    lava_island_rear_max = lavas[-1].x - 5
+    lava_island_left_min = lavas[0].z + 2
+    lava_island_right_max = lavas[-1].z - 4
     front_count = 0
     rear_count = 0
     left_count = 0
     right_count = 0
-    min_left = lavas[0]['z']
-    max_right = lavas[-1]['z']
-    min_front = lavas[0]['x']
-    max_rear = lavas[-1]['x']
+    min_left = lavas[0].z
+    max_right = lavas[-1].z
+    min_front = lavas[0].x
+    max_rear = lavas[-1].x
     for lava in lavas:
-        if lava['x'] < lava_island_front_min:
+        if lava.x < lava_island_front_min:
             front_count += 1
-        if lava['x'] > lava_island_rear_max:
+        if lava.x > lava_island_rear_max:
             rear_count += 1
-        if lava['z'] < lava_island_left_min:
+        if lava.z < lava_island_left_min:
             left_count += 1
-        if lava['z'] > lava_island_right_max:
+        if lava.z > lava_island_right_max:
             right_count += 1
     # not sure why this is missing 1, generating this scene works as expected
     right_count += 1
     assert front_count / (abs(max_right - min_left) + 1) == 3
-    assert rear_count / (abs(max_right - min_left) + 1) == 5
+    assert rear_count / (abs(max_right - min_left) +
+                         1) == 5
     assert left_count / (abs(max_rear - min_front) + 1) == 2
     assert right_count / (abs(max_rear - min_front) + 1) == 4
 
@@ -2923,7 +2990,7 @@ def test_shortcut_lava_island_hooked_tool():
     for x in range(-9, 10):
         for z in range(7, 10):
             if x != 0 and z != 8:
-                assert {'x': x, 'z': z} in lavas
+                assert Vector2dInt(x=x, z=z) in lavas
 
     objs = scene.objects
     assert len(objs) == 2
@@ -2966,7 +3033,7 @@ def test_shortcut_lava_island_hooked_tool_even_room_dim():
     for x in range(-10, 11):
         for z in range(7, 11):
             if x != 0 and z != 8:
-                assert {'x': x, 'z': z} in lavas
+                assert Vector2dInt(x=x, z=z) in lavas
 
     objs = scene.objects
     assert len(objs) == 2
@@ -3488,7 +3555,7 @@ def setup_turntables_with_agent_and_non_agent(agent_point_step=46):
         step_end=0,
         movement_rotation=0,
         material_tuple=materials.GREY
-    )[0]
+    )
     scene.objects.append(turntable_left)
     object_repository.add_to_labeled_objects(InstanceDefinitionLocationTuple(
         turntable_left,
@@ -3507,7 +3574,7 @@ def setup_turntables_with_agent_and_non_agent(agent_point_step=46):
         step_end=0,
         movement_rotation=0,
         material_tuple=materials.GREY
-    )[0]
+    )
     scene.objects.append(turntable_right)
     object_repository.add_to_labeled_objects(InstanceDefinitionLocationTuple(
         turntable_right,
@@ -3555,7 +3622,7 @@ def test_turntables_with_agent_and_non_agent():
     assert ball == original_ball
     assert cube == original_cube
     assert turntable_left != original_turntable_left
-    assert turntable_right != original_turntable_right
+    assert turntable_right == original_turntable_right
     assert turntable_left['rotates'] == [{
         'stepBegin': 1,
         'stepEnd': 36,
@@ -3598,7 +3665,7 @@ def test_turntables_with_agent_and_non_agent_angled():
     assert ball == original_ball
     assert cube == original_cube
     assert turntable_left != original_turntable_left
-    assert turntable_right != original_turntable_right
+    assert turntable_right == original_turntable_right
     assert turntable_left['rotates'] == [{
         'stepBegin': 1,
         'stepEnd': 28,
@@ -3637,7 +3704,7 @@ def test_turntables_with_agent_and_non_agent_with_random_directions():
     assert ball == original_ball
     assert cube == original_cube
     assert turntable_left != original_turntable_left
-    assert turntable_right != original_turntable_right
+    assert turntable_right == original_turntable_right
     assert turntable_left['rotates'] == [{
         'stepBegin': 1,
         'stepEnd': 36,
@@ -3684,7 +3751,7 @@ def test_turntables_with_agent_and_non_agent_with_label_lists():
     assert ball == original_ball
     assert cube == original_cube
     assert turntable_left != original_turntable_left
-    assert turntable_right != original_turntable_right
+    assert turntable_right == original_turntable_right
     assert turntable_left['rotates'] == [{
         'stepBegin': 1,
         'stepEnd': 36,
@@ -3735,7 +3802,7 @@ def test_turntables_with_agent_and_non_agent_with_mirrored_rotation():
     assert ball == original_ball
     assert cube == original_cube
     assert turntable_left != original_turntable_left
-    assert turntable_right != original_turntable_right
+    assert turntable_right == original_turntable_right
     assert turntable_left['rotates'] == [{
         'stepBegin': 1,
         'stepEnd': 36,
@@ -3783,7 +3850,7 @@ def test_turntables_with_agent_and_non_agent_with_point_step_begin_before_46():
     assert ball == original_ball
     assert cube == original_cube
     assert turntable_left != original_turntable_left
-    assert turntable_right != original_turntable_right
+    assert turntable_right == original_turntable_right
     assert turntable_left['rotates'] == [{
         'stepBegin': 51,
         'stepEnd': 86,
@@ -3841,15 +3908,15 @@ def test_shortcut_tool_choice_default():
     assert len(lavas) % 2 == 0
 
     for square in lavas:
-        assert(square['x'] > 1 or square['x'] < -1)
-        assert(square['x'] < 9 or square['x'] > -9)
-        assert(square['z'] > 0)
+        assert (square.x > 1 or square.x < -1)
+        assert (square.x < 9 or square.x > -9)
+        assert (square.z > 0)
 
-    assert scene.goal['metadata']['target']
-    assert 'targets' not in scene.goal['metadata']
-    assert scene.goal['action_list']
-    assert len(scene.goal['action_list']) == 36
-    for action in scene.goal['action_list']:
+    assert scene.goal.metadata['target']
+    assert 'targets' not in scene.goal.metadata
+    assert scene.goal.action_list
+    assert len(scene.goal.action_list) == 36
+    for action in scene.goal.action_list:
         assert action == ['RotateRight']
 
     objs = scene.objects
@@ -3860,13 +3927,13 @@ def test_shortcut_tool_choice_default():
     assert len(soccer_balls) == 2
     ball_1 = soccer_balls[0]
     ball_2 = soccer_balls[1]
-    tools = list(
+    tool_list = list(
         filter(
             lambda obj: obj['type'].startswith('tool_rect'),
             objs))
-    assert len(tools) == 2
-    tool_1 = tools[0]
-    tool_2 = tools[1] if len(tools) == 2 else None
+    assert len(tool_list) == 2
+    tool_1 = tool_list[0]
+    tool_2 = tool_list[1] if len(tool_list) == 2 else None
 
     # check platform properties and all object types
     assert platform['type'] == 'cube'
@@ -3900,15 +3967,15 @@ def test_shortcut_tool_choice_too_short():
     assert len(lavas) % 2 == 0
 
     for square in lavas:
-        assert(square['x'] > 1 or square['x'] < -1)
-        assert(square['x'] < 9 or square['x'] > -9)
-        assert(square['z'] > 0)
+        assert (square.x > 1 or square.x < -1)
+        assert (square.x < 9 or square.x > -9)
+        assert (square.z > 0)
 
-    assert scene.goal['metadata']['target']
-    assert 'targets' not in scene.goal['metadata']
-    assert scene.goal['action_list']
-    assert len(scene.goal['action_list']) == 36
-    for action in scene.goal['action_list']:
+    assert scene.goal.metadata['target']
+    assert 'targets' not in scene.goal.metadata
+    assert scene.goal.action_list
+    assert len(scene.goal.action_list) == 36
+    for action in scene.goal.action_list:
         assert action == ['RotateRight']
 
     objs = scene.objects
@@ -3919,13 +3986,13 @@ def test_shortcut_tool_choice_too_short():
     assert len(soccer_balls) == 2
     ball_1 = soccer_balls[0]
     ball_2 = soccer_balls[1]
-    tools = list(
+    tool_list = list(
         filter(
             lambda obj: obj['type'].startswith('tool_rect'),
             objs))
-    assert len(tools) == 2
-    tool_1 = tools[0]
-    tool_2 = tools[1]
+    assert len(tool_list) == 2
+    tool_1 = tool_list[0]
+    tool_2 = tool_list[1]
 
     # check platform properties and all object types
     assert platform['type'] == 'cube'
@@ -3970,15 +4037,15 @@ def test_shortcut_tool_choice_no_tool():
     assert len(lavas) % 2 == 0
 
     for square in lavas:
-        assert(square['x'] > 1 or square['x'] < -1)
-        assert(square['x'] < 9 or square['x'] > -9)
-        assert(square['z'] > 0)
+        assert (square.x > 1 or square.x < -1)
+        assert (square.x < 9 or square.x > -9)
+        assert (square.z > 0)
 
-    assert scene.goal['metadata']['target']
-    assert 'targets' not in scene.goal['metadata']
-    assert scene.goal['action_list']
-    assert len(scene.goal['action_list']) == 36
-    for action in scene.goal['action_list']:
+    assert scene.goal.metadata['target']
+    assert 'targets' not in scene.goal.metadata
+    assert scene.goal.action_list
+    assert len(scene.goal.action_list) == 36
+    for action in scene.goal.action_list:
         assert action == ['RotateRight']
 
     objs = scene.objects
@@ -4015,14 +4082,13 @@ def test_shortcut_imitation_left_side_teleport_containers_rotation_left_right():
         'shortcut_imitation_task': {
             'trigger_order': 'left_right',
             'containers_on_right_side': False,
-            'kidnap_option': 'containers_rotate'
+            'kidnap_option': 'containers'
         }
     })
 
     assert component.shortcut_imitation_task
     assert component.shortcut_imitation_task.containers_on_right_side is False
-    assert component.shortcut_imitation_task.kidnap_option == \
-        'containers_rotate'
+    assert component.shortcut_imitation_task.kidnap_option == 'containers'
     assert component.shortcut_imitation_task.trigger_order == 'left_right'
 
     scene = component.update_ile_scene(prior_scene())
@@ -4030,20 +4096,20 @@ def test_shortcut_imitation_left_side_teleport_containers_rotation_left_right():
     kidnapp_step = scene.debug['endHabituationStep']
 
     # goal
-    assert scene.goal['category'] == 'imitation'
-    assert scene.goal['description'] == (
+    assert scene.goal.category == 'imitation'
+    assert scene.goal.description == (
         'Open the containers in the correct order for '
         'the tiny light black white rubber ball to be placed.')
-    assert len(scene.goal['triggeredByTargetSequence']) == 2
+    assert len(scene.goal.triggered_by_target_sequence) == 2
     # left container
-    assert scene.goal['triggeredByTargetSequence'][0] == scene.objects[0]['id']
+    assert scene.goal.triggered_by_target_sequence[0] == scene.objects[0]['id']
     # right container
-    assert scene.goal['triggeredByTargetSequence'][1] == scene.objects[2]['id']
+    assert scene.goal.triggered_by_target_sequence[1] == scene.objects[2]['id']
     # action list
-    assert len(scene.goal['action_list']) == kidnapp_step
+    assert len(scene.goal.action_list) == kidnapp_step
     for i in range(kidnapp_step):
-        scene.goal['action_list'][i][0] == 'Pass'
-    assert scene.goal['action_list'][-1][0].startswith('EndHabituation')
+        scene.goal.action_list[i][0] == 'Pass'
+    assert scene.goal.action_list[-1][0].startswith('EndHabituation')
 
     # rectangular room with always 3 ceiling height
     assert (scene.room_dimensions.x == scene.room_dimensions.z /
@@ -4068,6 +4134,19 @@ def test_shortcut_imitation_left_side_teleport_containers_rotation_left_right():
     colors_used = []
     containers = scene.objects[0:3]
     end_container = containers[0]['shows']
+    teleport_rotation = containers[0]['shows'][1]['rotation']['y']
+    first_container_teleport_position = containers[0]['shows'][1]['position']
+    start_x = first_container_teleport_position['x']
+    start_z = first_container_teleport_position['z']
+    teleport_positions = []
+    teleport_positions.append((start_x, start_z))
+    for _ in range(1, 3):
+        x, z = \
+            get_magnitudes_of_x_z_dirs_for_rotation_and_move_vector(
+                teleport_rotation, -IMITATION_CONTAINER_SEPARATION, 0)
+        start_x += x
+        start_z += z
+        teleport_positions.append((start_x, start_z))
     for i in range(3):
         colors_used.append(containers[i]['debug']['color'][0])
         assert containers[i]['shows'][0]['position']['z'] == (i - 1)
@@ -4078,13 +4157,10 @@ def test_shortcut_imitation_left_side_teleport_containers_rotation_left_right():
         assert containers[i]['shows'][0]['scale']['z'] == 1
 
         teleport = containers[i]['shows'][1]
-        assert teleport['rotation']['y'] == 180
-        if i < 1:
-            # make sure next chest is in a straight line
-            assert teleport['position']['x'] < \
-                containers[i + 1]['shows'][1]['position']['x']
-            assert teleport['position']['z'] == \
-                containers[i + 1]['shows'][1]['position']['z']
+        assert teleport['position']['x'] == teleport_positions[i][0]
+        assert teleport['position']['z'] == teleport_positions[i][1]
+        assert teleport['rotation']['y'] in IMITATION_CONTAINER_TELEPORT_ROTATIONS_GLOBAL  # noqa
+        assert teleport['rotation']['y'] == teleport_rotation
         assert containers[i]['shows'][1]['stepBegin'] == kidnapp_step
     # no duplicate colors
     assert len(colors_used) == len(set(colors_used))
@@ -4100,12 +4176,21 @@ def test_shortcut_imitation_left_side_teleport_containers_rotation_left_right():
     assert containers[2]['openClose'][1]['open'] is False
     # left container is in view after rotation, it tells us if the other
     # containers are in view because they are in a straight line
-    assert -2.5 <= scene.objects[0]['shows'][1]['position']['x'] <= 0.5
+    index = IMITATION_CONTAINER_TELEPORT_ROTATIONS_GLOBAL.index(
+        teleport_rotation)
+    min_max = IMITATION_CONTAINER_TELEPORT_X_POS_RANGE[index]
+    assert min_max[0] <= scene.objects[0]['shows'][1]['position']['x'] \
+        <= min_max[1]
     agent_stand_behind_buffer = 1
     assert 0 <= scene.objects[0]['shows'][1]['position']['z'] <= \
         scene.room_dimensions.z / 2 - agent_stand_behind_buffer
 
     # target
+    x, z = \
+        get_magnitudes_of_x_z_dirs_for_rotation_and_move_vector(
+            teleport_rotation, -IMITATION_TASK_TARGET_SEPARATION, 0)
+    x = first_container_teleport_position['x'] - x
+    z = first_container_teleport_position['z'] - z
     target = scene.objects[3]
     assert target['triggeredBy']
     assert target['type'] == 'soccer_ball'
@@ -4113,10 +4198,8 @@ def test_shortcut_imitation_left_side_teleport_containers_rotation_left_right():
         end_container[0]['position']['x']
     assert target['shows'][0]['position']['z'] == \
         end_container[0]['position']['z'] - IMITATION_TASK_TARGET_SEPARATION
-    assert target['shows'][1]['position']['x'] == \
-        end_container[1]['position']['x'] - IMITATION_TASK_TARGET_SEPARATION
-    assert target['shows'][1]['position']['z'] == \
-        end_container[1]['position']['z']
+    assert target['shows'][1]['position']['x'] == x
+    assert target['shows'][1]['position']['z'] == z
     assert target['shows'][1]['stepBegin'] == kidnapp_step
     assert target['kinematic']
     assert len(target['moves']) == 1
@@ -4134,10 +4217,8 @@ def test_shortcut_imitation_left_side_teleport_containers_rotation_left_right():
         end_container[0]['position']['x']
     assert placer['shows'][0]['position']['z'] == \
         end_container[0]['position']['z'] - IMITATION_TASK_TARGET_SEPARATION
-    assert placer['shows'][1]['position']['x'] == \
-        end_container[1]['position']['x'] - IMITATION_TASK_TARGET_SEPARATION
-    assert placer['shows'][1]['position']['z'] == \
-        end_container[1]['position']['z']
+    assert placer['shows'][1]['position']['x'] == x
+    assert placer['shows'][1]['position']['z'] == z
     assert placer['shows'][1]['stepBegin'] == kidnapp_step
     assert len(placer['moves']) == 2
     assert placer['moves'][0]['stepBegin'] == 0
@@ -4158,19 +4239,20 @@ def test_shortcut_imitation_left_side_teleport_containers_rotation_left_right():
     assert start['position']['z'] == -1  # left chest
     assert start['rotation']['y'] == -90  # face right
     teleport = agent['shows'][1]
-    teleport['stepBegin'] == kidnapp_step
-    teleport['rotation']['y'] == 180  # face performer
-    end_container_pos = containers[0]['shows'][1]['position']['z']
+    assert teleport['stepBegin'] == kidnapp_step
+    assert teleport['rotation']['y'] == 180  # face performer
     # behind containers
     separation = 1
-    teleport['position']['z'] == end_container_pos + separation
-    # right or the left since the containers were rotated 90
+    max_container_z = \
+        max(containers, key=lambda c: c['shows'][1]['position']['z'])[
+            'shows'][1]['position']['z']
+    assert teleport['position']['z'] == max_container_z + separation
+    index = IMITATION_CONTAINER_TELEPORT_ROTATIONS_GLOBAL.index(
+        containers[0]['shows'][1]['rotation']['y'])
+    min_max = IMITATION_CONTAINER_TELEPORT_X_POS_RANGE[index]
     assert (
-        teleport['position']['x'] ==
-        containers[0]['shows'][1]['position']['x'] - separation or
-        containers[-1]['shows'][1]['position']['x'] + separation)
-    teleport['position']['x'] == 0
-    teleport['position']['z'] == 0
+        teleport['position']['x'] == min_max[0] - separation or
+        teleport['position']['x'] == min_max[1] + separation)
     assert len(agent['rotates']) == 1
     assert agent['rotates'][0]['stepBegin'] == 83
     # left rotation because agent is walking torward perfromer
@@ -4208,14 +4290,14 @@ def test_shortcut_imitation_right_side_teleport_containers_rotation_left_right()
         'shortcut_imitation_task': {
             'trigger_order': 'left_right',
             'containers_on_right_side': True,
-            'kidnap_option': 'containers_rotate'
+            'kidnap_option': 'containers'
         }
     })
 
     assert component.shortcut_imitation_task
     assert component.shortcut_imitation_task.containers_on_right_side is True
     assert component.shortcut_imitation_task.kidnap_option == \
-        'containers_rotate'
+        'containers'
     assert component.shortcut_imitation_task.trigger_order == 'left_right'
 
     scene = component.update_ile_scene(prior_scene())
@@ -4223,20 +4305,20 @@ def test_shortcut_imitation_right_side_teleport_containers_rotation_left_right()
     kidnapp_step = scene.debug['endHabituationStep']
 
     # goal
-    assert scene.goal['category'] == 'imitation'
-    assert scene.goal['description'] == (
+    assert scene.goal.category == 'imitation'
+    assert scene.goal.description == (
         'Open the containers in the correct order for '
         'the tiny light black white rubber ball to be placed.')
-    assert len(scene.goal['triggeredByTargetSequence']) == 2
+    assert len(scene.goal.triggered_by_target_sequence) == 2
     # left container
-    assert scene.goal['triggeredByTargetSequence'][0] == scene.objects[0]['id']
+    assert scene.goal.triggered_by_target_sequence[0] == scene.objects[0]['id']
     # right container
-    assert scene.goal['triggeredByTargetSequence'][1] == scene.objects[2]['id']
+    assert scene.goal.triggered_by_target_sequence[1] == scene.objects[2]['id']
     # action list
-    assert len(scene.goal['action_list']) == kidnapp_step
+    assert len(scene.goal.action_list) == kidnapp_step
     for i in range(kidnapp_step):
-        scene.goal['action_list'][i][0] == 'Pass'
-    assert scene.goal['action_list'][-1][0].startswith('EndHabituation')
+        scene.goal.action_list[i][0] == 'Pass'
+    assert scene.goal.action_list[-1][0].startswith('EndHabituation')
 
     # rectangular room with always 3 ceiling height
     assert (scene.room_dimensions.x == scene.room_dimensions.z /
@@ -4252,6 +4334,7 @@ def test_shortcut_imitation_right_side_teleport_containers_rotation_left_right()
     assert scene.debug['endHabituationTeleportPositionX'] == 0
     assert scene.debug['endHabituationTeleportPositionZ'] == -3.75
     assert scene.debug['endHabituationTeleportRotationY'] == 0
+    assert scene.debug['endHabituationStep'] == kidnapp_step
 
     # objects
     assert len(scene.objects) == 6
@@ -4260,6 +4343,19 @@ def test_shortcut_imitation_right_side_teleport_containers_rotation_left_right()
     colors_used = []
     containers = scene.objects[0:3]
     end_container = containers[-1]['shows']
+    teleport_rotation = containers[0]['shows'][1]['rotation']['y']
+    first_container_teleport_position = containers[0]['shows'][1]['position']
+    start_x = first_container_teleport_position['x']
+    start_z = first_container_teleport_position['z']
+    teleport_positions = []
+    teleport_positions.append((start_x, start_z))
+    for _ in range(1, 3):
+        x, z = \
+            get_magnitudes_of_x_z_dirs_for_rotation_and_move_vector(
+                teleport_rotation, IMITATION_CONTAINER_SEPARATION, 0)
+        start_x -= x
+        start_z -= z
+        teleport_positions.append((start_x, start_z))
     for i in range(3):
         colors_used.append(containers[i]['debug']['color'][0])
         assert containers[i]['shows'][0]['position']['z'] == -(i - 1)
@@ -4270,13 +4366,14 @@ def test_shortcut_imitation_right_side_teleport_containers_rotation_left_right()
         assert containers[i]['shows'][0]['scale']['z'] == 1
 
         teleport = containers[i]['shows'][1]
-        assert teleport['rotation']['y'] == 180
-        if i < 1:
-            # make sure next chest is in a straight line
-            assert teleport['position']['x'] < \
-                containers[i + 1]['shows'][1]['position']['x']
-            assert teleport['position']['z'] == \
-                containers[i + 1]['shows'][1]['position']['z']
+        assert round(
+            teleport['position']['x'], 3) == round(
+            teleport_positions[i][0], 3)
+        assert round(
+            teleport['position']['z'], 3) == round(
+            teleport_positions[i][1], 3)
+        assert teleport['rotation']['y'] in IMITATION_CONTAINER_TELEPORT_ROTATIONS_GLOBAL  # noqa
+        assert teleport['rotation']['y'] == teleport_rotation
         assert containers[i]['shows'][1]['stepBegin'] == kidnapp_step
     # no duplicate colors
     assert len(colors_used) == len(set(colors_used))
@@ -4292,12 +4389,21 @@ def test_shortcut_imitation_right_side_teleport_containers_rotation_left_right()
     assert containers[2]['openClose'][1]['open'] is False
     # left container is in view after rotation, it tells us if the other
     # containers are in view because they are in a straight line
-    assert -2.5 <= scene.objects[0]['shows'][1]['position']['x'] <= 0.5
+    index = IMITATION_CONTAINER_TELEPORT_ROTATIONS_GLOBAL.index(
+        teleport_rotation)
+    min_max = IMITATION_CONTAINER_TELEPORT_X_POS_RANGE[index]
+    assert min_max[0] <= scene.objects[0]['shows'][1]['position']['x'] \
+        <= min_max[1]
     agent_stand_behind_buffer = 1
     assert 0 <= scene.objects[0]['shows'][1]['position']['z'] <= \
         scene.room_dimensions.z / 2 - agent_stand_behind_buffer
 
     # target
+    x, z = \
+        get_magnitudes_of_x_z_dirs_for_rotation_and_move_vector(
+            teleport_rotation, IMITATION_TASK_TARGET_SEPARATION, 0)
+    x = end_container[1]['position']['x'] - x
+    z = end_container[1]['position']['z'] - z
     target = scene.objects[3]
     assert target['triggeredBy']
     assert target['type'] == 'soccer_ball'
@@ -4305,10 +4411,8 @@ def test_shortcut_imitation_right_side_teleport_containers_rotation_left_right()
         end_container[0]['position']['x']
     assert target['shows'][0]['position']['z'] == \
         end_container[0]['position']['z'] - IMITATION_TASK_TARGET_SEPARATION
-    assert target['shows'][1]['position']['x'] == \
-        end_container[1]['position']['x'] + IMITATION_TASK_TARGET_SEPARATION
-    assert target['shows'][1]['position']['z'] == \
-        end_container[1]['position']['z']
+    assert target['shows'][1]['position']['x'] == x
+    assert target['shows'][1]['position']['z'] == z
     assert target['shows'][1]['stepBegin'] == kidnapp_step
     assert target['kinematic']
     assert len(target['moves']) == 1
@@ -4326,10 +4430,8 @@ def test_shortcut_imitation_right_side_teleport_containers_rotation_left_right()
         end_container[0]['position']['x']
     assert placer['shows'][0]['position']['z'] == \
         end_container[0]['position']['z'] - IMITATION_TASK_TARGET_SEPARATION
-    assert placer['shows'][1]['position']['x'] == \
-        end_container[1]['position']['x'] + IMITATION_TASK_TARGET_SEPARATION
-    assert placer['shows'][1]['position']['z'] == \
-        end_container[1]['position']['z']
+    assert placer['shows'][1]['position']['x'] == x
+    assert placer['shows'][1]['position']['z'] == z
     assert placer['shows'][1]['stepBegin'] == kidnapp_step
     assert len(placer['moves']) == 2
     assert placer['moves'][0]['stepBegin'] == 0
@@ -4350,19 +4452,20 @@ def test_shortcut_imitation_right_side_teleport_containers_rotation_left_right()
     assert start['position']['z'] == 1  # left chest
     assert start['rotation']['y'] == 90  # face right
     teleport = agent['shows'][1]
-    teleport['stepBegin'] == kidnapp_step
-    teleport['rotation']['y'] == 180  # face performer
-    end_container_pos = containers[-1]['shows'][1]['position']['z']
+    assert teleport['stepBegin'] == kidnapp_step
+    assert teleport['rotation']['y'] == 180  # face performer
     # behind containers
     separation = 1
-    teleport['position']['z'] == end_container_pos + separation
-    # of to the right or the left since the containers were rotate 90
+    max_container_z = \
+        max(containers, key=lambda c: c['shows'][1]['position']['z'])[
+            'shows'][1]['position']['z']
+    assert teleport['position']['z'] == max_container_z + separation
+    index = IMITATION_CONTAINER_TELEPORT_ROTATIONS_GLOBAL.index(
+        teleport_rotation)
+    min_max = IMITATION_CONTAINER_TELEPORT_X_POS_RANGE[index]
     assert (
-        teleport['position']['x'] ==
-        containers[0]['shows'][1]['position']['x'] - separation or
-        containers[-1]['shows'][1]['position']['x'] + separation)
-    teleport['position']['x'] == 0
-    teleport['position']['z'] == 0
+        teleport['position']['x'] == min_max[0] - separation or
+        teleport['position']['x'] == min_max[1] + separation)
     assert len(agent['rotates']) == 1
     assert agent['rotates'][0]['stepBegin'] == 82
     # left rotation because agent is walking torward perfromer
@@ -4415,20 +4518,20 @@ def test_shortcut_imitation_left_side_teleport_containers_right_middle():
     kidnapp_step = scene.debug['endHabituationStep']
 
     # goal
-    assert scene.goal['category'] == 'imitation'
-    assert scene.goal['description'] == (
+    assert scene.goal.category == 'imitation'
+    assert scene.goal.description == (
         'Open the containers in the correct order for '
         'the tiny light black white rubber ball to be placed.')
-    assert len(scene.goal['triggeredByTargetSequence']) == 2
+    assert len(scene.goal.triggered_by_target_sequence) == 2
     # right container
-    assert scene.goal['triggeredByTargetSequence'][0] == scene.objects[2]['id']
+    assert scene.goal.triggered_by_target_sequence[0] == scene.objects[2]['id']
     # middle container
-    assert scene.goal['triggeredByTargetSequence'][1] == scene.objects[1]['id']
+    assert scene.goal.triggered_by_target_sequence[1] == scene.objects[1]['id']
     # action list
-    assert len(scene.goal['action_list']) == kidnapp_step
+    assert len(scene.goal.action_list) == kidnapp_step
     for i in range(kidnapp_step):
-        scene.goal['action_list'][i][0] == 'Pass'
-    assert scene.goal['action_list'][-1][0].startswith('EndHabituation')
+        scene.goal.action_list[i][0] == 'Pass'
+    assert scene.goal.action_list[-1][0].startswith('EndHabituation')
 
     # rectangular room with always 3 ceiling height
     assert (scene.room_dimensions.x == scene.room_dimensions.z /
@@ -4453,6 +4556,19 @@ def test_shortcut_imitation_left_side_teleport_containers_right_middle():
     colors_used = []
     containers = scene.objects[0:3]
     end_container = containers[0]['shows']
+    teleport_rotation = containers[0]['shows'][1]['rotation']['y']
+    first_container_teleport_position = containers[0]['shows'][1]['position']
+    start_x = first_container_teleport_position['x']
+    start_z = first_container_teleport_position['z']
+    teleport_positions = []
+    teleport_positions.append((start_x, start_z))
+    for _ in range(1, 3):
+        x, z = \
+            get_magnitudes_of_x_z_dirs_for_rotation_and_move_vector(
+                teleport_rotation, -IMITATION_CONTAINER_SEPARATION, 0)
+        start_x += x
+        start_z += z
+        teleport_positions.append((start_x, start_z))
     for i in range(3):
         colors_used.append(containers[i]['debug']['color'][0])
         assert containers[i]['shows'][0]['position']['z'] == (i - 1)
@@ -4463,39 +4579,40 @@ def test_shortcut_imitation_left_side_teleport_containers_right_middle():
         assert containers[i]['shows'][0]['scale']['z'] == 1
 
         teleport = containers[i]['shows'][1]
-        assert teleport['rotation']['y'] == 90
-        if i < 1:
-            # make sure next chest is in a straight line on z axis
-            assert teleport['position']['z'] < \
-                containers[i + 1]['shows'][1]['position']['z']
-            assert teleport['position']['x'] == \
-                containers[i + 1]['shows'][1]['position']['x']
+        assert teleport['position']['x'] == teleport_positions[i][0]
+        assert teleport['position']['z'] == teleport_positions[i][1]
+        assert teleport['rotation']['y'] in IMITATION_CONTAINER_TELEPORT_ROTATIONS_GLOBAL  # noqa
+        assert teleport['rotation']['y'] == teleport_rotation
         assert containers[i]['shows'][1]['stepBegin'] == kidnapp_step
     # no duplicate colors
     assert len(colors_used) == len(set(colors_used))
     # open close
-    assert containers[0].get('openClose') is None  # left container
     assert containers[2]['openClose'][0]['step'] == 22
     assert containers[2]['openClose'][0]['open'] is True
     assert containers[2]['openClose'][1]['step'] == kidnapp_step
     assert containers[2]['openClose'][1]['open'] is False
+    assert containers[0].get('openClose') is None  # left container
     assert containers[1]['openClose'][0]['step'] == 71
     assert containers[1]['openClose'][0]['open'] is True
     assert containers[1]['openClose'][1]['step'] == kidnapp_step
     assert containers[1]['openClose'][1]['open'] is False
-
-    # in view after teleport
-    buffer_for_all_containers_to_fit = 2
-    buffer_for_agent_to_stand_behind = 1
-    minimum = 0
-    maximum = scene.room_dimensions.z / 2 - \
-        buffer_for_all_containers_to_fit - buffer_for_agent_to_stand_behind
-    assert -2.5 <= scene.objects[0]['shows'][1]['position']['x'] <= 2.5
-    assert -2.5 <= scene.objects[1]['shows'][1]['position']['x'] <= 2.5
-    assert -2.5 <= scene.objects[2]['shows'][1]['position']['x'] <= 2.5
-    assert minimum <= containers[0]['shows'][1]['position']['z'] <= maximum
+    # left container is in view after rotation, it tells us if the other
+    # containers are in view because they are in a straight line
+    index = IMITATION_CONTAINER_TELEPORT_ROTATIONS_GLOBAL.index(
+        teleport_rotation)
+    min_max = IMITATION_CONTAINER_TELEPORT_X_POS_RANGE[index]
+    assert min_max[0] <= scene.objects[0]['shows'][1]['position']['x'] \
+        <= min_max[1]
+    agent_stand_behind_buffer = 1
+    assert 0 <= scene.objects[0]['shows'][1]['position']['z'] <= \
+        scene.room_dimensions.z / 2 - agent_stand_behind_buffer
 
     # target
+    x, z = \
+        get_magnitudes_of_x_z_dirs_for_rotation_and_move_vector(
+            teleport_rotation, -IMITATION_TASK_TARGET_SEPARATION, 0)
+    x = first_container_teleport_position['x'] - x
+    z = first_container_teleport_position['z'] - z
     target = scene.objects[3]
     assert target['triggeredBy']
     assert target['type'] == 'soccer_ball'
@@ -4503,10 +4620,8 @@ def test_shortcut_imitation_left_side_teleport_containers_right_middle():
         end_container[0]['position']['x']
     assert target['shows'][0]['position']['z'] == \
         end_container[0]['position']['z'] - IMITATION_TASK_TARGET_SEPARATION
-    assert target['shows'][1]['position']['x'] == \
-        end_container[1]['position']['x']
-    assert target['shows'][1]['position']['z'] == \
-        end_container[1]['position']['z'] - IMITATION_TASK_TARGET_SEPARATION
+    assert target['shows'][1]['position']['x'] == x
+    assert target['shows'][1]['position']['z'] == z
     assert target['shows'][1]['stepBegin'] == kidnapp_step
     assert target['kinematic']
     assert len(target['moves']) == 1
@@ -4524,10 +4639,8 @@ def test_shortcut_imitation_left_side_teleport_containers_right_middle():
         end_container[0]['position']['x']
     assert placer['shows'][0]['position']['z'] == \
         end_container[0]['position']['z'] - IMITATION_TASK_TARGET_SEPARATION
-    assert placer['shows'][1]['position']['x'] == \
-        end_container[1]['position']['x']
-    assert placer['shows'][1]['position']['z'] == \
-        end_container[1]['position']['z'] - IMITATION_TASK_TARGET_SEPARATION
+    assert placer['shows'][1]['position']['x'] == x
+    assert placer['shows'][1]['position']['z'] == z
     assert placer['shows'][1]['stepBegin'] == kidnapp_step
     assert len(placer['moves']) == 2
     assert placer['moves'][0]['stepBegin'] == 0
@@ -4548,22 +4661,23 @@ def test_shortcut_imitation_left_side_teleport_containers_right_middle():
     assert start['position']['z'] == 1  # right chest
     assert start['rotation']['y'] == -90  # face left
     teleport = agent['shows'][1]
-    teleport['stepBegin'] == kidnapp_step
-    teleport['rotation']['y'] == 180  # face performer
-    end_container_pos = containers[0]['shows'][1]['position']['z']
+    assert teleport['stepBegin'] == kidnapp_step
+    assert teleport['rotation']['y'] == 180  # face performer
     # behind containers
     separation = 1
-    teleport['position']['z'] == end_container_pos + separation
-    # of to the right or the left since the containers were rotated 90
+    max_container_z = \
+        max(containers, key=lambda c: c['shows'][1]['position']['z'])[
+            'shows'][1]['position']['z']
+    assert teleport['position']['z'] == max_container_z + separation
+    index = IMITATION_CONTAINER_TELEPORT_ROTATIONS_GLOBAL.index(
+        teleport_rotation)
+    min_max = IMITATION_CONTAINER_TELEPORT_X_POS_RANGE[index]
     assert (
-        teleport['position']['x'] ==
-        containers[0]['shows'][1]['position']['x'] - separation or
-        containers[-1]['shows'][1]['position']['x'] + separation)
-    teleport['position']['x'] == 0
-    teleport['position']['z'] == 0
+        teleport['position']['x'] == min_max[0] - separation or
+        teleport['position']['x'] == min_max[1] + separation)
     assert len(agent['rotates']) == 1
     assert agent['rotates'][0]['stepBegin'] == 57
-    # right rotation because agent is walking torward perfromer
+    # left rotation because agent is walking torward perfromer
     assert agent['rotates'][0]['vector']['y'] == 9
     # opening containers sequence
     animations = agent['actions']
@@ -4588,8 +4702,8 @@ def test_shortcut_imitation_left_side_teleport_containers_right_middle():
     assert (movement['sequence'][0]['endPoint']['x'] ==
             movement['sequence'][1]['endPoint']['x'] ==
             movement['sequence'][2]['endPoint']['x'] == -IMITATION_AGENT_END_X)
-    assert movement['sequence'][0]['endPoint']['z'] == 1  # right
-    assert movement['sequence'][1]['endPoint']['z'] == 0  # middle
+    assert movement['sequence'][0]['endPoint']['z'] == 1.0  # right
+    assert movement['sequence'][1]['endPoint']['z'] == 0.0  # middle
     assert movement['sequence'][2]['endPoint']['z'] == -0.15  # face performer
 
 
@@ -4613,21 +4727,20 @@ def test_shortcut_imitation_right_side_teleport_containers_right_middle():
     kidnapp_step = scene.debug['endHabituationStep']
 
     # goal
-    assert scene.goal['category'] == 'imitation'
-    assert scene.goal['description'] == (
+    assert scene.goal.category == 'imitation'
+    assert scene.goal.description == (
         'Open the containers in the correct order for '
         'the tiny light black white rubber ball to be placed.')
-    assert len(scene.goal['triggeredByTargetSequence']) == 2
+    assert len(scene.goal.triggered_by_target_sequence) == 2
     # right container
-    assert scene.goal['triggeredByTargetSequence'][0] == scene.objects[2]['id']
+    assert scene.goal.triggered_by_target_sequence[0] == scene.objects[2]['id']
     # middle container
-    assert scene.goal['triggeredByTargetSequence'][1] == scene.objects[1]['id']
+    assert scene.goal.triggered_by_target_sequence[1] == scene.objects[1]['id']
     # action list
-    assert len(scene.goal['action_list']) == kidnapp_step
+    assert len(scene.goal.action_list) == kidnapp_step
     for i in range(kidnapp_step):
-        scene.goal['action_list'][i][0] == 'Pass'
-    assert scene.goal['action_list'][-1][0].startswith('EndHabituation')
-
+        scene.goal.action_list[i][0] == 'Pass'
+    assert scene.goal.action_list[-1][0].startswith('EndHabituation')
     # rectangular room with always 3 ceiling height
     assert (scene.room_dimensions.x == scene.room_dimensions.z /
             2 or scene.room_dimensions.x == scene.room_dimensions.z * 2)
@@ -4651,6 +4764,19 @@ def test_shortcut_imitation_right_side_teleport_containers_right_middle():
     colors_used = []
     containers = scene.objects[0:3]
     end_container = containers[-1]['shows']
+    teleport_rotation = containers[0]['shows'][1]['rotation']['y']
+    first_container_teleport_position = containers[0]['shows'][1]['position']
+    start_x = first_container_teleport_position['x']
+    start_z = first_container_teleport_position['z']
+    teleport_positions = []
+    teleport_positions.append((start_x, start_z))
+    for _ in range(1, 3):
+        x, z = \
+            get_magnitudes_of_x_z_dirs_for_rotation_and_move_vector(
+                teleport_rotation, IMITATION_CONTAINER_SEPARATION, 0)
+        start_x -= x
+        start_z -= z
+        teleport_positions.append((start_x, start_z))
     for i in range(3):
         colors_used.append(containers[i]['debug']['color'][0])
         assert containers[i]['shows'][0]['position']['z'] == -(i - 1)
@@ -4661,38 +4787,44 @@ def test_shortcut_imitation_right_side_teleport_containers_right_middle():
         assert containers[i]['shows'][0]['scale']['z'] == 1
 
         teleport = containers[i]['shows'][1]
-        assert teleport['rotation']['y'] == -90
-        if i < 1:
-            # make sure next chest is in a straight line on z axis
-            assert teleport['position']['z'] > \
-                containers[i + 1]['shows'][1]['position']['z']
-            assert teleport['position']['x'] == \
-                containers[i + 1]['shows'][1]['position']['x']
+        assert round(
+            teleport['position']['x'], 3) == round(
+            teleport_positions[i][0], 3)
+        assert round(
+            teleport['position']['z'], 3) == round(
+            teleport_positions[i][1], 3)
+        assert teleport['rotation']['y'] in IMITATION_CONTAINER_TELEPORT_ROTATIONS_GLOBAL  # noqa
+        assert teleport['rotation']['y'] == teleport_rotation
         assert containers[i]['shows'][1]['stepBegin'] == kidnapp_step
     # no duplicate colors
     assert len(colors_used) == len(set(colors_used))
     # open close
-    assert containers[0].get('openClose') is None  # left container
     assert containers[2]['openClose'][0]['step'] == 22
     assert containers[2]['openClose'][0]['open'] is True
     assert containers[2]['openClose'][1]['step'] == kidnapp_step
     assert containers[2]['openClose'][1]['open'] is False
+    assert containers[0].get('openClose') is None  # left container
     assert containers[1]['openClose'][0]['step'] == 71
     assert containers[1]['openClose'][0]['open'] is True
     assert containers[1]['openClose'][1]['step'] == kidnapp_step
     assert containers[1]['openClose'][1]['open'] is False
-
-    # in view after teleport
-    buffer_for_agent_to_stand_behind = 1
-    minimum = 2
-    maximum = scene.room_dimensions.z / 2 - \
-        buffer_for_agent_to_stand_behind
-    assert -2.5 <= scene.objects[0]['shows'][1]['position']['x'] <= 2.5
-    assert -2.5 <= scene.objects[1]['shows'][1]['position']['x'] <= 2.5
-    assert -2.5 <= scene.objects[2]['shows'][1]['position']['x'] <= 2.5
-    assert minimum <= containers[0]['shows'][1]['position']['z'] <= maximum
+    # left container is in view after rotation, it tells us if the other
+    # containers are in view because they are in a straight line
+    index = IMITATION_CONTAINER_TELEPORT_ROTATIONS_GLOBAL.index(
+        teleport_rotation)
+    min_max = IMITATION_CONTAINER_TELEPORT_X_POS_RANGE[index]
+    assert min_max[0] <= scene.objects[0]['shows'][1]['position']['x'] \
+        <= min_max[1]
+    agent_stand_behind_buffer = 1
+    assert 0 <= scene.objects[0]['shows'][1]['position']['z'] <= \
+        scene.room_dimensions.z / 2 - agent_stand_behind_buffer
 
     # target
+    x, z = \
+        get_magnitudes_of_x_z_dirs_for_rotation_and_move_vector(
+            teleport_rotation, IMITATION_TASK_TARGET_SEPARATION, 0)
+    x = end_container[1]['position']['x'] - x
+    z = end_container[1]['position']['z'] - z
     target = scene.objects[3]
     assert target['triggeredBy']
     assert target['type'] == 'soccer_ball'
@@ -4700,10 +4832,8 @@ def test_shortcut_imitation_right_side_teleport_containers_right_middle():
         end_container[0]['position']['x']
     assert target['shows'][0]['position']['z'] == \
         end_container[0]['position']['z'] - IMITATION_TASK_TARGET_SEPARATION
-    assert target['shows'][1]['position']['x'] == \
-        end_container[1]['position']['x']
-    assert target['shows'][1]['position']['z'] == \
-        end_container[1]['position']['z'] - IMITATION_TASK_TARGET_SEPARATION
+    assert target['shows'][1]['position']['x'] == x
+    assert target['shows'][1]['position']['z'] == z
     assert target['shows'][1]['stepBegin'] == kidnapp_step
     assert target['kinematic']
     assert len(target['moves']) == 1
@@ -4721,10 +4851,8 @@ def test_shortcut_imitation_right_side_teleport_containers_right_middle():
         end_container[0]['position']['x']
     assert placer['shows'][0]['position']['z'] == \
         end_container[0]['position']['z'] - IMITATION_TASK_TARGET_SEPARATION
-    assert placer['shows'][1]['position']['x'] == \
-        end_container[1]['position']['x']
-    assert placer['shows'][1]['position']['z'] == \
-        end_container[1]['position']['z'] - IMITATION_TASK_TARGET_SEPARATION
+    assert placer['shows'][1]['position']['x'] == x
+    assert placer['shows'][1]['position']['z'] == z
     assert placer['shows'][1]['stepBegin'] == kidnapp_step
     assert len(placer['moves']) == 2
     assert placer['moves'][0]['stepBegin'] == 0
@@ -4742,25 +4870,26 @@ def test_shortcut_imitation_right_side_teleport_containers_right_middle():
     # positions
     start = agent['shows'][0]
     assert start['position']['x'] == -IMITATION_AGENT_START_X
-    assert start['position']['z'] == -1  # right chest
+    assert start['position']['z'] == -1  # left chest
     assert start['rotation']['y'] == 90  # face right
     teleport = agent['shows'][1]
-    teleport['stepBegin'] == kidnapp_step
-    teleport['rotation']['y'] == 180  # face performer
-    end_container_pos = containers[0]['shows'][1]['position']['z']
+    assert teleport['stepBegin'] == kidnapp_step
+    assert teleport['rotation']['y'] == 180  # face performer
     # behind containers
     separation = 1
-    teleport['position']['z'] == end_container_pos + separation
-    # of to the right or the left since the containers were rotate 90
+    max_container_z = \
+        max(containers, key=lambda c: c['shows'][1]['position']['z'])[
+            'shows'][1]['position']['z']
+    assert teleport['position']['z'] == max_container_z + separation
+    index = IMITATION_CONTAINER_TELEPORT_ROTATIONS_GLOBAL.index(
+        teleport_rotation)
+    min_max = IMITATION_CONTAINER_TELEPORT_X_POS_RANGE[index]
     assert (
-        teleport['position']['x'] ==
-        containers[0]['shows'][1]['position']['x'] - separation or
-        containers[-1]['shows'][1]['position']['x'] + separation)
-    teleport['position']['x'] == 0
-    teleport['position']['z'] == 0
+        teleport['position']['x'] == min_max[0] - separation or
+        teleport['position']['x'] == min_max[1] + separation)
     assert len(agent['rotates']) == 1
     assert agent['rotates'][0]['stepBegin'] == 57
-    # right rotation because agent is walking torward perfromer
+    # left rotation because agent is walking torward perfromer
     assert agent['rotates'][0]['vector']['y'] == 9
     # opening containers sequence
     animations = agent['actions']
@@ -4785,8 +4914,8 @@ def test_shortcut_imitation_right_side_teleport_containers_right_middle():
     assert (movement['sequence'][0]['endPoint']['x'] ==
             movement['sequence'][1]['endPoint']['x'] ==
             movement['sequence'][2]['endPoint']['x'] == IMITATION_AGENT_END_X)
-    assert movement['sequence'][0]['endPoint']['z'] == -1  # right
-    assert movement['sequence'][1]['endPoint']['z'] == 0  # middle
+    assert movement['sequence'][0]['endPoint']['z'] == -1.0  # right
+    assert movement['sequence'][1]['endPoint']['z'] == 0.0  # middle
     assert movement['sequence'][2]['endPoint']['z'] == -0.15  # face performer
 
 
@@ -4810,18 +4939,18 @@ def test_shortcut_imitation_left_side_teleport_performer_left():
     kidnapp_step = scene.debug['endHabituationStep']
 
     # goal
-    assert scene.goal['category'] == 'imitation'
-    assert scene.goal['description'] == (
+    assert scene.goal.category == 'imitation'
+    assert scene.goal.description == (
         'Open the containers in the correct order for '
         'the tiny light black white rubber ball to be placed.')
-    assert len(scene.goal['triggeredByTargetSequence']) == 1
+    assert len(scene.goal.triggered_by_target_sequence) == 1
     # left container
-    assert scene.goal['triggeredByTargetSequence'][0] == scene.objects[0]['id']
+    assert scene.goal.triggered_by_target_sequence[0] == scene.objects[0]['id']
     # action list
-    assert len(scene.goal['action_list']) == kidnapp_step
+    assert len(scene.goal.action_list) == kidnapp_step
     for i in range(kidnapp_step):
-        scene.goal['action_list'][i][0] == 'Pass'
-    assert scene.goal['action_list'][-1][0].startswith('EndHabituation')
+        scene.goal.action_list[i][0] == 'Pass'
+    assert scene.goal.action_list[-1][0].startswith('EndHabituation')
 
     # rectangular room with always 3 ceiling height
     assert (scene.room_dimensions.x == scene.room_dimensions.z /
@@ -4940,7 +5069,7 @@ def test_shortcut_imitation_left_side_teleport_performer_left():
     assert start['rotation']['y'] == -90  # face right
     # move agent after kidnapp
     teleport = agent['shows'][1]
-    teleport['stepBegin'] == kidnapp_step
+    assert teleport['stepBegin'] == kidnapp_step
     agent_z_choices = (-2, 2)
     agent_x_range = (-2, 2)
     assert teleport['rotation']['y'] == \
@@ -4989,18 +5118,18 @@ def test_shortcut_imitation_right_side_teleport_performer_right():
     kidnapp_step = scene.debug['endHabituationStep']
 
     # goal
-    assert scene.goal['category'] == 'imitation'
-    assert scene.goal['description'] == (
+    assert scene.goal.category == 'imitation'
+    assert scene.goal.description == (
         'Open the containers in the correct order for '
         'the tiny light black white rubber ball to be placed.')
-    assert len(scene.goal['triggeredByTargetSequence']) == 1
+    assert len(scene.goal.triggered_by_target_sequence) == 1
     # left container
-    assert scene.goal['triggeredByTargetSequence'][0] == scene.objects[2]['id']
+    assert scene.goal.triggered_by_target_sequence[0] == scene.objects[2]['id']
     # action list
-    assert len(scene.goal['action_list']) == kidnapp_step
+    assert len(scene.goal.action_list) == kidnapp_step
     for i in range(kidnapp_step):
-        scene.goal['action_list'][i][0] == 'Pass'
-    assert scene.goal['action_list'][-1][0].startswith('EndHabituation')
+        scene.goal.action_list[i][0] == 'Pass'
+    assert scene.goal.action_list[-1][0].startswith('EndHabituation')
 
     # rectangular room with always 3 ceiling height
     assert (scene.room_dimensions.x == scene.room_dimensions.z /
@@ -5119,7 +5248,7 @@ def test_shortcut_imitation_right_side_teleport_performer_right():
     assert start['rotation']['y'] == 90  # face right
     # move agent after kidnapp
     teleport = agent['shows'][1]
-    teleport['stepBegin'] == kidnapp_step
+    assert teleport['stepBegin'] == kidnapp_step
     agent_z_choices = (-2, 2)
     agent_x_range = (-2, 2)
     assert teleport['rotation']['y'] == \
@@ -5154,18 +5283,18 @@ def test_shortcut_imitation_left_side_middle():
     kidnapp_step = scene.debug['endHabituationStep']
 
     # goal
-    assert scene.goal['category'] == 'imitation'
-    assert scene.goal['description'] == (
+    assert scene.goal.category == 'imitation'
+    assert scene.goal.description == (
         'Open the containers in the correct order for '
         'the tiny light black white rubber ball to be placed.')
-    assert len(scene.goal['triggeredByTargetSequence']) == 1
+    assert len(scene.goal.triggered_by_target_sequence) == 1
     # left container
-    assert scene.goal['triggeredByTargetSequence'][0] == scene.objects[1]['id']
+    assert scene.goal.triggered_by_target_sequence[0] == scene.objects[1]['id']
     # action list
-    assert len(scene.goal['action_list']) == kidnapp_step
+    assert len(scene.goal.action_list) == kidnapp_step
     for i in range(kidnapp_step):
-        scene.goal['action_list'][i][0] == 'Pass'
-    assert scene.goal['action_list'][-1][0].startswith('EndHabituation')
+        scene.goal.action_list[i][0] == 'Pass'
+    assert scene.goal.action_list[-1][0].startswith('EndHabituation')
 
     # rectangular room with always 3 ceiling height
     assert (scene.room_dimensions.x == scene.room_dimensions.z /
@@ -5262,7 +5391,7 @@ def test_shortcut_imitation_left_side_middle():
     assert start['rotation']['y'] == -90  # face left
     # move agent after kidnapp
     teleport = agent['shows'][1]
-    teleport['stepBegin'] == kidnapp_step
+    assert teleport['stepBegin'] == kidnapp_step
     agent_x_range = (-2, 2)
     assert teleport['rotation']['y'] == 180
     assert teleport['position']['z'] == 2
@@ -5288,7 +5417,7 @@ def test_shortcut_imitation_left_side_middle():
     assert movement['sequence'][1]['endPoint']['z'] == -0.15  # face performer
 
 
-def test_shortcut_imitation_right_side_teleport_containers_middle_left():
+def test_shortcut_imitation_right_side_middle_left():
     component = ShortcutComponent({
         'shortcut_imitation_task': {
             'trigger_order': 'middle_left',
@@ -5308,20 +5437,18 @@ def test_shortcut_imitation_right_side_teleport_containers_middle_left():
     kidnapp_step = scene.debug['endHabituationStep']
 
     # goal
-    assert scene.goal['category'] == 'imitation'
-    assert scene.goal['description'] == (
+    assert scene.goal.category == 'imitation'
+    assert scene.goal.description == (
         'Open the containers in the correct order for '
         'the tiny light black white rubber ball to be placed.')
-    assert len(scene.goal['triggeredByTargetSequence']) == 2
+    assert len(scene.goal.triggered_by_target_sequence) == 2
     # left container
-    assert scene.goal['triggeredByTargetSequence'][0] == scene.objects[1]['id']
-    # right container
-    assert scene.goal['triggeredByTargetSequence'][1] == scene.objects[0]['id']
+    assert scene.goal.triggered_by_target_sequence[0] == scene.objects[1]['id']
     # action list
-    assert len(scene.goal['action_list']) == kidnapp_step
+    assert len(scene.goal.action_list) == kidnapp_step
     for i in range(kidnapp_step):
-        scene.goal['action_list'][i][0] == 'Pass'
-    assert scene.goal['action_list'][-1][0].startswith('EndHabituation')
+        scene.goal.action_list[i][0] == 'Pass'
+    assert scene.goal.action_list[-1][0].startswith('EndHabituation')
 
     # rectangular room with always 3 ceiling height
     assert (scene.room_dimensions.x == scene.room_dimensions.z /
@@ -5420,8 +5547,8 @@ def test_shortcut_imitation_right_side_teleport_containers_middle_left():
     assert start['position']['z'] == 0  # middle chest
     assert start['rotation']['y'] == 90  # face right
     teleport = agent['shows'][1]
-    teleport['stepBegin'] == kidnapp_step
-    teleport['rotation']['y'] == 180  # face performer
+    assert teleport['stepBegin'] == kidnapp_step
+    assert teleport['rotation']['y'] == 180  # face performer
     # behind containers
     # of to the right or the left since the containers were rotate 90
     assert -2 <= teleport['position']['x'] <= 2
@@ -5458,6 +5585,173 @@ def test_shortcut_imitation_right_side_teleport_containers_middle_left():
     assert movement['sequence'][2]['endPoint']['z'] == 0.85  # face performer
 
 
+def test_shortcut_imitation_container_rotations():
+    right_side_check = (True, IMITATION_CONTAINER_TELEPORT_ROTATIONS_GLOBAL,
+                        IMITATION_CONTAINER_TELEPORT_ROTATIONS_RIGHT_SIDE)
+    left_side_check = (False, IMITATION_CONTAINER_TELEPORT_ROTATIONS_GLOBAL,
+                       IMITATION_CONTAINER_TELEPORT_ROTATIONS_LEFT_SIDE)
+    for (on_right_side, global_rotations, relative_rotations) in \
+            [right_side_check, left_side_check]:
+        rotation_amount_with_rotation_types = (
+            [(rot, 'global') for rot in global_rotations] +
+            [(rot, 'relative') for rot in relative_rotations])
+        for rot, rotation_type in rotation_amount_with_rotation_types:
+            component = ShortcutComponent({
+                'shortcut_imitation_task': {
+                    'containers_on_right_side': on_right_side,
+                    'kidnap_option': 'containers',
+                    f'{rotation_type}_container_rotation': rot
+                }
+            })
+            assert (
+                component.shortcut_imitation_task.containers_on_right_side ==
+                on_right_side)
+            assert (
+                component.shortcut_imitation_task.kidnap_option ==
+                'containers')
+            scene = component.update_ile_scene(prior_scene())
+            containers = scene.objects[0:3]
+            teleport_rotation = (rot if rotation_type == 'global' else
+                                 ((270 if on_right_side else 90) + rot) % 360)
+            assert all(
+                c['shows'][1]['rotation']['y'] == teleport_rotation
+                for c in containers)
+
+
+def test_shortcut_imitation_container_rotations_global_override():
+    right_side_check = (True, IMITATION_CONTAINER_TELEPORT_ROTATIONS_GLOBAL,
+                        IMITATION_CONTAINER_TELEPORT_ROTATIONS_RIGHT_SIDE)
+    left_side_check = (False, IMITATION_CONTAINER_TELEPORT_ROTATIONS_GLOBAL,
+                       IMITATION_CONTAINER_TELEPORT_ROTATIONS_LEFT_SIDE)
+    for (on_right_side, global_rotations, relative_rotations) in \
+            [right_side_check, left_side_check]:
+        for global_rotation in global_rotations:
+            for relative_rotation in relative_rotations:
+                component = ShortcutComponent({
+                    'shortcut_imitation_task': {
+                        'containers_on_right_side': on_right_side,
+                        'kidnap_option': 'containers',
+                        'global_container_rotation': global_rotation,
+                        'relative_container_rotation': relative_rotation
+                    }
+                })
+                assert (
+                    component.shortcut_imitation_task.containers_on_right_side ==  # noqa
+                    on_right_side)
+                assert (
+                    component.shortcut_imitation_task.kidnap_option ==
+                    'containers')
+                scene = component.update_ile_scene(prior_scene())
+                containers = scene.objects[0:3]
+                # Expecting global rotation to override relative rotation
+                assert all(
+                    c['shows'][1]['rotation']['y'] == global_rotation
+                    for c in containers)
+
+
+def test_shortcut_imitation_container_rotations_multiple_choices():
+    right_side_check = (True, IMITATION_CONTAINER_TELEPORT_ROTATIONS_GLOBAL,
+                        IMITATION_CONTAINER_TELEPORT_ROTATIONS_RIGHT_SIDE)
+    left_side_check = (False, IMITATION_CONTAINER_TELEPORT_ROTATIONS_GLOBAL,
+                       IMITATION_CONTAINER_TELEPORT_ROTATIONS_LEFT_SIDE)
+    for (on_right_side, global_rotations, relative_rotations) in \
+            [right_side_check, left_side_check]:
+        rotation_amounts_with_rotation_types = \
+            [('global', global_rotations), ('relative', relative_rotations)]
+        for rotation_type, rotations in rotation_amounts_with_rotation_types:
+            # make sure all rotations are randomly ran
+            for i in range(25):
+                component = ShortcutComponent({
+                    'shortcut_imitation_task': {
+                        'containers_on_right_side': on_right_side,
+                        'kidnap_option': 'containers',
+                        f'{rotation_type}_container_rotation': rotations
+                    }
+                })
+                assert (
+                    component.shortcut_imitation_task.containers_on_right_side ==  # noqa
+                    on_right_side)
+                assert (
+                    component.shortcut_imitation_task.kidnap_option ==
+                    'containers')
+                scene = component.update_ile_scene(prior_scene())
+                containers = scene.objects[0:3]
+                teleport_rotation = containers[0]['shows'][1]['rotation']['y']
+                global_rot = teleport_rotation
+                right_side_rot = (teleport_rotation - 270) % 360
+                left_side_rot = (teleport_rotation - 90) % 360
+                assert (
+                    global_rot in
+                    IMITATION_CONTAINER_TELEPORT_ROTATIONS_GLOBAL if
+                    rotation_type == "global" else
+                    right_side_rot in
+                    IMITATION_CONTAINER_TELEPORT_ROTATIONS_RIGHT_SIDE if
+                    on_right_side else left_side_rot in
+                    IMITATION_CONTAINER_TELEPORT_ROTATIONS_LEFT_SIDE)
+                assert all(
+                    c['shows'][1]['rotation']['y'] == teleport_rotation
+                    for c in containers)
+
+
+def test_shortcut_imitation_container_rotations_only_on_container_kidnap():
+    for on_right_side in [True, False]:
+        for kidnap_option in ['agent_only', 'performer']:
+            for rotation_type in ['global', 'relative']:
+                component = ShortcutComponent({
+                    'shortcut_imitation_task': {
+                        'containers_on_right_side': on_right_side,
+                        'kidnap_option': kidnap_option,
+                        f'{rotation_type}_container_rotation': 45
+                    }
+                })
+                assert (
+                    component.shortcut_imitation_task.kidnap_option ==
+                    kidnap_option
+                )
+                scene = component.update_ile_scene(prior_scene())
+                containers = scene.objects[0:3]
+                same_start_rotation = -90 if on_right_side else 90
+                assert all(len(c['shows']) == 1 for c in containers)
+                assert all(
+                    c['shows'][0]['rotation']['y'] == same_start_rotation
+                    for c in containers)
+
+
+def test_shortcut_imitation_container_rotations_errors():
+    global_rotations = [
+        i for i in range(361) if i not in
+        IMITATION_CONTAINER_TELEPORT_ROTATIONS_GLOBAL]
+    right_side_relative_rotations = [
+        i for i in range(361) if i not in
+        IMITATION_CONTAINER_TELEPORT_ROTATIONS_RIGHT_SIDE]
+    left_side_relative_rotations = [
+        i for i in range(361) if i not in
+        IMITATION_CONTAINER_TELEPORT_ROTATIONS_LEFT_SIDE]
+    rotation_type_lists = [
+        ('global', global_rotations),
+        ('relative_right', right_side_relative_rotations),
+        ('relative_left', left_side_relative_rotations)]
+
+    for rotation_type, rotation_list in rotation_type_lists:
+        side_conditions = (
+            [True, False] if rotation_type == 'global' else
+            [True] if rotation_type.endswith("right") else [False]
+        )
+        component_rotation_type = \
+            "global" if rotation_type == "global" else "relative"
+        for on_right_side in side_conditions:
+            for rot in rotation_list:
+                component = ShortcutComponent({
+                    'shortcut_imitation_task': {
+                        'containers_on_right_side': on_right_side,
+                        'kidnap_option': 'containers',
+                        f'{component_rotation_type}_container_rotation': rot
+                    }
+                })
+                with pytest.raises(ILEException):
+                    component.update_ile_scene(prior_scene())
+
+
 def test_shortcut_imitation_true():
     component = ShortcutComponent({
         'shortcut_imitation_task': True
@@ -5475,35 +5769,47 @@ def test_shortcut_imitation_true():
     assert scene.objects[5]['type'].startswith('agent')
 
 
-def test_shortcut_imitation_trigger_order_failures():
-    options = ['error', 'left_middle_right', 'left_right_middle',
-               'middle_right_left', 'middle_left_right', 'right_middle_left',
-               'right_left_middle']
-    for option in options:
+def test_shortcut_imitation_failures():
+    trigger_order_options = [
+        'error', 'left_middle_right', 'left_right_middle', 'middle_right_left',
+        'middle_left_right', 'right_middle_left', 'right_left_middle']
+    for option in trigger_order_options:
         with pytest.raises(ILEException):
             ShortcutComponent({
                 'shortcut_imitation_task': {
                     'trigger_order': option,
                 }
             })
-
-
-def test_shortcut_imitation_trigger_order_options():
-    options = ['left', 'middle', 'right', 'left_middle', 'left_right',
-               'middle_left', 'middle_right', 'right_middle', 'right_left']
     with pytest.raises(ILEException):
         ShortcutComponent({
             'shortcut_imitation_task': {
-                'trigger_order': 'error',
+                'kidnap_option': 'error'
             }
         })
-    for option in options:
+
+
+def test_shortcut_imitation_options():
+    trigger_order_options = [
+        'left', 'middle', 'right', 'left_middle', 'left_right',
+        'middle_left', 'middle_right', 'right_middle', 'right_left']
+    for option in trigger_order_options:
         component = ShortcutComponent({
             'shortcut_imitation_task': {
                 'trigger_order': option,
             }
         })
         assert component.shortcut_imitation_task
+        assert component.shortcut_imitation_task.trigger_order == option
+
+    kidnap_options = ['agent_only', 'containers', 'performer']
+    for option in kidnap_options:
+        component = ShortcutComponent({
+            'shortcut_imitation_task': {
+                'kidnap_option': option,
+            }
+        })
+        assert component.shortcut_imitation_task
+        assert component.shortcut_imitation_task.kidnap_option == option
 
 
 def test_shortcut_lava_target_tool_offset_rectangular():
@@ -5798,23 +6104,23 @@ def test_shortcut_lava_target_tool_broken():
             'tool_type': 'broken'
         }
     })
-    minimum = structures.BROKEN_TOOL_HORIZONTAL_SEPARATION_MIN
-    maximum = structures.BROKEN_TOOL_HORIZONTAL_SEPARATION_MAX
+    minimum = tools.BROKEN_TOOL_HORIZONTAL_SEPARATION_MIN
+    maximum = tools.BROKEN_TOOL_HORIZONTAL_SEPARATION_MAX
     assert component.shortcut_lava_target_tool
     assert component.shortcut_lava_target_tool.tool_type == 'broken'
     assert component.get_shortcut_lava_target_tool()
     scene = prior_scene_custom_size(15, 20)
     scene = component.update_ile_scene(scene)
     objs = scene.objects
-    tools = objs[1:]
-    assert len(tools) == 5
-    first_tool_pos = tools[0]['shows'][0]['position']
-    last_tool_pos = tools[-1]['shows'][0]['position']
+    tool_list = objs[1:]
+    assert len(tool_list) == 5
+    first_tool_pos = tool_list[0]['shows'][0]['position']
+    last_tool_pos = tool_list[-1]['shows'][0]['position']
     assert first_tool_pos['z'] == 3
     assert last_tool_pos['z'] == round(
         first_tool_pos['z'] -
-        structures.BROKEN_TOOL_VERTICAL_SEPARATION * (len(tools) - 1), 2)
-    for tool in tools:
+        tools.BROKEN_TOOL_VERTICAL_SEPARATION * (len(tool_list) - 1), 2)
+    for tool in tool_list:
         assert tool['type'].startswith('tool_rect')
         assert tool['debug']['length'] == 1
         pos_x = tool['shows'][0]['position']['x']
@@ -5824,15 +6130,15 @@ def test_shortcut_lava_target_tool_broken():
     scene = prior_scene_custom_size(20, 15)
     scene = component.update_ile_scene(scene)
     objs = scene.objects
-    tools = objs[1:]
-    assert len(tools) == 5
-    first_tool_pos = tools[0]['shows'][0]['position']
-    last_tool_pos = tools[-1]['shows'][0]['position']
+    tool_list = objs[1:]
+    assert len(tool_list) == 5
+    first_tool_pos = tool_list[0]['shows'][0]['position']
+    last_tool_pos = tool_list[-1]['shows'][0]['position']
     assert first_tool_pos['x'] == 3
     assert last_tool_pos['x'] == round(
         first_tool_pos['x'] -
-        structures.BROKEN_TOOL_VERTICAL_SEPARATION * (len(tools) - 1), 2)
-    for tool in tools:
+        tools.BROKEN_TOOL_VERTICAL_SEPARATION * (len(tool_list) - 1), 2)
+    for tool in tool_list:
         assert tool['type'].startswith('tool_rect')
         assert tool['debug']['length'] == 1
         pos_z = tool['shows'][0]['position']['z']
@@ -5858,20 +6164,20 @@ def test_shortcut_lava_target_tool_broken_rotated():
     scene = prior_scene_custom_size(15, 20)
     scene = component.update_ile_scene(scene)
     objs = scene.objects
-    tools = objs[1:]
-    assert len(tools) == 5
-    first_tool_pos = tools[0]['shows'][0]['position']
-    last_tool_pos = tools[-1]['shows'][0]['position']
+    tool_list = objs[1:]
+    assert len(tool_list) == 5
+    first_tool_pos = tool_list[0]['shows'][0]['position']
+    last_tool_pos = tool_list[-1]['shows'][0]['position']
     assert first_tool_pos['x'] == 2
     assert last_tool_pos['x'] == round(
         first_tool_pos['x'] -
-        structures.BROKEN_TOOL_VERTICAL_SEPARATION * (len(tools) - 1), 2)
+        tools.BROKEN_TOOL_VERTICAL_SEPARATION * (len(tool_list) - 1), 2)
     center_of_broken_tools = 1
     positive_x_maximum = center_of_broken_tools + \
-        structures.BROKEN_TOOL_HORIZONTAL_SEPARATION_MAX
+        tools.BROKEN_TOOL_HORIZONTAL_SEPARATION_MAX
     negative_x_maximum = center_of_broken_tools - \
-        structures.BROKEN_TOOL_HORIZONTAL_SEPARATION_MAX
-    for tool in tools:
+        tools.BROKEN_TOOL_HORIZONTAL_SEPARATION_MAX
+    for tool in tool_list:
         assert tool['type'].startswith('tool_rect')
         assert tool['debug']['length'] == 1
         pos_z = tool['shows'][0]['position']['z']
@@ -5880,20 +6186,20 @@ def test_shortcut_lava_target_tool_broken_rotated():
     scene = prior_scene_custom_size(20, 15)
     scene = component.update_ile_scene(scene)
     objs = scene.objects
-    tools = objs[1:]
-    assert len(tools) == 5
-    first_tool_pos = tools[0]['shows'][0]['position']
-    last_tool_pos = tools[-1]['shows'][0]['position']
+    tool_list = objs[1:]
+    assert len(tool_list) == 5
+    first_tool_pos = tool_list[0]['shows'][0]['position']
+    last_tool_pos = tool_list[-1]['shows'][0]['position']
     assert first_tool_pos['z'] == -2
     assert last_tool_pos['z'] == round(
         first_tool_pos['z'] +
-        structures.BROKEN_TOOL_VERTICAL_SEPARATION * (len(tools) - 1), 2)
+        tools.BROKEN_TOOL_VERTICAL_SEPARATION * (len(tool_list) - 1), 2)
     center_of_broken_tools = 1
     positive_x_maximum = center_of_broken_tools + \
-        structures.BROKEN_TOOL_HORIZONTAL_SEPARATION_MAX
+        tools.BROKEN_TOOL_HORIZONTAL_SEPARATION_MAX
     negative_x_maximum = center_of_broken_tools - \
-        structures.BROKEN_TOOL_HORIZONTAL_SEPARATION_MAX
-    for tool in tools:
+        tools.BROKEN_TOOL_HORIZONTAL_SEPARATION_MAX
+    for tool in tool_list:
         assert tool['type'].startswith('tool_rect')
         assert tool['debug']['length'] == 1
         pos_x = tool['shows'][0]['position']['x']
@@ -6298,28 +6604,28 @@ def test_shortcut_lava_target_tool_offset_broken():
         }
     })
     minimum_positive = \
-        structures.BROKEN_TOOL_HORIZONTAL_SEPARATION_MIN + horizontal
+        tools.BROKEN_TOOL_HORIZONTAL_SEPARATION_MIN + horizontal
     maximum_positive = \
-        structures.BROKEN_TOOL_HORIZONTAL_SEPARATION_MAX + horizontal
+        tools.BROKEN_TOOL_HORIZONTAL_SEPARATION_MAX + horizontal
     minimum_negative = \
-        structures.BROKEN_TOOL_HORIZONTAL_SEPARATION_MIN - horizontal
+        tools.BROKEN_TOOL_HORIZONTAL_SEPARATION_MIN - horizontal
     maximum_negative = \
-        structures.BROKEN_TOOL_HORIZONTAL_SEPARATION_MAX - horizontal
+        tools.BROKEN_TOOL_HORIZONTAL_SEPARATION_MAX - horizontal
     assert component.shortcut_lava_target_tool
     assert component.shortcut_lava_target_tool.tool_type == 'broken'
     assert component.get_shortcut_lava_target_tool()
     scene = prior_scene_custom_size(15, 20)
     scene = component.update_ile_scene(scene)
     objs = scene.objects
-    tools = objs[1:]
-    assert len(tools) == 5
-    first_tool_pos = tools[0]['shows'][0]['position']
-    last_tool_pos = tools[-1]['shows'][0]['position']
+    tool_list = objs[1:]
+    assert len(tool_list) == 5
+    first_tool_pos = tool_list[0]['shows'][0]['position']
+    last_tool_pos = tool_list[-1]['shows'][0]['position']
     assert first_tool_pos['z'] == 3 - backward
     assert last_tool_pos['z'] == round(
         first_tool_pos['z'] -
-        structures.BROKEN_TOOL_VERTICAL_SEPARATION * (len(tools) - 1), 2)
-    for tool in tools:
+        tools.BROKEN_TOOL_VERTICAL_SEPARATION * (len(tool_list) - 1), 2)
+    for tool in tool_list:
         assert tool['type'].startswith('tool_rect')
         assert tool['debug']['length'] == 1
         pos_x = tool['shows'][0]['position']['x']
@@ -6331,15 +6637,15 @@ def test_shortcut_lava_target_tool_offset_broken():
     scene = prior_scene_custom_size(20, 15)
     scene = component.update_ile_scene(scene)
     objs = scene.objects
-    tools = objs[1:]
-    assert len(tools) == 5
-    first_tool_pos = tools[0]['shows'][0]['position']
-    last_tool_pos = tools[-1]['shows'][0]['position']
+    tool_list = objs[1:]
+    assert len(tool_list) == 5
+    first_tool_pos = tool_list[0]['shows'][0]['position']
+    last_tool_pos = tool_list[-1]['shows'][0]['position']
     assert first_tool_pos['x'] == 3 - backward
     assert last_tool_pos['x'] == round(
         first_tool_pos['x'] -
-        structures.BROKEN_TOOL_VERTICAL_SEPARATION * (len(tools) - 1), 2)
-    for tool in tools:
+        tools.BROKEN_TOOL_VERTICAL_SEPARATION * (len(tool_list) - 1), 2)
+    for tool in tool_list:
         assert tool['type'].startswith('tool_rect')
         assert tool['debug']['length'] == 1
         pos_z = tool['shows'][0]['position']['z']
@@ -6370,9 +6676,9 @@ def test_shortcut_lava_target_tool_distance_between_performer_broken():
             performer_start = Point(
                 scene.performer_start.position.x,
                 scene.performer_start.position.z)
-            tools = scene.objects[1:]
+            tool_list = scene.objects[1:]
             valid = False
-            for tool in tools:
+            for tool in tool_list:
                 bb_boxes = tool['shows'][0]['boundingBox'].box_xz
                 top_right = Point(bb_boxes[0].x, bb_boxes[0].z)
                 bottom_right = Point(bb_boxes[1].x, bb_boxes[1].z)
@@ -6439,14 +6745,14 @@ def test_shortcut_seeing_leads_to_knowing_default():
 
     # target and goal info
     assert scene.goal
-    assert scene.goal['metadata']['target']
-    assert 'targets' not in scene.goal['metadata']
-    assert scene.goal['category'] == 'passive'
-    assert scene.goal['answer']['choice'] == 'plausible'
-    assert scene.goal['last_step'] == 105
-    assert scene.goal['action_list']
-    assert len(scene.goal['action_list']) == 105
-    for action in scene.goal['action_list']:
+    assert scene.goal.metadata['target']
+    assert 'targets' not in scene.goal.metadata
+    assert scene.goal.category == 'passive'
+    assert scene.goal.answer['choice'] == 'plausible'
+    assert scene.goal.last_step == 105
+    assert scene.goal.action_list
+    assert len(scene.goal.action_list) == 105
+    for action in scene.goal.action_list:
         assert action == ['Pass']
 
     assert target['debug']['dimensions'] == {
@@ -6504,14 +6810,14 @@ def test_shortcut_seeing_leads_to_knowing_target_behind_agent():
 
     # target and goal info
     assert scene.goal
-    assert scene.goal['metadata']['target']
-    assert 'targets' not in scene.goal['metadata']
-    assert scene.goal['category'] == 'passive'
-    assert scene.goal['answer']['choice'] == 'plausible'
-    assert scene.goal['last_step'] == 105
-    assert scene.goal['action_list']
-    assert len(scene.goal['action_list']) == 105
-    for action in scene.goal['action_list']:
+    assert scene.goal.metadata['target']
+    assert 'targets' not in scene.goal.metadata
+    assert scene.goal.category == 'passive'
+    assert scene.goal.answer['choice'] == 'plausible'
+    assert scene.goal.last_step == 105
+    assert scene.goal.action_list
+    assert len(scene.goal.action_list) == 105
+    for action in scene.goal.action_list:
         assert action == ['Pass']
 
     assert target['debug']['dimensions'] == {
@@ -6537,7 +6843,7 @@ def test_shortcut_seeing_leads_to_knowing_target_behind_agent():
     agent_start_on_left = agent['shows'][0]['position']['x'] == -2
 
     # ensure target is behind agent's path
-    if(agent_start_on_left):
+    if (agent_start_on_left):
         assert target_pos['x'] == -1
     else:
         assert target_pos['x'] == 1
@@ -6576,14 +6882,14 @@ def test_shortcut_seeing_leads_to_knowing_target_ahead_agent():
 
     # target and goal info
     assert scene.goal
-    assert scene.goal['metadata']['target']
-    assert 'targets' not in scene.goal['metadata']
-    assert scene.goal['category'] == 'passive'
-    assert scene.goal['answer']['choice'] == 'plausible'
-    assert scene.goal['last_step'] == 105
-    assert scene.goal['action_list']
-    assert len(scene.goal['action_list']) == 105
-    for action in scene.goal['action_list']:
+    assert scene.goal.metadata['target']
+    assert 'targets' not in scene.goal.metadata
+    assert scene.goal.category == 'passive'
+    assert scene.goal.answer['choice'] == 'plausible'
+    assert scene.goal.last_step == 105
+    assert scene.goal.action_list
+    assert len(scene.goal.action_list) == 105
+    for action in scene.goal.action_list:
         assert action == ['Pass']
 
     assert target['debug']['dimensions'] == {
@@ -6610,7 +6916,7 @@ def test_shortcut_seeing_leads_to_knowing_target_ahead_agent():
     agent_start_on_left = agent['shows'][0]['position']['x'] == -2
 
     # ensure target is ahead of agent's path
-    if(agent_start_on_left):
+    if (agent_start_on_left):
         assert target_pos['x'] == 1
     else:
         assert target_pos['x'] == -1

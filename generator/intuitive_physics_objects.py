@@ -55,24 +55,32 @@ _INTUITIVE_PHYSICS_COMPLEX_OBJECTS = [
     ('car_1', base_objects._TOY_SEDAN_SIZE),
     ('car_2', base_objects._TOY_CAR_2_SIZE),
     ('car_3', base_objects._TOY_CAR_3_SIZE),
+    ('car_4', base_objects._TOY_CAR_4_SIZE),
+    ('car_5', base_objects._TOY_CAR_5_SIZE),
     ('cart_2', base_objects._CART_2_SIZE),
     ('dog_on_wheels', base_objects._DOG_ON_WHEELS_SIZE),
     ('dog_on_wheels_2', base_objects._DOG_ON_WHEELS_2_SIZE),
     ('duck_on_wheels', base_objects._DUCK_ON_WHEELS_SIZE),
     ('duck_on_wheels_2', base_objects._DUCK_ON_WHEELS_2_SIZE),
     ('jeep', base_objects._TOY_JEEP_SIZE),
+    ('power_shovel', base_objects._TOY_POWER_SHOVEL_SIZE),
     ('racecar_red', base_objects._TOY_RACECAR_SIZE),
+    ('road_scraper', base_objects._TOY_ROAD_SCRAPER_SIZE),
     ('roller', base_objects._TOY_ROLLER_SIZE),
     ('skateboard', base_objects._SKATEBOARD_SIZE),
     ('tank_1', base_objects._TOY_TANK_1_SIZE),
     ('tank_2', base_objects._TOY_TANK_2_SIZE),
+    ('tank_3', base_objects._TOY_TANK_3_SIZE),
     ('train_1', base_objects._TOY_TRAIN_1_SIZE),
     ('train_2', base_objects._TOY_TRAIN_2_SIZE),
+    ('train_3', base_objects._TOY_TRAIN_3_SIZE),
+    ('trike', base_objects._TOY_TRIKE_SIZE),
     ('trolley_1', base_objects._TOY_TROLLEY_SIZE),
     ('truck_1', base_objects._TOY_TRUCK_1_SIZE),
     ('truck_2', base_objects._TOY_TRUCK_2_SIZE),
     ('truck_3', base_objects._TOY_TRUCK_3_SIZE),
     ('truck_4', base_objects._TOY_TRUCK_4_SIZE),
+    ('truck_5', base_objects._TOY_TRUCK_5_SIZE),
     ('turtle_on_wheels', base_objects._TURTLE_ON_WHEELS_SIZE),
 ]
 _COMPLEX_TYPES_TO_SIZES = dict([
@@ -448,7 +456,6 @@ _ROLLABLE_1 = create_variable_definition_from_base(
     size_multiplier_list=TRAINED_SIZE_MULTIPLIER_LIST.copy(),
     chosen_material_list=INTUITIVE_PHYSICS_OBJECT_CHOSEN_MATERIAL_LIST
 )
-_ROLLABLE_1.untrainedShape = True
 _ROLLABLE_1_NOVEL_SIZE = create_variable_definition_from_base(
     type='rollable_1',
     size_multiplier_list=NOVEL_SIZE_MULTIPLIER_LIST.copy(),
@@ -467,7 +474,6 @@ _ROLLABLE_2 = create_variable_definition_from_base(
     size_multiplier_list=TRAINED_SIZE_MULTIPLIER_LIST.copy(),
     chosen_material_list=INTUITIVE_PHYSICS_OBJECT_CHOSEN_MATERIAL_LIST
 )
-_ROLLABLE_2.untrainedShape = True
 _ROLLABLE_2_NOVEL_SIZE = create_variable_definition_from_base(
     type='rollable_2',
     size_multiplier_list=NOVEL_SIZE_MULTIPLIER_LIST.copy(),
@@ -486,7 +492,6 @@ _ROLLABLE_3 = create_variable_definition_from_base(
     size_multiplier_list=TRAINED_SIZE_MULTIPLIER_LIST.copy(),
     chosen_material_list=INTUITIVE_PHYSICS_OBJECT_CHOSEN_MATERIAL_LIST
 )
-_ROLLABLE_3.untrainedShape = True
 _ROLLABLE_3_NOVEL_SIZE = create_variable_definition_from_base(
     type='rollable_3',
     size_multiplier_list=NOVEL_SIZE_MULTIPLIER_LIST.copy(),
@@ -505,7 +510,6 @@ _ROLLABLE_4 = create_variable_definition_from_base(
     size_multiplier_list=TRAINED_SIZE_MULTIPLIER_LIST.copy(),
     chosen_material_list=INTUITIVE_PHYSICS_OBJECT_CHOSEN_MATERIAL_LIST
 )
-_ROLLABLE_4.untrainedShape = True
 _ROLLABLE_4_NOVEL_SIZE = create_variable_definition_from_base(
     type='rollable_4',
     size_multiplier_list=NOVEL_SIZE_MULTIPLIER_LIST.copy(),
@@ -524,7 +528,6 @@ _BOBCAT = create_variable_definition_from_base(
     size_multiplier_list=_COMPLEX_TYPES_TO_SIZES['bobcat'],
     chosen_material_list=INTUITIVE_PHYSICS_OBJECT_CHOSEN_MATERIAL_LIST
 )
-_BOBCAT.untrainedShape = True
 _BOBCAT_NOVEL_SIZE = create_variable_definition_from_base(
     type='bobcat',
     size_multiplier_list=_NOVEL_COMPLEX_TYPES_TO_SIZES['bobcat'],
@@ -538,7 +541,6 @@ _CAR_3 = create_variable_definition_from_base(
     size_multiplier_list=_COMPLEX_TYPES_TO_SIZES['car_3'],
     chosen_material_list=INTUITIVE_PHYSICS_OBJECT_CHOSEN_MATERIAL_LIST
 )
-_CAR_3.untrainedShape = True
 _CAR_3_NOVEL_SIZE = create_variable_definition_from_base(
     type='car_3',
     size_multiplier_list=_NOVEL_COMPLEX_TYPES_TO_SIZES['car_3'],
@@ -552,7 +554,6 @@ _DOG_2 = create_variable_definition_from_base(
     size_multiplier_list=_COMPLEX_TYPES_TO_SIZES['dog_on_wheels_2'],
     chosen_material_list=INTUITIVE_PHYSICS_OBJECT_CHOSEN_MATERIAL_LIST
 )
-_DOG_2.untrainedShape = True
 _DOG_2_NOVEL_SIZE = create_variable_definition_from_base(
     type='dog_on_wheels_2',
     size_multiplier_list=_NOVEL_COMPLEX_TYPES_TO_SIZES['dog_on_wheels_2'],
@@ -566,7 +567,6 @@ _DUCK_2 = create_variable_definition_from_base(
     size_multiplier_list=_COMPLEX_TYPES_TO_SIZES['duck_on_wheels_2'],
     chosen_material_list=INTUITIVE_PHYSICS_OBJECT_CHOSEN_MATERIAL_LIST
 )
-_DUCK_2.untrainedShape = True
 _DUCK_2_NOVEL_SIZE = create_variable_definition_from_base(
     type='duck_on_wheels_2',
     size_multiplier_list=_NOVEL_COMPLEX_TYPES_TO_SIZES['duck_on_wheels_2'],
@@ -580,7 +580,6 @@ _JEEP = create_variable_definition_from_base(
     size_multiplier_list=_COMPLEX_TYPES_TO_SIZES['jeep'],
     chosen_material_list=INTUITIVE_PHYSICS_OBJECT_CHOSEN_MATERIAL_LIST
 )
-_JEEP.untrainedShape = True
 _JEEP_NOVEL_SIZE = create_variable_definition_from_base(
     type='jeep',
     size_multiplier_list=_NOVEL_COMPLEX_TYPES_TO_SIZES['jeep'],
@@ -594,7 +593,6 @@ _ROLLER = create_variable_definition_from_base(
     size_multiplier_list=_COMPLEX_TYPES_TO_SIZES['roller'],
     chosen_material_list=INTUITIVE_PHYSICS_OBJECT_CHOSEN_MATERIAL_LIST
 )
-_ROLLER.untrainedShape = True
 _ROLLER_NOVEL_SIZE = create_variable_definition_from_base(
     type='roller',
     size_multiplier_list=_NOVEL_COMPLEX_TYPES_TO_SIZES['roller'],
@@ -608,7 +606,6 @@ _SKATEBOARD = create_variable_definition_from_base(
     size_multiplier_list=_COMPLEX_TYPES_TO_SIZES['skateboard'],
     chosen_material_list=INTUITIVE_PHYSICS_OBJECT_CHOSEN_MATERIAL_LIST
 )
-_SKATEBOARD.untrainedShape = True
 _SKATEBOARD_NOVEL_SIZE = create_variable_definition_from_base(
     type='skateboard',
     size_multiplier_list=_NOVEL_COMPLEX_TYPES_TO_SIZES['skateboard'],
@@ -622,7 +619,6 @@ _TANK_1 = create_variable_definition_from_base(
     size_multiplier_list=_COMPLEX_TYPES_TO_SIZES['tank_1'],
     chosen_material_list=INTUITIVE_PHYSICS_OBJECT_CHOSEN_MATERIAL_LIST
 )
-_TANK_1.untrainedShape = True
 _TANK_1_NOVEL_SIZE = create_variable_definition_from_base(
     type='tank_1',
     size_multiplier_list=_NOVEL_COMPLEX_TYPES_TO_SIZES['tank_1'],
@@ -636,7 +632,6 @@ _TANK_2 = create_variable_definition_from_base(
     size_multiplier_list=_COMPLEX_TYPES_TO_SIZES['tank_2'],
     chosen_material_list=INTUITIVE_PHYSICS_OBJECT_CHOSEN_MATERIAL_LIST
 )
-_TANK_2.untrainedShape = True
 _TANK_2_NOVEL_SIZE = create_variable_definition_from_base(
     type='tank_2',
     size_multiplier_list=_NOVEL_COMPLEX_TYPES_TO_SIZES['tank_2'],
@@ -650,7 +645,6 @@ _TRAIN_2 = create_variable_definition_from_base(
     size_multiplier_list=_COMPLEX_TYPES_TO_SIZES['train_2'],
     chosen_material_list=INTUITIVE_PHYSICS_OBJECT_CHOSEN_MATERIAL_LIST
 )
-_TRAIN_2.untrainedShape = True
 _TRAIN_2_NOVEL_SIZE = create_variable_definition_from_base(
     type='train_2',
     size_multiplier_list=_NOVEL_COMPLEX_TYPES_TO_SIZES['train_2'],
@@ -664,7 +658,6 @@ _TRUCK_3 = create_variable_definition_from_base(
     size_multiplier_list=_COMPLEX_TYPES_TO_SIZES['truck_3'],
     chosen_material_list=INTUITIVE_PHYSICS_OBJECT_CHOSEN_MATERIAL_LIST
 )
-_TRUCK_3.untrainedShape = True
 _TRUCK_3_NOVEL_SIZE = create_variable_definition_from_base(
     type='truck_3',
     size_multiplier_list=_NOVEL_COMPLEX_TYPES_TO_SIZES['truck_3'],
@@ -678,13 +671,217 @@ _TRUCK_4 = create_variable_definition_from_base(
     size_multiplier_list=_COMPLEX_TYPES_TO_SIZES['truck_4'],
     chosen_material_list=INTUITIVE_PHYSICS_OBJECT_CHOSEN_MATERIAL_LIST
 )
-_TRUCK_4.untrainedShape = True
 _TRUCK_4_NOVEL_SIZE = create_variable_definition_from_base(
     type='truck_4',
     size_multiplier_list=_NOVEL_COMPLEX_TYPES_TO_SIZES['truck_4'],
     chosen_material_list=INTUITIVE_PHYSICS_OBJECT_CHOSEN_MATERIAL_LIST
 )
 _TRUCK_4_NOVEL_SIZE.untrainedSize = True
+
+
+# EVAL 6 NOVEL OBJECTS
+
+
+_ROLLABLE_5 = create_variable_definition_from_base(
+    type='rollable_5',
+    size_multiplier_list=TRAINED_SIZE_MULTIPLIER_LIST.copy(),
+    chosen_material_list=INTUITIVE_PHYSICS_OBJECT_CHOSEN_MATERIAL_LIST
+)
+_ROLLABLE_5.untrainedShape = True
+_ROLLABLE_5_NOVEL_SIZE = create_variable_definition_from_base(
+    type='rollable_5',
+    size_multiplier_list=NOVEL_SIZE_MULTIPLIER_LIST.copy(),
+    chosen_material_list=INTUITIVE_PHYSICS_OBJECT_CHOSEN_MATERIAL_LIST
+)
+_ROLLABLE_5_NOVEL_SIZE.untrainedSize = True
+# Rotate the object onto its curved side so it can roll sideways.
+_ROLLABLE_5_SIDEWAYS = copy.deepcopy(_ROLLABLE_5)
+_ROLLABLE_5_SIDEWAYS.rotation = Vector3d(x=90, y=0, z=0)
+_ROLLABLE_5_SIDEWAYS_NOVEL_SIZE = copy.deepcopy(_ROLLABLE_5_NOVEL_SIZE)
+_ROLLABLE_5_SIDEWAYS_NOVEL_SIZE.rotation = Vector3d(x=90, y=0, z=0)
+
+
+_ROLLABLE_6 = create_variable_definition_from_base(
+    type='rollable_6',
+    size_multiplier_list=TRAINED_SIZE_MULTIPLIER_LIST.copy(),
+    chosen_material_list=INTUITIVE_PHYSICS_OBJECT_CHOSEN_MATERIAL_LIST
+)
+_ROLLABLE_6.untrainedShape = True
+_ROLLABLE_6_NOVEL_SIZE = create_variable_definition_from_base(
+    type='rollable_6',
+    size_multiplier_list=NOVEL_SIZE_MULTIPLIER_LIST.copy(),
+    chosen_material_list=INTUITIVE_PHYSICS_OBJECT_CHOSEN_MATERIAL_LIST
+)
+_ROLLABLE_6_NOVEL_SIZE.untrainedSize = True
+# Rotate the object onto its curved side so it can roll sideways.
+_ROLLABLE_6_SIDEWAYS = copy.deepcopy(_ROLLABLE_6)
+_ROLLABLE_6_SIDEWAYS.rotation = Vector3d(x=90, y=0, z=0)
+_ROLLABLE_6_SIDEWAYS_NOVEL_SIZE = copy.deepcopy(_ROLLABLE_6_NOVEL_SIZE)
+_ROLLABLE_6_SIDEWAYS_NOVEL_SIZE.rotation = Vector3d(x=90, y=0, z=0)
+
+
+_ROLLABLE_7 = create_variable_definition_from_base(
+    type='rollable_7',
+    size_multiplier_list=TRAINED_SIZE_MULTIPLIER_LIST.copy(),
+    chosen_material_list=INTUITIVE_PHYSICS_OBJECT_CHOSEN_MATERIAL_LIST
+)
+_ROLLABLE_7.untrainedShape = True
+_ROLLABLE_7_NOVEL_SIZE = create_variable_definition_from_base(
+    type='rollable_7',
+    size_multiplier_list=NOVEL_SIZE_MULTIPLIER_LIST.copy(),
+    chosen_material_list=INTUITIVE_PHYSICS_OBJECT_CHOSEN_MATERIAL_LIST
+)
+_ROLLABLE_7_NOVEL_SIZE.untrainedSize = True
+# Rotate the object onto its curved side so it can roll sideways.
+_ROLLABLE_7_SIDEWAYS = copy.deepcopy(_ROLLABLE_7)
+_ROLLABLE_7_SIDEWAYS.rotation = Vector3d(x=90, y=0, z=0)
+_ROLLABLE_7_SIDEWAYS_NOVEL_SIZE = copy.deepcopy(_ROLLABLE_7_NOVEL_SIZE)
+_ROLLABLE_7_SIDEWAYS_NOVEL_SIZE.rotation = Vector3d(x=90, y=0, z=0)
+
+
+_ROLLABLE_8 = create_variable_definition_from_base(
+    type='rollable_8',
+    size_multiplier_list=TRAINED_SIZE_MULTIPLIER_LIST.copy(),
+    chosen_material_list=INTUITIVE_PHYSICS_OBJECT_CHOSEN_MATERIAL_LIST
+)
+_ROLLABLE_8.untrainedShape = True
+_ROLLABLE_8_NOVEL_SIZE = create_variable_definition_from_base(
+    type='rollable_8',
+    size_multiplier_list=NOVEL_SIZE_MULTIPLIER_LIST.copy(),
+    chosen_material_list=INTUITIVE_PHYSICS_OBJECT_CHOSEN_MATERIAL_LIST
+)
+_ROLLABLE_8_NOVEL_SIZE.untrainedSize = True
+# Rotate the object onto its curved side so it can roll sideways.
+_ROLLABLE_8_SIDEWAYS = copy.deepcopy(_ROLLABLE_8)
+_ROLLABLE_8_SIDEWAYS.rotation = Vector3d(x=90, y=0, z=0)
+_ROLLABLE_8_SIDEWAYS_NOVEL_SIZE = copy.deepcopy(_ROLLABLE_8_NOVEL_SIZE)
+_ROLLABLE_8_SIDEWAYS_NOVEL_SIZE.rotation = Vector3d(x=90, y=0, z=0)
+
+
+_CAR_4 = create_variable_definition_from_base(
+    type='car_4',
+    size_multiplier_list=_COMPLEX_TYPES_TO_SIZES['car_4'],
+    chosen_material_list=INTUITIVE_PHYSICS_OBJECT_CHOSEN_MATERIAL_LIST
+)
+_CAR_4.untrainedShape = True
+_CAR_4_NOVEL_SIZE = create_variable_definition_from_base(
+    type='car_4',
+    size_multiplier_list=_NOVEL_COMPLEX_TYPES_TO_SIZES['car_4'],
+    chosen_material_list=INTUITIVE_PHYSICS_OBJECT_CHOSEN_MATERIAL_LIST
+)
+_CAR_4_NOVEL_SIZE.untrainedSize = True
+
+
+_CAR_5 = create_variable_definition_from_base(
+    type='car_5',
+    size_multiplier_list=_COMPLEX_TYPES_TO_SIZES['car_5'],
+    chosen_material_list=INTUITIVE_PHYSICS_OBJECT_CHOSEN_MATERIAL_LIST
+)
+_CAR_5.untrainedShape = True
+_CAR_5_NOVEL_SIZE = create_variable_definition_from_base(
+    type='car_5',
+    size_multiplier_list=_NOVEL_COMPLEX_TYPES_TO_SIZES['car_5'],
+    chosen_material_list=INTUITIVE_PHYSICS_OBJECT_CHOSEN_MATERIAL_LIST
+)
+_CAR_5_NOVEL_SIZE.untrainedSize = True
+
+
+_POWER_SHOVEL = create_variable_definition_from_base(
+    type='power_shovel',
+    size_multiplier_list=_COMPLEX_TYPES_TO_SIZES['power_shovel'],
+    chosen_material_list=INTUITIVE_PHYSICS_OBJECT_CHOSEN_MATERIAL_LIST
+)
+_POWER_SHOVEL.untrainedShape = True
+_POWER_SHOVEL_NOVEL_SIZE = create_variable_definition_from_base(
+    type='power_shovel',
+    size_multiplier_list=_NOVEL_COMPLEX_TYPES_TO_SIZES['power_shovel'],
+    chosen_material_list=INTUITIVE_PHYSICS_OBJECT_CHOSEN_MATERIAL_LIST
+)
+_POWER_SHOVEL_NOVEL_SIZE.untrainedSize = True
+
+
+_ROAD_SCRAPER = create_variable_definition_from_base(
+    type='road_scraper',
+    size_multiplier_list=_COMPLEX_TYPES_TO_SIZES['road_scraper'],
+    chosen_material_list=INTUITIVE_PHYSICS_OBJECT_CHOSEN_MATERIAL_LIST
+)
+_ROAD_SCRAPER.untrainedShape = True
+_ROAD_SCRAPER_NOVEL_SIZE = create_variable_definition_from_base(
+    type='road_scraper',
+    size_multiplier_list=_NOVEL_COMPLEX_TYPES_TO_SIZES['road_scraper'],
+    chosen_material_list=INTUITIVE_PHYSICS_OBJECT_CHOSEN_MATERIAL_LIST
+)
+_ROAD_SCRAPER_NOVEL_SIZE.untrainedSize = True
+
+
+_TANK_3 = create_variable_definition_from_base(
+    type='tank_3',
+    size_multiplier_list=_COMPLEX_TYPES_TO_SIZES['tank_3'],
+    chosen_material_list=INTUITIVE_PHYSICS_OBJECT_CHOSEN_MATERIAL_LIST
+)
+_TANK_3.untrainedShape = True
+_TANK_3_NOVEL_SIZE = create_variable_definition_from_base(
+    type='tank_3',
+    size_multiplier_list=_NOVEL_COMPLEX_TYPES_TO_SIZES['tank_3'],
+    chosen_material_list=INTUITIVE_PHYSICS_OBJECT_CHOSEN_MATERIAL_LIST
+)
+_TANK_3_NOVEL_SIZE.untrainedSize = True
+
+
+_TANK_3 = create_variable_definition_from_base(
+    type='tank_3',
+    size_multiplier_list=_COMPLEX_TYPES_TO_SIZES['tank_3'],
+    chosen_material_list=INTUITIVE_PHYSICS_OBJECT_CHOSEN_MATERIAL_LIST
+)
+_TANK_3.untrainedShape = True
+_TANK_3_NOVEL_SIZE = create_variable_definition_from_base(
+    type='tank_3',
+    size_multiplier_list=_NOVEL_COMPLEX_TYPES_TO_SIZES['tank_3'],
+    chosen_material_list=INTUITIVE_PHYSICS_OBJECT_CHOSEN_MATERIAL_LIST
+)
+_TANK_3_NOVEL_SIZE.untrainedSize = True
+
+
+_TRAIN_3 = create_variable_definition_from_base(
+    type='train_3',
+    size_multiplier_list=_COMPLEX_TYPES_TO_SIZES['train_3'],
+    chosen_material_list=INTUITIVE_PHYSICS_OBJECT_CHOSEN_MATERIAL_LIST
+)
+_TRAIN_3.untrainedShape = True
+_TRAIN_3_NOVEL_SIZE = create_variable_definition_from_base(
+    type='train_3',
+    size_multiplier_list=_NOVEL_COMPLEX_TYPES_TO_SIZES['train_3'],
+    chosen_material_list=INTUITIVE_PHYSICS_OBJECT_CHOSEN_MATERIAL_LIST
+)
+_TRAIN_3_NOVEL_SIZE.untrainedSize = True
+
+
+_TRIKE = create_variable_definition_from_base(
+    type='trike',
+    size_multiplier_list=_COMPLEX_TYPES_TO_SIZES['trike'],
+    chosen_material_list=INTUITIVE_PHYSICS_OBJECT_CHOSEN_MATERIAL_LIST
+)
+_TRIKE.untrainedShape = True
+_TRIKE_NOVEL_SIZE = create_variable_definition_from_base(
+    type='trike',
+    size_multiplier_list=_NOVEL_COMPLEX_TYPES_TO_SIZES['trike'],
+    chosen_material_list=INTUITIVE_PHYSICS_OBJECT_CHOSEN_MATERIAL_LIST
+)
+_TRIKE_NOVEL_SIZE.untrainedSize = True
+
+
+_TRUCK_5 = create_variable_definition_from_base(
+    type='truck_5',
+    size_multiplier_list=_COMPLEX_TYPES_TO_SIZES['truck_5'],
+    chosen_material_list=INTUITIVE_PHYSICS_OBJECT_CHOSEN_MATERIAL_LIST
+)
+_TRUCK_5.untrainedShape = True
+_TRUCK_5_NOVEL_SIZE = create_variable_definition_from_base(
+    type='truck_5',
+    size_multiplier_list=_NOVEL_COMPLEX_TYPES_TO_SIZES['truck_5'],
+    chosen_material_list=INTUITIVE_PHYSICS_OBJECT_CHOSEN_MATERIAL_LIST
+)
+_TRUCK_5_NOVEL_SIZE.untrainedSize = True
 
 
 # Only use rollable objects in move-across setups.
@@ -703,6 +900,14 @@ _MOVE_ACROSS_BASIC = [
     _ROLLABLE_3_SIDEWAYS_NOVEL_SIZE,
     _ROLLABLE_4_SIDEWAYS,
     _ROLLABLE_4_SIDEWAYS_NOVEL_SIZE,
+    _ROLLABLE_5_SIDEWAYS,
+    _ROLLABLE_5_SIDEWAYS_NOVEL_SIZE,
+    _ROLLABLE_6_SIDEWAYS,
+    _ROLLABLE_6_SIDEWAYS_NOVEL_SIZE,
+    _ROLLABLE_7_SIDEWAYS,
+    _ROLLABLE_7_SIDEWAYS_NOVEL_SIZE,
+    _ROLLABLE_8_SIDEWAYS,
+    _ROLLABLE_8_SIDEWAYS_NOVEL_SIZE,
     _SPHERE,
     _SPHERE_NOVEL_SIZE,
     _TIE_FIGHTER_SIDEWAYS,
@@ -735,6 +940,14 @@ _FALL_DOWN_BASIC = [
     _ROLLABLE_3_NOVEL_SIZE,
     _ROLLABLE_4,
     _ROLLABLE_4_NOVEL_SIZE,
+    _ROLLABLE_5,
+    _ROLLABLE_5_NOVEL_SIZE,
+    _ROLLABLE_6,
+    _ROLLABLE_6_NOVEL_SIZE,
+    _ROLLABLE_7,
+    _ROLLABLE_7_NOVEL_SIZE,
+    _ROLLABLE_8,
+    _ROLLABLE_8_NOVEL_SIZE,
     _TIE_FIGHTER,
     _TIE_FIGHTER_NOVEL_SIZE,
     # Objects specific to _FALL_DOWN_BASIC
@@ -762,6 +975,10 @@ _MOVE_ACROSS_COMPLEX = [
     _CAR_2_NOVEL_SIZE,
     _CAR_3,
     _CAR_3_NOVEL_SIZE,
+    _CAR_4,
+    _CAR_4_NOVEL_SIZE,
+    _CAR_5,
+    _CAR_5_NOVEL_SIZE,
     _CART_2,
     _CART_2_NOVEL_SIZE,
     _DOG,
@@ -774,8 +991,12 @@ _MOVE_ACROSS_COMPLEX = [
     _DUCK_2_NOVEL_SIZE,
     _JEEP,
     _JEEP_NOVEL_SIZE,
+    _POWER_SHOVEL,
+    _POWER_SHOVEL_NOVEL_SIZE,
     _RACECAR,
     _RACECAR_NOVEL_SIZE,
+    _ROAD_SCRAPER,
+    _ROAD_SCRAPER_NOVEL_SIZE,
     _ROLLER,
     _ROLLER_NOVEL_SIZE,
     _SEDAN,
@@ -786,10 +1007,16 @@ _MOVE_ACROSS_COMPLEX = [
     _TANK_1_NOVEL_SIZE,
     _TANK_2,
     _TANK_2_NOVEL_SIZE,
+    _TANK_3,
+    _TANK_3_NOVEL_SIZE,
     _TRAIN_1,
     _TRAIN_1_NOVEL_SIZE,
     _TRAIN_2,
     _TRAIN_2_NOVEL_SIZE,
+    _TRAIN_3,
+    _TRAIN_3_NOVEL_SIZE,
+    _TRIKE,
+    _TRIKE_NOVEL_SIZE,
     _TROLLEY,
     _TROLLEY_NOVEL_SIZE,
     _TRUCK_2,
@@ -798,6 +1025,8 @@ _MOVE_ACROSS_COMPLEX = [
     _TRUCK_3_NOVEL_SIZE,
     _TRUCK_4,
     _TRUCK_4_NOVEL_SIZE,
+    _TRUCK_5,
+    _TRUCK_5_NOVEL_SIZE,
     _TURTLE,
     _TURTLE_NOVEL_SIZE,
 ]
@@ -843,7 +1072,7 @@ def _create_opposite_colors_definition_list(
     for definition in definition_list:
         definition.assign_chosen_material(definition.chooseMaterialList[0])
         materials_count = len(definition.materialCategory)
-        definition.materialCategory = (['opposite'] * materials_count)
+        definition.materialCategory = (['object_opposite'] * materials_count)
     return definition_list
 
 

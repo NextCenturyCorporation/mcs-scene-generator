@@ -2,6 +2,8 @@ import json
 from dataclasses import dataclass
 from typing import Any, Dict, List, Union
 
+from generator import Scene
+
 from .components import ILEComponent
 from .decorators import ile_config_setter
 from .numerics import VectorFloatConfig
@@ -125,7 +127,7 @@ class MockComponent(ILEComponent):
             return data
 
     # Override
-    def update_ile_scene(self, scene: Dict[str, Any]) -> Dict[str, Any]:
+    def update_ile_scene(self, scene: Scene) -> Scene:
         for prop, attr in vars(self).items():
             if attr is not None and not prop.startswith('_'):
                 scene.debug[prop] = self.__get_scene_data(attr)

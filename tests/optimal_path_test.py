@@ -87,7 +87,7 @@ def test_dilate_and_unify_object_bounds_multiple_poly():
     )
     assert len(output) == 3
     assert_array_almost_equal_nulp(numpy.array(output[0]), numpy.array([
-        (-4.0, -1.5), (-4.5, -1.0), (-4.5, 1.0), (-4.0, 1.5), (-3.0, 1.5),
+        (-4, -1.5), (-4.5, -1.0), (-4.5, 1.0), (-4.0, 1.5), (-3.0, 1.5),
         (-2.5, 1.0), (-2.5, -1.0), (-3.0, -1.5)
     ]))
     assert_array_almost_equal_nulp(numpy.array(output[1]), numpy.array([

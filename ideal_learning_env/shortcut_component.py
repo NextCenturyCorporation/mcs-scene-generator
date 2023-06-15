@@ -6,12 +6,13 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Dict, List, Union
 
-from machine_common_sense.config_manager import Vector3d
+from machine_common_sense.config_manager import Goal, Vector3d
 
 from generator import (
     MAX_TRIES,
     ObjectBounds,
     Scene,
+    SceneObject,
     geometry,
     instances,
     materials,
@@ -21,47 +22,39 @@ from generator.base_objects import (
     LARGE_BLOCK_TOOLS_TO_DIMENSIONS,
     create_soccer_ball
 )
+from generator.imitation import (
+    IMITATION_CONTAINER_TELEPORT_ROTATIONS_GLOBAL,
+    IMITATION_CONTAINER_TELEPORT_ROTATIONS_LEFT_SIDE,
+    IMITATION_CONTAINER_TELEPORT_ROTATIONS_RIGHT_SIDE,
+    ImitationKidnapOptions,
+    ImitationTriggerOrder,
+    add_imitation_task
+)
+from generator.lava import LavaIslandSizes
 from generator.mechanisms import create_placer
 from generator.structures import (
     BASE_DOOR_HEIGHT,
     BASE_DOOR_WIDTH,
-    INACCESSIBLE_TOOL_BLOCKING_WALL_MINIMUM_SEPARATION,
-    create_broken_tool,
-    create_guide_rails_around,
-    create_inaccessible_tool
+    create_guide_rails_around
 )
-from ideal_learning_env.action_service import ActionService, TeleportConfig
+from generator.tools import (
+    HOOKED_TOOL_BUFFER,
+    INACCESSIBLE_TOOL_BLOCKING_WALL_MINIMUM_SEPARATION,
+    MAX_TOOL_LENGTH,
+    MIN_LAVA_ISLAND_LONG_ROOM_DIMENSION_LENGTH,
+    MIN_LAVA_ISLAND_SHORT_ROOM_DIMENSION_LENGTH,
+    MIN_TOOL_CHOICE_X_DIMENSION,
+    TOOL_TYPES,
+    create_broken_tool,
+    create_inaccessible_tool,
+    get_tool_shape
+)
+from ideal_learning_env.action_service import ActionService
 from ideal_learning_env.actions_component import StepBeginEnd
 from ideal_learning_env.agent_service import (
     AgentActionConfig,
     AgentConfig,
     AgentMovementConfig
-)
-from ideal_learning_env.goal_services import GoalConfig, GoalServices
-from ideal_learning_env.interactable_object_service import (
-    InteractableObjectConfig,
-    KeywordLocationConfig,
-    create_user_configured_interactable_object
-)
-from ideal_learning_env.numerics import (
-    MinMaxFloat,
-    MinMaxInt,
-    RandomizableFloat,
-    RandomizableInt,
-    RandomizableVectorFloat3d,
-    VectorFloatConfig,
-    VectorIntConfig
-)
-from ideal_learning_env.object_services import (
-    InstanceDefinitionLocationTuple,
-    KeywordLocation,
-    ObjectRepository,
-    RelativePositionConfig
-)
-from ideal_learning_env.validators import (
-    ValidateNumber,
-    ValidateOptions,
-    ValidateOr
 )
 
 from .components import ILEComponent
@@ -75,6 +68,27 @@ from .defs import (
     find_bounds,
     return_list
 )
+from .goal_services import GoalConfig, GoalServices
+from .interactable_object_service import (
+    InteractableObjectConfig,
+    KeywordLocationConfig,
+    ToolConfig,
+    create_user_configured_interactable_object
+)
+from .numerics import (
+    MinMaxFloat,
+    RandomizableFloat,
+    RandomizableInt,
+    RandomizableVectorFloat3d,
+    VectorFloatConfig,
+    VectorIntConfig
+)
+from .object_services import (
+    InstanceDefinitionLocationTuple,
+    KeywordLocation,
+    ObjectRepository,
+    RelativePositionConfig
+)
 from .structural_object_service import (
     DOOR_MATERIAL_RESTRICTIONS,
     FeatureCreationService,
@@ -83,9 +97,9 @@ from .structural_object_service import (
     PartitionFloorConfig,
     StructuralDoorConfig,
     StructuralPlacerConfig,
-    StructuralPlatformConfig,
-    ToolConfig
+    StructuralPlatformConfig
 )
+from .validators import ValidateNumber, ValidateOptions, ValidateOr
 
 logger = logging.getLogger(__name__)
 
@@ -106,25 +120,10 @@ MAX_LAVA_WIDTH_HOOKED_TOOL = 3
 MIN_LAVA_WIDTH = 2
 MAX_LAVA_WIDTH = 6
 
-MIN_LAVA_ISLAND_LONG_ROOM_DIMENSION_LENGTH = 13
-MIN_LAVA_ISLAND_SHORT_ROOM_DIMENSION_LENGTH = 7
-
 # Min lava with island width should be 5
 MAX_LAVA_WITH_ISLAND_WIDTH = 9
 MIN_LAVA_WITH_ISLAND_WIDTH_HOOKED_TOOL = 3
 MAX_LAVA_WITH_ISLAND_WIDTH_HOOKED_TOOL = 7
-
-HOOKED_TOOL_BUFFER = 2
-MAX_TOOL_LENGTH = 9
-
-TOOL_RECTANGULAR = 'rectangular'
-TOOL_HOOKED = 'hooked'
-TOOL_SMALL = 'small'
-TOOL_BROKEN = 'broken'
-TOOL_INACCESSIBLE = 'inaccessible'
-
-TOOL_LENGTH_TOO_SHORT = 1
-MIN_TOOL_CHOICE_X_DIMENSION = 20
 
 IMITATION_TASK_CONTAINER_SCALE = 1
 IMITATION_TASK_TARGET_SEPARATION = 0.6
@@ -192,7 +191,8 @@ class LavaTargetToolConfig():
     the lava or the island. If the `tool_type` is inaccessible the performer
     will randomly start on the side of the room where the target is where
     they cannot access the tool. Default: False
-    - `tool_rotation` (int, or list of ints, or [MinMaxInt](#MinMaxInt):
+    - `tool_rotation` (float, or list of floats, or
+    [MinMaxFloat](#MinMaxFloat) dict, or list of MinMaxFloat dicts):
     Angle that tool should be rotated out of alignment with target.
     This option cannot be used with `guide_rails`.  Default: 0
     - `distance_between_performer_and_tool` (float, or list of floats,
@@ -200,13 +200,13 @@ class LavaTargetToolConfig():
     tool at start. The performer will be at random point around a rectangular
     perimeter surrounding the tool. This option cannot be used with
     `random_performer_position`.  Default: None
-    - `tool_offset_backward_from_lava` (
-    [RandomizableFloat](#RandomizableFloat)): The vertical offset of tool
-    either away from the lava pool. Must be greater than or equal to 0
+    - `tool_offset_backward_from_lava` (float, or [MinMaxFloat](#MinMaxFloat)
+    dict, or list of floats and/or MinMaxFloat dicts): The vertical offset of
+    tool either away from the lava pool. Must be greater than or equal to 0
     Default: 0
-    - `tool_horizontal_offset` ([RandomizableFloat](#RandomizableFloat)):
-    The horizontal offset of tool either
-    left or right from being aligned with the target. If `tool_type` is
+    - `tool_horizontal_offset` (float, or [MinMaxFloat](#MinMaxFloat) dict, or
+    list of floats and/or MinMaxFloat dicts): The horizontal offset of tool
+    either left or right from being aligned with the target. If `tool_type` is
     inaccessible this has alternate behavior. See
     `inaccessible_tool_blocking_wall_horizontal_offset` for description.
     Default: 0
@@ -242,39 +242,27 @@ class LavaTargetToolConfig():
     Default: `rectangular`
 
     """
-    island_size: Union[int, MinMaxInt, List[Union[int, MinMaxInt]]] = None
-    front_lava_width: Union[int, MinMaxInt, List[Union[int, MinMaxInt]]] = None
-    rear_lava_width: Union[int, MinMaxInt, List[Union[int, MinMaxInt]]] = None
-    left_lava_width: Union[int, MinMaxInt, List[Union[int, MinMaxInt]]] = None
-    right_lava_width: Union[int, MinMaxInt, List[Union[int, MinMaxInt]]] = None
-    guide_rails: Union[bool, List[bool]] = False
-    tool_rotation: Union[int, MinMaxInt, List[Union[int, MinMaxInt]]] = 0
-    random_performer_position: Union[bool, List[bool]] = False
-    random_target_position: Union[bool, List[bool]] = False
-    distance_between_performer_and_tool: Union[
-        float, MinMaxFloat, List[Union[float, MinMaxFloat]]
-    ] = None
+    island_size: RandomizableInt = None
+    front_lava_width: RandomizableInt = None
+    rear_lava_width: RandomizableInt = None
+    left_lava_width: RandomizableInt = None
+    right_lava_width: RandomizableInt = None
+    guide_rails: RandomizableBool = False
+    tool_rotation: RandomizableFloat = 0
+    random_performer_position: RandomizableBool = False
+    random_target_position: RandomizableBool = False
+    distance_between_performer_and_tool: RandomizableFloat = None
     tool_offset_backward_from_lava: RandomizableFloat = 0
     tool_horizontal_offset: RandomizableFloat = 0
     inaccessible_tool_blocking_wall_horizontal_offset: RandomizableFloat = None
-    tool_type: RandomizableString = TOOL_RECTANGULAR
-
-
-@dataclass
-class LavaIslandSizes():
-    # internal class for storing lava widths and island sizes
-    island_size: int = 0
-    front: int = 0
-    rear: int = 0
-    left: int = 0
-    right: int = 0
+    tool_type: RandomizableString = TOOL_TYPES.RECT
 
 
 @dataclass
 class InaccessibleToolProperties():
     # internal class for storing inaccessible tool properties
-    tool: Dict[str, Any] = None
-    wall: Dict[str, Any] = None
+    tool: SceneObject = None
+    wall: SceneObject = None
     short_direction: str = None
     blocking_wall_pos_cutoff: float = None
     room_wall_pos_cutoff: float = None
@@ -325,20 +313,16 @@ class TripleDoorConfig():
     - `wall_material` (string, or list of strings): The material or material
     type for the wall.
     """
-    start_drop_step: Union[int, MinMaxInt, List[Union[int, MinMaxInt]]] = None
-    add_lips: Union[bool, List[bool]] = True
-    add_freeze: Union[bool, List[bool]] = True
-    restrict_open_doors: Union[bool, List[bool]] = True
-    door_material: Union[str, List[str]] = None
-    wall_material: Union[str, List[str]] = None
-    add_extension: Union[bool, List[bool]] = False
-    extension_length: Union[
-        float, MinMaxFloat, List[Union[float, MinMaxFloat]]
-    ] = None
-    extension_position: Union[
-        float, MinMaxFloat, List[Union[float, MinMaxFloat]]
-    ] = None
-    bigger_far_end: Union[bool, List[bool]] = False
+    start_drop_step: RandomizableInt = None
+    add_lips: RandomizableBool = True
+    add_freeze: RandomizableBool = True
+    restrict_open_doors: RandomizableBool = True
+    door_material: RandomizableString = None
+    wall_material: RandomizableString = None
+    add_extension: RandomizableBool = False
+    extension_length: RandomizableFloat = None
+    extension_position: RandomizableFloat = None
+    bigger_far_end: RandomizableBool = False
 
 
 @dataclass
@@ -362,23 +346,28 @@ class DoubleDoorConfig():
     - `door_material` (string, or list of strings): The material or material
     type for the doors.
     - `occluder_wall_position_z` (float, or list of floats, or
-    [MinMaxFloat](#MinMaxFloat) dict: Where the occluder wall will cross the
-    z-axis in the room. `performer_distance_from_occluder` will override this
+    [MinMaxFloat](#MinMaxFloat) dict, or list of MinMaxFloat dicts):
+    Where the occluder wall will cross the
+    z-axis in the room. `occluder_distance_from_performer` will override this
     value. Default: 0 (middle of the room)
     - `occluder_distance_from_performer` (float, or list of floats, or
-    [MinMaxFloat](#MinMaxFloat) dict: If there is a platform the, the performer
+    [MinMaxFloat](#MinMaxFloat) dict, or list of MinMaxFloat dicts):
+    If there is a platform the, the performer
     will start on top of the platform and the occluder wall will be placed
     this distance (`occluder_distance_from_performer`) from the performer. Must
     be greater than 1 or null
     Default: 6.5
     - `platform_height` (float, or list of floats, or
-    [MinMaxFloat](#MinMaxFloat) dict: The height (y scale) of the platform
+    [MinMaxFloat](#MinMaxFloat) dict, or list of MinMaxFloat dicts):
+    The height (y scale) of the platform
     Default: 1.5
     - `platform_length` (float, or list of floats, or
-    [MinMaxFloat](#MinMaxFloat) dict: The lenth (z scale) of the platform
+    [MinMaxFloat](#MinMaxFloat) dict, or list of MinMaxFloat dicts):
+    The lenth (z scale) of the platform
     Default: 1
     - `platform_width` (float, or list of floats, or
-    [MinMaxFloat](#MinMaxFloat) dict: The width (z scale) of the platform
+    [MinMaxFloat](#MinMaxFloat) dict, or list of MinMaxFloat dicts):
+    The width (z scale) of the platform
     Default: 1
     - `start_drop_step` (int, or list of ints, or [MinMaxInt](#MinMaxInt) dict,
     or list of MinMaxInt dicts): Step number to start dropping the bisecting
@@ -419,7 +408,7 @@ class AgentTargetConfig():
     agent: Union[AgentConfig, List[AgentConfig]] = None
     agent_position: RandomizableVectorFloat3d = None
     movement_bounds: List[RandomizableVectorFloat3d] = None
-    movement: Union[bool, List[bool]] = None
+    movement: RandomizableBool = None
 
 
 @dataclass
@@ -431,8 +420,11 @@ class BisectingPlatformConfig():
     to choose a side to drop off of the platform, but this can be disabled.
     - `has_blocking_wall` (bool): Enables the blocking wall so that the
     performer has to stop and choose a side of the room. Default: True
-    - `has_long_blocking_wall` (bool): Enables the long blocking wall used in
-    Spatial Reorientation tasks. Overrides `has_blocking_wall`. Default: False
+    - `has_double_blocking_wall` (bool): Enables the double blocking wall used
+    in Spatial Reorientation tasks. Overrides both `has_blocking_wall` and
+    `has_long_blocking_wall`. Default: False
+    - `has_long_blocking_wall` (bool): Enables the extra-long blocking wall.
+    Overrides `has_blocking_wall`. Default: False
     - `is_short` (bool): Makes the platform short (a Y scale of 0.5 rather
     than 1). Default: False
     - `is_thin` (bool): Makes the platform thin (an X scale of 0.5 rather
@@ -441,8 +433,12 @@ class BisectingPlatformConfig():
     dict, or list of StructuralPlatformConfig dicts): Configurations to
     generate other platforms that may intersect with the bisecting platform.
     Default: No other platforms
+    - `position_z` (float, or list of floats, or [MinMaxFloat](#MinMaxFloat)
+    dict, or list of MinMaxFloat dicts): The starting Z position for the
+    performer agent. Default: 0.5 away from the back wall
     """
     has_blocking_wall: bool = True
+    has_double_blocking_wall: bool = False
     has_long_blocking_wall: bool = False
     is_short: bool = False
     is_thin: bool = False
@@ -450,25 +446,7 @@ class BisectingPlatformConfig():
         StructuralPlatformConfig,
         List[StructuralPlatformConfig]
     ] = None
-
-
-class ImitationTriggerOrder(str, Enum):
-    LEFT = "left"
-    MIDDLE = "middle"
-    RIGHT = "right"
-    LEFT_MIDDLE = "left_middle"
-    LEFT_RIGHT = "left_right"
-    MIDDLE_LEFT = "middle_left"
-    MIDDLE_RIGHT = "middle_right"
-    RIGHT_MIDDLE = "right_middle"
-    RIGHT_LEFT = "right_left"
-
-
-class ImitationKidnapOptions(str, Enum):
-    AGENT_ONLY = "agent_only"
-    CONTAINERS = "containers"
-    CONTAINERS_ROTATE = "containers_rotate"
-    PERFORMER = "performer"
+    position_z: RandomizableFloat = None
 
 
 @dataclass
@@ -490,21 +468,36 @@ class ImitationTaskConfig():
     to and the performer is kidnapped. Options are:
     1) agent_only: The imitation agent teleports away from the
     containers but in view. Nothing else is teleported.
-    2) containers: The containers are teleported but still in view. The
-    containers are still aligned with their start rotation. The imitation agent
-    is teleported away from the containers but in view.
-    3) containers_rotate: The containers are teleported but still in view. The
-    containers are rotated 90 degrees to be perpendicular to how they started.
+    2) containers: The containers are teleported anr rotated but still in view.
     The imitation agent is teleported away from the containers but in view.
     4) performer: The performer is teleported to a random part of the room
     but looks at the center of the room where the containers still are.
     The imitation agent is teleported away from the containers but in view.
-
+    Default: random
+    - `relative_container_rotation`: (int, or list of int): Dictates
+    what degree of rotation change the containers will rotate relative to
+    their clockwise starting rotation. For example, if the they are facing
+    270 (starting on the right side) and container_rotation of 45 will make
+    the final rotation 315. Examples of what rotations containers cannot
+    rotate:
+    1) 360 and 180 for both left and right because the containers will
+    face identical or opposite from their start.
+    2) 90 on right side, 270 on left which will make the containers face
+    directly away from the performer.
+    Direction containers can rotate for right side: [45, 135, 225, 270, 315]
+    Direction containers can rotate for left side: [45, 90, 135, 225, 315]
+    Default: random
+    - `global_container_rotation`: (int, or list of int): Dictates
+    what degree of rotation change the containers will rotate on based on
+    the absolute global rotation. Options are: [45, 135, 180, 225, 315].
+    Will override `relative_container_rotation`
     Default: random
     """
-    trigger_order: Union[str, List[str]] = None
-    containers_on_right_side: Union[bool, List[bool]] = None
-    kidnap_option: Union[str, List[str]] = None
+    trigger_order: RandomizableString = None
+    containers_on_right_side: RandomizableBool = None
+    kidnap_option: RandomizableString = None
+    relative_container_rotation: RandomizableInt = None
+    global_container_rotation: RandomizableInt = None
 
 
 @dataclass
@@ -565,8 +558,8 @@ class TurntablesAgentNonAgentConfig():
     """
     agent_label: str
     non_agent_label: str
-    turntable_labels: Union[str, List[str]]
-    direction_labels: Union[str, List[str]]
+    turntable_labels: RandomizableString
+    direction_labels: RandomizableString
 
 
 class ShortcutComponent(ILEComponent):
@@ -960,8 +953,7 @@ class ShortcutComponent(ILEComponent):
                  )
     ))
     @ile_config_setter(validator=ValidateNumber(
-        props=['occluder_distance_from_performer'], min_value=1,
-        null_ok=True))
+        props=['occluder_distance_from_performer'], min_value=1, null_ok=True))
     @ile_config_setter(validator=ValidateNumber(
         props=['platform_height'], min_value=1))
     @ile_config_setter(validator=ValidateNumber(
@@ -969,8 +961,7 @@ class ShortcutComponent(ILEComponent):
     @ile_config_setter(validator=ValidateNumber(
         props=['platform_width'], min_value=1))
     @ile_config_setter(validator=ValidateNumber(
-        props=['start_drop_step'], min_value=0,
-        null_ok=True))
+        props=['start_drop_step'], min_value=0, null_ok=True))
     @ile_config_setter(validator=ValidateOptions(
         props=['wall_material'],
         options=(materials.ALL_UNRESTRICTED_MATERIAL_LISTS_AND_STRINGS)
@@ -1063,11 +1054,10 @@ class ShortcutComponent(ILEComponent):
             ImitationTriggerOrder.RIGHT_LEFT)
     ))
     @ile_config_setter(validator=ValidateOptions(
-        props=['kidnap_options'],
+        props=['kidnap_option'],
         options=(
             ImitationKidnapOptions.AGENT_ONLY,
             ImitationKidnapOptions.CONTAINERS,
-            ImitationKidnapOptions.CONTAINERS_ROTATE,
             ImitationKidnapOptions.PERFORMER)
     ))
     def set_shortcut_imitation_task(self, data: Any) -> None:
@@ -1123,15 +1113,15 @@ class ShortcutComponent(ILEComponent):
         return config
 
     # Override
-    def update_ile_scene(self, scene: Dict[str, Any]) -> Dict[str, Any]:
+    def update_ile_scene(self, scene: Scene) -> Scene:
         logger.info('Configuring shortcut options for the scene...')
         room_dim = scene.room_dimensions
 
         scene = self._add_bisecting_platform(scene, room_dim)
         scene = self._add_triple_door_shortcut(scene, room_dim)
         scene = self._add_double_door_shortcut(scene, room_dim)
-        scene = self._delay_performer_placement(scene, room_dim)
         scene = self._add_lava_shortcut(scene, room_dim)
+        scene = self._delay_performer_placement(scene, room_dim)
         scene = self._add_tool_lava_goal(scene, room_dim)
         scene = self._add_agent_holds_target(scene)
         scene = self._add_imitation_task(scene)
@@ -1157,13 +1147,15 @@ class ShortcutComponent(ILEComponent):
             room_dim,
             blocking_wall=config.has_blocking_wall,
             platform_height=(0.5 if config.is_short else 1),
+            double_blocking_wall=config.has_double_blocking_wall,
             long_blocking_wall=config.has_long_blocking_wall,
             is_thin=config.is_thin,
             other_platforms=(
                 config.other_platforms
                 if isinstance(config.other_platforms, list)
                 else [config.other_platforms]
-            ) if config.other_platforms else []
+            ) if config.other_platforms else [],
+            position_z=choose_random(config.position_z, float)
         )
 
         return scene
@@ -1174,9 +1166,11 @@ class ShortcutComponent(ILEComponent):
         room_dim: Vector3d,
         blocking_wall: bool = False,
         platform_height: float = 1,
+        double_blocking_wall: bool = False,
         long_blocking_wall: bool = False,
         is_thin: bool = False,
-        other_platforms: List[StructuralPlatformConfig] = None
+        other_platforms: List[StructuralPlatformConfig] = None,
+        position_z: float = None
     ) -> None:
 
         # Second platform is the wall to prevent performer from moving too
@@ -1185,18 +1179,23 @@ class ShortcutComponent(ILEComponent):
         # platform.
 
         bounds = find_bounds(scene)
-        performer_z = -room_dim.z / 2.0
+        half_room_z = room_dim.z / 2.0
+        performer_z = -half_room_z + 0.5
+        if position_z is not None and -half_room_z < position_z < half_room_z:
+            performer_z = position_z
         scale_x = 0.5 if is_thin else 1
         platform_config = StructuralPlatformConfig(
             num=1, position=VectorFloatConfig(0, 0, 0), rotation_y=0,
             scale=VectorFloatConfig(scale_x, platform_height, room_dim.z))
 
         # Create the blocking wall.
-        position_z = 0 if long_blocking_wall else (performer_z + 1.5)
+        wall_position_z = 0 if long_blocking_wall else (performer_z + 1)
+        if double_blocking_wall:
+            wall_position_z = -half_room_z + 3
         blocking_wall_config = StructuralPlatformConfig(
             num=1,
             material=materials.BLACK.material,
-            position=VectorFloatConfig(0, 0, position_z),
+            position=VectorFloatConfig(0, 0, wall_position_z),
             rotation_y=0,
             scale=VectorFloatConfig(
                 scale_x - 0.01,
@@ -1206,7 +1205,7 @@ class ShortcutComponent(ILEComponent):
         )
 
         scene.set_performer_start_position(
-            x=0, y=platform_config.scale.y, z=(performer_z) + 0.5)
+            x=0, y=platform_config.scale.y, z=performer_z)
         # Start looking down if the room is short.
         rotation_x = (10 if scene.room_dimensions.z < 10 else 0)
         scene.set_performer_start_rotation(rotation_x, 0)
@@ -1220,13 +1219,23 @@ class ShortcutComponent(ILEComponent):
             bounds.copy()
         )[0]
 
-        if blocking_wall or long_blocking_wall:
-            FeatureCreationService.create_feature(
+        if blocking_wall or long_blocking_wall or double_blocking_wall:
+            wall = FeatureCreationService.create_feature(
                 scene,
                 FeatureTypes.PLATFORMS,
                 blocking_wall_config,
                 bounds.copy()
-            )
+            )[0]
+            wall['id'] = wall['id'].replace('platform', 'blocking_wall')
+        if double_blocking_wall:
+            blocking_wall_config.position.z = -blocking_wall_config.position.z
+            wall = FeatureCreationService.create_feature(
+                scene,
+                FeatureTypes.PLATFORMS,
+                blocking_wall_config,
+                bounds.copy()
+            )[0]
+            wall['id'] = wall['id'].replace('platform', 'blocking_wall')
 
         for other_config in (other_platforms or []):
             if not other_config.material:
@@ -1257,7 +1266,7 @@ class ShortcutComponent(ILEComponent):
     def _add_platform_extension(
         self,
         scene: Scene,
-        platform: Dict[str, Any],
+        platform: SceneObject,
         extension_length: float,
         extension_position: float,
         bounds: List[ObjectBounds]
@@ -1411,7 +1420,7 @@ class ShortcutComponent(ILEComponent):
             self._add_door_drops(scene, config.start_drop_step,
                                  add_y, door_index)
             if config.add_freeze:
-                goal = scene.goal or {}
+                goal = scene.goal or Goal()
                 step_end = (int)(config.start_drop_step + add_y * 4)
                 freezes = [StepBeginEnd(1, step_end)]
                 ActionService.add_freezes(goal, freezes)
@@ -1523,7 +1532,7 @@ class ShortcutComponent(ILEComponent):
             self._add_door_drops(scene, config.start_drop_step,
                                  add_y, door_index)
             if config.add_freeze:
-                goal = scene.goal or {}
+                goal = scene.goal or Goal()
                 step_end = (int)(config.start_drop_step + add_y * 4)
                 freezes = [StepBeginEnd(1, step_end)]
                 ActionService.add_freezes(goal, freezes)
@@ -1673,8 +1682,9 @@ class ShortcutComponent(ILEComponent):
         num_prev_lava = len(scene.lava)
 
         if config.guide_rails and (
-            config.tool_rotation or config.tool_type == TOOL_INACCESSIBLE or
-                config.tool_type == TOOL_BROKEN):
+            config.tool_rotation or
+                config.tool_type == TOOL_TYPES.INACCESSIBLE or
+                config.tool_type == TOOL_TYPES.BROKEN):
             raise ILEException(
                 "Unable to use 'guide_rails' and 'tool_rotation' or "
                 "tool_types: 'inaccessible' or 'broken' from "
@@ -1686,7 +1696,7 @@ class ShortcutComponent(ILEComponent):
                 "and random_performer_position"
             )
         if (config.distance_between_performer_and_tool is not None and
-                config.tool_type == TOOL_INACCESSIBLE):
+                config.tool_type == TOOL_TYPES.INACCESSIBLE):
             raise ILEException(
                 "Cannot have distance_between_performer_and_tool "
                 "or random_performer_position with an "
@@ -1746,10 +1756,10 @@ class ShortcutComponent(ILEComponent):
                     sizes.front +
                     sizes.island_size)
 
-                if config.tool_type == TOOL_HOOKED:
+                if config.tool_type == TOOL_TYPES.HOOKED:
                     tool_length = random.randint(
                         tool_length + HOOKED_TOOL_BUFFER, MAX_TOOL_LENGTH)
-                if config.tool_type == TOOL_SMALL:
+                if config.tool_type == TOOL_TYPES.SMALL:
                     tool_length = 1
 
                 # if size 13, edge is whole tiles at 6, buffer should be 6,
@@ -1757,11 +1767,12 @@ class ShortcutComponent(ILEComponent):
 
                 # buffer here not used for hooked tools
                 far_island_buffer = (
-                    1 if config.tool_type != TOOL_HOOKED else 0)
+                    1 if config.tool_type != TOOL_TYPES.HOOKED else 0)
                 # additional buffer of lava needed for hooked tool scenes
                 # with even sized long dimension
                 rear_lava_buffer = (
-                    1 if config.tool_type == TOOL_HOOKED and long_length %
+                    1 if config.tool_type ==
+                    TOOL_TYPES.HOOKED and long_length %
                     2 == 0 else 0)
 
                 long_buffer_coord = math.floor(long_length / 2.0 - 0.5)
@@ -1816,7 +1827,7 @@ class ShortcutComponent(ILEComponent):
                     short_right_island_coord)
 
                 # Add block tool
-                tool_shape = self._get_tool_shape(
+                tool_shape = get_tool_shape(
                     tool_length, config.tool_type)
                 tool = self._add_tool(
                     scene,
@@ -1854,7 +1865,7 @@ class ShortcutComponent(ILEComponent):
                         target = scene.objects[-1]
 
                 if config.random_performer_position:
-                    if config.tool_type == TOOL_INACCESSIBLE:
+                    if config.tool_type == TOOL_TYPES.INACCESSIBLE:
                         self._place_performer_in_inaccessible_zone(
                             scene, short_key, long_key,
                             long_near_island_coord,
@@ -1867,14 +1878,14 @@ class ShortcutComponent(ILEComponent):
                             long_key, short_key, long_near_island_coord,
                             long_far_island_coord, sizes)
                 elif config.distance_between_performer_and_tool is not None:
-                    if config.tool_type == TOOL_BROKEN:
+                    if config.tool_type == TOOL_TYPES.BROKEN:
                         broken_tool = random.choice(tool)
                         (x, z) = geometry.get_position_distance_away_from_obj(
                             scene.room_dimensions, broken_tool,
                             config.distance_between_performer_and_tool,
                             bounds + [island_bounds])
                         scene.set_performer_start_position(x=x, y=None, z=z)
-                    elif config.tool_type == TOOL_HOOKED:
+                    elif config.tool_type == TOOL_TYPES.HOOKED:
                         (x, z) = geometry.get_position_distance_away_from_hooked_tool(  # noqa
                             scene.room_dimensions, tool,
                             config.distance_between_performer_and_tool,
@@ -1897,7 +1908,7 @@ class ShortcutComponent(ILEComponent):
                 scene.objects = scene.objects[:num_prev_objs]
                 scene.lava = scene.lava[:num_prev_lava]
                 if self.remove_target_on_error:
-                    meta = (scene.goal or {}).get('metadata', {})
+                    meta = (scene.goal or Goal()).metadata or {}
                     if 'target' in meta:
                         meta.pop('target')
                 config = self.get_shortcut_lava_target_tool()
@@ -1969,7 +1980,7 @@ class ShortcutComponent(ILEComponent):
                     True,
                     "front_lava_width",
                     "rear_lava_width",
-                    TOOL_RECTANGULAR)
+                    TOOL_TYPES.RECT)
                 (_, left, right) = self._get_island_and_lava_size_by_dimension(
                     short_length,
                     island_size,
@@ -1978,7 +1989,7 @@ class ShortcutComponent(ILEComponent):
                     False,
                     "left_lava_width",
                     "right_lava_width",
-                    TOOL_RECTANGULAR)
+                    TOOL_TYPES.RECT)
 
                 sizes = LavaIslandSizes(island_size, front, rear, left, right)
 
@@ -2064,7 +2075,7 @@ class ShortcutComponent(ILEComponent):
                 )
 
                 # Add forced rotation at the beginning of tool choice scenes
-                scene.goal['action_list'] = ([['RotateRight']] * 36)
+                scene.goal.action_list = ([['RotateRight']] * 36)
 
                 return scene
             except Exception as e:
@@ -2078,7 +2089,7 @@ class ShortcutComponent(ILEComponent):
                 scene.objects = scene.objects[:num_prev_objs]
                 scene.lava = scene.lava[:num_prev_lava]
                 if self.remove_target_on_error:
-                    meta = (scene.goal or {}).get('metadata', {})
+                    meta = (scene.goal or Goal()).metadata or {}
                     if 'target' in meta:
                         meta.pop('target')
                 config = self.get_shortcut_tool_choice()
@@ -2098,7 +2109,7 @@ class ShortcutComponent(ILEComponent):
                                 valid_tool=True):
 
         # Find or create the target and position it on the island
-        if(valid_tool):
+        if (valid_tool):
             self._add_target_to_lava_island(
                 scene,
                 long_key,
@@ -2151,11 +2162,11 @@ class ShortcutComponent(ILEComponent):
             short_right_island_coord)
 
         # Add block tool
-        if(valid_tool):
-            tool_shape = self._get_tool_shape(tool_length, TOOL_RECTANGULAR)
+        if (valid_tool):
+            tool_shape = get_tool_shape(tool_length, TOOL_TYPES.RECT)
         else:
             # if improbable_option set to no_tool, nothing left to do, return
-            if(config.improbable_option == ImprobableToolOption.NO_TOOL):
+            if (config.improbable_option == ImprobableToolOption.NO_TOOL):
                 return
 
             tool_shape = self._get_too_small_tool()
@@ -2171,7 +2182,7 @@ class ShortcutComponent(ILEComponent):
             sizes.front,
             tool_length,
             long_near_island_coord,
-            TOOL_RECTANGULAR,
+            TOOL_TYPES.RECT,
             tool_shape,
             False)
 
@@ -2207,7 +2218,7 @@ class ShortcutComponent(ILEComponent):
         rot = tool['shows'][0]['rotation']['y']
         end_guide_rail = copy.deepcopy(target['shows'][0]['position'])
         center = VectorIntConfig(y=tool_pos['y'])
-        if TOOL_HOOKED in tool['type']:
+        if TOOL_TYPES.HOOKED in tool['type']:
             max_long_dim = (scene.room_dimensions.z if short_key ==
                             'x' else scene.room_dimensions.x) / 2.0
             end_guide_rail[short_key] = tool_pos[short_key]
@@ -2240,7 +2251,7 @@ class ShortcutComponent(ILEComponent):
                         (scene.floor_material or ""),
                         (scene.wall_material or "")]
         invalid_mats = set(invalid_mats)
-        room_mats = scene.room_materials or {}
+        room_mats = vars(scene.room_materials) if scene.room_materials else {}
         for mat in room_mats.values():
             invalid_mats.add(mat)
         valid = False
@@ -2387,7 +2398,7 @@ class ShortcutComponent(ILEComponent):
                          front_lava_width - tool_length / 2.0 - 0.5)
         setattr(tool_pos, short_key, short_coord)
 
-        if tool_type == TOOL_INACCESSIBLE:
+        if tool_type == TOOL_TYPES.INACCESSIBLE:
             if not blocking_wall_horizontal_offset:
                 # If no value is setup use the island size to minimum range
                 # as a default offset
@@ -2397,7 +2408,7 @@ class ShortcutComponent(ILEComponent):
                     random.choice([negative, positive])
             tool_horizontal_offset = abs(tool_horizontal_offset) * \
                 (-1 if blocking_wall_horizontal_offset < 0 else 1)
-            material = random.choice(materials._CUSTOM_WOOD_MATERIALS)
+            material = random.choice(materials.CUSTOM_WOOD_MATERIALS)
             (tool, wall, width_direction, blocking_wall_pos_cutoff,
              room_wall_pos_cutoff) = create_inaccessible_tool(
                 tool_type=tool_shape,
@@ -2453,7 +2464,7 @@ class ShortcutComponent(ILEComponent):
         # Direction left is negative when long direction is on z axis
         # But positive when long direction is x axis and tool is facing right
         direction_left = 1 if long_key == 'z' else -1
-        if tool_type == TOOL_BROKEN:
+        if tool_type == TOOL_TYPES.BROKEN:
             max_tool_pos = (
                 long_near_island_coord - front_lava_width - 1 -
                 tool_offset_backward_from_lava)
@@ -2493,7 +2504,7 @@ class ShortcutComponent(ILEComponent):
                 tool['debug']['length'] = 1
             return tools
 
-        if(tool_type == TOOL_HOOKED):
+        if (tool_type == TOOL_TYPES.HOOKED):
             bounds_to_check = []
             tool_width = LARGE_BLOCK_TOOLS_TO_DIMENSIONS[tool_shape][0]
             tool_buffer = 1.0 - (tool_width / 3.0)
@@ -2521,7 +2532,7 @@ class ShortcutComponent(ILEComponent):
         # helps with distance_between_performer_and_tool calculations for
         # hooked bounding box shapes
         tool = scene.objects[-1]
-        if tool_type == TOOL_HOOKED:
+        if tool_type == TOOL_TYPES.HOOKED:
             tool['debug']['tool_thickness'] = tool_width / 3.0
             tool['debug']['length'] = tool_length
         else:
@@ -2578,7 +2589,7 @@ class ShortcutComponent(ILEComponent):
 
         min_lava_width = (
             MIN_LAVA_WIDTH_HOOKED_TOOL
-            if tool_type == TOOL_HOOKED else MIN_LAVA_WIDTH)
+            if tool_type == TOOL_TYPES.HOOKED else MIN_LAVA_WIDTH)
         buffer = 1.5 if long_side else \
             (3 if dimension_length % 2 == 0 else 1.5)
         total_max_width_in_dimension = math.floor(
@@ -2587,7 +2598,7 @@ class ShortcutComponent(ILEComponent):
             MAX_LAVA_WITH_ISLAND_WIDTH,
             total_max_width_in_dimension)
 
-        if long_side and tool_type == TOOL_HOOKED:
+        if long_side and tool_type == TOOL_TYPES.HOOKED:
             if (not side_one and not side_two):
                 total_max_width_in_dimension = (
                     MIN_LAVA_WITH_ISLAND_WIDTH_HOOKED_TOOL if (
@@ -2606,14 +2617,15 @@ class ShortcutComponent(ILEComponent):
                     f"Island size ({island_size}) is larger than "
                     f"max island size ({max_island_size})")
         else:
-            island_size = (1 if tool_type == TOOL_HOOKED else random.randint(
-                MIN_LAVA_ISLAND_SIZE, max_island_size))
+            island_size = (1 if tool_type == TOOL_TYPES.HOOKED
+                           else random.randint(
+                               MIN_LAVA_ISLAND_SIZE, max_island_size))
 
         total_accumulated_size += island_size
 
         # for the left and right lava sides in hooked tool scenes,
         # make sure lava extends to the wall
-        if(not long_side and tool_type == TOOL_HOOKED):
+        if (not long_side and tool_type == TOOL_TYPES.HOOKED):
             side_size = math.ceil((dimension_length - island_size) / 2.0)
             return island_size, side_size, side_size
         # Side 1
@@ -2621,7 +2633,7 @@ class ShortcutComponent(ILEComponent):
         max_side_one_width = (
             total_max_width_in_dimension - total_accumulated_size - side_two)
 
-        if(tool_type == TOOL_HOOKED and (side_two or side_one)):
+        if (tool_type == TOOL_TYPES.HOOKED and (side_two or side_one)):
             max_side_one_width = min(
                 max_side_one_width,
                 MAX_LAVA_WIDTH_HOOKED_TOOL)
@@ -2647,7 +2659,7 @@ class ShortcutComponent(ILEComponent):
         max_side_two_width = total_max_width_in_dimension - \
             total_accumulated_size
 
-        if(tool_type == TOOL_HOOKED and (side_two or side_one)):
+        if (tool_type == TOOL_TYPES.HOOKED and (side_two or side_one)):
             max_side_two_width = min(
                 max_side_two_width,
                 MAX_LAVA_WIDTH_HOOKED_TOOL)
@@ -2715,34 +2727,12 @@ class ShortcutComponent(ILEComponent):
             # sourcery recommends the 'from e'
             raise e from e
 
-    def _get_tool_shape(self, tool_length, tool_type):
-        tools = []
-        tool_type = \
-            TOOL_RECTANGULAR if tool_type == TOOL_INACCESSIBLE else tool_type
-        if tool_type == TOOL_SMALL or tool_type == TOOL_BROKEN:
-            tools = [
-                tool
-                for tool, (_, length) in
-                LARGE_BLOCK_TOOLS_TO_DIMENSIONS.items()
-                if "rect" in tool and length == 1
-            ]
-            return random.choice(tools)
-        tools = [
-            tool
-            for tool, (_, length) in LARGE_BLOCK_TOOLS_TO_DIMENSIONS.items()
-            if (length == tool_length and
-                ((TOOL_HOOKED in tool and tool_type == TOOL_HOOKED) or
-                    ("rect" in tool and length != 1 and
-                     tool_type == TOOL_RECTANGULAR)))
-        ]
-        return random.choice(tools)
-
     # Using only tools with a length of 1 for now
     def _get_too_small_tool(self):
         tools = [
             tool
             for tool, (_, length) in LARGE_BLOCK_TOOLS_TO_DIMENSIONS.items()
-            if tool.startswith('tool_rect') and length == TOOL_LENGTH_TOO_SHORT
+            if tool.startswith('tool_rect') and length == 1
         ]
         return random.choice(tools)
 
@@ -2773,7 +2763,7 @@ class ShortcutComponent(ILEComponent):
 
         return scene
 
-    def _get_or_add_soccer_ball_target(self, scene: Scene) -> Dict[str, Any]:
+    def _get_or_add_soccer_ball_target(self, scene: Scene) -> SceneObject:
         """Returns the existing target, or creates and returns a new soccer
         ball target with scale 1/1/1."""
         targets = scene.get_targets()
@@ -2846,7 +2836,8 @@ class ShortcutComponent(ILEComponent):
         for turntable in all_turntables:
             # If the agent is above this turntable, then it should NOT rotate.
             if geometry.is_above(agent, turntable):
-                del turntable['rotates']
+                if 'rotates' in turntable:
+                    del turntable['rotates']
                 continue
             # If the non-agent is above this turntable, then it should rotate.
             if geometry.is_above(non_agent, turntable):
@@ -2865,7 +2856,9 @@ class ShortcutComponent(ILEComponent):
                     'mirroredRotation',
                     non_agent['shows'][0]['rotation']['y']
                 )
-                rotation_amount = (ending_rotation - starting_rotation) % 360
+                rotation_amount = (
+                    round(ending_rotation - starting_rotation, 2) % 360
+                )
                 # Rotate clockwise by default.
                 clockwise = True
                 if rotation_amount > 180:
@@ -2892,523 +2885,6 @@ class ShortcutComponent(ILEComponent):
         self._delayed_turntables_with_agent_and_non_agent = False
         self._delayed_turntables_with_agent_and_non_agent_reason = None
         return scene
-
-    def _setup_containers_for_imitation_task(
-            self, scene: Scene,
-            config: ImitationTaskConfig) -> List:
-        containers = []
-        left_container_start_pos_z = \
-            1 if config.containers_on_right_side else -1
-        separation_between_containers = \
-            -1 if config.containers_on_right_side else 1
-        # Positive to negative z axis, positive is left, negative is right
-        container_range = range(left_container_start_pos_z,
-                                -left_container_start_pos_z * 2,
-                                separation_between_containers)
-        container_colors_used = []
-        material_choices = materials._CUSTOM_WOOD_MATERIALS
-        for container_index in container_range:
-            pos_z = container_index
-            rotation_y = -90 if config.containers_on_right_side else 90
-            for _ in range(MAX_TRIES):
-                try_new_color = False
-                material = random.choice(material_choices)
-                colors = material[1]
-                for color in colors:
-                    if color in container_colors_used:
-                        try_new_color = True
-                        break
-                if try_new_color:
-                    continue
-                for color in colors:
-                    container_colors_used.append(color)
-                break
-            container_template = InteractableObjectConfig(
-                position=Vector3d(
-                    x=0.9 if config.containers_on_right_side else -0.9,
-                    y=0,
-                    z=pos_z),
-                rotation=Vector3d(y=rotation_y),
-                scale=Vector3d(
-                    x=IMITATION_TASK_CONTAINER_SCALE,
-                    y=IMITATION_TASK_CONTAINER_SCALE,
-                    z=IMITATION_TASK_CONTAINER_SCALE),
-                shape='chest_1',
-                num=1,
-                material=material[0]
-            )
-            FeatureCreationService.create_feature(
-                scene, FeatureTypes.INTERACTABLE,
-                container_template, find_bounds(scene))
-            container_index = scene.objects[-1]
-            containers.append(container_index)
-        return containers, separation_between_containers
-
-    def _setup_target_and_placer_imitation_task(self, scene: Scene,
-                                                config: ImitationTaskConfig,
-                                                containers):
-        self.remove_target_on_error = True
-        goal_template = GoalConfig(
-            category=tags.SCENE.IMITATION,
-            target=InteractableObjectConfig(
-                position=Vector3d(x=0, y=0, z=0),
-                shape='soccer_ball',
-                scale=1))
-        GoalServices.attempt_to_add_goal(scene, goal_template)
-
-        target = scene.objects[-1]
-        target['shows'][0]['position']['y'] = \
-            scene.room_dimensions.y + target['debug']['dimensions']['y'] * 2
-        placer = create_placer(
-            target['shows'][0]['position'], target['debug']['dimensions'],
-            target['debug']['positionY'], 0, 0, scene.room_dimensions.y
-        )
-        placer['triggeredBy'] = True
-        scene.objects.append(placer)
-
-        target['triggeredBy'] = True
-        target['kinematic'] = True
-        target['moves'] = [placer['moves'][0]]
-        target['togglePhysics'] = [
-            {'stepBegin': placer['changeMaterials'][0]['stepBegin']}]
-        target['shows'][0]['position']['x'] = \
-            containers[0]['shows'][0]['position']['x']
-        placer['shows'][0]['position']['x'] = \
-            target['shows'][0]['position']['x']
-
-        # position in front of the left containers if containers on left
-        # position in front of the right containers if containers on right
-        target_separation = IMITATION_TASK_TARGET_SEPARATION
-        container_to_put_in_front_of_index = \
-            -1 if config.containers_on_right_side else 0
-        target['shows'][0]['position']['z'] = (
-            containers[container_to_put_in_front_of_index
-                       ]['shows'][0]['position']['z'] - target_separation)
-        placer['shows'][0]['position']['z'] = \
-            target['shows'][0]['position']['z']
-        return target, placer
-
-    def _setup_trigger_order_for_imitation_task(self, scene: Scene,
-                                                config: ImitationTaskConfig,
-                                                containers):
-        trigger_order_ids = []
-        solo_options = ['left', 'middle', 'right']
-        left_options = ['left_middle', 'left_right']
-        middle_options = ['middle_left', 'middle_right']
-        right_options = ['right_middle', 'right_left']
-        containers_to_open_indexes = []
-        if config.trigger_order in solo_options:
-            container_index = solo_options.index(config.trigger_order)
-            trigger_order_ids.append(containers[container_index]['id'])
-            containers_to_open_indexes.append(container_index)
-        elif config.trigger_order in left_options:
-            trigger_order_ids.append(containers[0]['id'])
-            container_index = left_options.index(config.trigger_order)
-            trigger_order_ids.append(
-                containers[1 if container_index == 0 else 2]['id'])
-            containers_to_open_indexes.append(0)
-            containers_to_open_indexes.append(1 if container_index == 0 else 2)
-        elif config.trigger_order in middle_options:
-            trigger_order_ids.append(containers[1]['id'])
-            container_index = middle_options.index(config.trigger_order)
-            trigger_order_ids.append(
-                containers[0 if container_index == 0 else 2]['id'])
-            containers_to_open_indexes.append(1)
-            containers_to_open_indexes.append(0 if container_index == 0 else 2)
-        elif config.trigger_order in right_options:
-            trigger_order_ids.append(containers[2]['id'])
-            container_index = right_options.index(config.trigger_order)
-            trigger_order_ids.append(
-                containers[1 if container_index == 0 else 0]['id'])
-            containers_to_open_indexes.append(2)
-            containers_to_open_indexes.append(1 if container_index == 0 else 0)
-        return trigger_order_ids, containers_to_open_indexes
-
-    def _setup_agent_for_imitation_task(
-        self, scene: Scene, config: ImitationTaskConfig, containers,
-            containers_to_open_indexes):
-        """
-        Agent Setup
-        1. Enter in front of starting chest
-        2. Walk to chest
-        3. Open (if only open one chest then end here and face performer)
-        4. Walk to other chest
-        5. Rotate to face chest
-        6. Open the chest
-        7. Face performer
-        """
-        step_begin_open_first_chest = 18
-        step_end_open_first_chest = 28
-        open_animation = "TPE_jump"
-        turn_left_animation = "TPM_turnL45"
-        turn_right_animation = "TPM_turnR45"
-        walk_animation = "TPM_walk"
-
-        movement_points = []
-        number_of_containers = 0
-        start_turning_step = None
-        rotates = None
-        for container_index in containers_to_open_indexes:
-            movement_points.append(
-                Vector3d(
-                    x=(IMITATION_AGENT_END_X if config.containers_on_right_side
-                       else -IMITATION_AGENT_END_X),
-                    y=0,
-                    z=containers[container_index]['shows'][0]['position']['z']
-                )
-            )
-            number_of_containers += 1
-            if number_of_containers > 1:
-                """
-                Example of chest on the right:
-                Rotate left because the agent walks toward the performer.
-                Start
-                  |     c opened
-                  |     c
-                Agent > c open this
-
-                Performer
-                """
-                containers_on_right_side_agent_moving_toward_performer = (
-                    config.containers_on_right_side and
-                    container_index > containers_to_open_indexes[0])
-                containers_on_left_side_agent_moving_away_from_performer = (
-                    not config.containers_on_right_side and
-                    container_index > containers_to_open_indexes[0])
-                # negative is left turn, positive is right turn
-                direction = (
-                    -1 if
-                    containers_on_right_side_agent_moving_toward_performer or
-                    containers_on_left_side_agent_moving_away_from_performer
-                    else 1)
-                is_adjacent_container = (
-                    container_index == containers_to_open_indexes[0] + 1 or
-                    container_index == containers_to_open_indexes[0] - 1)
-                # for some reason the left side needs one extra step
-                extra_step = (
-                    1 if
-                    containers_on_left_side_agent_moving_away_from_performer
-                    else 0)
-                # With an origin point of the start container z position,
-                # 57 and 82 are the number of steps required to reach the
-                # adjacent or far container z position and be centered in
-                # front of it
-                start_turning_step = 57 + extra_step if \
-                    is_adjacent_container else 82 + extra_step
-                rotation_per_step = 9 * direction
-                rotates = {
-                    "stepBegin": start_turning_step,
-                    "stepEnd": start_turning_step + 10,
-                    "vector": {
-                        "x": 0,
-                        "y": rotation_per_step,
-                        "z": 0
-                    }
-                }
-
-        # End position facing the performer
-        end_point_z = movement_points[-1].z - 0.15
-        movement_points.append(
-            Vector3d(
-                x=(IMITATION_AGENT_END_X if config.containers_on_right_side
-                   else -IMITATION_AGENT_END_X),
-                y=0,
-                z=end_point_z))
-        movement = AgentMovementConfig(
-            animation=walk_animation,
-            step_begin=1,
-            points=movement_points,
-            repeat=False
-        )
-
-        # Animations
-        actions = []
-        # The steps that each container is opened
-        open_steps = []
-        first_open = AgentActionConfig(
-            step_begin=step_begin_open_first_chest,
-            step_end=step_end_open_first_chest,
-            is_loop_animation=False,
-            id=open_animation
-        )
-        actions.append(first_open)
-        open_steps.append(step_begin_open_first_chest)
-
-        # Check if we are opening more than one chest
-        # A turning animation is required to face the second chest
-        if start_turning_step is not None:
-            turn = AgentActionConfig(
-                step_begin=start_turning_step,
-                step_end=start_turning_step + 10,
-                is_loop_animation=False,
-                id=(turn_left_animation if rotates['vector']['y'] < 1
-                    else turn_right_animation)
-            )
-            second_open = AgentActionConfig(
-                step_begin=start_turning_step + 10,
-                step_end=start_turning_step + 20,
-                is_loop_animation=False,
-                id=open_animation
-            )
-            actions.append(turn)
-            actions.append(second_open)
-            open_steps.append(start_turning_step + 10)
-
-        # Config the agent in front of the first chest to open
-        start_position = Vector3d(
-            x=(-IMITATION_AGENT_START_X if
-                config.containers_on_right_side else
-                IMITATION_AGENT_START_X), y=0,
-            z=(containers[containers_to_open_indexes[0]]
-                         ['shows'][0]['position']['z']))
-        rotation_y = 90 if config.containers_on_right_side else -90
-        agentConfig = AgentConfig(
-            position=start_position,
-            rotation_y=rotation_y,
-            actions=actions,
-            movement=movement
-        )
-        agent = FeatureCreationService.create_feature(
-            scene, FeatureTypes.AGENT, agentConfig, [])[0]
-        if rotates:
-            agent['rotates'] = [rotates]
-
-        # Open containers with animation timing
-        i = 0
-        for container_index in containers_to_open_indexes:
-            containers[container_index]['openClose'] = [{
-                'step': open_steps[i] + 4,
-                'open': True
-            }]
-            i += 1
-
-        return agent, open_steps
-
-    def _change_container_and_agent_positions_during_kidnap(
-            self, scene: Scene, config: ImitationTaskConfig, containers,
-            separation_between_containers, kidnap_step, target,
-            placer, agent):
-        # Need to slightly shift depending on the start side since
-        # the performer is offset to stay in the performers view
-        buffer_for_all_containers_to_fit = 2
-        buffer_for_agent_to_stand_behind = 1
-        rotate_90 = (random.choice([True, False]) if
-                     config.kidnap_option
-                     is None else config.kidnap_option ==
-                     ImitationKidnapOptions.CONTAINERS_ROTATE)
-        if not rotate_90:
-            start_x = round(random.uniform(-2.5, 2.5), 2)
-            if not config.containers_on_right_side:
-                start_z = round(random.uniform(
-                    0,
-                    scene.room_dimensions.z / 2 -
-                    buffer_for_all_containers_to_fit -
-                    buffer_for_agent_to_stand_behind), 2)
-            else:
-                start_z = round(random.uniform(
-                    2,
-                    scene.room_dimensions.z / 2 -
-                    buffer_for_agent_to_stand_behind), 2)
-        else:
-            start_x = round(random.uniform(-2.5, 0.5), 2)
-            start_z = round(random.uniform(
-                0,
-                scene.room_dimensions.z /
-                2 -
-                buffer_for_agent_to_stand_behind), 2)
-        for container in containers:
-            container['shows'].append({
-                'stepBegin': kidnap_step,
-                'position': {
-                    'x': start_x,
-                    'y': 0,
-                    'z': start_z
-                },
-                'rotation': {
-                    'y': (
-                        180 if rotate_90
-                        else container['shows'][0]['rotation']['y'])
-                }
-            })
-            if not rotate_90:
-                start_z += separation_between_containers
-            else:
-                start_x += abs(separation_between_containers)
-
-        end_container = containers[
-            -1 if config.containers_on_right_side else 0]
-
-        # target and placer need to shift too
-        target_separation = IMITATION_TASK_TARGET_SEPARATION
-        if rotate_90:
-            target['shows'][1]['position']['x'] = (
-                end_container['shows'][1]['position']['x'] +
-                (target_separation *
-                 (1 if config.containers_on_right_side else -1)))
-            target['shows'][1]['position']['z'] = \
-                end_container['shows'][1]['position']['z']
-        else:
-            target['shows'][1]['position']['x'] = \
-                end_container['shows'][1]['position']['x']
-            target['shows'][1]['position']['z'] = \
-                end_container['shows'][1]['position']['z'] - target_separation
-        placer['shows'][1]['position']['x'] = \
-            target['shows'][1]['position']['x']
-        placer['shows'][1]['position']['z'] = \
-            target['shows'][1]['position']['z']
-
-        # Place the agent behind
-        end_container_pos = \
-            containers[0 if config.containers_on_right_side
-                       else -1]['shows'][1]['position']['z']
-        separation = 1
-        agent_z = end_container_pos + separation
-        agent_x = random.choice(
-            [containers[0]['shows'][1]['position']['x'] - separation,
-                containers[-1]['shows'][1]['position']['x'] + separation])
-        agent['shows'].append({
-            'stepBegin': kidnap_step,
-            'position': {
-                'x': agent_x,
-                'y': 0,
-                'z': agent_z
-            },
-            'rotation': {
-                'y': 180
-            }
-        })
-
-        teleport_pos_x = scene.performer_start.position.x
-        teleport_pos_z = scene.performer_start.position.z
-        teleport_rot_y = scene.performer_start.rotation.y
-        ActionService.add_teleports(
-            scene.goal, [
-                TeleportConfig(
-                    step=kidnap_step, position_x=teleport_pos_x,
-                    position_z=teleport_pos_z, rotation_y=teleport_rot_y)],
-            False)
-
-    def _teleport_performer_for_imitation_task(
-            self, scene: Scene, agent,
-            kidnap_step):
-        # pick an x and z not in the center x of the room
-        # so the teleport is substantial
-        shift = 2.5
-        x1 = round(random.uniform(
-            -scene.room_dimensions.x / 2 + geometry.PERFORMER_WIDTH,
-            -shift), 2)
-        x2 = round(random.uniform(
-            shift, scene.room_dimensions.x / 2 - geometry.PERFORMER_WIDTH),
-            2)
-        teleport_pos_x = random.choice([x1, x2])
-        z1 = round(random.uniform(
-            -scene.room_dimensions.z / 2 + geometry.PERFORMER_WIDTH,
-            -shift), 2)
-        z2 = round(random.uniform(
-            shift, scene.room_dimensions.z / 2 - geometry.PERFORMER_WIDTH),
-            2)
-        teleport_pos_z = random.choice([z1, z2])
-        ActionService.add_teleports(
-            scene.goal, [
-                TeleportConfig(
-                    step=kidnap_step, position_x=teleport_pos_x,
-                    position_z=teleport_pos_z, look_at_center=True)],
-            False)
-        end_habituation_string = scene.goal['action_list'][-1][0]
-        teleport_rot_y_index = end_habituation_string.rfind('=')
-        teleport_rot_y = int(
-            end_habituation_string[teleport_rot_y_index + 1:])
-
-        agent_z = random.choice([-2, 2])
-        agent['shows'].append({
-            'stepBegin': kidnap_step,
-            # Put the agent still close the containers
-            'position': {
-                'x': random.uniform(-2, 2),
-                'y': 0,
-                'z': agent_z
-            },
-            'rotation': {
-                'y': 180 if agent_z > 0 else 0
-            }
-        })
-        scene.debug['endHabituationStep'] = kidnap_step
-        scene.debug['endHabituationTeleportPositionX'] = teleport_pos_x
-        scene.debug['endHabituationTeleportPositionZ'] = teleport_pos_z
-        scene.debug['endHabituationTeleportRotationY'] = teleport_rot_y
-
-    def _kidnap_performer_for_imitation_task(
-        self, scene: Scene, config: ImitationTaskConfig, target, placer,
-            agent, last_open_step, containers, containers_to_open_indexes,
-            separation_between_containers):
-        kidnap_step = last_open_step + placer['moves'][-1]['stepEnd'] + 10
-        ActionService.add_freezes(scene.goal, [StepBeginEnd(1, kidnap_step)])
-
-        placer_first_position = placer['shows'][0]['position']
-        placer['shows'].append({
-            'stepBegin': kidnap_step,
-            'position': {
-                'x': placer_first_position['x'],
-                'y': placer_first_position['y'],
-                'z': placer_first_position['z']
-            }
-        })
-        target_first_position = target['shows'][0]['position']
-        target['shows'].append({
-            'stepBegin': kidnap_step,
-            'position': {
-                'x': target_first_position['x'],
-                'y': target_first_position['y'],
-                'z': target_first_position['z']
-            }
-        })
-
-        # Close containers
-        for container_index in containers_to_open_indexes:
-            containers[container_index]['openClose'].append({
-                'step': kidnap_step,
-                'open': False
-            })
-
-        scene.debug['endHabituationStep'] = kidnap_step
-        scene.debug['endHabituationTeleportPositionX'] = \
-            scene.performer_start.position.x
-        scene.debug['endHabituationTeleportPositionZ'] = \
-            scene.performer_start.position.z
-        scene.debug['endHabituationTeleportRotationY'] = \
-            scene.performer_start.rotation.y
-        # If we do NOT need to teleport anything, teleport the agent only
-        if config.kidnap_option == ImitationKidnapOptions.AGENT_ONLY:
-            agent['shows'].append({
-                'stepBegin': kidnap_step,
-                'position': {
-                    'x': random.uniform(-2, 2),
-                    'y': 0,
-                    'z': 2
-                },
-                'rotation': {
-                    'y': 180
-                }
-            })
-            ActionService.add_teleports(
-                scene.goal, [
-                    TeleportConfig(
-                        step=kidnap_step,
-                        position_x=scene.performer_start.position.x,
-                        position_z=scene.performer_start.position.z,
-                        rotation_y=scene.performer_start.rotation.y)],
-                False)
-        # If we need to teleport the containers
-        elif (config.kidnap_option == ImitationKidnapOptions.CONTAINERS or
-              config.kidnap_option == ImitationKidnapOptions.CONTAINERS_ROTATE
-              ):
-            self._change_container_and_agent_positions_during_kidnap(
-                scene, config, containers, separation_between_containers,
-                kidnap_step, target, placer, agent)
-        # If we need to teleport the performer
-        else:
-            self._teleport_performer_for_imitation_task(
-                scene, agent, kidnap_step)
 
     def _add_seeing_leads_to_knowing(self, scene: Scene):
         config = self.get_shortcut_seeing_leads_to_knowing()
@@ -3451,7 +2927,7 @@ class ShortcutComponent(ILEComponent):
         return scene
 
     def _create_bins_placers_seeing_leads_to_knowing(
-            self, scene: Scene, target: Dict[str, Any]):
+            self, scene: Scene, target: SceneObject):
         # bin/bucket setup
         bin_shape_choices = ['cup_2_static', 'cup_3_static', 'cup_6_static']
         bin_shape = random.choice(bin_shape_choices)
@@ -3495,7 +2971,7 @@ class ShortcutComponent(ILEComponent):
 
             # if target should be in this bucket, move target to
             # corresponding placer
-            if(bin_pos == target_bucket):
+            if (bin_pos == target_bucket):
                 relative_bin = RelativePositionConfig(
                     label=bin_pos['label']
                 )
@@ -3529,7 +3005,7 @@ class ShortcutComponent(ILEComponent):
                     deactivation_step=PLACER_DEACTIVATION_STEP,
                     end_height=end_placer_height,
                     max_height=scene.room_dimensions.y,
-                    last_step=scene.goal['last_step']
+                    last_step=scene.goal.last_step
                 )
 
                 scene.objects.append(non_target_placer)
@@ -3555,24 +3031,24 @@ class ShortcutComponent(ILEComponent):
         scene.objects.append(target_inst)
         total_steps = 105
 
-        scene.goal = {
-            'metadata': {
+        scene.goal = Goal(
+            metadata={
                 'target': {
                     'id': target_inst['id']
                 }
             },
-            'category': 'passive',
-            'answer': {
+            category='passive',
+            answer={
                 'choice': 'plausible'
             },
-            'last_step': total_steps,
-            'action_list': [['Pass']] * total_steps,
-            'description': ''
-        }
+            last_step=total_steps,
+            action_list=([['Pass']] * total_steps),
+            description=''
+        )
 
     def _agent_setup_seeing_leads_to_knowing(
             self, config: SeeingLeadsToKnowingConfig,
-            scene: Scene, target: Dict[str, Any]):
+            scene: Scene, target: SceneObject):
         """
         Agent Setup
         1. Enter from left or right
@@ -3584,7 +3060,7 @@ class ShortcutComponent(ILEComponent):
         agent_x_start_left = -2
         agent_x_start_right = 2
 
-        if(config.target_behind_agent):
+        if (config.target_behind_agent):
             agent_x_start = (
                 agent_x_start_left
                 if target['shows'][0]['position']['x'] == BIN_LEFT_X_POS
@@ -3625,7 +3101,7 @@ class ShortcutComponent(ILEComponent):
         is_target_behind_agent = (config.target_behind_agent or
                                   ((agent_x_start * target['shows'][0]['position']['x']) > 0))  # noqa
 
-        if(is_target_behind_agent):
+        if (is_target_behind_agent):
             movement_points.append(
                 VectorFloatConfig(
                     x=target['shows'][0]['position']['x'],
@@ -3670,45 +3146,58 @@ class ShortcutComponent(ILEComponent):
         if config.containers_on_right_side is None:
             config.containers_on_right_side = choose_random([True, False])
         if config.kidnap_option is None:
-            config.kidnap_options = choose_random(
+            config.kidnap_option = choose_random(
                 [option.value for option in ImitationKidnapOptions])
 
-        scene.performer_start.position.x = 0
-        scene.performer_start.position.z = -3.75
-        scene.performer_start.rotation.y = 0
-        # Make a rectangular room
-        base_dimension = random.randint(8, 10)
-        rectangle_dimension = base_dimension * 2
-        rectangle_direction = random.randint(0, 1)
-        scene.room_dimensions.x = \
-            base_dimension if rectangle_direction == 0 else rectangle_dimension
-        scene.room_dimensions.y = 2
-        scene.room_dimensions.z = \
-            rectangle_dimension if rectangle_direction == 0 else base_dimension
+        rotation_to_use = None
+        relative_rotation = False
+        if config.global_container_rotation is not None or \
+                config.relative_container_rotation is None:
+            config.global_container_rotation = \
+                choose_random(
+                    IMITATION_CONTAINER_TELEPORT_ROTATIONS_GLOBAL if
+                    config.global_container_rotation is None else
+                    config.global_container_rotation)
+            rotation_to_use = config.global_container_rotation
+            relative_rotation = False
+            if config.global_container_rotation not in \
+                    IMITATION_CONTAINER_TELEPORT_ROTATIONS_GLOBAL:
+                raise ILEException(
+                    "Imitation Task Container Global Rotation "
+                    f"({config.global_container_rotation}) must "
+                    "be equal to a vale in "
+                    f"{IMITATION_CONTAINER_TELEPORT_ROTATIONS_GLOBAL} "
+                )
+        else:
+            config.relative_container_rotation = choose_random(
+                config.relative_container_rotation)
+            rotation_to_use = config.relative_container_rotation
+            relative_rotation = True
+            if rotation_to_use not in \
+                    (IMITATION_CONTAINER_TELEPORT_ROTATIONS_RIGHT_SIDE if
+                        config.containers_on_right_side else
+                        IMITATION_CONTAINER_TELEPORT_ROTATIONS_LEFT_SIDE):
+                raise ILEException(
+                    "Imitation Task Container Relative Rotation "
+                    f"({config.relative_container_rotation}) must "
+                    "be a value allowed on their container start side. "
+                    "RIGHT SIDE: "
+                    f"{IMITATION_CONTAINER_TELEPORT_ROTATIONS_RIGHT_SIDE}"
+                    ", LEFT SIDE: "
+                    f"{IMITATION_CONTAINER_TELEPORT_ROTATIONS_LEFT_SIDE}."
+                )
 
-        containers, separation_between_containers = \
-            self._setup_containers_for_imitation_task(scene, config)
-
-        target, placer = self._setup_target_and_placer_imitation_task(
-            scene, config, containers)
-
-        trigger_order_ids, containers_to_open_indexes = \
-            self._setup_trigger_order_for_imitation_task(
-                scene, config, containers)
-
-        scene.goal['triggeredByTargetSequence'] = trigger_order_ids
-
-        agent, open_steps = self._setup_agent_for_imitation_task(
-            scene, config, containers, containers_to_open_indexes)
-
-        # Now Kidnap the performer!!! ヽ(°o°)ﾉ
-        self._kidnap_performer_for_imitation_task(
-            scene, config, target, placer, agent, open_steps[-1], containers,
-            containers_to_open_indexes, separation_between_containers)
-
-        # raise the ceiling so the target and placer are visible
-        scene.room_dimensions.y = 3
-        return scene
+        goal_template = GoalConfig(
+            category=tags.SCENE.IMITATION,
+            target=InteractableObjectConfig(
+                position=Vector3d(x=0, y=0, z=4),
+                shape='soccer_ball',
+                scale=1))
+        GoalServices.attempt_to_add_goal(scene, goal_template)
+        return add_imitation_task(
+            scene, config.trigger_order, config.containers_on_right_side,
+            config.kidnap_option, containers_teleport_rotation=rotation_to_use,
+            relative_rotation=relative_rotation)
 
     def get_num_delayed_actions(self) -> int:
         count = 0
@@ -3716,7 +3205,7 @@ class ShortcutComponent(ILEComponent):
         count += 1 if self._delayed_turntables_with_agent_and_non_agent else 0
         return count
 
-    def run_delayed_actions(self, scene: Dict[str, Any]) -> Dict[str, Any]:
+    def run_delayed_actions(self, scene: Scene) -> Scene:
         if self._delayed_perf_pos:
             try:
                 self._position_performer_on_platform(scene)

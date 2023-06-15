@@ -66,7 +66,7 @@ def test_intuitive_physics_all_objects_diagonal_size():
             unshuffled=True
         )
     ]:
-        for definition in dataset.definitions(unshuffled=True):
+        for definition in dataset.definitions_unique_shape_scale():
             print(f'{definition}\n========================================')
             # If diagonal size is too big, it will cause an occassional issue
             # with implausible event calculations in intuitive physics scenes.

@@ -3,13 +3,12 @@ from machine_common_sense.config_manager import Vector3d
 
 from generator import materials
 from generator.base_objects import (
-    ALL_LARGE_BLOCK_TOOLS,
     create_soccer_ball,
     create_specific_definition_from_base
 )
 from generator.geometry import MAX_TRIES, ORIGIN_LOCATION
 from generator.instances import instantiate_object
-from ideal_learning_env.defs import ILEDelayException, ILEException
+from ideal_learning_env.defs import ILEDelayException
 from ideal_learning_env.numerics import (
     MinMaxFloat,
     MinMaxInt,
@@ -58,12 +57,12 @@ from ideal_learning_env.structural_object_service import (
     StructuralRampCreationService,
     StructuralThrowerConfig,
     StructuralThrowerCreationService,
-    StructuralToolsCreationService,
+    StructuralTubeOccluderConfig,
+    StructuralTubeOccluderCreationService,
     StructuralTurntableConfig,
     StructuralTurntableCreationService,
     StructuralWallConfig,
     StructuralWallCreationService,
-    ToolConfig,
     WallSide,
     is_wall_too_close
 )
@@ -604,6 +603,14 @@ def test_door_creation_reconcile():
                            "AI2-THOR/Materials/Plastics/BlackPlastic"]
     assert r2.wall_material == (
         "AI2-THOR/Materials/Metals/BrushedAluminum_Blue")
+
+    for i in range(50):
+        tmp3 = StructuralDoorConfig(num=[1, 2, 3])
+        srv = StructuralDoorsCreationService()
+        r3: StructuralDoorConfig = srv.reconcile(scene, tmp3)
+        door_color = materials.find_colors(r3.material)
+        wall_color = materials.find_colors(r3.wall_material)
+        assert not any(item in door_color for item in wall_color)
 
 
 def test_dropper_creation_reconcile():
@@ -1239,68 +1246,6 @@ def test_thrower_creation_reconcile():
     assert r2.projectile_scale == 1
 
 
-def test_tool_creation_reconcile():
-    scene = prior_scene()
-    srv = StructuralToolsCreationService()
-    tmp = ToolConfig(1)
-    r1: ToolConfig = srv.reconcile(scene, tmp)
-    assert r1.num == 1
-    assert -5 < r1.position.x < 5
-    assert r1.position.y == 0
-    assert -5 < r1.position.z < 5
-    assert 0 <= r1.rotation_y < 360
-    assert r1.shape in ALL_LARGE_BLOCK_TOOLS
-    assert r1.guide_rails is False
-
-    tmp2 = ToolConfig(
-        num=[2, 3],
-        position=VectorFloatConfig([3, 2], MinMaxFloat(0, 2), 3),
-        rotation_y=[90, 180],
-        shape=['imaginary_tool_1', 'imaginary_tool_2'], guide_rails=True)
-    srv = StructuralToolsCreationService()
-    r2: ToolConfig = srv.reconcile(scene, tmp2)
-
-    assert r2.num in [2, 3]
-    assert r2.position.x in [2, 3]
-    assert 0 <= r2.position.y <= 2
-    assert r2.position.z == 3
-    assert r2.rotation_y in [90, 180]
-    assert r2.shape in ["imaginary_tool_1",
-                        "imaginary_tool_2"]
-    assert r2.guide_rails is True
-
-
-def test_tool_creation_reconcile_by_size():
-    scene = prior_scene()
-    template = ToolConfig(num=1, width=0.75, length=6)
-    srv = StructuralToolsCreationService()
-    r1: ToolConfig = srv.reconcile(scene, template)
-
-    assert r1.num == 1
-    assert r1.shape == 'tool_rect_0_75_x_6_00'
-
-    template2 = ToolConfig(num=1, length=6)
-    srv = StructuralToolsCreationService()
-    r2: ToolConfig = srv.reconcile(scene, template2)
-
-    assert r2.num == 1
-    assert r2.shape in [
-        'tool_rect_0_50_x_6_00',
-        'tool_rect_0_75_x_6_00',
-        'tool_rect_1_00_x_6_00',
-        'tool_hooked_0_50_x_6_00',
-        'tool_hooked_0_75_x_6_00',
-        'tool_hooked_1_00_x_6_00']
-
-
-def test_tool_creation_reconcile_by_size_error():
-    scene = prior_scene()
-    template = ToolConfig(num=1, width=0.76, length=6)
-    srv = StructuralToolsCreationService()
-    with pytest.raises(ILEException):
-        srv.reconcile(scene, template)
-
-
 def test_wall_creation_reconcile():
     scene = prior_scene()
     rd = scene.room_dimensions
@@ -1428,6 +1373,39 @@ def test_dropper_create():
     show['scale'] == {'x': 1, 'y': 1.1, 'z': 1.2}
 
 
+def test_dropper_create_with_projectile_dimensions():
+    config = StructuralDropperConfig(
+        projectile_shape=DROPPER_SHAPES,
+        projectile_dimensions=0.5
+    )
+    scene = prior_scene()
+    service = StructuralDropperCreationService()
+    service.add_to_scene(scene, config, [])
+
+    dropper = scene.objects[0]
+    assert dropper
+    assert dropper['id'].startswith('dropping_device_')
+    assert dropper['type'] == 'tube_wide'
+
+    projectile = scene.objects[1]
+    assert projectile
+    assert projectile['debug']['dimensions'] == pytest.approx(
+        {'x': 0.5, 'y': 0.5, 'z': 0.5}
+    )
+
+
+def test_dropper_no_projectile():
+    config = StructuralDropperConfig(
+        num=1,
+        no_projectile=True,
+    )
+    scene = prior_scene()
+    service = StructuralDropperCreationService()
+    service.add_to_scene(scene, config, [])
+
+    assert len(scene.objects) == 1
+
+
 def test_floor_material_create():
     temp = FloorMaterialConfig(
         material="AI2-THOR/Materials/Walls/DrywallRed",
@@ -1442,8 +1420,9 @@ def test_floor_material_create():
     ).add_to_scene(scene, temp, [])
     assert scene.floor_textures
     text = scene.floor_textures[0]
-    assert text['material'] == "AI2-THOR/Materials/Walls/DrywallRed"
-    assert text['positions'] == [{'x': 3, 'z': -3}]
+    assert text.material == "AI2-THOR/Materials/Walls/DrywallRed"
+    assert text.positions == [{'x': 3, 'z': -3}]
+    assert len(scene.floor_textures) == 1
 
 
 def test_holes_create():
@@ -2168,6 +2147,27 @@ def test_thrower_create():
     # Note, the ball hasn't been positioned yet
 
 
+def test_thrower_create_with_projectile_dimensions():
+    config = StructuralThrowerConfig(
+        projectile_shape=THROWER_SHAPES,
+        projectile_dimensions=0.5
+    )
+    scene = prior_scene()
+    service = StructuralThrowerCreationService()
+    service.add_to_scene(scene, config, [])
+
+    thrower = scene.objects[0]
+    assert thrower
+    assert thrower['id'].startswith('throwing_device_')
+    assert thrower['type'] == 'tube_wide'
+
+    projectile = scene.objects[1]
+    assert projectile
+    assert projectile['debug']['dimensions'] == pytest.approx(
+        {'x': 0.5, 'y': 0.5, 'z': 0.5}
+    )
+
+
 def test_wall_create():
     temp = StructuralWallConfig(
         position=VectorFloatConfig(1.1, 0, 1.3), rotation_y=34,
@@ -2192,63 +2192,6 @@ def test_wall_create():
     assert pos == {'x': 1.1, 'y': 1.5, 'z': 1.3}
     assert rot == {'x': 0, 'y': 34, 'z': 0}
     assert scale == {'x': 2.2, 'y': 3, 'z': 0.1}
-
-
-def test_tool_create():
-    temp = ToolConfig(
-        position=VectorFloatConfig(1.1, 1.2, 1.3), rotation_y=34,
-        guide_rails=True, shape='tool_rect_0_75_x_4_00')
-    tool = StructuralToolsCreationService(
-    ).create_feature_from_specific_values(prior_scene(), temp, None)
-
-    assert tool
-    assert tool['id'].startswith('tool_')
-    assert tool['type'] == 'tool_rect_0_75_x_4_00'
-    show = tool['shows'][0]
-    pos = show['position']
-    rot = show['rotation']
-    scale = show['scale']
-    assert pos == {'x': 1.1, 'y': 0.15, 'z': 1.3}
-    assert rot == {'x': 0, 'y': 34, 'z': 0}
-    assert scale == {'x': 1, 'y': 1, 'z': 1}
-
-
-def test_tool_create_hooked():
-    temp = ToolConfig(
-        position=VectorFloatConfig(1.1, 1.2, 1.3), rotation_y=34,
-        guide_rails=False, shape='tool_hooked_0_75_x_4_00')
-    tool = StructuralToolsCreationService(
-    ).create_feature_from_specific_values(prior_scene(), temp, None)
-
-    assert tool
-    assert tool['id'].startswith('tool_')
-    assert tool['type'] == 'tool_hooked_0_75_x_4_00'
-    show = tool['shows'][0]
-    pos = show['position']
-    rot = show['rotation']
-    scale = show['scale']
-    assert pos == {'x': 1.1, 'y': 0.15, 'z': 1.3}
-    assert rot == {'x': 0, 'y': 34, 'z': 0}
-    assert scale == {'x': 1, 'y': 1, 'z': 1}
-
-
-def test_tool_create_short():
-    temp = ToolConfig(
-        position=VectorFloatConfig(1.1, 1.2, 1.3), rotation_y=34,
-        guide_rails=False, shape='tool_rect_0_75_x_1_00')
-    tool = StructuralToolsCreationService(
-    ).create_feature_from_specific_values(prior_scene(), temp, None)
-
-    assert tool
-    assert tool['id'].startswith('tool_')
-    assert tool['type'] == 'tool_rect_0_75_x_1_00'
-    show = tool['shows'][0]
-    pos = show['position']
-    rot = show['rotation']
-    scale = show['scale']
-    assert pos == {'x': 1.1, 'y': 0.15, 'z': 1.3}
-    assert rot == {'x': 0, 'y': 34, 'z': 0}
-    assert scale == {'x': 1, 'y': 1, 'z': 1}
 
 
 def test_turntable_creation_reconcile():
@@ -2424,9 +2367,9 @@ def test_turntable_rotation_y_zero_end_after_rotation():
 
 def test_platform_long_with_two_ramps():
     scene = prior_scene()
-    scene.room_dimensions.x = 10
+    scene.room_dimensions.x = 20
     scene.room_dimensions.y = 8
-    scene.room_dimensions.z = 10
+    scene.room_dimensions.z = 20
     # lips, attached_ramps, and platform_underneath_attached_ramps
     # will be overrided
     temp = StructuralPlatformConfig(
@@ -2606,61 +2549,236 @@ def test_platform_adjacent_to_wall():
 
 
 def test_platform_stacked_adjacent_to_wall():
+    for i in range(10):
+        scene = prior_scene()
+        x = 10
+        z = 8
+        scene.room_dimensions.x = x
+        scene.room_dimensions.y = 4
+        scene.room_dimensions.z = z
+        pos_x = 1
+        pos_z = 3
+        scale = 1
+        for side in WALL_SIDES:
+            temp = StructuralPlatformConfig(
+                num=1,
+                position=VectorFloatConfig(pos_x, 2, pos_z),
+                rotation_y=0,
+                scale=scale,
+                material="AI2-THOR/Materials/Ceramics/BrownMarbleFake 1",
+                lips=StructuralPlatformLipsConfig(False, False, False, False),
+                attached_ramps=1,
+                platform_underneath=True,
+                platform_underneath_attached_ramps=1,
+                adjacent_to_wall=[side]
+            )
+            platform_adjacent_to_wall = StructuralPlatformCreationService(
+            ).create_feature_from_specific_values(scene, temp, None)
+            side_x = -1 if 'left' in side else 1 if 'right' in side else 0
+            side_z = -1 if 'back' in side else 1 if 'front' in side else 0
+            for i in range(2):
+                plat = platform_adjacent_to_wall[i]
+                ramp = platform_adjacent_to_wall[i + 2]
+                plat_pos = plat['shows'][0]['position']
+                ramp_pos = ramp['shows'][0]['position']
+                half_scale_x = plat['shows'][0]['scale']['x'] / 2
+                half_scale_z = plat['shows'][0]['scale']['z'] / 2
+                # Check a different scale if the platform is rotated
+                # 90 or 270 degrees
+                scale_check_x = half_scale_z if abs(
+                    plat['shows'][0]['rotation']['y']) % 180 != 0 else \
+                    half_scale_x
+                scale_check_z = half_scale_x if abs(
+                    plat['shows'][0]['rotation']['y']) % 180 != 0 else \
+                    half_scale_z
+                if side_x:
+                    side_x_check = round(side_x * (x / 2 - scale_check_x), 3)
+                    assert abs(round(plat_pos['x'], 3) - side_x_check) < 0.0011
+                    assert (ramp_pos['x'] > side_x * (x / 2 + scale_check_x) if
+                            side_x == -1 else
+                            ramp_pos['x'] < side_x * (x / 2 + scale_check_x))
+                    assert ramp['shows'][0]['rotation']['y'] != -side_x * 90
+                else:
+                    plat_pos['x'] == pos_x
+                if side_z:
+                    side_z_check = round(side_z * (z / 2 - scale_check_z), 3)
+                    assert abs(round(plat_pos['z'], 3) - side_z_check) < 0.0011
+                    assert (ramp_pos['z'] > side_z * (z / 2 + scale_check_z) if
+                            side_z == -1 else
+                            ramp_pos['z'] < side_z * (z / 2 + scale_check_z))
+                    assert abs(ramp['shows'][0]['rotation']['y']) != (
+                        0 if side_z == -1 else 180)
+                else:
+                    plat_pos['z'] == pos_z
+
+
+def test_tube_occluder_creation_reconcile():
     scene = prior_scene()
-    x = 10
-    z = 8
-    scene.room_dimensions.x = x
+    limit_x = scene.room_dimensions.x / 2.0
+    limit_z = scene.room_dimensions.z / 2.0
+    service = StructuralTubeOccluderCreationService()
+
+    config = StructuralTubeOccluderConfig(num=1)
+    reconciled = service.reconcile(scene, config)
+    assert reconciled.material in material_tuple_group_to_string_list(
+        materials.ROOM_WALL_MATERIALS
+    )
+    assert -limit_x <= reconciled.position_x <= limit_x
+    assert -limit_z <= reconciled.position_z <= limit_z
+    assert 0.5 <= reconciled.radius <= 5
+    assert 1 <= reconciled.down_step <= 10
+    assert 51 <= reconciled.up_step <= 60
+    assert reconciled.down_after is None
+    assert reconciled.up_after is None
+
+    config = StructuralTubeOccluderConfig(
+        num=1,
+        down_step=20,
+        material='AI2-THOR/Materials/Plastics/BlackPlastic',
+        position_x=-1,
+        position_z=-2,
+        radius=6,
+        up_step=80
+    )
+    reconciled = service.reconcile(scene, config)
+    assert reconciled.material == 'AI2-THOR/Materials/Plastics/BlackPlastic'
+    assert reconciled.position_x == -1
+    assert reconciled.position_z == -2
+    assert reconciled.radius == 6
+    assert reconciled.down_step == 20
+    assert reconciled.up_step == 80
+    assert reconciled.down_after is None
+    assert reconciled.up_after is None
+
+
+def test_tube_occluder_create():
+    scene = prior_scene()
     scene.room_dimensions.y = 4
-    scene.room_dimensions.z = z
-    pos_x = 1
-    pos_z = 3
-    scale = 1
-    for side in WALL_SIDES:
-        temp = StructuralPlatformConfig(
-            num=1,
-            position=VectorFloatConfig(pos_x, 2, pos_z),
-            rotation_y=0,
-            scale=scale,
-            material="AI2-THOR/Materials/Ceramics/BrownMarbleFake 1",
-            lips=StructuralPlatformLipsConfig(False, False, False, False),
-            attached_ramps=1,
-            platform_underneath=True,
-            platform_underneath_attached_ramps=1,
-            adjacent_to_wall=[side]
-        )
-        platform_adjacent_to_wall = StructuralPlatformCreationService(
-        ).create_feature_from_specific_values(scene, temp, None)
-        side_x = -1 if 'left' in side else 1 if 'right' in side else 0
-        side_z = -1 if 'back' in side else 1 if 'front' in side else 0
-        for i in range(2):
-            plat = platform_adjacent_to_wall[i]
-            ramp = platform_adjacent_to_wall[i + 2]
-            plat_pos = plat['shows'][0]['position']
-            ramp_pos = ramp['shows'][0]['position']
-            half_scale_x = plat['shows'][0]['scale']['x'] / 2
-            half_scale_z = plat['shows'][0]['scale']['z'] / 2
-            # Check a different scale if the platform is rotated
-            # 90 or 270 degrees
-            scale_check_x = half_scale_z if abs(
-                plat['shows'][0]['rotation']['y']) % 180 != 0 else half_scale_x
-            scale_check_z = half_scale_x if abs(
-                plat['shows'][0]['rotation']['y']) % 180 != 0 else half_scale_z
-            if side_x:
-                assert round(plat_pos['x'], 3) == round(
-                    side_x * (x / 2 - scale_check_x), 3)
-                assert (ramp_pos['x'] > side_x * (x / 2 + scale_check_x) if
-                        side_x == -1 else
-                        ramp_pos['x'] < side_x * (x / 2 + scale_check_x))
-                assert ramp['shows'][0]['rotation']['y'] != -side_x * 90
-            else:
-                plat_pos['x'] == pos_x
-            if side_z:
-                assert round(plat_pos['z'], 2) == round(
-                    side_z * (z / 2 - scale_check_z), 2)
-                assert (ramp_pos['z'] > side_z * (z / 2 + scale_check_z) if
-                        side_z == -1 else
-                        ramp_pos['z'] < side_z * (z / 2 + scale_check_z))
-                assert abs(ramp['shows'][0]['rotation']['y']) != (
-                    0 if side_z == -1 else 180)
-            else:
-                plat_pos['z'] == pos_z
+    service = StructuralTubeOccluderCreationService()
+
+    config = StructuralTubeOccluderConfig(
+        num=1,
+        down_step=6,
+        material='AI2-THOR/Materials/Plastics/BlackPlastic',
+        position_x=1,
+        position_z=2,
+        radius=3,
+        up_step=61
+    )
+    output = service.create_feature_from_specific_values(scene, config, None)
+    assert len(output) == 1
+    tube = output[0]
+
+    assert tube['id'].startswith('tube_occluder_')
+    assert tube['type'] == 'tube_wide'
+    assert tube.get('kinematic', True)
+    assert tube.get('structure', True)
+    assert not tube.get('moveable')
+    assert not tube.get('pickupable')
+    assert tube['materials'] == ['AI2-THOR/Materials/Plastics/BlackPlastic']
+
+    assert len(tube['shows']) == 1
+    assert tube['shows'][0]['stepBegin'] == 0
+    assert tube['shows'][0]['position'] == {'x': 1, 'y': 5.75, 'z': 2}
+    assert tube['shows'][0]['rotation'] == {'x': 0, 'y': 0, 'z': 0}
+    assert tube['shows'][0]['scale'] == {'x': 3, 'y': 4, 'z': 3}
+    tube_bounds = tube['shows'][0]['boundingBox']
+    assert vars(tube_bounds.box_xz[0]) == pytest.approx(
+        {'x': 2.5, 'y': 0.0, 'z': 3.5}
+    )
+    assert vars(tube_bounds.box_xz[1]) == pytest.approx(
+        {'x': 2.5, 'y': 0.0, 'z': 0.5}
+    )
+    assert vars(tube_bounds.box_xz[2]) == pytest.approx(
+        {'x': -0.5, 'y': 0.0, 'z': 0.5}
+    )
+    assert vars(tube_bounds.box_xz[3]) == pytest.approx(
+        {'x': -0.5, 'y': 0.0, 'z': 3.5}
+    )
+    assert tube_bounds.min_y == -4
+    assert tube_bounds.max_y == -0.25
+
+    assert len(tube['moves']) == 2
+    assert tube['moves'][0]['stepBegin'] == 6
+    assert tube['moves'][0]['stepEnd'] == 20
+    assert tube['moves'][0]['vector'] == {'x': 0, 'y': -0.25, 'z': 0}
+    assert tube['moves'][1]['stepBegin'] == 61
+    assert tube['moves'][1]['stepEnd'] == 75
+    assert tube['moves'][1]['vector'] == {'x': 0, 'y': 0.25, 'z': 0}
+
+
+def test_tube_occluder_creation_reconcile_down_after():
+    object_repository = ObjectRepository.get_instance()
+    mock_moving_object = {
+        'id': 'object_1',
+        'moves': [{'stepBegin': 41, 'stepEnd': 50}]
+    }
+    mock_idl = InstanceDefinitionLocationTuple(mock_moving_object, {}, {})
+    object_repository.add_to_labeled_objects(mock_idl, 'label_1')
+
+    scene = prior_scene()
+    service = StructuralTubeOccluderCreationService()
+    config = StructuralTubeOccluderConfig(num=1, down_after='label_1')
+    reconciled = service.reconcile(scene, config)
+    assert reconciled.down_step == 51
+
+
+def test_tube_occluder_creation_reconcile_down_after_delay():
+    scene = prior_scene()
+    service = StructuralTubeOccluderCreationService()
+    config = StructuralTubeOccluderConfig(num=1, down_after='label_1')
+    with pytest.raises(ILEDelayException):
+        # Error because no objects with this label are in the ObjectRepository
+        service.reconcile(scene, config)
+
+
+def test_tube_occluder_creation_reconcile_up_after():
+    object_repository = ObjectRepository.get_instance()
+    mock_moving_object = {
+        'id': 'object_1',
+        'moves': [{'stepBegin': 41, 'stepEnd': 50}]
+    }
+    mock_idl = InstanceDefinitionLocationTuple(mock_moving_object, {}, {})
+    object_repository.add_to_labeled_objects(mock_idl, 'label_1')
+
+    scene = prior_scene()
+    service = StructuralTubeOccluderCreationService()
+    config = StructuralTubeOccluderConfig(num=1, up_after='label_1')
+    reconciled = service.reconcile(scene, config)
+    assert reconciled.up_step == 51
+
+
+def test_tube_occluder_creation_reconcile_up_after_delay():
+    scene = prior_scene()
+    service = StructuralTubeOccluderCreationService()
+    config = StructuralTubeOccluderConfig(num=1, up_after='label_1')
+    with pytest.raises(ILEDelayException):
+        # Error because no objects with this label are in the ObjectRepository
+        service.reconcile(scene, config)
+
+
+def test_tube_occluder_creation_reconcile_down_after_and_up_after():
+    object_repository = ObjectRepository.get_instance()
+    mock_moving_object_1 = {
+        'id': 'object_1',
+        'moves': [{'stepBegin': 1, 'stepEnd': 10}]
+    }
+    mock_idl_1 = InstanceDefinitionLocationTuple(mock_moving_object_1, {}, {})
+    object_repository.add_to_labeled_objects(mock_idl_1, 'label_1')
+    mock_moving_object_2 = {
+        'id': 'object_2',
+        'moves': [{'stepBegin': 41, 'stepEnd': 50}]
+    }
+    mock_idl_2 = InstanceDefinitionLocationTuple(mock_moving_object_2, {}, {})
+    object_repository.add_to_labeled_objects(mock_idl_2, 'label_2')
+
+    scene = prior_scene()
+    service = StructuralTubeOccluderCreationService()
+    config = StructuralTubeOccluderConfig(
+        num=1,
+        down_after='label_1',
+        up_after='label_2'
+    )
+    reconciled = service.reconcile(scene, config)
+    assert reconciled.down_step == 11
+    assert reconciled.up_step == 51

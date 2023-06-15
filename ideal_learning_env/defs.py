@@ -12,13 +12,7 @@ from typing import (
     get_type_hints
 )
 
-from generator import (
-    MAX_TRIES,
-    MaterialTuple,
-    ObjectBounds,
-    ObjectDefinition,
-    geometry
-)
+from generator import MAX_TRIES, MaterialTuple, ObjectBounds, ObjectDefinition
 from generator.materials import find_colors
 from generator.scene import Scene
 
@@ -190,25 +184,7 @@ def find_bounds(
     ignore_ids: List[str] = None
 ) -> List[ObjectBounds]:
     """Calculate and return the bounds for all the given objects."""
-    # Create a bounding box for each hole and lava area and add it to the list.
-    bounds = [] if ignore_ground else [
-        geometry.generate_floor_area_bounds(area['x'], area['z'])
-        for area in (scene.holes + scene.lava)
-    ]
-
-    if scene.partition_floor and not ignore_ground:
-        bounds += geometry.find_partition_floor_bounds(
-            scene.room_dimensions, scene.partition_floor)
-
-    # Add each object's bounding box to the list.
-    for instance in scene.objects:
-        if instance.get('id') in (ignore_ids or []):
-            continue
-        try:
-            bounds.append(instance['shows'][0]['boundingBox'])
-        except(KeyError):
-            ...
-    return bounds
+    return scene.find_bounds(ignore_ground, ignore_ids)
 
 
 def return_list(data: Any, default_value: Any = None) -> List[Any]:

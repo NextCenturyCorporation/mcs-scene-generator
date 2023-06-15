@@ -7,11 +7,13 @@ from typing import Any, Callable, Dict, List, Union
 from machine_common_sense.config_manager import Vector3d
 
 from generator import (
+    ALL_LARGE_BLOCK_TOOLS,
     MAX_TRIES,
     DefinitionDataset,
     ImmutableObjectDefinition,
     ObjectBounds,
     ObjectDefinition,
+    SceneObject,
     base_objects,
     containers,
     definitions,
@@ -22,12 +24,6 @@ from generator import (
 )
 from generator.containers import shift_lid_positions_based_on_movement
 from generator.scene import Scene
-from ideal_learning_env.defs import ILEDelayException
-from ideal_learning_env.feature_creation_service import (
-    BaseFeatureConfig,
-    FeatureCreationService,
-    FeatureTypes
-)
 
 from .choosers import (
     choose_counts,
@@ -38,16 +34,29 @@ from .choosers import (
 from .components import ILEComponent
 from .decorators import ile_config_setter
 from .defs import (
+    ILEDelayException,
     ILEException,
     ILESharedConfiguration,
+    RandomizableString,
     find_bounds,
     return_list
 )
+from .feature_creation_service import (
+    BaseFeatureConfig,
+    FeatureCreationService,
+    FeatureTypes
+)
 from .interactable_object_service import (
     InteractableObjectConfig,
+    ToolConfig,
     create_user_configured_interactable_object
 )
-from .numerics import MinMaxInt, VectorFloatConfig, VectorIntConfig
+from .numerics import (
+    MinMaxInt,
+    RandomizableVectorFloat3d,
+    VectorFloatConfig,
+    VectorIntConfig
+)
 from .object_services import (
     InstanceDefinitionLocationTuple,
     KeywordLocation,
@@ -110,8 +119,53 @@ class SpecificInteractableObjectsComponent(ILEComponent):
             max: 1
     ```
     """
+
+    tools: Union[ToolConfig, List[ToolConfig]] = 0
+    """
+    ([ToolConfig](#ToolConfig), or list of [ToolConfig](#ToolConfig) dict) --
+    Groups of large block tool configurations and how many should be generated
+    from the given options.
+    Default: 0
+
+
+    Simple Example:
+    ```
+    tools:
+        - num: 0
+    ```
+
+    Advanced Example:
+    ```
+    tools:
+        - num:
+            min: 1
+            max: 3
+        - num: 1
+            shape: tool_rect_1_00_x_9_00
+            position:
+            x: [1,2]
+            y: 0
+            z:
+                min: -3
+                max: 3
+        - num: [1, 3]
+            shape:
+            - tool_rect_0_50_x_4_00
+            - tool_rect_0_75_x_4_00
+            - tool_rect_1_00_x_4_00
+            position:
+            x: [4, 5]
+            y: 0
+            z:
+                min: -5
+                max: -4
+
+    ```
+    """
+
     _delayed_templates = []
     _delayed_separate_lids = []
+    _delayed_tools = []
 
     @ile_config_setter(validator=ValidateNumber(
         props=['num'], min_value=0, null_ok=True))
@@ -128,6 +182,13 @@ class SpecificInteractableObjectsComponent(ILEComponent):
     def set_specific_interactable_objects(self, data: Any) -> None:
         self.specific_interactable_objects = data
 
+    @ile_config_setter(validator=ValidateNumber(
+        props=['num'], min_value=0))
+    @ile_config_setter(validator=ValidateOptions(
+        props=['shape'], options=ALL_LARGE_BLOCK_TOOLS))
+    def set_tools(self, data: Any) -> None:
+        self.tools = data
+
     # Override
     def update_ile_scene(self, scene: Scene) -> Scene:
         logger.info('Configuring specific interactable objects...')
@@ -135,9 +196,13 @@ class SpecificInteractableObjectsComponent(ILEComponent):
         bounds = find_bounds(scene)
         self._delayed_templates = []
         self._delayed_separate_lids = []
+        self._delayed_tools = []
         templates = return_list(self.specific_interactable_objects)
         for template, num in choose_counts(templates):
             self._add_objects_from_template(scene, bounds, template, num)
+        tool_templates = return_list(self.tools)
+        for tool_template, num in choose_counts(tool_templates):
+            self._add_tools_from_template(scene, bounds, tool_template, num)
         return scene
 
     def run_delayed_actions(self, scene: Scene) -> Scene:
@@ -147,6 +212,8 @@ class SpecificInteractableObjectsComponent(ILEComponent):
         self._delayed_templates = []
         separate_lids = self._delayed_separate_lids
         self._delayed_separate_lids = []
+        tool_templates = self._delayed_tools
+        self._delayed_tools = []
         # Try running the delayed actions again.
         for _, template, num in templates:
             self._add_objects_from_template(scene, bounds, template, num)
@@ -157,18 +224,27 @@ class SpecificInteractableObjectsComponent(ILEComponent):
                 separate_lid,
                 separate_lid_after
             )
+        for _, tool_template, num in tool_templates:
+            self._add_tools_from_template(scene, bounds, tool_template, num)
         return scene
 
     def get_num_delayed_actions(self) -> bool:
-        return len(self._delayed_templates) + len(self._delayed_separate_lids)
+        return (
+            len(self._delayed_templates) +
+            len(self._delayed_separate_lids) +
+            len(self._delayed_tools)
+        )
 
     def get_delayed_action_error_strings(self) -> List[str]:
-        delayed = self._delayed_templates + self._delayed_separate_lids
+        delayed = (
+            self._delayed_templates + self._delayed_separate_lids +
+            self._delayed_tools
+        )
         # The first element in each tuple should be the exception.
         return [str(data[0]) for data in delayed]
 
     def run_actions_at_end_of_scene_generation(
-            self, scene: Dict[str, Any]) -> Dict[str, Any]:
+            self, scene: Scene) -> Scene:
         if scene.debug.get('containsSeparateLids'):
             scene.objects = shift_lid_positions_based_on_movement(
                 scene.objects)
@@ -228,7 +304,7 @@ class SpecificInteractableObjectsComponent(ILEComponent):
                 num = max((len(targets) - num_targets_minus), 0)
             except ILEDelayException as e:
                 self._delayed_templates.append(
-                    (template, num_targets_minus, e)
+                    (e, template, num_targets_minus)
                 )
 
         logger.trace(
@@ -241,7 +317,7 @@ class SpecificInteractableObjectsComponent(ILEComponent):
     def _add_separate_lid(
         self,
         scene: Scene,
-        instance: Dict[str, Any],
+        instance: SceneObject,
         separate_lid: int,
         separate_lid_after: List[str]
     ) -> None:
@@ -257,6 +333,24 @@ class SpecificInteractableObjectsComponent(ILEComponent):
                 FeatureTypes.INTERACTABLE
             )
             service.add_separate_lid(scene, separate_lid, instance)
+
+    def _add_tools_from_template(
+        self,
+        scene: Scene,
+        bounds: List[ObjectBounds],
+        tool_template: ToolConfig,
+        num: int
+    ) -> None:
+        for _ in range(num):
+            try:
+                FeatureCreationService.create_feature(
+                    scene,
+                    FeatureTypes.TOOLS,
+                    tool_template,
+                    bounds
+                )
+            except ILEDelayException as e:
+                self._delayed_tools.append((e, tool_template, 1))
 
 
 class RandomInteractableObjectsComponent(ILEComponent):
@@ -384,15 +478,15 @@ class KeywordObjectsConfig(BaseFeatureConfig):
     `position`. If configuring this as a list, then all listed options will be
     applied to each scene in the listed order, with later options overriding
     earlier options if necessary. Default: not used
-    - `rotation` ([VectorIntConfig](#VectorIntConfig) dict, or list of
-    VectorIntConfig dicts): The rotation of these objects in each scene. If
+    - `rotation` ([VectorFloatConfig](#VectorFloatConfig) dict, or list of
+    VectorFloatConfig dicts): The rotation of these objects in each scene. If
     given a list, a rotation will be randomly chosen for each object and each
     scene. Is overridden by the `keyword_location`. Default: random
     """
-    keyword: Union[str, List[str]] = None
+    keyword: RandomizableString = None
     keyword_location: KeywordLocationConfig = None
-    position: Union[VectorFloatConfig, List[VectorFloatConfig]] = None
-    rotation: Union[VectorIntConfig, List[VectorIntConfig]] = None
+    position: RandomizableVectorFloat3d = None
+    rotation: RandomizableVectorFloat3d = None
 
 
 class RandomKeywordObjectsComponent(ILEComponent):
@@ -604,7 +698,7 @@ class RandomKeywordObjectsComponent(ILEComponent):
         bounds: List[ObjectBounds],
         index: int,
         template: KeywordObjectsConfig
-    ) -> Dict[str, Any]:
+    ) -> SceneObject:
         return self._add_special_container(
             scene,
             bounds,
@@ -621,7 +715,7 @@ class RandomKeywordObjectsComponent(ILEComponent):
         bounds: List[ObjectBounds],
         index: int,
         template: KeywordObjectsConfig
-    ) -> Dict[str, Any]:
+    ) -> SceneObject:
         return self._add_special_container(
             scene,
             bounds,
@@ -770,7 +864,7 @@ class RandomKeywordObjectsComponent(ILEComponent):
         bounds: List[ObjectBounds],
         index: int,
         template: KeywordObjectsConfig
-    ) -> Dict[str, Any]:
+    ) -> SceneObject:
         return self._add_special_container(
             scene,
             bounds,
@@ -790,7 +884,7 @@ class RandomKeywordObjectsComponent(ILEComponent):
         keyword: str,
         label: str,
         dataset: DefinitionDataset
-    ) -> Dict[str, Any]:
+    ) -> SceneObject:
         def _choose_definition_callback() -> ObjectDefinition:
             return dataset.choose_random_definition()
 
@@ -804,7 +898,7 @@ class RandomKeywordObjectsComponent(ILEComponent):
         bounds: List[ObjectBounds],
         index: int,
         template: KeywordObjectsConfig
-    ) -> Dict[str, Any]:
+    ) -> SceneObject:
         return self._add_special_container(
             scene,
             bounds,
@@ -829,10 +923,10 @@ class RandomKeywordObjectsComponent(ILEComponent):
         bounds: List[ObjectBounds],
         choose_definition_callback: Callable[[], ObjectDefinition],
         index: int,
-        labels: Union[str, List[str]],
+        labels: RandomizableString,
         template: KeywordObjectsConfig,
         choose_rotation_callback: Callable[[], float] = None
-    ) -> Dict[str, Any]:
+    ) -> SceneObject:
 
         object_repo = ObjectRepository.get_instance()
         shared_config = ILESharedConfiguration.get_instance()

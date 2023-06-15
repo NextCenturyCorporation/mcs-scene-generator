@@ -3,12 +3,13 @@ from typing import Any, Dict, List
 
 from extremitypathfinder import PolygonEnvironment
 from extremitypathfinder.plotting import PlottingEnvironment
+from machine_common_sense.config_manager import Vector2dInt
 from shapely.geometry import JOIN_STYLE, mapping
 
-from generator import ObjectBounds, geometry
-from ideal_learning_env.decorators import ile_config_setter
+from generator import ObjectBounds, Scene, geometry
 
 from .components import ILEComponent
+from .decorators import ile_config_setter
 from .defs import ILEException
 from .structural_object_service import (
     LABEL_BIDIRECTIONAL_RAMP,
@@ -60,7 +61,7 @@ class ValidPathComponent(ILEComponent):
         super().__init__(data)
 
     # Override
-    def update_ile_scene(self, scene: Dict[str, Any]) -> Dict[str, Any]:
+    def update_ile_scene(self, scene: Scene) -> Scene:
         # Might be useful later but also helps with testing
         self.last_path = None
         self.last_distance = None
@@ -110,7 +111,7 @@ class ValidPathComponent(ILEComponent):
             "z": scene.room_dimensions.z
         })
 
-    def _find_valid_path(self, scene):
+    def _find_valid_path(self, scene: Scene):
         if self.check_valid_path:
             logger.info('Running path validation check...')
 
@@ -187,18 +188,18 @@ class ValidPathComponent(ILEComponent):
         return [(-x, -y), (x, -y), (x, y), (-x, y)]
 
     def _is_ramp_with_path(self, obj):
-        if(obj and obj["debug"] and "labels" in obj["debug"]):
+        if (obj and obj["debug"] and "labels" in obj["debug"]):
             labels = obj["debug"]["labels"]
-            if(LABEL_RAMP in labels and
+            if (LABEL_RAMP in labels and
                LABEL_BIDIRECTIONAL_RAMP in labels):
                 return True
 
         return False
 
     def _is_platform_with_path(self, obj):
-        if(obj and obj["debug"] and "labels" in obj["debug"]):
+        if (obj and obj["debug"] and "labels" in obj["debug"]):
             labels = obj["debug"]["labels"]
-            if(LABEL_PLATFORM in labels and
+            if (LABEL_PLATFORM in labels and
                LABEL_CONNECTED_TO_RAMP in labels):
                 return True
         return False
@@ -239,7 +240,7 @@ class ValidPathComponent(ILEComponent):
         gaps = platform["debug"]["gaps"]
         isFrontBack = side in ["front", "back"]
         bb_width = 0.1
-        if(gaps.get(side) is not None):
+        if (gaps.get(side) is not None):
             count = 0
             max = len(gaps[side])
 
@@ -379,16 +380,16 @@ class ValidPathComponent(ILEComponent):
 
     def _add_blocked_areas(
         self,
-        areas: list,
+        areas: List[Vector2dInt],
         blocked_area: list,
         area_buffer: float = 0.5 + geometry.PERFORMER_HALF_WIDTH
     ) -> None:
         for area in areas:
             blocked_area.append([
-                (area["x"] - area_buffer, area["z"] - area_buffer),
-                (area["x"] - area_buffer, area["z"] + area_buffer),
-                (area["x"] + area_buffer, area["z"] + area_buffer),
-                (area["x"] + area_buffer, area["z"] - area_buffer)
+                (area.x - area_buffer, area.z - area_buffer),
+                (area.x - area_buffer, area.z + area_buffer),
+                (area.x + area_buffer, area.z + area_buffer),
+                (area.x + area_buffer, area.z - area_buffer)
             ])
 
     def is_object_path_blocking(self, obj, tgt):
@@ -416,7 +417,7 @@ class ValidPathComponent(ILEComponent):
 
         return 1 if (delay or no_valid_path) else 0
 
-    def run_delayed_actions(self, scene: Dict[str, Any]) -> Dict[str, Any]:
+    def run_delayed_actions(self, scene: Scene) -> Scene:
         delay = self._delayed_target or self._delayed_performer_start
         no_valid_path = (self.last_path == [] and
                          self.last_distance is None)

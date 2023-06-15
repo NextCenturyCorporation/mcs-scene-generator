@@ -1,11 +1,12 @@
 import copy
 import math
 from enum import Enum, auto
-from typing import Any, Dict, List
+from typing import Dict, List
 
 from .definitions import ObjectDefinition
 from .geometry import create_bounds, move_to_location
 from .materials import MaterialTuple
+from .objects import SceneObject
 from .structures import finalize_structural_object
 
 DEVICE_MATERIAL = MaterialTuple('Custom/Materials/Grey', ['grey'])
@@ -119,6 +120,7 @@ PLACER_TEMPLATE = {
 CYLINDRICAL_SHAPES = [
     'cylinder', 'double_cone', 'dumbbell_1', 'dumbbell_2',
     'rollable_1', 'rollable_2', 'rollable_3', 'rollable_4',
+    'rollable_5', 'rollable_6', 'rollable_7', 'rollable_8',
     'tie_fighter', 'tube_narrow', 'tube_wide'
 ]
 
@@ -138,7 +140,7 @@ def _calculate_tube_scale(
 
 
 def _set_placer_or_placed_object_movement(
-    instance: Dict[str, Any],
+    instance: SceneObject,
     move_distance: float,
     activation_step: int,
     is_placer: bool = False,
@@ -190,7 +192,7 @@ def _set_placer_or_placed_object_movement(
 
 
 def _set_placer_or_placed_object_shellgame_movement(
-    instance: Dict[str, Any],
+    instance: SceneObject,
     move_object_end_position: Dict[str, float],
     placed_object_dimensions: Dict[str, float],
     activation_step: int,
@@ -198,8 +200,7 @@ def _set_placer_or_placed_object_shellgame_movement(
     is_placer: bool = False,
     move_distance: int = None,
     move_object_y: float = None,
-    move_object_z: float = None,
-
+    move_object_z: float = None
 ) -> int:
     """Add the placer/placed object shellgame movement starting
     at the given activation step to the given object instance."""
@@ -391,10 +392,10 @@ def create_dropping_device(
     dropping_step: int = None,
     id_modifier: str = None,
     is_round: bool = False
-) -> Dict[str, Any]:
+) -> SceneObject:
     """Create and return an instance of a dropping device (tube) to drop the
     object with the given dimensions. The device will always face down."""
-    device = copy.deepcopy(DEVICE_TEMPLATE)
+    device = SceneObject(copy.deepcopy(DEVICE_TEMPLATE))
     device['id'] = (
         f'dropping_device_{(id_modifier + "_") if id_modifier else ""}'
     )
@@ -450,6 +451,8 @@ def create_placer(
     """Create and return an instance of a placer (cylinder) descending from the
     ceiling at the given max height on the given activation step to place an
     object with the given position and dimensions at the given end height.
+
+    NOTE: Call place_object, pickup_object or move_object BEFORE this function!
 
     - placed_object_position: Placed object's position (probably in the air).
     - placed_object_dimensions: Placed object's dimensions.
@@ -583,11 +586,11 @@ def create_throwing_device(
     id_modifier: str = None,
     object_rotation_y: float = None,
     is_round: bool = False
-) -> Dict[str, Any]:
+) -> SceneObject:
     """Create and return an instance of a throwing device (tube) to throw the
     object with the given dimensions. The device will always face left by
     default, but can also face right, forward, or backward."""
-    device = copy.deepcopy(DEVICE_TEMPLATE)
+    device = SceneObject(copy.deepcopy(DEVICE_TEMPLATE))
     device['id'] = (
         f'throwing_device_{(id_modifier + "_") if id_modifier else ""}'
     )
@@ -640,22 +643,22 @@ def create_throwing_device(
 
 
 def rotate_x_for_cylinders_in_droppers_throwers(
-        instance: Dict[str, Any]) -> float:
+        instance: SceneObject) -> float:
     """For cylinder shaped projectiles in droppers and throwers,
     rotate 90 degrees along x-axis."""
     x_rot = 0
-    if(instance['type'] in CYLINDRICAL_SHAPES):
+    if (instance['type'] in CYLINDRICAL_SHAPES):
         x_rot = 90
 
     return x_rot
 
 
 def drop_object(
-    instance: Dict[str, Any],
-    dropping_device: Dict[str, Any],
+    instance: SceneObject,
+    dropping_device: SceneObject,
     dropping_step: int,
     rotation_y: int = 0
-) -> Dict[str, Any]:
+) -> SceneObject:
     """Modify and return the given object instance that will be dropped by the
     given device at the given step."""
     # Assign the object's location using its chosen corner.
@@ -677,16 +680,18 @@ def drop_object(
 
 
 def place_object(
-    instance: Dict[str, Any],
+    instance: SceneObject,
     activation_step: int,
     start_height: float = None,
     end_height: float = 0,
     deactivation_step: int = None
-) -> Dict[str, Any]:
+) -> SceneObject:
     """Modify and return the given object instance so its top is positioned at
     the given height, will move downward with a placer (instantiated later) at
     the given step like they're attached together, and is then placed when its
     bottom is at the given height.
+
+    NOTE: Call create_placer AFTER this function!
 
     - instance: Instantiated object to place.
     - activation_step: Step on which object should begin downward movement.
@@ -745,7 +750,7 @@ def place_object(
 
 
 def move_object(
-    instance: Dict[str, Any],
+    instance: SceneObject,
     move_object_end_position: Dict[str, float],
     activation_step: int,
     start_height: float = None,
@@ -753,12 +758,13 @@ def move_object(
     deactivation_step: int = None,
     move_object_y: float = None,
     move_object_z: float = None,
-
-) -> Dict[str, Any]:
+) -> SceneObject:
     """Modify and return the given object instance so its top is positioned at
     the given height, will move downward with a placer (instantiated later) at
     the given step like they're attached together, and is then placed when its
     bottom is at the given height.
+
+    NOTE: Call create_placer AFTER this function!
 
     - instance: Instantiated object to place.
     - activation_step: Step on which object should begin downward movement.
@@ -817,16 +823,18 @@ def move_object(
 
 
 def pickup_object(
-    instance: Dict[str, Any],
+    instance: SceneObject,
     activation_step: int,
     start_height: float = 0,
     end_height: float = 0,
     deactivation_step: int = None
-) -> Dict[str, Any]:
+) -> SceneObject:
     """Modify and return the given object instance so its bottom is positioned
     at the top of the object height, will move upward with a placer
     (instantiated later) at the given step like they're attached together,
     and is then stops when its top is at the ceiling height.
+
+    NOTE: Call create_placer AFTER this function!
 
     - instance: Instantiated object to place.
     - activation_step: Step on which object should begin upward movement.
@@ -873,8 +881,8 @@ def pickup_object(
 
 
 def throw_object(
-    instance: Dict[str, Any],
-    throwing_device: Dict[str, Any],
+    instance: SceneObject,
+    throwing_device: SceneObject,
     throwing_force: int,
     throwing_step: int,
     position_x_modifier: float = 0,
@@ -883,7 +891,7 @@ def throw_object(
     rotation_y: int = 0,
     rotation_z: int = 0,
     impulse: bool = True
-) -> Dict[str, Any]:
+) -> SceneObject:
     """Modify and return the given object instance that will be thrown by the
     given device with the given force at the given step. The rotation_y should
     be the rotation needed to turn the object to face toward the left."""

@@ -10,7 +10,7 @@ from .interactive_plans import ObjectLocationPlan, ObjectPlan
 def identify_larger_definition(
     one: ObjectDefinition,
     two: ObjectDefinition
-) -> Dict[str, Any]:
+) -> ObjectDefinition:
     """Return the larger (in dimensions) of the two given definitions."""
     if not one:
         return two
@@ -226,7 +226,7 @@ class ObjectData():
         """Return whether this object ever uses location plan RANDOM."""
         return self._uses_location_plan(ObjectLocationPlan.RANDOM)
 
-    def larger_definition(self) -> Dict[str, Any]:
+    def larger_definition(self) -> ObjectDefinition:
         """Return the larger (in dimensions) of this object's trained or
         untrained definition."""
         return identify_larger_definition(
@@ -238,7 +238,7 @@ class ObjectData():
         self,
         container_data_list: List[Any],
         second_object_data: Optional[Any] = None
-    ) -> Dict[str, Any]:
+    ) -> ObjectDefinition:
         """Return the larger (in dimensions) of this object's, the given second
         object's, or this object's container's trained or untrained definition.
         Useful if you need to reserve space for the object, since we assume the

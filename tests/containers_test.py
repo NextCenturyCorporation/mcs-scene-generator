@@ -42,23 +42,13 @@ PICKUPABLE_OBJECTS_WITHOUT_CONTAINMENTS = [
 CONTAINERS = specific_objects.get_container_openable_definition_dataset(
     unshuffled=True
 )
-CONTAINER_DEFINITIONS = [
-    # Just use the first variation (color) of each object for faster testing.
-    definition_variations[0]
-    for definition_selections in CONTAINERS._definition_groups
-    for definition_variations in definition_selections
-]
+CONTAINER_DEFINITIONS = CONTAINERS.definitions_unique_shape_scale()
 
 
 PICKUPABLES = specific_objects.get_pickupable_definition_dataset(
     unshuffled=True
 )
-PICKUPABLE_DEFINITIONS = [
-    # Just use the first variation (color) of each object for faster testing.
-    definition_variations[0]
-    for definition_selections in PICKUPABLES._definition_groups
-    for definition_variations in definition_selections
-]
+PICKUPABLE_DEFINITIONS = PICKUPABLES.definitions_unique_shape_scale()
 
 
 def get_valid_containments(object_a, object_b=None):
@@ -76,7 +66,7 @@ def get_valid_containments(object_a, object_b=None):
 @pytest.mark.slow
 def test_put_object_in_container():
     for obj_def in PICKUPABLE_DEFINITIONS:
-        print(f'\nOBJECT={obj_def}')
+        print(f'\nOBJECT={obj_def.type} {obj_def.scale}')
         obj_location = geometry.calc_obj_pos(
             {'x': 1, 'y': 0, 'z': 1}, [], obj_def)
         obj = instances.instantiate_object(obj_def, obj_location)
@@ -94,7 +84,7 @@ def test_put_object_in_container():
             assert False
 
         for container_def, containment in containments:
-            print(f'\nCONTAINER={container_def}')
+            print(f'CONTAINER={container_def.type} {container_def.scale}')
             area_index, rotations = containment
             container_location = geometry.calc_obj_pos(
                 {'x': -1, 'y': 0, 'z': -1}, [], container_def)

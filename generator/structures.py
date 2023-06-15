@@ -1,24 +1,14 @@
 import copy
 import math
-import random
 import uuid
-from typing import Any, Dict, List, Tuple
+from typing import Dict, List, Tuple
 
 from machine_common_sense.config_manager import Vector3d
 from shapely import affinity
 
-from .base_objects import (
-    ALL_LARGE_BLOCK_TOOLS,
-    LARGE_BLOCK_TOOLS_TO_DIMENSIONS
-)
-from .geometry import (
-    PERFORMER_HALF_WIDTH,
-    PERFORMER_HEIGHT,
-    ObjectBounds,
-    create_bounds,
-    rotate_point_around_origin
-)
+from .geometry import PERFORMER_HEIGHT, ObjectBounds, create_bounds
 from .materials import MaterialTuple
+from .objects import SceneObject
 
 ANGLE_BRACE_TEMPLATE = {
     'id': 'angle_brace_',
@@ -286,34 +276,6 @@ DOOR_TEMPLATE = {
     }]
 }
 
-TOOL_HEIGHT = 0.3
-TOOL_TEMPLATE = {
-    'id': 'tool_',
-    'type': None,
-    'debug': {
-        'color': ['grey', 'black'],
-        'info': []
-    },
-    'shows': [{
-        'stepBegin': 0,
-        'position': {
-            'x': 0,
-            'y': TOOL_HEIGHT / 2.0,
-            'z': 0
-        },
-        'rotation': {
-            'x': 0,
-            'y': 0,
-            'z': 0
-        },
-        'scale': {
-            'x': 1,
-            'y': 1,
-            'z': 1
-        }
-    }]
-}
-
 GUIDE_RAIL_DEFAULT_POSITION_Y = 0.15
 GUIDE_RAIL_TEMPLATE = {
     'id': 'guide_rail_',
@@ -346,6 +308,40 @@ GUIDE_RAIL_TEMPLATE = {
     }]
 }
 
+TUBE_OCCLUDER_TEMPLATE = {
+    'id': 'tube_occluder_',
+    'type': 'tube_wide',
+    'debug': {
+        'color': [],
+        'info': [],
+        'shape': ['tube_occluder'],
+        'size': 'huge'
+    },
+    'kinematic': True,
+    'structure': True,
+    'mass': None,
+    'materials': [],
+    'shows': [{
+        'stepBegin': 0,
+        'position': {
+            'x': 0,
+            'y': 0,
+            'z': 0
+        },
+        'rotation': {
+            'x': 0,
+            'y': 0,
+            'z': 0
+        },
+        'scale': {
+            'x': 1,
+            'y': 1,
+            'z': 1
+        }
+    }],
+    'moves': []
+}
+
 # door constants
 BASE_DOOR_HEIGHT = 2.0
 BASE_DOOR_WIDTH = 0.85
@@ -355,16 +351,6 @@ BASE_SIDE_WALL_SCALE = 0.08
 
 # guide rail constants
 RAIL_CENTER_TO_EDGE = 0.2
-
-# broken tool
-BROKEN_TOOL_VERTICAL_SEPARATION = 1.35
-BROKEN_TOOL_HORIZONTAL_SEPARATION_MIN = 0.75
-BROKEN_TOOL_HORIZONTAL_SEPARATION_MAX = 1.5
-
-# inaccessible tool
-INACCESSIBLE_TOOL_BLOCKING_WALL_HEIGHT = 0.25
-INACCESSIBLE_TOOL_BLOCKING_WALL_WIDTH = 0.1
-INACCESSIBLE_TOOL_BLOCKING_WALL_MINIMUM_SEPARATION = 0.5
 
 
 def _calculate_info(colors: List[str], labels: List[str]) -> List[str]:
@@ -398,11 +384,11 @@ def create_angle_brace(
     rotation_x: int = 0,
     rotation_z: int = 0,
     bounds: ObjectBounds = None
-) -> Dict[str, Any]:
+) -> SceneObject:
     """Create and return an instance of an L-shaped angle brace. Please note
     that its side is twice as long as its bottom, and that it's facing to the
     right (positive X axis) by default."""
-    angle_brace = copy.deepcopy(ANGLE_BRACE_TEMPLATE)
+    angle_brace = SceneObject(copy.deepcopy(ANGLE_BRACE_TEMPLATE))
     angle_brace['id'] += str(uuid.uuid4())
     angle_brace['shows'][0]['position'] = {
         'x': position_x,
@@ -437,9 +423,9 @@ def create_interior_wall(
     position_y_modifier: float = 0,
     thickness: float = 0.1,
     bounds: ObjectBounds = None
-) -> Dict[str, Any]:
+) -> SceneObject:
     """Create and return an instance of an interior room wall."""
-    wall = copy.deepcopy(INTERIOR_WALL_TEMPLATE)
+    wall = SceneObject(copy.deepcopy(INTERIOR_WALL_TEMPLATE))
     wall['id'] += str(uuid.uuid4())
     wall['shows'][0]['position'] = {
         'x': position_x,
@@ -476,10 +462,12 @@ def create_l_occluder(
     material_tuple: MaterialTuple,
     position_y_modifier: float = 0,
     flip: bool = False
-) -> List[Dict[str, Any]]:
+) -> List[SceneObject]:
     """Create and return an instance of an L-shaped occluder. If flip is True,
     the side part of the L will be on the left side (like a backwards L)."""
-    occluder = copy.deepcopy(L_OCCLUDER_TEMPLATE)
+    occluder = [
+        SceneObject(part) for part in copy.deepcopy(L_OCCLUDER_TEMPLATE)
+    ]
     front = occluder[0]
     side = occluder[1]
 
@@ -559,9 +547,9 @@ def create_platform(
     position_y_modifier: float = 0,
     bounds: ObjectBounds = None,
     auto_adjust_platform: bool = False
-) -> Dict[str, Any]:
+) -> SceneObject:
     """Create and return an instance of a platform."""
-    platform = copy.deepcopy(PLATFORM_TEMPLATE)
+    platform = SceneObject(copy.deepcopy(PLATFORM_TEMPLATE))
 
     buffer = PERFORMER_HEIGHT
     if auto_adjust_platform:
@@ -619,12 +607,12 @@ def create_ramp(
     material_tuple: MaterialTuple,
     position_y_modifier: float = 0,
     bounds: ObjectBounds = None
-) -> Dict[str, Any]:
+) -> SceneObject:
     """Create and return an instance of a ramp. Its height is derived from the
     given angle and length.  Length is the length along the ground in a single
     dimension.  The angle must be in degress up from the ground."""
     height = length * (math.tan(math.radians(angle)))
-    ramp = copy.deepcopy(RAMP_TEMPLATE)
+    ramp = SceneObject(copy.deepcopy(RAMP_TEMPLATE))
     ramp['shows'][0]['position'] = {
         'x': position_x,
         'y': position_y_modifier + (height / 2.0),
@@ -664,7 +652,7 @@ def create_door(
     wall_scale_y: float,
     bounds: ObjectBounds = None,
     add_walls: bool = True,
-) -> List[Dict[str, Any]]:
+) -> List[SceneObject]:
     """Create and return an instance of an interior door."""
     if rotation_y not in [0, 90, 180, 270]:
         raise Exception("Doors rotation must be either 0, 90, 180, or 270")
@@ -711,7 +699,7 @@ def create_door(
             top_wall_scale_y=top_wall_scale_y,
             side_wall_scale_x=side_wall_scale_x)
 
-    door = copy.deepcopy(DOOR_TEMPLATE)
+    door = SceneObject(copy.deepcopy(DOOR_TEMPLATE))
     door['shows'][0]['position'] = {
         'x': position_x,
         'y': position_y,
@@ -753,14 +741,32 @@ def create_door(
     return objs + walls
 
 
-def create_door_occluder(room_dimensions: Vector3d,
-                         door_start_drop_step: int,
-                         door_mat: MaterialTuple,
-                         wall_mat: MaterialTuple,
-                         middle_height: float,
-                         middle_width: float,
-                         position_z: float = 0):
-    door_gap = room_dimensions.y - middle_height - 2.25
+def create_door_occluder(
+    room_dimensions: Vector3d,
+    door_start_drop_step: int,
+    door_mat: MaterialTuple,
+    wall_mat: MaterialTuple,
+    middle_height: float,
+    middle_width: float,
+    position_z: float = 0,
+    wall_height: float = 0
+) -> Tuple[
+    List[SceneObject],
+    int,
+    SceneObject,
+    SceneObject,
+    SceneObject
+]:
+    """
+    Creates and returns a triple or double door occluder using the two given
+    materials that starts positioned above the ceiling and begins to descend
+    at the given step. Accommodates an existing platform in the middle of the
+    room with the given middle_height and middle_width; set both to 0 to
+    create a double door occluder. Set wall_height to a non-zero value to
+    make the occluder wall shorter than the height of the room. Returns all
+    object instances, the step at which the door occluder has finished
+    descending, the middle door, the left door, and the right door.
+    """
     side_wall_x = (room_dimensions.x - middle_width) / 2
     side_pos_x = room_dimensions.x / 2 - side_wall_x / 2
     add_y = room_dimensions.y
@@ -769,11 +775,11 @@ def create_door_occluder(room_dimensions: Vector3d,
     door_y = [middle_height, 0, 0]
     wall_scale_x = [middle_width, side_wall_x, side_wall_x]
     wall_scale_y = [
-        room_dimensions.y -
-        middle_height - door_gap,
-        room_dimensions.y - door_gap,
-        room_dimensions.y - door_gap]
-    door_end_drop_step = door_start_drop_step + add_y * 4 - 1
+        (wall_height or room_dimensions.y) - middle_height,
+        (wall_height or room_dimensions.y),
+        (wall_height or room_dimensions.y)
+    ]
+    door_end_drop_step = int(door_start_drop_step + add_y * 4 - 1)
     for i in range(3):
         new_objs = create_door(
             position_x=door_x[i],
@@ -798,8 +804,10 @@ def create_door_occluder(room_dimensions: Vector3d,
     center_door = doors_objs[0]
     left_door = doors_objs[4]
     right_door = doors_objs[8]
-    return (doors_objs, int(door_end_drop_step),
-            center_door, left_door, right_door)
+    if not middle_width:
+        doors_objs = doors_objs[4:]
+        center_door = None
+    return (doors_objs, door_end_drop_step, center_door, left_door, right_door)
 
 
 def create_turntable(
@@ -814,13 +822,13 @@ def create_turntable(
     movement_rotation: float,
     material_tuple: MaterialTuple,
     bounds: ObjectBounds = None
-) -> Dict[str, Any]:
+) -> SceneObject:
     """Create and return an instance of a turntable."""
     # Need to reconcile issues with y-scale value since the
     # default cog base object is very thin.
     y_scale_multiplier = 50.0
 
-    turntable = copy.deepcopy(TURNTABLE_TEMPLATE)
+    turntable = SceneObject(copy.deepcopy(TURNTABLE_TEMPLATE))
     turntable['shows'][0]['position'] = {
         'x': position_x,
         'y': position_y_modifier + height / 2.0,
@@ -837,10 +845,11 @@ def create_turntable(
         'z': radius * 2.0
     }
 
-    turntable['rotates'] = [copy.deepcopy(TURNTABLE_MOVEMENT_TEMPLATE)]
-    turntable['rotates'][0]['stepBegin'] = step_begin
-    turntable['rotates'][0]['stepEnd'] = step_end
-    turntable['rotates'][0]['vector']['y'] = movement_rotation
+    if step_begin > 0 and step_end > 0 and step_end >= step_begin:
+        turntable['rotates'] = [copy.deepcopy(TURNTABLE_MOVEMENT_TEMPLATE)]
+        turntable['rotates'][0]['stepBegin'] = step_begin
+        turntable['rotates'][0]['stepEnd'] = step_end
+        turntable['rotates'][0]['vector']['y'] = movement_rotation
 
     # Use height instead of y-scale for override
     return finalize_structural_object(
@@ -853,7 +862,7 @@ def create_turntable(
             'y': height,
             'z': turntable['shows'][0]['scale']['z']
         }
-    )
+    )[0]
 
 
 def _get_door_wall_objects(
@@ -868,12 +877,12 @@ def _get_door_wall_objects(
     top_wall_scale_y: float,
     side_wall_scale_x: float,
     wall_material_str: str = "Custom/Materials/GreyDrywallMCS",
-):
+) -> List[SceneObject]:
     # Create the wall sections and the door object
     objs = []
     # only add top wall if the scale is greater than 0
     if top_wall_scale_x > 0 and top_wall_scale_y > 0:
-        objs.append({
+        objs.append(SceneObject({
             "id": "wall_top",
             "type": "cube",
             "mass": 10,
@@ -904,9 +913,9 @@ def _get_door_wall_objects(
                     }
                 }
             ]
-        })
+        }))
     if side_wall_scale_x > 0:
-        objs += [{
+        objs += [SceneObject({
             "id": "wall_left",
             "type": "cube",
             "mass": 10,
@@ -937,8 +946,7 @@ def _get_door_wall_objects(
                     }
                 }
             ]
-        },
-            {
+        }), SceneObject({
             "id": "wall_right",
             "type": "cube",
             "mass": 10,
@@ -969,8 +977,7 @@ def _get_door_wall_objects(
                     }
                 }
             ]
-        }
-        ]
+        })]
     return objs
 
 
@@ -982,7 +989,7 @@ def create_guide_rails_around(
         width: float,
         material_tuple: MaterialTuple,
         position_y: float = GUIDE_RAIL_DEFAULT_POSITION_Y,
-        bounds: ObjectBounds = None):
+        bounds: ObjectBounds = None) -> List[SceneObject]:
     """Provide a rectangle to put rails on the sides.  The rectangle will be
     centered on the position, rotated by the rotation_y and have size of
     length and width."""
@@ -1025,8 +1032,8 @@ def create_guide_rail(
         length: float,
         material_tuple: MaterialTuple,
         position_y: float = GUIDE_RAIL_DEFAULT_POSITION_Y,
-        bounds: ObjectBounds = None):
-    rail = copy.deepcopy(GUIDE_RAIL_TEMPLATE)
+        bounds: ObjectBounds = None) -> SceneObject:
+    rail = SceneObject(copy.deepcopy(GUIDE_RAIL_TEMPLATE))
     rail['shows'][0]['position']['x'] = position_x
     rail['shows'][0]['position']['y'] = position_y
     rail['shows'][0]['position']['z'] = position_z
@@ -1041,50 +1048,68 @@ def create_guide_rail(
     return rail
 
 
-def create_tool(
-    # TODO MCS-1206 Move into a separate file for interactable objects
-    object_type: str,
+def create_tube_occluder(
     position_x: float,
     position_z: float,
-    rotation_y: float,
-    bounds: ObjectBounds = None
-) -> Dict[str, Any]:
-    """Create and return an instance of a tool."""
-    tool = copy.deepcopy(TOOL_TEMPLATE)
-    tool['type'] = object_type
-    tool['shows'][0]['position']['x'] = position_x
-    tool['shows'][0]['position']['z'] = position_z
-    tool['shows'][0]['rotation']['y'] = rotation_y
-    dimensions = LARGE_BLOCK_TOOLS_TO_DIMENSIONS.get(object_type)
-    if not dimensions:
-        raise Exception(f'Tool object type must be in {ALL_LARGE_BLOCK_TOOLS}')
-    tool = finalize_structural_object(
-        [tool],
-        # Use the tool's default materials set by the Unity prefab.
-        None,
-        ['tool'],
-        bounds,
-        override_scale={
-            'x': dimensions[0],
-            'y': TOOL_HEIGHT,
-            'z': dimensions[1]
-        },
-        override_standing_y=(TOOL_HEIGHT / 2.0)
+    radius: float,
+    room_height: int,
+    material_tuple: MaterialTuple,
+    down_step: int,
+    up_step: int = 0
+) -> SceneObject:
+    """Create and return a tube occluder using the given parameters."""
+    tube = SceneObject(copy.deepcopy(TUBE_OCCLUDER_TEMPLATE))
+    tube['shows'][0]['position']['x'] = position_x
+    tube['shows'][0]['position']['y'] = round(room_height * 1.5, 2) - 0.25
+    tube['shows'][0]['position']['z'] = position_z
+    tube['shows'][0]['scale']['x'] = radius
+    tube['shows'][0]['scale']['y'] = room_height
+    tube['shows'][0]['scale']['z'] = radius
+    down_end = down_step + (room_height * 4) - 2
+    if up_step > 0:
+        down_end = min(down_end, up_step - 1)
+    tube['moves'].append({
+        'stepBegin': down_step,
+        'stepEnd': down_end,
+        'vector': {
+            'x': 0,
+            'y': -0.25,
+            'z': 0
+        }
+    })
+    if up_step > 0:
+        tube['moves'].append({
+            'stepBegin': up_step,
+            'stepEnd': up_step + (room_height * 4) - 2,
+            'vector': {
+                'x': 0,
+                'y': 0.25,
+                'z': 0
+            }
+        })
+    tube = finalize_structural_object(
+        [tube],
+        material_tuple,
+        ['tube_occluder'],
     )[0]
-    # Use the tool's default mass set in the Unity object registry file.
-    del tool['mass']
-    return tool
+    # Other objects can safely be positioned inside the tube occluder, but the
+    # scene generator cannot handle that use case properly, so just move the
+    # bounding box out-of-the-way, to avoid triggering the collision detection.
+    # Yes, this may cause problems if used outside Hidden Set Rotation scenes.
+    tube['shows'][0]['boundingBox'].min_y = -room_height
+    tube['shows'][0]['boundingBox'].max_y = -0.25
+    return tube
 
 
 def finalize_structural_object(
-    instance_list: List[Dict[str, Any]],
+    instance_list: List[SceneObject],
     material_tuple: MaterialTuple = None,
     name_list: List[str] = None,
     bounds: ObjectBounds = None,
     override_scale: Dict[str, float] = None,
     override_offset: Dict[str, float] = None,
     override_standing_y: float = None
-) -> List[Dict[str, Any]]:
+) -> List[SceneObject]:
     """Finalize and return each of the instances of structural objects."""
     common_id = str(uuid.uuid4())
     for instance in instance_list:
@@ -1110,266 +1135,3 @@ def finalize_structural_object(
             name_list or []
         )
     return instance_list
-
-
-def create_broken_tool(
-    object_type: str,
-    direction: str,
-    width_position: float,
-    max_broken_tool_length_pos: float,
-    min_broken_tool_length_pos: float,
-    rotation_for_entire_tool: float,
-    length: int
-) -> Dict[str, Any]:
-    """Create and return an instance of a broken tool."""
-    tools_before_rotation = []
-    final_tools = []
-    current_pos = max_broken_tool_length_pos  # start at lava edge
-    for _ in range(length):
-        tool = copy.deepcopy(TOOL_TEMPLATE)
-        tool['type'] = object_type
-        tool['shows'][0]['position']['x'] = \
-            (width_position + round(random.uniform(
-                BROKEN_TOOL_HORIZONTAL_SEPARATION_MIN,
-                BROKEN_TOOL_HORIZONTAL_SEPARATION_MAX), 2) *
-             random.choice([-1, 1]) if direction == 'z' else current_pos)
-        tool['shows'][0]['position']['z'] = \
-            (width_position + round(random.uniform(
-                BROKEN_TOOL_HORIZONTAL_SEPARATION_MIN,
-                BROKEN_TOOL_HORIZONTAL_SEPARATION_MAX), 2) *
-             random.choice([-1, 1]) if direction == 'x' else current_pos)
-        tool['shows'][0]['rotation']['y'] = random.randint(0, 359)
-        dimensions = LARGE_BLOCK_TOOLS_TO_DIMENSIONS.get(object_type)
-        if not dimensions:
-            raise Exception(
-                f'Tool object type must be in {ALL_LARGE_BLOCK_TOOLS}')
-        temp_tool = copy.deepcopy(tool)
-        tools_before_rotation.append(temp_tool)
-        current_pos -= BROKEN_TOOL_VERTICAL_SEPARATION
-    center_of_tool = (max_broken_tool_length_pos +
-                      min_broken_tool_length_pos) / 2
-    for tool in tools_before_rotation:
-        tool_pos = tool['shows'][0]['position']
-        (x, z) = rotate_point_around_origin(
-            origin_x=width_position if direction == 'z' else
-            center_of_tool,
-            origin_z=width_position if direction == 'x' else
-            center_of_tool,
-            point_x=tool_pos['x'],
-            point_z=tool_pos['z'],
-            rotation=rotation_for_entire_tool)
-        tool_pos['x'] = round(x, 2)
-        tool_pos['z'] = round(z, 2)
-        tool = finalize_structural_object(
-            instance_list=[tool],
-            material_tuple=None,
-            name_list=['tool'],
-            bounds=None,
-            override_scale={
-                'x': dimensions[0],
-                'y': TOOL_HEIGHT,
-                'z': dimensions[1]
-            },
-            override_standing_y=(TOOL_HEIGHT / 2.0)
-        )[0]
-        # Use the tool's default mass set in the Unity object registry file.
-        del tool['mass']
-        final_tools.append(tool)
-    return final_tools
-
-
-def create_inaccessible_tool(
-    tool_type: str,
-    long_direction: str,
-    short_direction: str,
-    original_short_position: float,
-    original_long_position: float,
-    tool_horizontal_offset: float,
-    tool_offset_backward_from_lava: float,
-    blocking_wall_horizontal_offset: float,
-    tool_rotation_y: int,
-    room_dimension_x: float,
-    room_dimension_z: float,
-    blocking_wall_material: MaterialTuple,
-    bounds: ObjectBounds = None
-) -> Tuple:
-    """
-    Create and return an instance of an inaccessible tool and its blocking wall
-    - `tool_type` (string): The type of tool
-    - `long_direction` (string): The direction to tool extends to reach
-    the target.
-    - `short_direction` (string): The direction of the tool width
-    - `original_short_position` (float): The original position of the tool
-    that is centered with the target.
-    - `original_long_position` (float): The original position of the tool that
-    is shifted to the edge of the lava pool.
-    - `tool_horizontal_offset` (float): The left and right offset the tool
-    should be moved from the blocking wall position.
-    - `tool_offset_backwards_from_lava` (float): The offset away from the
-    lava pool the tool should move from its original position.
-    - `blocking_wall_separation` (float): The separation from the tool the
-    blocking wall should have. Negative numbers will be on left side, positive
-    will be on right. The minimum separation should always be greater than or
-    equal to 0.5 or less than or equal to -0.5.
-    - `tool_rotation_y` (float): The rotation of the tool.
-    - `room_dimension_x` (float): X Room dimension.
-    - `room_dimension_z` (float): Z Room dimension.
-    - `blocking_wall_material` (MaterialTyple): Material for the blocking wall.
-    - `bounds` (ObjectBounds): Object Bounds. Default: None
-    """
-    # Make sure the blocking wall separation is valid
-    if abs(blocking_wall_horizontal_offset) < \
-            INACCESSIBLE_TOOL_BLOCKING_WALL_MINIMUM_SEPARATION:
-        raise Exception(
-            "The minimum separation of the inaccessible tool blocking "
-            "wall should always be greater than or equal to "
-            f"{INACCESSIBLE_TOOL_BLOCKING_WALL_MINIMUM_SEPARATION} or "
-            f"less than or equal to "
-            f"-{INACCESSIBLE_TOOL_BLOCKING_WALL_MINIMUM_SEPARATION}")
-
-    """
-    short direction is the axis of width when the tool is
-    aligned with the target. Left right directions:
-    For 'x' short direction when the tool long direction is on the z axis
-    ------------------------
-    |        (z+)          |
-    |        front         |
-    |(x-) left * right (x+)|
-    |        back          |
-    |        (z-)          |
-    ------------------------
-
-    For 'z' short direction the tool long direction is on the x axis
-    everything is rotated clockwise ⟳ 90
-    ------------------------
-    |        (z+)          |
-    |        left          |
-    |(x-) back * front (x+)|
-    |        right         |
-    |        (z-)          |
-    ------------------------
-    """
-    # Wall creation
-    # Create a straight wall positioned vertically across the room
-    # If z short direction reverse separation direction because left is now
-    # z 'positive' axis instead of x 'negative' axis
-    original_offset = blocking_wall_horizontal_offset
-    if short_direction == 'z':
-        blocking_wall_horizontal_offset *= -1
-    blocking_wall_horizontal_offset = \
-        original_short_position + blocking_wall_horizontal_offset
-    length = room_dimension_z if short_direction == 'x' else room_dimension_x
-    wall_rotation = 0 if short_direction == 'x' else 90
-    x = blocking_wall_horizontal_offset if short_direction == 'x' else 0
-    z = blocking_wall_horizontal_offset if short_direction == 'z' else 0
-    horizontal_pos = x if short_direction == 'x' else z
-    wall = create_interior_wall(
-        position_x=x,
-        position_z=z,
-        rotation_y=wall_rotation,
-        width=INACCESSIBLE_TOOL_BLOCKING_WALL_WIDTH,
-        height=INACCESSIBLE_TOOL_BLOCKING_WALL_HEIGHT,
-        material_tuple=blocking_wall_material,
-        position_y_modifier=0,
-        thickness=length
-    )
-    blocking_wall_pos_cutoff = (
-        horizontal_pos +
-        (INACCESSIBLE_TOOL_BLOCKING_WALL_WIDTH + PERFORMER_HALF_WIDTH) *
-        (-1 if blocking_wall_horizontal_offset > 0 else 1))
-    room_wall_pos_cutoff = (
-        (room_dimension_x / 2 - PERFORMER_HALF_WIDTH) *
-        (-1 if original_offset > 0 else 1) *
-        (-1 if long_direction == 'x' else 1))
-
-    adjusted_offset_x = 0
-    adjusted_offset_z = 0
-    base_x = wall['shows'][0]['position']['x']
-    base_z = wall['shows'][0]['position']['z']
-    # Make the tool twice, the first time figure out where its bounds are
-    # after its been rotated.
-    # Calculate the difference from its maximum or minimum bounds to the edge
-    # of the wall and then shift the tool so its aligned perfectly to wall edge
-    # Then apply the tool horizontal offset after so that the closet edge
-    # of the tool is the correct horizontal offset away rather than the
-    # the tool center.
-    for _ in range(2):
-        # Tool creation
-        tool = copy.deepcopy(TOOL_TEMPLATE)
-        tool['type'] = tool_type
-        x = (
-            ((base_x + tool_horizontal_offset) if short_direction == 'x' else
-             (original_long_position - tool_offset_backward_from_lava)) +
-            adjusted_offset_x
-        )
-        z = (
-            ((base_z - tool_horizontal_offset) if short_direction == 'z' else
-             (original_long_position - tool_offset_backward_from_lava)) -
-            adjusted_offset_z
-        )
-        tool['shows'][0]['position']['x'] = x
-        tool['shows'][0]['position']['z'] = z
-        tool['shows'][0]['rotation']['y'] = tool_rotation_y
-        dimensions = LARGE_BLOCK_TOOLS_TO_DIMENSIONS.get(tool_type)
-        if not dimensions:
-            raise Exception(
-                f'Tool object type must be in {ALL_LARGE_BLOCK_TOOLS}')
-        # Create the tool
-        tool = finalize_structural_object(
-            [tool],
-            None,
-            ['tool'],
-            bounds,
-            override_scale={
-                'x': dimensions[0],
-                'y': TOOL_HEIGHT,
-                'z': dimensions[1]
-            },
-            override_standing_y=(TOOL_HEIGHT / 2.0)
-        )[0]
-        del tool['mass']  # Use default mass in unity
-        tool_bounds = tool['shows'][0]['boundingBox'].box_xz
-        # Maximum bounds and minimum bounds of tool in short direction
-        maximum_bound = round(max(getattr(pos, short_direction)
-                                  for pos in tool_bounds), 2)
-        minimum_bound = round(min(getattr(pos, short_direction)
-                                  for pos in tool_bounds), 2)
-        cutoff = (wall['shows'][0][
-            'position']['x' if short_direction == 'x' else 'z'] -
-            (INACCESSIBLE_TOOL_BLOCKING_WALL_WIDTH *
-             (1 if original_offset > 0 else -1) *
-             (1 if long_direction == 'x' else -1)))
-        if short_direction == 'x':
-            difference = cutoff - \
-                (maximum_bound if original_offset < 0 else minimum_bound)
-            adjusted_offset_x += difference + tool_horizontal_offset
-            adjusted_offset_z = 0
-        else:
-            difference = cutoff - \
-                (maximum_bound if original_offset > 0 else minimum_bound)
-            adjusted_offset_z -= difference - tool_horizontal_offset
-            adjusted_offset_x = 0
-
-    """
-    Simple example of what we should have now.
-    This example is with a negative blocking wall separation and
-    tool long direction on the z axis, short direction on x axis.
-    P = Performer
-    T = Target
-    * = Lava
-    C1 = (cutoff 1) blocking_wall_pos_cutoff
-    C2 = (cutoff 2) room_wall_pos_cutoff
-    x = x wall
-    z = z wall
-    |--------(z+)-------|
-    |         |B|  ***  |
-    |         |l|  *T*  |
-    (x-) |t|  |o|  ***  (x+)
-    |    |o|  |c|       |
-    |    |o|  |k|   P   |
-    |    |l|  |k|       |
-    |--------(z-)-------|
-                [C1---C2]
-    """
-    return (tool, wall, short_direction, blocking_wall_pos_cutoff,
-            room_wall_pos_cutoff)

@@ -2,19 +2,16 @@ import logging
 import math
 import random
 from dataclasses import dataclass
-from typing import List, Union
+from typing import List
 
 import matplotlib.pyplot as plt
-from machine_common_sense.config_manager import Vector3d
+from machine_common_sense.config_manager import Goal, Vector3d
 
 from generator import Scene, geometry
-from ideal_learning_env.defs import (
-    ILEConfigurationException,
-    ILEException,
-    RandomizableString
-)
-from ideal_learning_env.numerics import MinMaxFloat, MinMaxInt, RandomizableInt
-from ideal_learning_env.object_services import ObjectRepository
+
+from .defs import ILEConfigurationException, ILEException, RandomizableString
+from .numerics import RandomizableFloat, RandomizableInt
+from .object_services import ObjectRepository
 
 logger = logging.getLogger(__name__)
 
@@ -35,8 +32,8 @@ class StepBeginEnd():
     The step where the performer agent ends being frozen and can resume
     using actions besides `"Pass"`.  Therefore, this is an exclusive limit.
     """
-    begin: Union[int, MinMaxInt, List[Union[int, MinMaxInt]]] = None
-    end: Union[int, MinMaxInt, List[Union[int, MinMaxInt]]] = None
+    begin: RandomizableInt = None
+    end: RandomizableInt = None
 
 
 @dataclass
@@ -67,13 +64,10 @@ class TeleportConfig():
     is teleported.  This field is required for teleport action
     restrictions if `position_x` and `position_z` are not both set.
     """
-    step: Union[int, MinMaxInt, List[Union[int, MinMaxInt]]] = None
-    position_x: Union[float, MinMaxFloat,
-                      List[Union[float, MinMaxFloat]]] = None
-    position_z: Union[float, MinMaxFloat,
-                      List[Union[float, MinMaxFloat]]] = None
-    rotation_y: Union[float, MinMaxFloat,
-                      List[Union[float, MinMaxFloat]]] = None
+    step: RandomizableInt = None
+    position_x: RandomizableFloat = None
+    position_z: RandomizableFloat = None
+    rotation_y: RandomizableFloat = None
     look_at_center: bool = False
 
 
@@ -82,15 +76,17 @@ class SidestepsConfig():
     """
     Contains data to describe the performer's sidesteps.
 
-    - `begin` ([RandomizableInt](#RandomizableInt)):
+    - `begin` (int, or [MinMaxInt](#MinMaxInt) dict, or list of ints and/or
+    MinMaxInt dicts):
     The step where the performer agent starts being frozen
     and can only use the `"Pass"` action. For example, if 1, the performer
     agent must pass immediately at the start of the scene.  This is an
     inclusive limit.
-    - `object_label` ([RandomizableString](#RandomizableString)):
+    - `object_label` (string, or list of strings):
     The label of the object the performer will sidestep around. The performer
     must be 3 distance away from the object's center for sidesteps to work.
-    - `degrees` ([RandomizableInt](#RandomizableInt)):
+    - `degrees` (int, or [MinMaxInt](#MinMaxInt) dict, or list of ints and/or
+    MinMaxInt dicts):
     The positive or negative degrees the performer will sidestep around the
     object. Positive forces the performer to sidestep right while negative
     sidesteps left. The degree value must always be in 90 or -90 degree
@@ -104,14 +100,14 @@ class SidestepsConfig():
 
 class ActionService():
     @staticmethod
-    def add_circles(goal: dict, circles: List):
+    def add_circles(goal: Goal, circles: List):
         """Adds restrictions to the steps in the goal portion of a scene such
         that the performer can only rotate clockwise for 36 consecutive steps.
         The intervals provided by 'circles' should not overlap."""
         circle_action_list = ['RotateRight']
         circle_length = 36
-        goal['action_list'] = goal.get('action_list', [])
-        action_list = goal['action_list']
+        goal.action_list = goal.action_list or []
+        action_list = goal.action_list
 
         for circle in circles:
             no_actions = len(action_list) == 0
@@ -142,24 +138,24 @@ class ActionService():
                     step = step + 1
 
     @staticmethod
-    def add_freezes(goal: dict, freezes: List[StepBeginEnd]):
+    def add_freezes(goal: Goal, freezes: List[StepBeginEnd]):
         """Adds freezes to the goal portion of the scene. The freezes occur
         over ranges provided by `freezes` and should not overlap.  All random
         choices in any StepBeginEnd instances should be determined prior to
         calling this method."""
-        goal['action_list'] = goal.get('action_list', [])
-        al = goal['action_list']
+        goal.action_list = goal.action_list or []
+        al = goal.action_list
         limit = 1
         for f in freezes:
             f.begin = 1 if f.begin is None else f.begin
             if f.end is None:
-                if goal['last_step'] is None:
+                if goal.last_step is None:
                     raise ILEConfigurationException(
                         "Configuration error.  A freeze without an 'end' "
                         "requires 'last_step' to be set.")
                 else:
                     # Add one so we include the last step.  End is exclusive.
-                    f.end = goal['last_step'] + 1
+                    f.end = goal.last_step + 1
             if (limit > f.begin):
                 raise ILEException(f"Freezes overlapped at {limit}")
             if f.begin >= f.end:
@@ -172,10 +168,10 @@ class ActionService():
             limit = f.end
 
     @staticmethod
-    def add_freeze_while_moving(goal: dict, freeze_while_moving):
+    def add_freeze_while_moving(goal: Goal, freeze_while_moving):
         """Adds freeze while moving"""
-        goal['action_list'] = goal.get('action_list', [])
-        al = goal['action_list']
+        goal.action_list = goal.action_list or []
+        al = goal.action_list
         # Must be the first action
         if len(al) > 0:
             raise ILEException(
@@ -184,6 +180,7 @@ class ActionService():
                 "must be after.")
         last_move = 0
         last_rotate = 0
+        last_action = 0
         if isinstance(freeze_while_moving, str):
             freeze_while_moving = [freeze_while_moving]
         for label in freeze_while_moving:
@@ -198,15 +195,20 @@ class ActionService():
             for object in objects:
                 moves = object.get("moves")
                 rotates = object.get("rotates")
+                actions = object.get("actions")
                 if moves:
                     last_move = max(moves[-1]['stepEnd'], last_move)
                 if rotates:
                     last_rotate = max(rotates[-1]['stepEnd'], last_rotate)
-        al += ([['Pass']] * (max(last_move, last_rotate)))
+                if actions:
+                    last_action = max(max(
+                        item['stepEnd'] for item in actions if not item.get(
+                            'isLoopAnimation', False)), last_action)
+        al += ([['Pass']] * (max(last_move, last_rotate, last_action)))
 
     @staticmethod
     def add_teleports(
-        goal: dict,
+        goal: Goal,
         teleports: List[TeleportConfig],
         passive: bool
     ):
@@ -214,8 +216,8 @@ class ActionService():
         performer will be teleported to a new position and/or rotation. All
         random choices in any TeleportConfig instances should be determined
         prior to calling this method."""
-        goal['action_list'] = goal.get('action_list', [])
-        al = goal['action_list']
+        goal.action_list = goal.action_list or []
+        al = goal.action_list
         for t in teleports:
             rotation_y = t.rotation_y
             # See TeleportConfig docs for information and assumptions.
@@ -245,15 +247,15 @@ class ActionService():
             al[step - 1] = [cmd]
 
     @staticmethod
-    def add_swivels(goal: dict, swivels: List[StepBeginEnd]):
+    def add_swivels(goal: Goal, swivels: List[StepBeginEnd]):
         """Adds restrictions to steps the goal portion of a scene such that the
         performer can only rotate its view (LookDown, LookUp, RotateLeft, or
         RotateRight).  The intervals provided by 'swivels' should not
         overlap. All random choices in any StepBeginEnd instances should be
         determined prior to calling this method."""
         swivel_actions = ['LookDown', 'LookUp', 'RotateLeft', 'RotateRight']
-        goal['action_list'] = goal.get('action_list', [])
-        al = goal['action_list']
+        goal.action_list = goal.action_list or []
+        al = goal.action_list
 
         # check if actions already exist in action list
         # at the start
@@ -264,20 +266,20 @@ class ActionService():
         for s in swivels:
             s.begin = 1 if s.begin is None else s.begin
             if s.end is None:
-                if goal['last_step'] is None:
+                if goal.last_step is None:
                     raise ILEConfigurationException(
                         "Configuration error.  A swivel without an 'end' "
                         "requires 'last_step' to be set.")
                 else:
                     # Add one so we include the last step.  End is exclusive.
-                    s.end = goal['last_step'] + 1
+                    s.end = goal.last_step + 1
             if (limit > s.begin):
                 raise ILEException(f"Swivels overlapped at {limit}")
             if s.begin >= s.end:
                 raise ILEException(
                     f"Swivels has begin >= end ({s.begin} >= {s.end})")
 
-            if(no_actions or s.begin > al_length):
+            if (no_actions or s.begin > al_length):
                 num_free = s.begin - \
                     limit if no_actions else (s.begin - al_length - 1)
                 num_limited = s.end - s.begin
@@ -287,9 +289,9 @@ class ActionService():
             else:
                 step = s.begin
 
-                while(step < s.end):
-                    if(len(al) >= step):
-                        if(al[step - 1] != []):
+                while (step < s.end):
+                    if (len(al) >= step):
+                        if (al[step - 1] != []):
                             raise ILEException(
                                 f"Swivels with begin {s.begin} and end "
                                 f"{s.end} overlap with existing action "
@@ -301,7 +303,7 @@ class ActionService():
             limit = s.end
 
     @staticmethod
-    def add_sidesteps(goal: dict,
+    def add_sidesteps(goal: Goal,
                       sidesteps: List[SidestepsConfig],
                       scene: Scene):
         """Adds sidesteps to the goal portion of the scene. The sidesteps occur
@@ -309,8 +311,8 @@ class ActionService():
         choices in any SidestepsConfig instances should be determined prior to
         calling this method."""
         # For a 90 degree increment
-        goal['action_list'] = goal.get('action_list', [])
-        al = goal['action_list']
+        goal.action_list = goal.action_list or []
+        al = goal.action_list
         object = None
         label = None
         start_x = scene.performer_start.position.x

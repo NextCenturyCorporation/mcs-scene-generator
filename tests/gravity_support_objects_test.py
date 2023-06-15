@@ -24,7 +24,7 @@ def test_does_have_definitions():
     dataset = gravity_support_objects.get_asymmetric_target_definition_dataset(
         unshuffled=True
     )
-    definitions = dataset.definitions()
+    definitions = dataset.definitions_unique_shape_scale()
     assert len(definitions) > 0
     for definition in definitions:
         assert isinstance(definition, ObjectDefinition)
@@ -32,7 +32,7 @@ def test_does_have_definitions():
     dataset = gravity_support_objects.get_symmetric_target_definition_dataset(
         unshuffled=True
     )
-    definitions = dataset.definitions()
+    definitions = dataset.definitions_unique_shape_scale()
     assert len(definitions) > 0
     for definition in definitions:
         assert isinstance(definition, ObjectDefinition)

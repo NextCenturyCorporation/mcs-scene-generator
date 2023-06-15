@@ -1,29 +1,25 @@
 import copy
-import logging
 import random
 import uuid
 from abc import ABC, abstractmethod
 from typing import Any, Callable, Dict, List
 
-from generator import Scene, SceneException, materials, tags
+from machine_common_sense.config_manager import Goal
 
-logger = logging.getLogger(__name__)
+from generator import Scene, SceneException, SceneObject, materials, tags
 
 
-def initialize_goal(goal: Dict[str, Any]) -> Dict[str, Any]:
+def initialize_goal(goal_template: Goal) -> Goal:
     """Initialize and return the properties in the given goal template."""
 
-    goal_copy = copy.deepcopy(goal)
-    for prop in ['category', 'domainsInfo', 'sceneInfo']:
-        if prop not in goal_copy:
-            raise ValueError(f'Hypercube goal template must have {prop}')
+    goal_copy = copy.deepcopy(goal_template)
 
-    scene_info = goal_copy['sceneInfo']
+    scene_info = goal_copy.scene_info
     scene_info[tags.ALL] = scene_info.get(tags.ALL, [])
     scene_info[tags.SCENE.SLICES] = scene_info.get(tags.SCENE.SLICES, [])
 
-    goal_copy['objectsInfo'] = goal_copy.get('objectsInfo', {})
-    goal_copy['objectsInfo'][tags.ALL] = []
+    goal_copy.objects_info = goal_copy.objects_info or {}
+    goal_copy.objects_info[tags.ALL] = []
 
     # Add scene tags like 'fallDown', 'moveAcross', 'targetLocation', etc.
     for tag in tags.SCENE_OPTIONAL_TAGS_DICT.values():
@@ -44,15 +40,15 @@ def initialize_goal(goal: Dict[str, Any]) -> Dict[str, Any]:
                 0 if tag == tags.SCENE.COUNT else False
             )
 
-        goal_copy['objectsInfo'][tags.role_to_key(role)] = []
+        goal_copy.objects_info[tags.role_to_key(role)] = []
 
     return goal_copy
 
 
 def update_floor_and_walls(
     scene: Scene,
-    role_to_object_data_list: Dict[str, Any],
-    retrieve_object_list_from_data: Callable[[], List[Dict[str, Any]]],
+    role_to_object_data_list: Dict[str, List[Any]],
+    retrieve_object_list_from_data: Callable[[Any], List[SceneObject]],
     scenes: List[Scene],
     floor_material_list=materials.FLOOR_MATERIALS,
     wall_material_list=materials.WALL_MATERIALS
@@ -99,7 +95,7 @@ def update_floor_and_walls(
 
 def update_scene_objects(
     scene: Scene,
-    role_to_object_list: Dict[str, Dict[str, Any]]
+    role_to_object_list: Dict[str, List[SceneObject]]
 ) -> Scene:
     """Update and return the given scene with the given objects."""
 
@@ -124,24 +120,24 @@ def update_scene_objects(
             # The intuitive physics occluders are always two objects.
             count = (int)(count / 2)
 
-        scene.goal['sceneInfo'][tags.SCENE.COUNT][
+        scene.goal.scene_info[tags.SCENE.COUNT][
             tags.role_to_key(role)
         ] = count
-        scene.goal['sceneInfo'][tags.SCENE.PRESENT][
+        scene.goal.scene_info[tags.SCENE.PRESENT][
             tags.role_to_key(role)
         ] = (count > 0)
-        scene.goal['sceneInfo'][tags.SCENE.COUNT][tags.ALL] += count
+        scene.goal.scene_info[tags.SCENE.COUNT][tags.ALL] += count
 
     tags.append_object_tags(
-        scene.goal['sceneInfo'],
-        scene.goal['objectsInfo'],
+        scene.goal.scene_info,
+        scene.goal.objects_info,
         role_to_object_list
     )
 
     for role, object_list in role_to_object_list.items():
         for instance in object_list:
             # First add this object's info to the scene's objects tags.
-            scene.goal['objectsInfo'][tags.role_to_key(role)].extend(
+            scene.goal.objects_info[tags.role_to_key(role)].extend(
                 instance['debug']['info']
             )
 
@@ -159,40 +155,40 @@ def update_scene_objects_tag_lists(
 
     for role in tags.ROLE_DICT.values():
         # Ensure the objects tags have only unique values.
-        scene.goal['objectsInfo'][tags.role_to_key(role)] = list(
-            set(scene.goal['objectsInfo'][tags.role_to_key(role)])
+        scene.goal.objects_info[tags.role_to_key(role)] = list(
+            set(scene.goal.objects_info[tags.role_to_key(role)])
         )
 
-        if role in scene.goal['objectsInfo'][tags.role_to_key(role)]:
-            scene.goal['objectsInfo'][tags.role_to_key(role)].remove(
+        if role in scene.goal.objects_info[tags.role_to_key(role)]:
+            scene.goal.objects_info[tags.role_to_key(role)].remove(
                 role
             )
 
         # Add the list of object tags by role to the list of all tags.
-        if len(scene.goal['objectsInfo'][tags.role_to_key(role)]) > 0:
-            scene.goal['objectsInfo'][tags.ALL].extend(
+        if len(scene.goal.objects_info[tags.role_to_key(role)]) > 0:
+            scene.goal.objects_info[tags.ALL].extend(
                 [role] +
-                scene.goal['objectsInfo'][tags.role_to_key(role)]
+                scene.goal.objects_info[tags.role_to_key(role)]
             )
 
     # Ensure the objects tags have only unique values.
-    scene.goal['objectsInfo'][tags.ALL] = list(
-        set(scene.goal['objectsInfo'][tags.ALL])
+    scene.goal.objects_info[tags.ALL] = list(
+        set(scene.goal.objects_info[tags.ALL])
     )
 
     # Add all domains tags to the 'all' list.
-    scene.goal['domainsInfo'][tags.ALL] = (
-        scene.goal['domainsInfo'].get(tags.DOMAINS.OBJECTS, []) +
-        scene.goal['domainsInfo'].get(tags.DOMAINS.PLACES, []) +
-        scene.goal['domainsInfo'].get(tags.DOMAINS.AGENTS, [])
+    scene.goal.domains_info[tags.ALL] = (
+        scene.goal.domains_info.get(tags.DOMAINS.OBJECTS, []) +
+        scene.goal.domains_info.get(tags.DOMAINS.PLACES, []) +
+        scene.goal.domains_info.get(tags.DOMAINS.AGENTS, [])
     )
 
     # Add all scene tags to the 'all' list.
-    scene.goal['sceneInfo'][tags.ALL] = list(filter(None, [
-        scene.goal['sceneInfo'].get(tags.SCENE.PRIMARY),
-        scene.goal['sceneInfo'].get(tags.SCENE.SECONDARY),
-        scene.goal['sceneInfo'].get(tags.SCENE.TERTIARY),
-        scene.goal['sceneInfo'].get(tags.SCENE.QUATERNARY)
+    scene.goal.scene_info[tags.ALL] = list(filter(None, [
+        scene.goal.scene_info.get(tags.SCENE.PRIMARY),
+        scene.goal.scene_info.get(tags.SCENE.SECONDARY),
+        scene.goal.scene_info.get(tags.SCENE.TERTIARY),
+        scene.goal.scene_info.get(tags.SCENE.QUATERNARY)
     ]))
 
     for tag in tags.SCENE_OPTIONAL_TAGS_DICT.values():
@@ -201,49 +197,24 @@ def update_scene_objects_tag_lists(
             tag_label = (
                 '' if tag == tags.SCENE.SETUP else tags.tag_to_label(tag)
             )
-            tag_value = scene.goal['sceneInfo'][tag]
+            tag_value = scene.goal.scene_info[tag]
             if tag_value:
-                scene.goal['sceneInfo'][tags.ALL].append(
-                    ((tag_label + ' ') if tag_label else '') + tag_value
+                scene.goal.scene_info[tags.ALL].append(
+                    f"{((tag_label + ' ') if tag_label else '')}{tag_value}"
                 )
 
     for tag in tags.SCENE_ROLE_TAGS_DICT.values():
         tag_label = tags.tag_to_label(tag)
         for role in tags.ROLE_DICT.values():
-            if scene.goal['sceneInfo'][tag][tags.role_to_key(role)]:
-                scene.goal['sceneInfo'][tags.ALL].append(role + ' ' + (
+            if scene.goal.scene_info[tag][tags.role_to_key(role)]:
+                scene.goal.scene_info[tags.ALL].append(role + ' ' + (
                     tag_label if tag != 'count'
-                    else str(scene.goal['sceneInfo'][tag][
+                    else str(scene.goal.scene_info[tag][
                         tags.role_to_key(role)
                     ])
                 ))
 
     return scene
-
-
-def get_skewed_bell_curve_for_room_size(minimum=10, maximum=50):
-    val = random.uniform(0, 100)
-    if minimum > 19:
-        raise Exception(
-            f'Minimum room size {minimum} must be less than or equal to 10'
-        )
-    if maximum < 40:
-        raise Exception(
-            f'Maximum room size {maximum} must be greater than or equal to 40'
-        )
-    if val <= 80:
-        # most scenes should be medium sized 20 - 39
-        low = 20
-        high = 39
-    elif val <= 90:
-        # size small 10 medium 19
-        low = minimum
-        high = 19
-    elif val <= 100:
-        # size large 40 to 50
-        low = 40
-        high = maximum
-    return low, high
 
 
 class Hypercube(ABC):
@@ -259,33 +230,38 @@ class Hypercube(ABC):
     ) -> None:
         self._uuid = str(uuid.uuid4()).upper()
         self._name = name
+        self._scenes = []
+        self._starter_scene = starter_scene
+        self._task_type = task_type
         self._training = training
 
+    def generate_scenes(self) -> List[Scene]:
+        """Generate and return the scenes for this hypercube."""
         # Create all the scenes using the starter scene and the goal template.
-        goal_template = self._create_goal_template(task_type)
-        self._scenes = self._create_scenes(starter_scene, goal_template)
+        goal_template = self._create_goal_template(self._task_type)
+        self._scenes = self._create_scenes(self._starter_scene, goal_template)
 
         # Finalize the slice tags for each scene in this hypercube.
         for scene in self._scenes:
             for tag in self._get_slices():
-                scene.goal['sceneInfo'][tags.SCENE.SLICES].append(
+                scene.goal.scene_info[tags.SCENE.SLICES].append(
                     tags.tag_to_label(tag) + ' ' +
-                    str(scene.goal['sceneInfo'][tag])
+                    str(scene.goal.scene_info[tag])
                 )
 
         # Sort the scenes alphabetically by ID.
         self._scenes = sorted(
             self._scenes,
-            key=lambda x: x.goal['sceneInfo'].get(tags.SCENE.ID, [''])[0]
+            key=lambda x: x.goal.scene_info.get(tags.SCENE.ID, [''])[0]
         )
 
-        is_passive_agent = tags.is_passive_agent_task(task_type)
-        is_passive_physics = tags.is_passive_physics_task(task_type)
+        is_passive_agent = tags.is_passive_agent_task(self._task_type)
+        is_passive_physics = tags.is_passive_physics_task(self._task_type)
 
         # Update specific tags in each scene.
         prefix = ((self._name + ' ') if self._name else '').replace(' ', '_')
         for index, scene in enumerate(self._scenes):
-            scene_info = scene.goal['sceneInfo']
+            scene_info = scene.goal.scene_info
             if tags.SCENE.ID not in scene_info:
                 scene_info[tags.SCENE.ID] = [f'{(index + 1):02}']
             if tags.SCENE.NAME not in scene_info:
@@ -298,26 +274,31 @@ class Hypercube(ABC):
             scene_info[tags.ALL].extend(
                 [scene_info[tags.SCENE.NAME]] + scene_info[tags.SCENE.ID]
             )
+            scene_info[tags.SCENE.DOMAIN_TYPE] = (
+                tags.get_domain_type(self._task_type))
             if not (is_passive_agent or is_passive_physics):
                 scene_info[tags.SCENE.QUATERNARY] = tags.tag_to_label(
                     tags.SCENE.ACTION_FULL
-                    if not len(scene.goal.get('action_list', [])) else
+                    if not len(scene.goal.action_list or []) else
                     tags.SCENE.ACTION_VARIABLE
                 )
 
-    def _create_goal_template(self, task_type: str) -> Dict[str, Any]:
+        return self.get_scenes()
+
+    def _create_goal_template(self, task_type: str) -> Goal:
         """Create and return this hypercube's template for a goal object."""
-        goal_template = {
-            'category': '',
-            'sceneInfo': {},
+        goal_template = Goal(
+            category='',
+            scene_info={},
             # No longer used but kept here to maintain backwards compatibility.
-            'domainsInfo': {'objects': [], 'places': [], 'agents': []}
-        }
-        scene_info = goal_template['sceneInfo']
+            domains_info={'objects': [], 'places': [], 'agents': []}
+        )
+        scene_info = goal_template.scene_info
         is_passive_agent = tags.is_passive_agent_task(task_type)
         is_passive_physics = tags.is_passive_physics_task(task_type)
+        is_multi_retrieval = tags.is_multi_retrieval(task_type)
         if is_passive_agent:
-            goal_template['category'] = tags.tag_to_label(tags.SCENE.AGENTS)
+            goal_template.category = tags.tag_to_label(tags.SCENE.AGENTS)
             scene_info[tags.SCENE.PRIMARY] = tags.tag_to_label(
                 tags.SCENE.PASSIVE
             )
@@ -328,7 +309,7 @@ class Hypercube(ABC):
                 tags.SCENE.ACTION_NONE
             )
         elif is_passive_physics:
-            goal_template['category'] = tags.tag_to_label(
+            goal_template.category = tags.tag_to_label(
                 tags.SCENE.INTUITIVE_PHYSICS
             )
             scene_info[tags.SCENE.PRIMARY] = tags.tag_to_label(
@@ -340,8 +321,17 @@ class Hypercube(ABC):
             scene_info[tags.SCENE.QUATERNARY] = tags.tag_to_label(
                 tags.SCENE.ACTION_NONE
             )
+        elif is_multi_retrieval:
+            goal_template.category = tags.tag_to_label(
+                tags.SCENE.MULTI_RETRIEVAL)
+            scene_info[tags.SCENE.PRIMARY] = tags.tag_to_label(
+                tags.SCENE.INTERACTIVE
+            )
+            scene_info[tags.SCENE.SECONDARY] = tags.tag_to_label(
+                tags.SCENE.MULTI_RETRIEVAL
+            )
         else:
-            goal_template['category'] = tags.tag_to_label(tags.SCENE.RETRIEVAL)
+            goal_template.category = tags.tag_to_label(tags.SCENE.RETRIEVAL)
             scene_info[tags.SCENE.PRIMARY] = tags.tag_to_label(
                 tags.SCENE.INTERACTIVE
             )
@@ -358,7 +348,7 @@ class Hypercube(ABC):
     def _create_scenes(
         self,
         starter_scene: Scene,
-        goal_template: Dict[str, Any]
+        goal_template: Goal
     ) -> List[Scene]:
         """Create and return this hypercube's scenes."""
         pass
@@ -373,6 +363,10 @@ class Hypercube(ABC):
         By default, returns [] (no training data from this hypercube)."""
         return []
 
+    def get_info(self) -> str:
+        """Return unique hypercube info. Can override as needed."""
+        return ''
+
     def get_name(self) -> str:
         """Return this hypercube's name."""
         return self._name
@@ -381,11 +375,7 @@ class Hypercube(ABC):
         """Return this hypercube's list of scenes."""
         if self._training:
             scenes = self._get_training_scenes()
-            logger.info(f'{self.get_name()} hypercube made '
-                        f'{len(scenes)} training scenes')
             return scenes
-        logger.info(f'{self.get_name()} hypercube made '
-                    f'{len(self._scenes)} non-training scenes')
         return self._scenes
 
 
@@ -402,7 +392,7 @@ class HypercubeFactory(ABC):
         """Create and return a new hypercube built by this factory."""
         pass
 
-    def build(
+    def generate_hypercubes(
         self,
         total: str,
         starter_scene_function: Callable[[], Scene],
@@ -410,30 +400,12 @@ class HypercubeFactory(ABC):
         throw_error=False,
         sort_data=False
     ) -> List[Hypercube]:
-        """Create and return a new list of scenes built by this factory."""
+        """Create and return a new list of hypercubes built by this factory."""
         # Save this now in case it's used by a hypercube factory subclass.
         self.role_to_type = role_to_type
 
         hypercubes = []
         for count in range(1, total + 1):
-            logger.info(f'Generating hypercube {count} / {total}')
-            tries = 0
-            while tries < 100:
-                tries += 1
-                try:
-                    # Build the hypercube and all of its scenes.
-                    hypercube = self._build(starter_scene_function())
-                    hypercubes.append(hypercube)
-                    break
-                except (
-                    SceneException,
-                    RuntimeError,
-                    TypeError,
-                    ValueError,
-                    ZeroDivisionError
-                ):
-                    logging.exception(f'Fail to create {self.name} hypercube')
-                    if throw_error or tries >= 100:
-                        raise
-
+            hypercube = self._build(starter_scene_function())
+            hypercubes.append(hypercube)
         return hypercubes

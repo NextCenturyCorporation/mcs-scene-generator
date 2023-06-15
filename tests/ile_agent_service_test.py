@@ -12,8 +12,7 @@ from ideal_learning_env.agent_service import (
     AgentCreationService,
     AgentMovementConfig,
     AgentPointingConfig,
-    AgentSettings,
-    get_default_agent_settings
+    AgentSettings
 )
 from ideal_learning_env.defs import ILEConfigurationException, ILEException
 from ideal_learning_env.numerics import MinMaxFloat, VectorFloatConfig
@@ -50,8 +49,8 @@ def test_agent_service_reconcile():
     template = AgentConfig(
         1,
         type=[
-            'test_type',
-            'test_type2'],
+            'agent_male_01',
+            'agent_female_01'],
         agent_settings=AgentSettings(
             chest=[
                 2,
@@ -62,7 +61,7 @@ def test_agent_service_reconcile():
     srv = AgentCreationService()
     reconciled: AgentConfig = srv.reconcile(scene, template)
     assert reconciled.num == 1
-    assert reconciled.type in ['test_type', 'test_type2']
+    assert reconciled.type in ['agent_male_01', 'agent_female_01']
     assert reconciled.agent_settings.chest in [2, 4]
     assert reconciled.position.x in [1, 2]
     assert 0.5 <= reconciled.position.y <= 0.6
@@ -70,6 +69,39 @@ def test_agent_service_reconcile():
     assert reconciled.rotation_y in [56, 57]
     assert reconciled.movement is None
     assert reconciled.actions == []
+
+
+def test_agent_labels():
+    scene = Scene()
+    template = AgentConfig(
+        1,
+        type=[
+            'agent_male_01',
+            'agent_female_01'],
+        agent_settings=AgentSettings(
+            chest=[
+                2,
+                4]),
+        position=VectorFloatConfig([1, 2], MinMaxFloat(0.5, 0.6),
+                                   [1, MinMaxFloat(4.4, 4.5)]),
+        rotation_y=[56, 57],
+        labels=[
+            'label1',
+            'label2'
+        ]
+    )
+    srv = AgentCreationService()
+    agents, _ = srv.add_to_scene(scene, template, [])
+    agent = agents[0]
+
+    object_repo = ObjectRepository.get_instance()
+    agents_label1 = object_repo.get_all_from_labeled_objects('label1') or []
+    agents_label2 = object_repo.get_all_from_labeled_objects('label2') or []
+    assert (len(agents_label1) == 1) or (len(agents_label2) == 1)
+    if len(agents_label1):
+        assert agents_label1[0].instance == agent
+    if len(agents_label2):
+        assert agents_label2[0].instance == agent
 
 
 def test_agent_service_reconcile_default():
@@ -90,15 +122,16 @@ def test_agent_service_reconcile_default():
 def test_agent_service_create():
     scene = Scene()
     template = AgentConfig(
-        1,
-        type='test_type',
+        num=1,
+        type='agent_female_01',
         agent_settings=AgentSettings(),
         position=VectorFloatConfig(1, 0.5, 1),
-        rotation_y=90)
+        rotation_y=90
+    )
     srv = AgentCreationService()
     agent = srv.create_feature_from_specific_values(
-        scene, template, template)
-    assert agent['type'] == 'test_type'
+        scene, srv.reconcile(scene, template), template)
+    assert agent['type'] == 'agent_female_01'
     assert agent['id'].startswith('agent')
     assert agent['agentSettings']
     assert agent['shows'][0]['position']['x'] == 1
@@ -125,14 +158,14 @@ def test_agent_service_add():
     scene = Scene()
     template = AgentConfig(
         1,
-        type='test_type',
+        type='agent_male_01',
         agent_settings=AgentSettings(),
         position=VectorFloatConfig(1, 0.5, 1),
         rotation_y=90)
     srv = AgentCreationService()
     agents, _ = srv.add_to_scene(scene, template, [])
     agent = agents[0]
-    assert agent['type'] == 'test_type'
+    assert agent['type'] == 'agent_male_01'
     assert agent['id'].startswith('agent')
     assert agent['agentSettings']
     assert agent['shows'][0]['position']['x'] == 1
@@ -163,7 +196,7 @@ def test_agent_service_add_fail():
     scene = Scene()
     template = AgentConfig(
         2,
-        type='test_type',
+        type='agent_male_01',
         agent_settings=AgentSettings(),
         position=VectorFloatConfig(1, 0.5, 1),
         rotation_y=90)
@@ -183,7 +216,7 @@ def test_agent_service_add_actions():
     ]
     template = AgentConfig(
         1,
-        type='test_type',
+        type='agent_male_01',
         agent_settings=AgentSettings(),
         position=VectorFloatConfig(0, 0, 2),
         rotation_y=180,
@@ -191,7 +224,7 @@ def test_agent_service_add_actions():
     srv = AgentCreationService()
     agents, _ = srv.add_to_scene(scene, template, [])
     agent = agents[0]
-    assert agent['type'] == 'test_type'
+    assert agent['type'] == 'agent_male_01'
     assert agent['id'].startswith('agent')
     assert agent['agentSettings']
     assert agent['shows'][0]['position']['x'] == 0
@@ -249,7 +282,7 @@ def test_agent_service_add_actions_fail():
     ]
     template = AgentConfig(
         1,
-        type='test_type',
+        type='agent_male_01',
         agent_settings=AgentSettings(),
         position=VectorFloatConfig(0, 0, 2),
         rotation_y=180,
@@ -323,8 +356,11 @@ def test_agent_service_reconcile_movement_empty():
 def test_agent_service_create_movement_bounds_and_points():
     scene = Scene()
     template = AgentConfig(
-        1, position=Vector3d(), rotation_y=0,
-        agent_settings=get_default_agent_settings())
+        num=1,
+        position=Vector3d(),
+        rotation_y=0,
+        agent_settings=None
+    )
     template.movement = AgentMovementConfig(
         animation='anim1', step_begin=3,
         points=[Vector3d(x=1, y=0, z=3),
@@ -337,9 +373,13 @@ def test_agent_service_create_movement_bounds_and_points():
 
     srv = AgentCreationService()
     agent = srv.create_feature_from_specific_values(
-        scene, template, template)
+        scene, srv.reconcile(scene, template), template)
     move = agent['agentMovement']
     assert agent
+    assert (
+        agent['type'].startswith('agent_male_') or
+        agent['type'].startswith('agent_female_')
+    )
     assert move
     assert move['repeat'] is True
     assert move['stepBegin'] == 3
@@ -353,8 +393,11 @@ def test_agent_service_create_movement_bounds_and_points():
 def test_agent_service_create_movement_bounds():
     scene = Scene()
     template = AgentConfig(
-        1, position=Vector3d(), rotation_y=0,
-        agent_settings=get_default_agent_settings())
+        num=1,
+        position=Vector3d(),
+        rotation_y=0,
+        agent_settings=None
+    )
     template.movement = AgentMovementConfig(
         animation='anim2', step_begin=1,
         bounds=[Vector3d(x=0, y=0, z=1.0),
@@ -366,9 +409,13 @@ def test_agent_service_create_movement_bounds():
 
     srv = AgentCreationService()
     agent = srv.create_feature_from_specific_values(
-        scene, template, template)
+        scene, srv.reconcile(scene, template), template)
     move = agent['agentMovement']
     assert agent
+    assert (
+        agent['type'].startswith('agent_male_') or
+        agent['type'].startswith('agent_female_')
+    )
     assert move
     assert move['repeat'] is True
     assert move['stepBegin'] == 1
@@ -383,8 +430,11 @@ def test_agent_service_create_movement_bounds():
 def test_agent_service_create_no_bounds():
     scene = prior_scene_custom_size(2, 10)
     template = AgentConfig(
-        1, position=Vector3d(), rotation_y=0,
-        agent_settings=get_default_agent_settings())
+        num=1,
+        position=Vector3d(),
+        rotation_y=0,
+        agent_settings=None
+    )
     template.movement = AgentMovementConfig(
         animation='anim3', step_begin=3,
         num_points=10,
@@ -392,9 +442,13 @@ def test_agent_service_create_no_bounds():
 
     srv = AgentCreationService()
     agent = srv.create_feature_from_specific_values(
-        scene, template, template)
+        scene, srv.reconcile(scene, template), template)
     move = agent['agentMovement']
     assert agent
+    assert (
+        agent['type'].startswith('agent_male_') or
+        agent['type'].startswith('agent_female_')
+    )
     assert move
     assert move['repeat'] is False
     assert move['stepBegin'] == 3
@@ -409,15 +463,22 @@ def test_agent_service_create_no_bounds():
 def test_agent_service_create_no_data():
     scene = prior_scene_custom_size(2, 10)
     template = AgentConfig(
-        1, position=Vector3d(), rotation_y=0,
-        agent_settings=get_default_agent_settings())
+        num=1,
+        position=Vector3d(),
+        rotation_y=0,
+        agent_settings=None
+    )
     template.movement = AgentMovementConfig()
 
     srv = AgentCreationService()
     agent = srv.create_feature_from_specific_values(
-        scene, template, template)
+        scene, srv.reconcile(scene, template), template)
     move = agent['agentMovement']
     assert agent
+    assert (
+        agent['type'].startswith('agent_male_') or
+        agent['type'].startswith('agent_female_')
+    )
     assert move
     assert move['repeat'] in [True, False]
     assert move['stepBegin'] > -1
@@ -435,7 +496,7 @@ def test_agent_opposite_x():
             keyword=KeywordLocation.OPPOSITE_X,
             relative_object_label='target'),
         rotation_y=0,
-        agent_settings=get_default_agent_settings())
+        agent_settings=None)
 
     srv = AgentCreationService()
     agents, _ = srv.add_to_scene(scene, template, [])
@@ -453,7 +514,7 @@ def test_agent_opposite_z():
             keyword=KeywordLocation.OPPOSITE_Z,
             relative_object_label='target'),
         rotation_y=0,
-        agent_settings=get_default_agent_settings())
+        agent_settings=None)
 
     srv = AgentCreationService()
     agents, _ = srv.add_to_scene(scene, template, [])
@@ -471,7 +532,7 @@ def test_agent_adjacent_to_object():
             keyword=KeywordLocation.ADJACENT_TO_OBJECT,
             relative_object_label='target'),
         rotation_y=0,
-        agent_settings=get_default_agent_settings())
+        agent_settings=None)
 
     srv = AgentCreationService()
     agents, _ = srv.add_to_scene(scene, template, [])
@@ -490,7 +551,7 @@ def test_agent_behind_object_from_performer():
             keyword=KeywordLocation.BEHIND_OBJECT_FROM_PERFORMER,
             relative_object_label='target'),
         rotation_y=0,
-        agent_settings=get_default_agent_settings())
+        agent_settings=None)
 
     srv = AgentCreationService()
     agents, _ = srv.add_to_scene(scene, template, [])
@@ -508,7 +569,7 @@ def test_agent_front_of_performer():
             keyword=KeywordLocation.FRONT_OF_PERFORMER,
             relative_object_label='target'),
         rotation_y=0,
-        agent_settings=get_default_agent_settings())
+        agent_settings=None)
 
     srv = AgentCreationService()
     agents, _ = srv.add_to_scene(scene, template, [])
@@ -531,7 +592,7 @@ def test_agent_on_object():
             keyword=KeywordLocation.ON_OBJECT,
             relative_object_label='platforms'),
         rotation_y=0,
-        agent_settings=get_default_agent_settings())
+        agent_settings=None)
 
     srv = AgentCreationService()
     agents, _ = srv.add_to_scene(scene, template, bounds)
@@ -554,7 +615,7 @@ def test_agent_on_object_centered():
             keyword=KeywordLocation.ON_OBJECT,
             relative_object_label='platforms'),
         rotation_y=0,
-        agent_settings=get_default_agent_settings())
+        agent_settings=None)
 
     srv = AgentCreationService()
     agents, _ = srv.add_to_scene(scene, template, [])
@@ -572,7 +633,7 @@ def test_agent_keyword_location_random():
             keyword=KeywordLocation.RANDOM,
             relative_object_label='target'),
         rotation_y=0,
-        agent_settings=get_default_agent_settings())
+        agent_settings=None)
 
     srv = AgentCreationService()
     agents, _ = srv.add_to_scene(scene, template, [])
@@ -591,7 +652,7 @@ def test_agent_keyword_location_and_position_fail():
             relative_object_label='target'),
         position=VectorFloatConfig(1, 2, 3),
         rotation_y=0,
-        agent_settings=get_default_agent_settings())
+        agent_settings=None)
 
     srv = AgentCreationService()
     with pytest.raises(ILEException):
@@ -605,7 +666,7 @@ def test_agent_opposite_z_fail_overlap():
             keyword=KeywordLocation.OPPOSITE_Z,
             relative_object_label='target'),
         rotation_y=0,
-        agent_settings=get_default_agent_settings())
+        agent_settings=None)
 
     srv = AgentCreationService()
     bounds = []
@@ -621,7 +682,7 @@ def test_agent_associate_with_agent_fail():
             keyword=KeywordLocation.ASSOCIATED_WITH_AGENT,
             relative_object_label='target'),
         rotation_y=0,
-        agent_settings=get_default_agent_settings())
+        agent_settings=None)
 
     srv = AgentCreationService()
     with pytest.raises(ILEConfigurationException):
@@ -636,7 +697,7 @@ def test_agent_in_fail():
             relative_object_label='target',
             container_label="test"),
         rotation_y=0,
-        agent_settings=get_default_agent_settings())
+        agent_settings=None)
 
     srv = AgentCreationService()
     with pytest.raises(ILEConfigurationException):
@@ -651,7 +712,7 @@ def test_agent_in_with_fail():
             relative_object_label='target',
             container_label="test"),
         rotation_y=0,
-        agent_settings=get_default_agent_settings())
+        agent_settings=None)
 
     srv = AgentCreationService()
     with pytest.raises(ILEConfigurationException):
@@ -665,7 +726,7 @@ def test_agent_occlude_fail():
             keyword=KeywordLocation.OCCLUDE_OBJECT,
             relative_object_label='target'),
         rotation_y=0,
-        agent_settings=get_default_agent_settings())
+        agent_settings=None)
 
     srv = AgentCreationService()
     with pytest.raises(ILEConfigurationException):
@@ -874,7 +935,7 @@ def test_agent_pointing_walk_distance():
         True
     )
     # Agent starts turned around
-    rotation_y = (rotation_y + 180) % 360
+    rotation_y = round(rotation_y + 180, 2) % 360
     assert agent['shows'][0]['rotation'] == {'x': 0, 'y': rotation_y, 'z': 0}
     assert agent['shows'][0]['scale'] == {'x': 1, 'y': 1, 'z': 1}
     assert agent['agentMovement'] == {
@@ -925,7 +986,7 @@ def test_agent_pointing_walk_distance_custom_step():
         True
     )
     # Agent starts turned around
-    rotation_y = (rotation_y + 180) % 360
+    rotation_y = round(rotation_y + 180, 2) % 360
     assert agent['shows'][0]['rotation'] == {'x': 0, 'y': rotation_y, 'z': 0}
     assert agent['shows'][0]['scale'] == {'x': 1, 'y': 1, 'z': 1}
     assert agent['agentMovement'] == {

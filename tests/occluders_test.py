@@ -2,6 +2,7 @@ import pytest
 
 from generator.geometry import ObjectBounds
 from generator.materials import MaterialTuple
+from generator.objects import SceneObject
 from generator.occluders import (
     DEFAULT_INTUITIVE_PHYSICS_ROOM_DIMENSIONS,
     OCCLUDER_HEIGHT,
@@ -64,7 +65,7 @@ def verify_bounds(
 
 
 def verify_pole(
-    pole: dict,
+    pole: SceneObject,
     position_x: float,
     position_y: float = ((DEFAULT_ROOM_Y * 0.5) + (OCCLUDER_HEIGHT * 0.5)),
     position_z: float = 1,
@@ -115,7 +116,7 @@ def verify_pole(
         scale_z
     )
 
-    if(not move_down_only):
+    if (not move_down_only):
         assert len(pole['moves']) == (2 if no_last_step else 3)
         assert pole['moves'][0]['stepBegin'] == 1
         assert pole['moves'][0]['stepEnd'] == 6
@@ -134,7 +135,7 @@ def verify_pole(
 
 
 def verify_pole_sideways(
-    pole: dict,
+    pole: SceneObject,
     position_x: float,
     position_y: float = (OCCLUDER_HEIGHT * 0.5),
     position_z: float = 1,
@@ -186,7 +187,7 @@ def verify_pole_sideways(
             scale_z if rotation_y % 180 == 0 else (scale_y * 2)
         )
 
-    if(not move_down_only):
+    if (not move_down_only):
         assert len(pole['moves']) == (2 if no_last_step else 3)
         assert pole['moves'][0]['stepBegin'] == 1
         assert pole['moves'][0]['stepEnd'] == 6
@@ -205,7 +206,7 @@ def verify_pole_sideways(
 
 
 def verify_wall(
-    wall: dict,
+    wall: SceneObject,
     position_x: float,
     position_y: float = (OCCLUDER_HEIGHT * 0.5),
     position_z: float = 1,
@@ -222,7 +223,7 @@ def verify_wall(
     move_down_only: bool = False
 ):
 
-    if(move_down_only):
+    if (move_down_only):
         position_y = room_dim_y - (OCCLUDER_HEIGHT * 0.5)
         move_down_dist = (
             wall['shows'][0]['position']['y'] -
@@ -260,7 +261,7 @@ def verify_wall(
     move_2_step_end = move_2_step_begin + 5
     move_3_step_end = move_3_step_begin + 5
 
-    if(not move_down_only):
+    if (not move_down_only):
         assert len(wall['moves']) == (2 if no_last_step else 3)
         assert wall['moves'][0]['stepBegin'] == 1
         assert wall['moves'][0]['stepEnd'] == 6

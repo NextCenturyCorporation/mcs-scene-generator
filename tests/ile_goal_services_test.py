@@ -21,14 +21,14 @@ def test_attempt_goal_retrieval():
         )
     )
     GoalServices.attempt_to_add_goal(scene, goal_template)
-    assert scene.goal['category'] == 'retrieval'
-    assert scene.goal['description'] == 'Find and pick up the small light ' + \
+    assert scene.goal.category == 'retrieval'
+    assert scene.goal.description == 'Find and pick up the small light ' + \
         'black white rubber ball.'
-    assert scene.goal['metadata']['target']
-    assert scene.goal['metadata']['target']['id']
+    assert scene.goal.metadata['target']
+    assert scene.goal.metadata['target']['id']
     objs = scene.objects
     assert len(objs) == 1
-    assert objs[0]['id'] == scene.goal['metadata']['target']['id']
+    assert objs[0]['id'] == scene.goal.metadata['target']['id']
     assert objs[0]['type'] == 'soccer_ball'
     assert objs[0]['pickupable']
     assert objs[0]['moveable']
@@ -45,14 +45,14 @@ def test_attempt_goal_retrieval_ignore_num():
         target=InteractableObjectConfig(num=2, scale=1.5, shape='soccer_ball')
     )
     GoalServices.attempt_to_add_goal(scene, goal_template)
-    assert scene.goal['category'] == 'retrieval'
-    assert scene.goal['description'] == 'Find and pick up the small light ' + \
+    assert scene.goal.category == 'retrieval'
+    assert scene.goal.description == 'Find and pick up the small light ' + \
         'black white rubber ball.'
-    assert scene.goal['metadata']['target']
-    assert scene.goal['metadata']['target']['id']
+    assert scene.goal.metadata['target']
+    assert scene.goal.metadata['target']['id']
     objs = scene.objects
     assert len(objs) == 1
-    assert objs[0]['id'] == scene.goal['metadata']['target']['id']
+    assert objs[0]['id'] == scene.goal.metadata['target']['id']
     assert objs[0]['type'] == 'soccer_ball'
 
 
@@ -62,14 +62,14 @@ def test_attempt_goal_retrieval_no_category():
         target=InteractableObjectConfig(scale=1, shape='soccer_ball')
     )
     GoalServices.attempt_to_add_goal(scene, goal_template)
-    assert scene.goal['category'] == 'retrieval'
-    assert scene.goal['description'] == 'Find and pick up the tiny light ' + \
+    assert scene.goal.category == 'retrieval'
+    assert scene.goal.description == 'Find and pick up the tiny light ' + \
         'black white rubber ball.'
-    assert scene.goal['metadata']['target']
-    assert scene.goal['metadata']['target']['id']
+    assert scene.goal.metadata['target']
+    assert scene.goal.metadata['target']['id']
     objs = scene.objects
     assert len(objs) == 1
-    assert objs[0]['id'] == scene.goal['metadata']['target']['id']
+    assert objs[0]['id'] == scene.goal.metadata['target']['id']
     assert objs[0]['type'] == 'soccer_ball'
 
 
@@ -82,14 +82,14 @@ def test_attempt_goal_multi_retrieval():
         ]
     )
     GoalServices.attempt_to_add_goal(scene, goal_template)
-    assert scene.goal['category'] == 'multi retrieval'
-    assert scene.goal['description'] == 'Find and pick up as many objects ' + \
+    assert scene.goal.category == 'multi retrieval'
+    assert scene.goal.description == 'Find and pick up as many objects ' + \
         'as possible of type: tiny light black white rubber ball.'
-    assert len(scene.goal['metadata']['targets']) == 1
-    assert scene.goal['metadata']['targets'][0]['id']
+    assert len(scene.goal.metadata['targets']) == 1
+    assert scene.goal.metadata['targets'][0]['id']
     objs = scene.objects
     assert len(objs) == 1
-    assert objs[0]['id'] == scene.goal['metadata']['targets'][0]['id']
+    assert objs[0]['id'] == scene.goal.metadata['targets'][0]['id']
     assert objs[0]['type'] == 'soccer_ball'
 
 
@@ -102,17 +102,17 @@ def test_attempt_goal_multi_retrieval_with_num():
         ]
     )
     GoalServices.attempt_to_add_goal(scene, goal_template)
-    assert scene.goal['category'] == 'multi retrieval'
-    assert scene.goal['description'] == 'Find and pick up as many objects ' + \
+    assert scene.goal.category == 'multi retrieval'
+    assert scene.goal.description == 'Find and pick up as many objects ' + \
         'as possible of type: tiny light black white rubber ball.'
-    assert len(scene.goal['metadata']['targets']) == 2
-    assert scene.goal['metadata']['targets'][0]['id']
-    assert scene.goal['metadata']['targets'][1]['id']
+    assert len(scene.goal.metadata['targets']) == 2
+    assert scene.goal.metadata['targets'][0]['id']
+    assert scene.goal.metadata['targets'][1]['id']
     objs = scene.objects
     assert len(objs) == 2
-    assert objs[0]['id'] == scene.goal['metadata']['targets'][0]['id']
+    assert objs[0]['id'] == scene.goal.metadata['targets'][0]['id']
     assert objs[0]['type'] == 'soccer_ball'
-    assert objs[1]['id'] == scene.goal['metadata']['targets'][1]['id']
+    assert objs[1]['id'] == scene.goal.metadata['targets'][1]['id']
     assert objs[1]['type'] == 'soccer_ball'
 
 
@@ -131,23 +131,23 @@ def test_attempt_goal_multi_retrieval_multiple_shapes():
         ]
     )
     GoalServices.attempt_to_add_goal(scene, goal_template)
-    assert scene.goal['category'] == 'multi retrieval'
-    assert scene.goal['description'] == 'Find and pick up as many objects ' + \
+    assert scene.goal.category == 'multi retrieval'
+    assert scene.goal.description == 'Find and pick up as many objects ' + \
         'as possible of type: small light black white rubber ball; ' + \
         'and tiny light grey metal trophy.'
-    assert len(scene.goal['metadata']['targets']) == 3
-    assert scene.goal['metadata']['targets'][0]['id']
-    assert scene.goal['metadata']['targets'][1]['id']
-    assert scene.goal['metadata']['targets'][2]['id']
+    assert len(scene.goal.metadata['targets']) == 3
+    assert scene.goal.metadata['targets'][0]['id']
+    assert scene.goal.metadata['targets'][1]['id']
+    assert scene.goal.metadata['targets'][2]['id']
     objs = scene.objects
     assert len(objs) == 3
-    assert objs[0]['id'] == scene.goal['metadata']['targets'][0]['id']
+    assert objs[0]['id'] == scene.goal.metadata['targets'][0]['id']
     assert objs[0]['type'] == 'soccer_ball'
-    assert objs[1]['id'] == scene.goal['metadata']['targets'][1]['id']
+    assert objs[1]['id'] == scene.goal.metadata['targets'][1]['id']
     assert objs[1]['id'] != objs[0]['id']
     assert objs[1]['type'] == 'soccer_ball'
     assert objs[1]['shows'][0]['scale'] == objs[0]['shows'][0]['scale']
-    assert objs[2]['id'] == scene.goal['metadata']['targets'][2]['id']
+    assert objs[2]['id'] == scene.goal.metadata['targets'][2]['id']
     assert objs[2]['type'] == 'trophy'
     assert objs[2]['id'] != objs[0]['id']
     assert objs[2]['id'] != objs[1]['id']

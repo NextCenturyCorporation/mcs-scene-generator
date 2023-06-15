@@ -2,30 +2,31 @@ from __future__ import annotations
 
 import copy
 import logging
+import math
 import random
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum, auto
 from typing import Any, Dict, List, Optional, Tuple, Union
 
-from machine_common_sense.config_manager import Vector3d
+from machine_common_sense.config_manager import Vector2dInt, Vector3d
 
-from generator import MAX_TRIES, geometry
-from generator.scene import Scene
-from ideal_learning_env.numerics import MinMaxInt
-from ideal_learning_env.object_services import (
-    InstanceDefinitionLocationTuple,
-    ObjectRepository,
-    RelativePositionConfig,
-    reconcile_template
-)
+from generator import MAX_TRIES, Scene, SceneObject, geometry
 
 from .choosers import choose_random
 from .defs import (
     ILEConfigurationException,
     ILEDelayException,
     ILEException,
+    RandomizableString,
     return_list
+)
+from .numerics import RandomizableInt
+from .object_services import (
+    InstanceDefinitionLocationTuple,
+    ObjectRepository,
+    RelativePositionConfig,
+    reconcile_template
 )
 
 logger = logging.getLogger(__name__)
@@ -49,6 +50,7 @@ class FeatureTypes(Enum):
     TOOLS = auto()
     INTERACTABLE = auto()
     AGENT = auto()
+    TUBE_OCCLUDERS = auto()
     TURNTABLES = auto()
     # Should be the same as the TARGET_LABEL
     TARGET = auto()
@@ -57,8 +59,8 @@ class FeatureTypes(Enum):
 @dataclass
 class BaseFeatureConfig():
     """Base class that should used for all structural objects."""
-    num: Union[int, MinMaxInt, List[Union[int, MinMaxInt]]] = 1
-    labels: Union[str, List[str]] = None
+    num: RandomizableInt = 1
+    labels: RandomizableString = None
     randomize_once: Dict = None
 
 
@@ -164,7 +166,7 @@ class BaseObjectCreationService(ABC):
     def _on_valid_instances(
             self, scene: Scene,
             reconciled_template: BaseFeatureConfig,
-            new_obj: dict, key: str = 'objects'):
+            new_obj: SceneObject, key: str = 'objects'):
         if new_obj is not None:
             for obj in new_obj:
                 key_list = getattr(scene, key)
@@ -230,7 +232,7 @@ class BaseObjectCreationService(ABC):
                 } for single_bounds in bounds]
                 logger.trace(
                     f'Failed validating location of {self._get_type()} on'
-                    f' try {try_num + 1} of {retries}.'
+                    f' try {try_num} of {retries}.'
                     f'\nEXISTING BOUNDS = {debug_bounds}'
                     f'\nFAILED OBJECT = {new_obj}'
                     f'\nROOM DIMENSIONS = {scene.room_dimensions}'
@@ -238,14 +240,14 @@ class BaseObjectCreationService(ABC):
             else:
                 logger.debug(
                     f'Failed validating location of {self._get_type()} on'
-                    f' try {try_num + 1} of {retries}.'
+                    f' try {try_num} of {retries}.'
                 )
             new_obj = None
         return valid
 
 
 def save_to_object_repository(
-    obj_or_idl: Union[Dict[str, Any], InstanceDefinitionLocationTuple],
+    obj_or_idl: Union[SceneObject, InstanceDefinitionLocationTuple],
     structural_type: FeatureTypes,
     labels: List[str]
 ) -> None:
@@ -280,7 +282,7 @@ def save_to_object_repository(
 
 
 def validate_all_locations_and_update_bounds(
-    objects: Union[list, dict],
+    objects: Union[SceneObject, List[SceneObject]],
     scene: Scene,
     bounds: List[geometry.ObjectBounds]
 ) -> bool:
@@ -392,3 +394,32 @@ def position_relative_to(
             )
 
     return position_x, position_z
+
+
+def validate_floor_position(
+        scene: Scene, floor_pos: Vector2dInt, key, restrict_under_user,
+        bounds):
+    room_dim = scene.room_dimensions
+    x = floor_pos.x
+    z = floor_pos.z
+    perf_x = round(scene.performer_start.position.x)
+    perf_z = round(scene.performer_start.position.z)
+    xmax = math.floor(room_dim.x / 2)
+    zmax = math.floor(room_dim.z / 2)
+    valid = not (x < -xmax or x > xmax or z < -zmax or z > zmax)
+    bb = geometry.generate_floor_area_bounds(x, z)
+    # It is expected that some holes/lava will extend beyond the walls, so we
+    # extend the room bounds.
+    room_dim_extended = Vector3d(
+        x=scene.room_dimensions.x + 1,
+        y=scene.room_dimensions.y,
+        z=scene.room_dimensions.z + 1)
+    valid = valid and geometry.validate_location_rect(
+        bb,
+        vars(scene.performer_start.position),
+        bounds,
+        vars(room_dim_extended))
+    valid = valid and floor_pos not in getattr(scene, key, '')
+    restricted = restrict_under_user and x == perf_x and z == perf_z
+    valid = valid and not restricted
+    return valid, bb

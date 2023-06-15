@@ -3,7 +3,7 @@ import random
 from dataclasses import dataclass
 from typing import Any, Dict, List, Tuple, Union
 
-from generator import ObjectBounds, Scene, tags
+from generator import ObjectBounds, Scene, SceneObject, tags
 
 from .choosers import choose_random
 from .defs import ILEConfigurationException, find_bounds, return_list
@@ -117,7 +117,7 @@ class GoalServices:
         scene: Scene,
         goal_template: GoalConfig,
         bounds_list: List[ObjectBounds]
-    ) -> Tuple[Dict[str, Any], List[Dict[str, Any]]]:
+    ) -> Tuple[Dict[str, Any], List[SceneObject]]:
         if not goal_template:
             return None, []
 
@@ -189,7 +189,7 @@ class GoalServices:
         scene: Scene,
         goal_template: GoalConfig,
         bounds_list: List[ObjectBounds] = None
-    ) -> List[Dict[str, Any]]:
+    ) -> List[SceneObject]:
         """Attempt to add the given goal to the scene. The goal_template must
         NOT have randomness resolved (a.k.a. be reconciled) before calling this
         function. Returns the list of target objects."""
@@ -199,11 +199,11 @@ class GoalServices:
         goal_data, target_list = GoalServices._generate_goal_data(
             scene, goal_template, bounds_list)
         if goal_data:
-            scene.goal['category'] = goal_data['category']
-            scene.goal['description'] = goal_data['description']
-            scene.goal['metadata'] = goal_data['metadata']
+            scene.goal.category = goal_data['category']
+            scene.goal.description = goal_data['description']
+            scene.goal.metadata = goal_data['metadata']
             logger.trace(
-                f'Setting {scene.goal["category"]} goal with '
+                f'Setting {scene.goal.category} goal with '
                 f'{len(target_list)} target(s): {scene.goal}'
             )
         return target_list
@@ -211,7 +211,7 @@ class GoalServices:
     @staticmethod
     def make_goal_description(
         goal_category: str,
-        target_list: List[Dict[str, Any]]
+        target_list: List[SceneObject]
     ) -> str:
         """Return the goal description for the given goal category and target
         list."""

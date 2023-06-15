@@ -3,12 +3,7 @@ import copy
 import pytest
 from machine_common_sense.config_manager import Vector3d
 
-from generator import (
-    DefinitionDataset,
-    ObjectDefinition,
-    base_objects,
-    specific_objects
-)
+from generator import ObjectDefinition, base_objects, specific_objects
 from generator.definitions import (
     create_dataset,
     do_materials_match,
@@ -19,22 +14,17 @@ from generator.definitions import (
 )
 
 DATASET = specific_objects.get_interactable_definition_dataset(unshuffled=True)
-ALL_DEFINITIONS = [
-    # Just use a few variations (colors) of each object for faster testing.
-    definition_variations[:2]
-    for definition_selections in DATASET._definition_groups
-    for definition_variations in definition_selections
-]
-# Reassign the dataset to use the filtered definition list for faster testing.
-DATASET = DefinitionDataset([ALL_DEFINITIONS])
+DATASET = DATASET.dataset_unique_shape_scale(keep=2)
 DEFINITIONS = DATASET.definitions(unshuffled=True)
 
 
 # TODO MCS-1012 Add new shapes/textures that are similar to these objects.
 SIMILARITY_EXCEPTIONS = [
-    'sofa_4', 'sofa_5', 'sofa_6', 'sofa_7', 'sofa_8', 'sofa_9',
-    'sofa_chair_4', 'sofa_chair_5', 'sofa_chair_6', 'sofa_chair_7',
-    'sofa_chair_8', 'sofa_chair_9', 'skateboard', 'antique_armchair_1'
+    'sofa_4', 'sofa_5', 'sofa_6', 'sofa_7', 'sofa_8', 'sofa_9', 'sofa_11',
+    'sofa_12', 'sofa_chair_4', 'sofa_chair_5', 'sofa_chair_6', 'sofa_chair_7',
+    'sofa_chair_8', 'sofa_chair_9', 'skateboard', 'antique_armchair_1',
+    'antique_armchair_2', 'antique_armchair_3', 'antique_chair_2',
+    'antique_chair_3'
 ]
 
 

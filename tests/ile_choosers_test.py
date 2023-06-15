@@ -555,7 +555,7 @@ def test_choose_shape_material_neither_none_non_restricted():
     shape, mat = choose_shape_material(shape_input, mat_input)
     assert shape == "sphere"
     assert mat.material == "AI2-THOR/Materials/Fabrics/Carpet2"
-    assert mat.color == ["brown"]
+    assert mat.color == ["brown", "grey"]
 
 
 def test_choose_shape_material_neither_none_non_restricted_category():
@@ -668,7 +668,7 @@ def test_choose_shape_material_neither_none_non_restricted_with_prohibited():
     shape, mat = choose_shape_material(shape_input, mat_input, prohibited)
     assert shape == "sphere"
     assert mat.material == "AI2-THOR/Materials/Fabrics/Carpet2"
-    assert mat.color == ["brown"]
+    assert mat.color == ["brown", "grey"]
 
 
 def test_choose_shape_material_prohibited_colors():
@@ -696,14 +696,14 @@ def test_choose_shape_material_category_prohibited_colors():
 
 
 def test_choose_shape_material_no_shape_or_material_with_excluded_colors():
-    ILESharedConfiguration.get_instance().set_excluded_colors(['brown'])
+    ILESharedConfiguration.get_instance().set_excluded_colors(['white'])
     # Really just make sure this does not throw an error
     shape, mat = choose_shape_material(None, None)
     assert shape
     # Some shapes do not have an assigned material
     if mat:
         assert mat.material
-        assert 'brown' not in mat.color
+        assert 'white' not in mat.color
 
 
 def test_choose_shape_material_with_excluded_colors():
@@ -793,7 +793,7 @@ def test_choose_shape_material_with_excluded_colors_override():
     shape, mat = choose_shape_material(shape_input, mat_input)
     assert shape == 'sphere'
     assert mat.material == 'Custom/Materials/BrownWoodMCS'
-    assert mat.color == ['brown']
+    assert mat.color == ['brown', 'orange']
 
 
 def test_choose_shape_material_no_shape_with_excluded_colors_override():
@@ -802,4 +802,4 @@ def test_choose_shape_material_no_shape_with_excluded_colors_override():
     shape, mat = choose_shape_material(None, mat_input)
     assert shape
     assert mat.material == 'Custom/Materials/BrownWoodMCS'
-    assert mat.color == ['brown']
+    assert mat.color == ['brown', 'orange']

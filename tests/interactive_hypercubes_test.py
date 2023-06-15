@@ -1,3 +1,4 @@
+import math
 import os
 
 import pytest
@@ -11,6 +12,7 @@ from hypercube import (
     InteractiveOccluderEvaluationHypercubeFactory,
     InteractiveSingleSceneFactory
 )
+from hypercube.interactive_hypercubes import ROOM_SIZE_XZ_MAX
 from tests.interactive_hypercube_test_util import (
     STARTER_SCENE,
     map_id_to_scene,
@@ -165,7 +167,8 @@ def verify_immediately_visible(
         if 'locationParent' in target else target
     target_poly = geometry.get_bounding_polygon(target_or_parent)
 
-    view_line = shapely.geometry.LineString([[0, 0], [0, 10]])
+    max_diagonal = int(math.sqrt(2 * (ROOM_SIZE_XZ_MAX**2)) + 1)
+    view_line = shapely.geometry.LineString([[0, 0], [0, max_diagonal]])
     view_line = affinity.rotate(
         view_line,
         -performer_start['rotation']['y'],
@@ -415,15 +418,15 @@ def verify_object_list(scene, index, tag, object_list):
 
         # Verify object instance info is in goal info.
         for info in expected['debug']['info']:
-            if info not in scene.goal['objectsInfo']['all']:
+            if info not in scene.goal.objects_info['all']:
                 return False
             if info != tag:
-                if info not in scene.goal['objectsInfo'][tag]:
+                if info not in scene.goal.objects_info[tag]:
                     return False
 
-    if scene.goal['sceneInfo']['count'][tag] != len(object_list):
+    if scene.goal.scene_info['count'][tag] != len(object_list):
         return False
-    if scene.goal['sceneInfo']['present'][tag] != (len(object_list) > 0):
+    if scene.goal.scene_info['present'][tag] != (len(object_list) > 0):
         return False
     return True
 
@@ -470,15 +473,15 @@ def verify_object_data_list(scene, index, tag, object_data_list, ignore_list):
 
         # Verify object instance info is in goal info.
         for info in expected['debug']['info']:
-            if info not in scene.goal['objectsInfo']['all']:
+            if info not in scene.goal.objects_info['all']:
                 return False
             if info != tag:
-                if info not in scene.goal['objectsInfo'][tag]:
+                if info not in scene.goal.objects_info[tag]:
                     return False
 
-    if scene.goal['sceneInfo']['count'][tag] != count:
+    if scene.goal.scene_info['count'][tag] != count:
         return False
-    if scene.goal['sceneInfo']['present'][tag] != (count > 0):
+    if scene.goal.scene_info['present'][tag] != (count > 0):
         return False
     return True
 
@@ -599,12 +602,9 @@ def verify_scene_properties(
         slice_count = 0
     verify_scene(scene, task, slice_count)
 
-    assert 10 <= scene.room_dimensions.x <= 15
+    assert 10 <= scene.room_dimensions.x <= ROOM_SIZE_XZ_MAX
     assert 3 <= scene.room_dimensions.y <= 5
-    assert 10 <= scene.room_dimensions.z <= 15
-
-    # Floor should not have distracting patterns.
-    assert len(scene.debug['floorColors']) == 1
+    assert 10 <= scene.room_dimensions.z <= ROOM_SIZE_XZ_MAX
 
     # Floor should not have the same color as critical (non-context) objects.
     for role in [
@@ -740,15 +740,15 @@ def verify_scene_properties(
                 performer_start
             )
 
-    assert scene.goal['category'] == tags.tag_to_label(tags.SCENE.RETRIEVAL)
-    assert scene.goal['description']
-    assert scene.goal['last_step'] >= 2500
-    assert scene.goal['sceneInfo']['id']
-    assert 'slices' in scene.goal['sceneInfo']
+    assert scene.goal.category == tags.tag_to_label(tags.SCENE.RETRIEVAL)
+    assert scene.goal.description
+    assert scene.goal.last_step >= 2500
+    assert scene.goal.scene_info['id']
+    assert 'slices' in scene.goal.scene_info
 
-    target_metadata = scene.goal['metadata'].get(
+    target_metadata = scene.goal.metadata.get(
         'target',
-        scene.goal['metadata'].get('target_1')
+        scene.goal.metadata.get('target_1')
     )
 
     assert target_metadata['id'] == (
@@ -817,16 +817,13 @@ def verify_target_trophy(tag, instance):
 def test_single_scene():
     hypercube_factory = InteractiveSingleSceneFactory(RetrievalGoal(''))
     hypercube = hypercube_factory._build(STARTER_SCENE)
-
+    scenes = hypercube.generate_scenes()
+    assert len(scenes) == 1
     assert len(hypercube._data['large_container']) == 0
     assert len(hypercube._data['small_container']) == 0
     assert len(hypercube._data['obstacle']) == 0
     assert len(hypercube._data['occluder']) == 0
-
     assert 0 <= len(hypercube._small_context_object_list) <= 10
-
-    scenes = hypercube.get_scenes()
-    assert len(scenes) == 1
     assert verify_scene_properties(hypercube, scenes[0], 0)
 
 
@@ -835,6 +832,7 @@ def test_eval_4_container_hypercube():
         RetrievalGoal('container')
     )
     hypercube = hypercube_factory._build(STARTER_SCENE)
+    scene_dict = map_id_to_scene(hypercube.generate_scenes())
 
     assert len(hypercube._data['large_container']) == 3
     assert len(hypercube._data['small_container']) == 0
@@ -860,7 +858,6 @@ def test_eval_4_container_hypercube():
         large_container_data_3
     ], large_container_data_1)
 
-    scene_dict = map_id_to_scene(hypercube.get_scenes())
     base_filename = save_scene_debug_files(scene_dict, 'container')
 
     for i in ['a', 'd', 'g', 'j', 'm', 'p']:
@@ -915,8 +912,8 @@ def test_eval_4_container_hypercube():
                     hypercube._target_data.instance_list[index],
                     target
                 )
-                assert scene.goal['sceneInfo']['contained']['target']
-                assert not scene.goal['sceneInfo']['uncontained']['target']
+                assert scene.goal.scene_info['contained']['target']
+                assert not scene.goal.scene_info['uncontained']['target']
 
             # Verify target is close to 1st large container.
             if i in ['d', 'e', 'f', 'j', 'k', 'l', 'p', 'q', 'r']:
@@ -937,8 +934,8 @@ def test_eval_4_container_hypercube():
                     hypercube._target_data.instance_list[index],
                     target
                 )
-                assert not scene.goal['sceneInfo']['contained']['target']
-                assert scene.goal['sceneInfo']['uncontained']['target']
+                assert not scene.goal.scene_info['contained']['target']
+                assert scene.goal.scene_info['uncontained']['target']
 
             # Verify large container 2 location same across all scenes.
             if i in [
@@ -1013,6 +1010,7 @@ def test_obstacle_hypercube():
         RetrievalGoal('obstacle')
     )
     hypercube = hypercube_factory._build(STARTER_SCENE)
+    scene_dict = map_id_to_scene(hypercube.generate_scenes())
 
     assert len(hypercube._data['obstacle']) == 1
 
@@ -1033,7 +1031,6 @@ def test_obstacle_hypercube():
         target_data, obstacle_data_1
     ])
 
-    scene_dict = map_id_to_scene(hypercube.get_scenes())
     base_filename = save_scene_debug_files(scene_dict, 'obstacle')
 
     for i in ['a', 'b', 'c', 'd']:
@@ -1153,6 +1150,7 @@ def test_occluder_hypercube():
         RetrievalGoal('occluder')
     )
     hypercube = hypercube_factory._build(STARTER_SCENE)
+    scene_dict = map_id_to_scene(hypercube.generate_scenes())
 
     assert len(hypercube._data['occluder']) == 3
 
@@ -1177,7 +1175,6 @@ def test_occluder_hypercube():
         target_data, occluder_data_1, occluder_data_2, occluder_data_3
     ])
 
-    scene_dict = map_id_to_scene(hypercube.get_scenes())
     base_filename = save_scene_debug_files(scene_dict, 'occluder')
 
     for i in ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l']:

@@ -4,12 +4,7 @@ import pytest
 import shapely
 from machine_common_sense.config_manager import Vector3d
 
-from generator import (
-    DefinitionDataset,
-    ObjectBounds,
-    geometry,
-    specific_objects
-)
+from generator import ObjectBounds, geometry, specific_objects
 from generator.base_objects import create_soccer_ball
 from generator.geometry import calculate_rotations, rotate_point_around_origin
 from generator.instances import instantiate_object
@@ -22,17 +17,8 @@ DEFAULT_ROOM_Z_MIN = -DEFAULT_ROOM_Z_MAX
 
 
 DATASET = specific_objects.get_interactable_definition_dataset(unshuffled=True)
-ALL_DEFINITIONS = [
-    # Just use the first variation (color) of each object for faster testing.
-    definition_variations[0]
-    for definition_selections in DATASET._definition_groups
-    for definition_variations in definition_selections
-]
-# Reassign the dataset to just have one variation (color) for faster testing.
-DATASET = DefinitionDataset([
-    [[variations[0]] for variations in selections]
-    for selections in DATASET._definition_groups
-])
+DATASET = DATASET.dataset_unique_shape_scale()
+ALL_DEFINITIONS = DATASET.definitions(unshuffled=True)
 
 
 # Use the sofa because it should obstruct any pickupable object.
@@ -3306,6 +3292,40 @@ def test_get_along_wall_xz_fail():
         geometry.get_along_wall_xz(wall_label, room_dimensions, dimensions)
 
 
+def test_get_adjacent_to_corner_xz():
+    room_dimensions = {'x': 10, 'y': 3, 'z': 30}
+    dimensions = {'x': 0.4, 'y': 1, 'z': 0.6}
+    corner_label = "front_left"
+    x, z = geometry.get_adjacent_to_corner_xz(
+        corner_label, room_dimensions, dimensions)
+    assert z == 14.7
+    assert x == -4.8
+    corner_label = "front_right"
+    x, z = geometry.get_adjacent_to_corner_xz(
+        corner_label, room_dimensions, dimensions)
+    assert z == 14.7
+    assert x == 4.8
+    corner_label = "back_left"
+    x, z = geometry.get_adjacent_to_corner_xz(
+        corner_label, room_dimensions, dimensions)
+    assert z == -14.7
+    assert x == -4.8
+    corner_label = "back_right"
+    x, z = geometry.get_adjacent_to_corner_xz(
+        corner_label, room_dimensions, dimensions)
+    assert z == -14.7
+    assert x == 4.8
+
+
+def test_get_adjacent_to_corner_xz_fail():
+    room_dimensions = {'x': 10, 'y': 3, 'z': 30}
+    dimensions = {'x': 0.4, 'y': 1, 'z': 0.6}
+    corner_label = "invalid"
+    with pytest.raises(Exception):
+        geometry.get_adjacent_to_corner_xz(
+            corner_label, room_dimensions, dimensions)
+
+
 def test_calculate_rotations_no_rounding():
     v1 = Vector3d(x=0, y=0, z=0)
     result = calculate_rotations(v1, Vector3d(x=0, y=0, z=1), True)
@@ -3882,3 +3902,119 @@ def test_rotate_point_around_origin():
         assert x == x_points[index]
         assert z == z_points[index]
         index += 1
+
+
+def test_nearby_equidistant_locations():
+    x, z = geometry._nearby_equidistant_locations_helper(
+        x_1=-1,
+        z_1=3,
+        start_x=-1,
+        start_z=1,
+        x_min=-5,
+        x_max=5,
+        z_min=1,
+        z_max=5
+    )
+    assert (x, z) == (0.3858, 2.426) or (x, z) == (-2.3858, 2.426)
+
+    x, z = geometry._nearby_equidistant_locations_helper(
+        x_1=2,
+        z_1=1,
+        start_x=-1,
+        start_z=1,
+        x_min=-1,
+        x_max=5,
+        z_min=-5,
+        z_max=5
+    )
+    assert (x, z) == (1.5646, -0.4354) or (x, z) == (1.5646, 2.4354)
+
+    x, z = geometry._nearby_equidistant_locations_helper(
+        x_1=-1,
+        z_1=-4,
+        start_x=-1,
+        start_z=1,
+        x_min=-5,
+        x_max=5,
+        z_min=-5,
+        z_max=1
+    )
+    assert (x, z) == (-2.4712, -3.7074) or (x, z) == (0.4712, -3.7074)
+
+    x, z = geometry._nearby_equidistant_locations_helper(
+        x_1=-3,
+        z_1=1,
+        start_x=-1,
+        start_z=1,
+        x_min=-5,
+        x_max=-1,
+        z_min=-5,
+        z_max=5
+    )
+    assert (x, z) == (-2.426, -0.3858) or (x, z) == (-2.426, 2.3858)
+
+
+def test_nearby_equidistant_locations_exception():
+    with pytest.raises(Exception):
+        geometry.nearby_equidistant_locations(
+            start_x=-1,
+            start_z=1,
+            x_min=-1,
+            x_max=-1,
+            z_min=2,
+            z_max=2
+        )
+
+
+def test_calculate_aligned_position():
+    # Test rotations
+    x, z = geometry.calculate_aligned_position(0, 0, 0, 5, 3, 2)
+    assert (x, z) == (0, -6)
+    x, z = geometry.calculate_aligned_position(0, 0, 45, 5, 3, 2)
+    assert (x, z) == (-4.2426, -4.2426)
+    x, z = geometry.calculate_aligned_position(0, 0, 90, 5, 3, 2)
+    assert (x, z) == (-6, 0)
+    x, z = geometry.calculate_aligned_position(0, 0, 180, 5, 3, 2)
+    assert (x, z) == (0, 6)
+    x, z = geometry.calculate_aligned_position(0, 0, 270, 5, 3, 2)
+    assert (x, z) == (6, 0)
+
+    # Test sizes
+    x, z = geometry.calculate_aligned_position(0, 0, 0, 1, 0.5, 2)
+    assert (x, z) == (0, -2.75)
+    x, z = geometry.calculate_aligned_position(0, 0, 45, 1, 0.5, 2)
+    assert (x, z) == (-1.9445, -1.9445)
+
+    # Test positions
+    x, z = geometry.calculate_aligned_position(-1, -2, 0, 5, 3, 2)
+    assert (x, z) == (-1, -8)
+    x, z = geometry.calculate_aligned_position(-1, -2, 45, 5, 3, 2)
+    assert (x, z) == (-5.2426, -6.2426)
+
+    # Test X axis
+    x, z = geometry.calculate_aligned_position(0, 0, 0, 5, 3, 2, 'x')
+    assert (x, z) == (-6, 0)
+
+    # Test X offset
+    x, z = geometry.calculate_aligned_position(0, 0, 0, 5, 3, 2, offset_x=1)
+    assert (x, z) == (1, -6)
+    x, z = geometry.calculate_aligned_position(0, 0, 45, 5, 3, 2, offset_x=1)
+    assert (x, z) == (-3.5355, -4.9497)
+    x, z = geometry.calculate_aligned_position(0, 0, 90, 5, 3, 2, offset_x=1)
+    assert (x, z) == (-6, -1)
+    x, z = geometry.calculate_aligned_position(0, 0, 180, 5, 3, 2, offset_x=1)
+    assert (x, z) == (-1, 6)
+    x, z = geometry.calculate_aligned_position(0, 0, 270, 5, 3, 2, offset_x=1)
+    assert (x, z) == (6, 1)
+
+    # Test Z offset
+    x, z = geometry.calculate_aligned_position(0, 0, 0, 5, 3, 2, offset_z=1)
+    assert (x, z) == (0, -5)
+    x, z = geometry.calculate_aligned_position(0, 0, 45, 5, 3, 2, offset_z=1)
+    assert (x, z) == (-3.5355, -3.5355)
+    x, z = geometry.calculate_aligned_position(0, 0, 90, 5, 3, 2, offset_z=1)
+    assert (x, z) == (-5, 0)
+    x, z = geometry.calculate_aligned_position(0, 0, 180, 5, 3, 2, offset_z=1)
+    assert (x, z) == (0, 5)
+    x, z = geometry.calculate_aligned_position(0, 0, 270, 5, 3, 2, offset_z=1)
+    assert (x, z) == (5, 0)

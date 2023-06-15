@@ -3,11 +3,13 @@ import json
 import logging
 import os
 import random
-from typing import Any, Callable, Dict, List
+from typing import Callable, Dict, List
 
-from generator import Scene, SceneException, tags
+from machine_common_sense.config_manager import Goal
 
-from .agent_scene_pair_json_converter import convert_scene_pair
+from generator import Scene, tags
+
+from .agent_scene_pair_json_converter import OccluderMode, convert_scene_pair
 from .hypercubes import Hypercube, HypercubeFactory
 
 logger = logging.getLogger(__name__)
@@ -21,11 +23,13 @@ class AgentHypercube(Hypercube):
         task_type: str,
         role_to_type: Dict[str, str],
         training=False,
-        untrained=False
+        untrained=False,
+        occluder_mode=None
     ) -> None:
         self._filename_prefix = filename_prefix
         self._role_to_type = role_to_type
         self._untrained = untrained
+        self._occluder_mode = occluder_mode
         super().__init__(
             task_type,
             starter_scene,
@@ -37,7 +41,7 @@ class AgentHypercube(Hypercube):
     def _create_scenes(
         self,
         starter_scene: Scene,
-        goal_template: Dict[str, Any]
+        goal_template: Goal
     ) -> List[Scene]:
         # Each JSON filename will have a suffix of either 'e.json' or 'u.json'
         json_filename = {
@@ -77,19 +81,25 @@ class AgentHypercube(Hypercube):
             json_data['unexpected'],
             self._filename_prefix,
             self._role_to_type,
-            self._untrained
+            self._untrained,
+            occluder_mode=self._occluder_mode
         )
 
         # Remember a training hypercube will only have its expected scene.
-        scenes[0].goal['sceneInfo'][tags.SCENE.ID] = [os.path.splitext(
+        scenes[0].goal.scene_info[tags.SCENE.ID] = [os.path.splitext(
             os.path.basename(json_filename['expected'])
         )[0]]
         if len(scenes) > 1:
-            scenes[1].goal['sceneInfo'][tags.SCENE.ID] = [os.path.splitext(
+            scenes[1].goal.scene_info[tags.SCENE.ID] = [os.path.splitext(
                 os.path.basename(json_filename['unexpected'])
             )[0]]
 
         return scenes
+
+    # Override
+    def get_info(self) -> str:
+        """Return unique hypercube info. Can override as needed."""
+        return self._filename_prefix
 
     # Override
     def _get_slices(self) -> List[str]:
@@ -114,6 +124,7 @@ class AgentHypercubeFactory(HypercubeFactory):
         self._folder_name = folder_name
         self._task_type = task_type
         self._untrained = False
+        self._occluder_mode = OccluderMode.NONE
 
     # Override
     def _build(self, starter_scene: Scene) -> Hypercube:
@@ -124,13 +135,15 @@ class AgentHypercubeFactory(HypercubeFactory):
             self.role_to_type,
             self.training,
             # Must use only untrained shapes in 50% of scenes.
-            untrained=self._untrained
+            untrained=self._untrained,
+            # For the agent/non-agent scenes.
+            occluder_mode=self._occluder_mode
         )
 
     # Override
-    def build(
+    def generate_hypercubes(
         self,
-        total: str,
+        total: int,
         starter_scene_function: Callable[[], Scene],
         role_to_type: Dict[str, str],
         throw_error=False,
@@ -143,6 +156,19 @@ class AgentHypercubeFactory(HypercubeFactory):
         # in the folder associated with this factory, or up to the given total.
         hypercubes = []
 
+        if self.training:
+            logger.info(
+                'Agent hypercube factory set to generate training scenes; '
+                'only "expected" JSON scene files are required (ending with '
+                '"e.json")'
+            )
+        else:
+            logger.info(
+                'Agent hypercube factory set to generate evaluation scenes; '
+                'both "expected" and "unexpected" JSON scene files are '
+                'required (ending with "e.json" or "u.json" respectively)'
+            )
+
         prefix_to_number = {}
         # Each JSON filename will have a suffix of either 'e.json' or 'u.json'
         for suffix in ['e.json', 'u.json']:
@@ -154,7 +180,7 @@ class AgentHypercubeFactory(HypercubeFactory):
 
         logger.info(
             f'Agent hypercube factory found {len(prefix_to_number.items())} '
-            f'pairs of scene JSON files in {self._folder_name}'
+            f'sets of scene JSON files in {self._folder_name}'
         )
 
         # Randomize (or sort, for testing) the order of the files.
@@ -166,55 +192,46 @@ class AgentHypercubeFactory(HypercubeFactory):
 
         # Generate one hypercube per valid pair of files.
         count = 0
-        failed_filename_list = []
         for prefix, number in randomized_prefix_to_number:
             if (not self.training) and (number < 2):
                 logger.warn(
-                    f'[NOTE] Agent hypercube factory found only one scene '
+                    f'Agent hypercube factory found only one scene '
                     f'JSON file in {self._folder_name} but expected two '
                     f'named {prefix + "e.json"} and {prefix + "u.json"}'
                 )
                 continue
             count += 1
-            logger.info(f'Generating agent hypercube {count} / {total}')
             self._filename_prefix = prefix
-            try:
-                hypercube = self._build(starter_scene_function())
-                hypercubes.append(hypercube)
-                # Every other scene pair should have untrained objects.
-                self._untrained = (not self._untrained)
-            except (
-                RuntimeError,
-                ZeroDivisionError,
-                TypeError,
-                SceneException,
-                ValueError
-            ) as e:
-                if throw_error:
-                    raise
-                logger.warn(f'[ERROR] Failed to create {self.name} hypercube')
-                logger.exception(e)
-                failed_filename_list.append(prefix)
-            if count == total:
-                break
+            hypercube = self._build(starter_scene_function())
+            hypercubes.append(hypercube)
+            # Every other scene pair should have untrained objects.
+            self._untrained = (not self._untrained)
+            if count % 100 == 0:
+                logger.info(
+                    f'Finished initialization of {count} / '
+                    f'{len(randomized_prefix_to_number)} '
+                    f'{self._task_type} hypercubes...'
+                )
 
         if count < total:
-            logger.debug(
-                f'[NOTE] Agent hypercube factory found only '
+            logger.info(
+                f'Agent hypercube factory found only '
                 f'{count} valid pairs of scene JSON files in '
                 f'{self._folder_name} but {total} were required '
                 f'via command line argument.'
             )
-
-        if len(failed_filename_list) > 0:
-            logger.warn('[NOTE] The following agent scene files failed:')
-        for filename in failed_filename_list:
-            logger.warn(f'{filename}')
+        if count > total:
+            logger.info(
+                f'Agent hypercube factory found {count} valid pairs of scene '
+                f'JSON files in {self._folder_name} but only {total} were '
+                f'required via command line argument; extra scenes will only '
+                f'be used if other scenes fail.'
+            )
 
         return hypercubes
 
 
-class AgentInstrumentalActionTrainingHypercubeFactory(AgentHypercubeFactory):
+class InstrumentalActionTrainingHypercubeFactory(AgentHypercubeFactory):
     def __init__(self) -> None:
         super().__init__(
             'AgentInstrumentalActionTraining',
@@ -224,7 +241,7 @@ class AgentInstrumentalActionTrainingHypercubeFactory(AgentHypercubeFactory):
         )
 
 
-class AgentMultipleAgentsTrainingHypercubeFactory(AgentHypercubeFactory):
+class MultipleAgentsTrainingHypercubeFactory(AgentHypercubeFactory):
     def __init__(self) -> None:
         super().__init__(
             'AgentMultipleAgentsTraining',
@@ -234,7 +251,7 @@ class AgentMultipleAgentsTrainingHypercubeFactory(AgentHypercubeFactory):
         )
 
 
-class AgentObjectPreferenceTrainingHypercubeFactory(AgentHypercubeFactory):
+class ObjectPreferenceTrainingHypercubeFactory(AgentHypercubeFactory):
     def __init__(self) -> None:
         super().__init__(
             'AgentObjectPreferenceTraining',
@@ -244,7 +261,7 @@ class AgentObjectPreferenceTrainingHypercubeFactory(AgentHypercubeFactory):
         )
 
 
-class AgentSingleObjectTrainingHypercubeFactory(AgentHypercubeFactory):
+class SingleObjectTrainingHypercubeFactory(AgentHypercubeFactory):
     def __init__(self) -> None:
         super().__init__(
             'AgentSingleObjectTraining',
@@ -254,7 +271,7 @@ class AgentSingleObjectTrainingHypercubeFactory(AgentHypercubeFactory):
         )
 
 
-class AgentEfficientActionIrrationalEvaluationHypercubeFactory(
+class EfficientActionIrrationalEvaluationHypercubeFactory(
     AgentHypercubeFactory
 ):
     def __init__(self) -> None:
@@ -266,9 +283,7 @@ class AgentEfficientActionIrrationalEvaluationHypercubeFactory(
         )
 
 
-class AgentEfficientActionPathEvaluationHypercubeFactory(
-    AgentHypercubeFactory
-):
+class EfficientActionPathEvaluationHypercubeFactory(AgentHypercubeFactory):
     def __init__(self) -> None:
         super().__init__(
             'AgentEfficientActionPath',
@@ -278,9 +293,7 @@ class AgentEfficientActionPathEvaluationHypercubeFactory(
         )
 
 
-class AgentEfficientActionTimeEvaluationHypercubeFactory(
-    AgentHypercubeFactory
-):
+class EfficientActionTimeEvaluationHypercubeFactory(AgentHypercubeFactory):
     def __init__(self) -> None:
         super().__init__(
             'AgentEfficientActionTime',
@@ -290,7 +303,7 @@ class AgentEfficientActionTimeEvaluationHypercubeFactory(
         )
 
 
-class AgentInaccessibleGoalEvaluationHypercubeFactory(AgentHypercubeFactory):
+class InaccessibleGoalEvaluationHypercubeFactory(AgentHypercubeFactory):
     def __init__(self) -> None:
         super().__init__(
             'AgentInaccessibleGoal',
@@ -300,7 +313,7 @@ class AgentInaccessibleGoalEvaluationHypercubeFactory(AgentHypercubeFactory):
         )
 
 
-class AgentInstrumentalActionBlockingBarriersEvaluationHypercubeFactory(
+class InstrumentalActionBlockingBarriersEvaluationHypercubeFactory(
     AgentHypercubeFactory
 ):
     def __init__(self) -> None:
@@ -312,7 +325,7 @@ class AgentInstrumentalActionBlockingBarriersEvaluationHypercubeFactory(
         )
 
 
-class AgentInstrumentalActionInconsequentialBarriersEvaluationHypercubeFactory(
+class InstrumentalActionInconsequentialBarriersEvaluationHypercubeFactory(
     AgentHypercubeFactory
 ):
     def __init__(self) -> None:
@@ -324,7 +337,7 @@ class AgentInstrumentalActionInconsequentialBarriersEvaluationHypercubeFactory(
         )
 
 
-class AgentInstrumentalActionNoBarriersEvaluationHypercubeFactory(
+class InstrumentalActionNoBarriersEvaluationHypercubeFactory(
     AgentHypercubeFactory
 ):
     def __init__(self) -> None:
@@ -336,7 +349,7 @@ class AgentInstrumentalActionNoBarriersEvaluationHypercubeFactory(
         )
 
 
-class AgentMultipleAgentsEvaluationHypercubeFactory(AgentHypercubeFactory):
+class MultipleAgentsEvaluationHypercubeFactory(AgentHypercubeFactory):
     def __init__(self) -> None:
         super().__init__(
             'AgentMultipleAgents',
@@ -346,7 +359,7 @@ class AgentMultipleAgentsEvaluationHypercubeFactory(AgentHypercubeFactory):
         )
 
 
-class AgentObjectPreferenceEvaluationHypercubeFactory(AgentHypercubeFactory):
+class ObjectPreferenceEvaluationHypercubeFactory(AgentHypercubeFactory):
     def __init__(self) -> None:
         super().__init__(
             'AgentObjectPreference',
@@ -356,44 +369,181 @@ class AgentObjectPreferenceEvaluationHypercubeFactory(AgentHypercubeFactory):
         )
 
 
-class AgentExamplesTrainingHypercubeFactory(AgentHypercubeFactory):
+class ExamplesTrainingHypercubeFactory(AgentHypercubeFactory):
     def __init__(self) -> None:
         super().__init__(
             'AgentExamplesTraining',
             'agents_examples',
-            'agents examples',
+            tags.TYPES.AGENT_EXAMPLE,
             training=True
         )
 
 
-class AgentExamplesEvaluationHypercubeFactory(AgentHypercubeFactory):
+class ExamplesEvaluationHypercubeFactory(AgentHypercubeFactory):
     def __init__(self) -> None:
         super().__init__(
             'AgentExamples',
             'agents_examples',
-            'agents examples',
+            tags.TYPES.AGENT_EXAMPLE,
             training=False
         )
 
 
+class AgentOneGoalTrainingHypercubeFactory(AgentHypercubeFactory):
+    def __init__(self) -> None:
+        super().__init__(
+            'AgentOneGoal',
+            'agents_background_agent_one_goal',
+            tags.TYPES.AGENT_BACKGROUND_AGENT_ONE_GOAL,
+            training=True
+        )
+        self._occluder_mode = OccluderMode.TRAINING
+
+
+class AgentPreferenceTrainingHypercubeFactory(AgentHypercubeFactory):
+    def __init__(self) -> None:
+        super().__init__(
+            'AgentPreference',
+            'agents_background_agent_preference',
+            tags.TYPES.AGENT_BACKGROUND_AGENT_PREFERENCE,
+            training=True
+        )
+        self._occluder_mode = OccluderMode.TRAINING
+
+
+class CollectTrainingHypercubeFactory(AgentHypercubeFactory):
+    def __init__(self) -> None:
+        super().__init__(
+            'AgentCollect',
+            'agents_background_collect',
+            tags.TYPES.AGENT_BACKGROUND_COLLECT,
+            training=True
+        )
+
+
+class InstrumentalApproachTrainingHypercubeFactory(AgentHypercubeFactory):
+    def __init__(self) -> None:
+        super().__init__(
+            'AgentInstrumentalApproach',
+            'agents_background_instrumental_approach',
+            tags.TYPES.AGENT_BACKGROUND_INSTRUMENTAL_APPROACH,
+            training=True
+        )
+
+
+class InstrumentalImitationTrainingHypercubeFactory(AgentHypercubeFactory):
+    def __init__(self) -> None:
+        super().__init__(
+            'AgentInstrumentalImitation',
+            'agents_background_instrumental_imitation',
+            tags.TYPES.AGENT_BACKGROUND_INSTRUMENTAL_IMITATION,
+            training=True
+        )
+
+
+class NonAgentEvaluationHypercubeFactory(AgentHypercubeFactory):
+    def __init__(self) -> None:
+        super().__init__(
+            'AgentNonAgent',
+            'agents_evaluation_non_agent',
+            tags.TYPES.AGENT_EVALUATION_AGENT_NON_AGENT,
+            training=False
+        )
+        self._occluder_mode = OccluderMode.EVAL
+
+
+class NonAgentOneGoalTrainingHypercubeFactory(AgentHypercubeFactory):
+    def __init__(self) -> None:
+        super().__init__(
+            'AgentNonAgentOneGoal',
+            'agents_background_non_agent_one_goal',
+            tags.TYPES.AGENT_BACKGROUND_NON_AGENT_ONE_GOAL,
+            training=True
+        )
+        self._occluder_mode = OccluderMode.TRAINING
+
+
+class NonAgentPreferenceTrainingHypercubeFactory(AgentHypercubeFactory):
+    def __init__(self) -> None:
+        super().__init__(
+            'AgentNonAgentPreference',
+            'agents_background_non_agent_preference',
+            tags.TYPES.AGENT_BACKGROUND_NON_AGENT_PREFERENCE,
+            training=True
+        )
+        self._occluder_mode = OccluderMode.TRAINING
+
+
+class SocialApproachEvaluationHypercubeFactory(AgentHypercubeFactory):
+    def __init__(self) -> None:
+        super().__init__(
+            'AgentApproach',
+            'agents_evaluation_approach',
+            tags.TYPES.AGENT_EVALUATION_APPROACH,
+            training=False
+        )
+
+
+class SocialApproachTrainingHypercubeFactory(AgentHypercubeFactory):
+    def __init__(self) -> None:
+        super().__init__(
+            'AgentSocialApproach',
+            'agents_background_social_approach',
+            tags.TYPES.AGENT_BACKGROUND_SOCIAL_APPROACH,
+            training=True
+        )
+
+
+class SocialImitationEvaluationHypercubeFactory(AgentHypercubeFactory):
+    def __init__(self) -> None:
+        super().__init__(
+            'AgentImitation',
+            'agents_evaluation_imitation',
+            tags.TYPES.AGENT_EVALUATION_IMITATION,
+            training=False
+        )
+
+
+class SocialImitationTrainingHypercubeFactory(AgentHypercubeFactory):
+    def __init__(self) -> None:
+        super().__init__(
+            'AgentSocialImitation',
+            'agents_background_social_imitation',
+            tags.TYPES.AGENT_BACKGROUND_SOCIAL_IMITATION,
+            training=True
+        )
+
+
 AGENT_TRAINING_HYPERCUBE_LIST = [
-    AgentInstrumentalActionTrainingHypercubeFactory(),
-    AgentMultipleAgentsTrainingHypercubeFactory(),
-    AgentObjectPreferenceTrainingHypercubeFactory(),
-    AgentSingleObjectTrainingHypercubeFactory(),
-    AgentExamplesTrainingHypercubeFactory()
+    AgentOneGoalTrainingHypercubeFactory(),
+    AgentPreferenceTrainingHypercubeFactory(),
+    CollectTrainingHypercubeFactory(),
+    InstrumentalActionTrainingHypercubeFactory(),
+    InstrumentalApproachTrainingHypercubeFactory(),
+    InstrumentalImitationTrainingHypercubeFactory(),
+    MultipleAgentsTrainingHypercubeFactory(),
+    NonAgentOneGoalTrainingHypercubeFactory(),
+    NonAgentPreferenceTrainingHypercubeFactory(),
+    ObjectPreferenceTrainingHypercubeFactory(),
+    SingleObjectTrainingHypercubeFactory(),
+    SocialApproachTrainingHypercubeFactory(),
+    SocialImitationTrainingHypercubeFactory(),
+    ExamplesTrainingHypercubeFactory()
 ]
 
 
 AGENT_EVALUATION_HYPERCUBE_LIST = [
-    AgentEfficientActionIrrationalEvaluationHypercubeFactory(),
-    AgentEfficientActionPathEvaluationHypercubeFactory(),
-    AgentEfficientActionTimeEvaluationHypercubeFactory(),
-    AgentInaccessibleGoalEvaluationHypercubeFactory(),
-    AgentInstrumentalActionBlockingBarriersEvaluationHypercubeFactory(),
-    AgentInstrumentalActionInconsequentialBarriersEvaluationHypercubeFactory(),
-    AgentInstrumentalActionNoBarriersEvaluationHypercubeFactory(),
-    AgentMultipleAgentsEvaluationHypercubeFactory(),
-    AgentObjectPreferenceEvaluationHypercubeFactory(),
-    AgentExamplesEvaluationHypercubeFactory()
+    EfficientActionIrrationalEvaluationHypercubeFactory(),
+    EfficientActionPathEvaluationHypercubeFactory(),
+    EfficientActionTimeEvaluationHypercubeFactory(),
+    InaccessibleGoalEvaluationHypercubeFactory(),
+    InstrumentalActionBlockingBarriersEvaluationHypercubeFactory(),
+    InstrumentalActionInconsequentialBarriersEvaluationHypercubeFactory(),
+    InstrumentalActionNoBarriersEvaluationHypercubeFactory(),
+    MultipleAgentsEvaluationHypercubeFactory(),
+    NonAgentEvaluationHypercubeFactory(),
+    ObjectPreferenceEvaluationHypercubeFactory(),
+    SocialApproachEvaluationHypercubeFactory(),
+    SocialImitationEvaluationHypercubeFactory(),
+    ExamplesEvaluationHypercubeFactory()
 ]

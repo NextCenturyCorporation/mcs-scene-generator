@@ -7,11 +7,12 @@ from .geometry import (
     create_bounds,
     get_magnitudes_of_x_z_dirs_for_rotation_and_move_vector
 )
+from .objects import SceneObject
 
 
 def put_object_in_container(
-    instance: Dict[str, Any],
-    container: Dict[str, Any],
+    instance: SceneObject,
+    container: SceneObject,
     area_index: int,
     rotation: Optional[float] = None
 ) -> None:
@@ -64,9 +65,9 @@ class Orientation(Enum):
 
 
 def put_objects_in_container(
-    object_a: Dict[str, Any],
-    object_b: Dict[str, Any],
-    container: Dict[str, Any],
+    object_a: SceneObject,
+    object_b: SceneObject,
+    container: SceneObject,
     area_index: int,
     orientation: Orientation,
     rotation_a: float,

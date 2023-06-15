@@ -16,7 +16,7 @@ room_dimensions:
 
 # Choose the wall material from a color palette with bright, distinct colors.
 # All four exterior room walls will be the same color.
-wall_material: OPPOSITE_MATERIALS
+wall_material: WALL_OPPOSITE_MATERIALS
 
 # Sometimes one of the exterior room walls will be the opposite color instead.
 side_wall_opposite_colors: [true, false]
@@ -26,7 +26,8 @@ trapezoidal_room: [true, false]
 
 # Generate a platform bisecting the room.
 shortcut_bisecting_platform:
-    has_long_blocking_wall: true
+    has_double_blocking_wall: true
+    position_z: -5.5
 
 # Generate a random bin on each side of the room.
 keyword_objects:

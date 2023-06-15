@@ -1,12 +1,12 @@
-import random
-
 import pytest
+from machine_common_sense.config_manager import Goal
 
 from ideal_learning_env.actions_component import ActionRestrictionsComponent
 from ideal_learning_env.defs import ILEConfigurationException, ILEException
 
 from .ile_helper import (
     create_placers_turntables_scene,
+    create_random_agent_placer_turntable_scene,
     create_test_obj_scene,
     prior_scene
 )
@@ -23,8 +23,8 @@ def test_action_restrictions_defaults():
 
     scene = component.update_ile_scene(prior_scene())
     goal = scene.goal
-    assert isinstance(goal, dict)
-    assert not hasattr(goal, 'action_list')
+    assert isinstance(goal, Goal)
+    assert goal.action_list is None
 
 
 def test_action_restrictions_passive():
@@ -36,11 +36,11 @@ def test_action_restrictions_passive():
     last_step = 100
     scene = component.update_ile_scene(prior_scene(last_step))
     goal = scene.goal
-    assert isinstance(goal, dict)
-    category = goal['category']
+    assert isinstance(goal, Goal)
+    category = goal.category
     assert isinstance(category, str)
     assert category == 'intuitive physics'
-    al = goal['action_list']
+    al = goal.action_list
     assert isinstance(al, list)
     assert len(al) == last_step
     for inner in al:
@@ -64,8 +64,8 @@ def test_action_restrictions_freeze_start():
 
     scene = component.update_ile_scene(prior_scene(100))
     goal = scene.goal
-    assert isinstance(goal, dict)
-    al = goal['action_list']
+    assert isinstance(goal, Goal)
+    al = goal.action_list
     assert isinstance(al, list)
     assert len(al) == 100
     for idx, inner in enumerate(al):
@@ -95,8 +95,8 @@ def test_action_restrictions_freeze_start_end():
 
     scene = component.update_ile_scene(prior_scene())
     goal = scene.goal
-    assert isinstance(goal, dict)
-    al = goal['action_list']
+    assert isinstance(goal, Goal)
+    al = goal.action_list
     assert isinstance(al, list)
     assert len(al) == end_step - 1
     for idx, inner in enumerate(al):
@@ -136,8 +136,8 @@ def test_action_restrictions_freeze_choice():
 
     scene = component.update_ile_scene(prior_scene())
     goal = scene.goal
-    assert isinstance(goal, dict)
-    al = goal['action_list']
+    assert isinstance(goal, Goal)
+    al = goal.action_list
     assert isinstance(al, list)
     choice = [1, 3, 5].index(len(al))
     start = [1, 3, 5][choice]
@@ -176,8 +176,8 @@ def test_action_restrictions_freeze_ok_overlap():
 
     scene = component.update_ile_scene(prior_scene())
     goal = scene.goal
-    assert isinstance(goal, dict)
-    al = goal['action_list']
+    assert isinstance(goal, Goal)
+    al = goal.action_list
     assert isinstance(al, list)
     assert len(al) == end_step - 1
     for idx, inner in enumerate(al):
@@ -213,8 +213,8 @@ def test_action_restrictions_freeze_gap():
 
     scene = component.update_ile_scene(prior_scene())
     goal = scene.goal
-    assert isinstance(goal, dict)
-    al = goal['action_list']
+    assert isinstance(goal, Goal)
+    al = goal.action_list
     assert isinstance(al, list)
     assert len(al) == end_step - 1
     for idx, inner in enumerate(al):
@@ -266,8 +266,8 @@ def test_action_restrictions_freeze_just_end():
 
     scene = component.update_ile_scene(prior_scene())
     goal = scene.goal
-    assert isinstance(goal, dict)
-    al = goal['action_list']
+    assert isinstance(goal, Goal)
+    al = goal.action_list
     assert isinstance(al, list)
     assert len(al) == end_step - 1
     for idx, inner in enumerate(al):
@@ -303,8 +303,8 @@ def test_action_restrictions_freeze_empty_list():
     assert isinstance(fzs, list)
     scene = component.update_ile_scene(prior_scene())
     goal = scene.goal
-    assert isinstance(goal, dict)
-    assert not hasattr(goal, 'action_list')
+    assert isinstance(goal, Goal)
+    assert goal.action_list is None
 
 
 def test_action_restrictions_circles():
@@ -316,8 +316,8 @@ def test_action_restrictions_circles():
 
     scene = component.update_ile_scene(prior_scene(100))
     goal = scene.goal
-    assert isinstance(goal, dict)
-    action_list = goal['action_list']
+    assert isinstance(goal, Goal)
+    action_list = goal.action_list
     assert isinstance(action_list, list)
     assert len(action_list) == 36
     for i, actions_per_step in enumerate(action_list):
@@ -337,8 +337,8 @@ def test_action_restrictions_circles_late():
 
     scene = component.update_ile_scene(prior_scene(100))
     goal = scene.goal
-    assert isinstance(goal, dict)
-    action_list = goal['action_list']
+    assert isinstance(goal, Goal)
+    action_list = goal.action_list
     assert isinstance(action_list, list)
     assert len(action_list) == 46
     for i, actions_per_step in enumerate(action_list):
@@ -358,8 +358,8 @@ def test_action_restrictions_circles_multiple():
 
     scene = component.update_ile_scene(prior_scene(100))
     goal = scene.goal
-    assert isinstance(goal, dict)
-    action_list = goal['action_list']
+    assert isinstance(goal, Goal)
+    action_list = goal.action_list
     assert isinstance(action_list, list)
     assert len(action_list) == 136
     for i, actions_per_step in enumerate(action_list):
@@ -379,8 +379,8 @@ def test_action_restrictions_circles_option():
 
     scene = component.update_ile_scene(prior_scene(100))
     goal = scene.goal
-    assert isinstance(goal, dict)
-    action_list = goal['action_list']
+    assert isinstance(goal, Goal)
+    action_list = goal.action_list
     assert isinstance(action_list, list)
     assert len(action_list) in [36, 136]
     choice_1 = (len(action_list) == 36)
@@ -407,8 +407,8 @@ def test_action_restrictions_swivel_start():
 
     scene = component.update_ile_scene(prior_scene(100))
     goal = scene.goal
-    assert isinstance(goal, dict)
-    al = goal['action_list']
+    assert isinstance(goal, Goal)
+    al = goal.action_list
     assert isinstance(al, list)
     assert len(al) == 100
     for idx, inner in enumerate(al):
@@ -441,8 +441,8 @@ def test_action_restrictions_swivel_start_end():
 
     scene = component.update_ile_scene(prior_scene())
     goal = scene.goal
-    assert isinstance(goal, dict)
-    al = goal['action_list']
+    assert isinstance(goal, Goal)
+    al = goal.action_list
     assert isinstance(al, list)
     assert len(al) == end_step - 1
 
@@ -486,8 +486,8 @@ def test_action_restrictions_swivel_choice():
 
     scene = component.update_ile_scene(prior_scene())
     goal = scene.goal
-    assert isinstance(goal, dict)
-    al = goal['action_list']
+    assert isinstance(goal, Goal)
+    al = goal.action_list
     assert isinstance(al, list)
     choice = [1, 3, 5].index(len(al))
     start = [1, 3, 5][choice]
@@ -529,8 +529,8 @@ def test_action_restrictions_swivel_ok_overlap():
 
     scene = component.update_ile_scene(prior_scene())
     goal = scene.goal
-    assert isinstance(goal, dict)
-    al = goal['action_list']
+    assert isinstance(goal, Goal)
+    al = goal.action_list
     assert isinstance(al, list)
     assert len(al) == end_step - 1
     for idx, inner in enumerate(al):
@@ -569,8 +569,8 @@ def test_action_restrictions_swivel_gap():
 
     scene = component.update_ile_scene(prior_scene())
     goal = scene.goal
-    assert isinstance(goal, dict)
-    al = goal['action_list']
+    assert isinstance(goal, Goal)
+    al = goal.action_list
     assert isinstance(al, list)
     assert len(al) == end_step - 1
     for idx, inner in enumerate(al):
@@ -625,8 +625,8 @@ def test_action_restrictions_swivel_just_end():
 
     scene = component.update_ile_scene(prior_scene())
     goal = scene.goal
-    assert isinstance(goal, dict)
-    al = goal['action_list']
+    assert isinstance(goal, Goal)
+    al = goal.action_list
     assert isinstance(al, list)
     assert len(al) == end_step - 1
     for idx, inner in enumerate(al):
@@ -665,8 +665,8 @@ def test_action_restrictions_swivel_empty_list():
     assert isinstance(svls, list)
     scene = component.update_ile_scene(prior_scene())
     goal = scene.goal
-    assert isinstance(goal, dict)
-    assert not hasattr(goal, 'action_list')
+    assert isinstance(goal, Goal)
+    assert goal.action_list is None
 
 
 def test_action_restrictions_swivel_then_freeze_ok():
@@ -702,8 +702,8 @@ def test_action_restrictions_swivel_then_freeze_ok():
 
     scene = component.update_ile_scene(prior_scene())
     goal = scene.goal
-    assert isinstance(goal, dict)
-    al = goal['action_list']
+    assert isinstance(goal, Goal)
+    al = goal.action_list
     assert isinstance(al, list)
     assert len(al) == fend - 1
     for idx, inner in enumerate(al):
@@ -754,8 +754,8 @@ def test_action_restrictions_freeze_then_swivel_ok():
 
     scene = component.update_ile_scene(prior_scene())
     goal = scene.goal
-    assert isinstance(goal, dict)
-    al = goal['action_list']
+    assert isinstance(goal, Goal)
+    al = goal.action_list
     assert isinstance(al, list)
     assert len(al) == end - 1
     for idx, inner in enumerate(al):
@@ -805,8 +805,8 @@ def test_action_restrictions_freeze_then_swivel_ok_overlap():
 
     scene = component.update_ile_scene(prior_scene())
     goal = scene.goal
-    assert isinstance(goal, dict)
-    al = goal['action_list']
+    assert isinstance(goal, Goal)
+    al = goal.action_list
     assert isinstance(al, list)
     assert len(al) == end_step - 1
     for idx, inner in enumerate(al):
@@ -857,8 +857,8 @@ def test_action_restrictions_swivel_then_freeze_ok_overlap():
 
     scene = component.update_ile_scene(prior_scene())
     goal = scene.goal
-    assert isinstance(goal, dict)
-    al = goal['action_list']
+    assert isinstance(goal, Goal)
+    al = goal.action_list
     assert isinstance(al, list)
     assert len(al) == end_step - 1
     for idx, inner in enumerate(al):
@@ -1017,8 +1017,8 @@ def test_action_restriction_teleport_missing_rot_y():
 
     scene = component.update_ile_scene(prior_scene())
     goal = scene.goal
-    assert isinstance(goal, dict)
-    al = goal['action_list']
+    assert isinstance(goal, Goal)
+    al = goal.action_list
     assert isinstance(al, list)
     assert len(al) == step
     for idx, inner in enumerate(al):
@@ -1052,8 +1052,8 @@ def test_action_restriction_teleport():
 
     scene = component.update_ile_scene(prior_scene())
     goal = scene.goal
-    assert isinstance(goal, dict)
-    al = goal['action_list']
+    assert isinstance(goal, Goal)
+    al = goal.action_list
     assert isinstance(al, list)
     assert len(al) == step
     for idx, inner in enumerate(al):
@@ -1076,7 +1076,7 @@ def test_action_restriction_teleport_look_at_center_facing_forward():
         }]
     })
     scene = component.update_ile_scene(prior_scene())
-    assert scene.goal['action_list'][0] == [
+    assert scene.goal.action_list[0] == [
         'EndHabituation,xPosition=0,zPosition=-4.5,yRotation=0'
     ]
 
@@ -1091,7 +1091,7 @@ def test_action_restriction_teleport_look_at_center_facing_back():
         }]
     })
     scene = component.update_ile_scene(prior_scene())
-    assert scene.goal['action_list'][0] == [
+    assert scene.goal.action_list[0] == [
         'EndHabituation,xPosition=0,zPosition=4.5,yRotation=180'
     ]
 
@@ -1120,8 +1120,8 @@ def test_action_restriction_teleport_choice():
 
     scene = component.update_ile_scene(prior_scene())
     goal = scene.goal
-    assert isinstance(goal, dict)
-    al = goal['action_list']
+    assert isinstance(goal, Goal)
+    al = goal.action_list
     assert isinstance(al, list)
     assert len(al) in [3, 6]
     num_end_hab = 0
@@ -1179,8 +1179,8 @@ def test_action_restriction_teleport_multi():
 
     scene = component.update_ile_scene(prior_scene())
     goal = scene.goal
-    assert isinstance(goal, dict)
-    al = goal['action_list']
+    assert isinstance(goal, Goal)
+    al = goal.action_list
     assert isinstance(al, list)
     assert len(al) == step3
     for idx, inner in enumerate(al):
@@ -1264,8 +1264,8 @@ def test_action_restriction_freeze_teleport_combined():
 
     scene = component.update_ile_scene(prior_scene())
     goal = scene.goal
-    assert isinstance(goal, dict)
-    al = goal['action_list']
+    assert isinstance(goal, Goal)
+    al = goal.action_list
     assert isinstance(al, list)
     assert len(al) == max(end - 1, tstep)
     for idx, inner in enumerate(al):
@@ -1313,8 +1313,8 @@ def test_action_restriction_swivel_teleport_combined():
 
     scene = component.update_ile_scene(prior_scene())
     goal = scene.goal
-    assert isinstance(goal, dict)
-    al = goal['action_list']
+    assert isinstance(goal, Goal)
+    al = goal.action_list
     assert isinstance(al, list)
     assert len(al) == max(end - 1, tstep)
     for idx, inner in enumerate(al):
@@ -1377,8 +1377,8 @@ def test_action_restriction_freeze_swivel_teleport_combined():
 
     scene = component.update_ile_scene(prior_scene())
     goal = scene.goal
-    assert isinstance(goal, dict)
-    al = goal['action_list']
+    assert isinstance(goal, Goal)
+    al = goal.action_list
     assert isinstance(al, list)
     assert len(al) == end - 1
 
@@ -1491,8 +1491,8 @@ def test_action_restriction_passive_teleport():
 
     scene = component.update_ile_scene(prior_scene(100))
     goal = scene.goal
-    assert isinstance(goal, dict)
-    al = goal['action_list']
+    assert isinstance(goal, Goal)
+    al = goal.action_list
     assert isinstance(al, list)
     assert len(al) == 100
     for idx, inner in enumerate(al):
@@ -1584,8 +1584,8 @@ def test_action_sidesteps():
     assert component.get_num_delayed_actions() == 0
 
     goal = scene.goal
-    assert isinstance(goal, dict)
-    al = goal['action_list']
+    assert isinstance(goal, Goal)
+    al = goal.action_list
     assert isinstance(al, list)
     assert len(al) == 218
     for action in al:
@@ -1624,30 +1624,48 @@ def test_action_sidesteps_error():
 
 
 def test_action_freeze_while_moving():
-    labels = ['placers', 'turntables', ['placers', 'turntables']]
+    labels = ['placers', 'turntables', 'agent',
+              ['placers', 'turntables', 'agent']]
     for label in labels:
         component = ActionRestrictionsComponent({
             'freeze_while_moving': label
         })
-        scene = component.update_ile_scene(create_placers_turntables_scene(
-            random.randint(1, 50), random.randint(1, 50)))
+        scene = component.update_ile_scene(
+            create_random_agent_placer_turntable_scene())
         freeze_while_moving = component.freeze_while_moving
         assert (isinstance(freeze_while_moving, str) or
                 isinstance(freeze_while_moving, list))
         assert freeze_while_moving in labels
         component.run_actions_at_end_of_scene_generation(scene)
-        # middle objects are the multiple placers
-        moves = \
-            max(scene.objects[1:-1],
-                key=lambda x: 0 if not x.get('moves') else
-                x['moves'][-1]['stepEnd'])['moves'][-1]['stepEnd']
-        # last object is the one turntable
-        rotates = scene.objects[-1]['rotates'][-1]['stepEnd']
+
+        action_lists = [
+            obj.get('actions') for obj in scene.objects if
+            obj.get('actions') is not None]
+        moves_lists = [
+            obj.get('moves') for obj in scene.objects if
+            obj.get('moves') is not None]
+        rotates_lists = [
+            obj.get('rotates') for obj in scene.objects if
+            obj.get('rotates') is not None]  # noqa
+
+        actions_max_step_end = max(
+            item['stepEnd'] for action_list in action_lists
+            for item in action_list if not item.get('isLoopAnimation', False))
+        moves_max_step_end = max(
+            move['stepEnd'] for moves in moves_lists for move in moves)
+        rotates_max_step_end = max(
+            rotate['stepEnd'] for rotates in rotates_lists for
+            rotate in rotates)
+
         passes = \
-            [["Pass"]] * (moves if freeze_while_moving == 'placers' else
-                          rotates if freeze_while_moving == 'turntables' else
-                          max(moves, rotates))
-        assert scene.goal['action_list'] == passes
+            [["Pass"]] * (
+                actions_max_step_end if freeze_while_moving == 'agent' else
+                moves_max_step_end if freeze_while_moving == 'placers' else
+                rotates_max_step_end if freeze_while_moving == 'turntables' else  # noqa
+                max(actions_max_step_end,
+                    moves_max_step_end,
+                    rotates_max_step_end))
+        assert scene.goal.action_list == passes
 
 
 def test_action_freeze_while_moving_error():

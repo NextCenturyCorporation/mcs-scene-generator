@@ -1,5 +1,11 @@
-from machine_common_sense.config_manager import Vector3d
+from machine_common_sense.config_manager import (
+    FloorTexturesConfig,
+    Goal,
+    Vector2dInt,
+    Vector3d
+)
 
+from generator import ObjectBounds, SceneObject, geometry
 from generator.scene import Scene, get_step_limit_from_dimensions
 
 from .ile_helper import prior_scene_with_target, prior_scene_with_targets
@@ -55,7 +61,7 @@ def test_scene_default():
     assert scene.floor_material is None
     assert scene.floor_properties is None
     assert scene.floor_textures == []
-    assert scene.goal == {"metadata": {}}
+    assert scene.goal == Goal(metadata={})
     assert scene.holes == []
     assert not scene.intuitive_physics
     assert not scene.isometric
@@ -147,15 +153,13 @@ def test_to_dict():
     scene.set_performer_start_position(1, 2, 3)
     scene.set_room_dimensions(4, 5, 6)
     scene.name = "test"
-    scene.objects.append({"name": "pretend object"})
-    scene.lava.append({
-        "x": 0,
-        "z": -1
-    })
-    scene.holes.append({
-        "x": 3,
-        "z": 4
-    })
+    scene.objects.append(SceneObject({"id": "pretend object"}))
+    scene.lava.append(Vector2dInt(x=0, z=-1))
+    scene.holes.append(Vector2dInt(x=3, z=4))
+    scene.floor_textures.append(FloorTexturesConfig(
+        material='floor_texture_a',
+        positions=[Vector2dInt(x=-2, z=-3)]
+    ))
     d = scene.to_dict()
     assert d == {
         "version": 2,
@@ -172,9 +176,12 @@ def test_to_dict():
             "z": -1
         }],
         "name": "test",
-        "objects": [{"name": "pretend object"}],
+        "objects": [{"id": "pretend object"}],
         "screenshot": False,
-        "floorTextures": [],
+        "floorTextures": [{
+            'material': 'floor_texture_a',
+            'positions': [{'x': -2, 'z': -3}]
+        }],
         "intuitivePhysics": False,
         "performerStart": {
             "position": {
@@ -204,3 +211,151 @@ def test_get_last_step():
     assert get_step_limit_from_dimensions(None, None) == 2500
     assert get_step_limit_from_dimensions(None, 10) == 2500
     assert get_step_limit_from_dimensions(10, None) == 2500
+
+
+def test_find_bounds():
+    # Case 1: No objects
+    scene = Scene(objects=[])
+    assert scene.find_bounds() == []
+
+    bounds_1 = ObjectBounds(box_xz=[
+        Vector3d(x=1, y=0, z=1),
+        Vector3d(x=2, y=0, z=1),
+        Vector3d(x=2, y=0, z=2),
+        Vector3d(x=1, y=0, z=2)
+    ], max_y=1, min_y=0)
+    bounds_2 = ObjectBounds(box_xz=[
+        Vector3d(x=-1, y=0, z=-1),
+        Vector3d(x=-2, y=0, z=-1),
+        Vector3d(x=-2, y=0, z=-2),
+        Vector3d(x=-1, y=0, z=-2)
+    ], max_y=1, min_y=0)
+
+    # Case 2: 1 object
+    scene = Scene(objects=[
+        {'shows': [{'boundingBox': bounds_1}]}
+    ])
+    assert scene.find_bounds() == [bounds_1]
+
+    # Case 3: 2 objects
+    scene = Scene(objects=[
+        {'shows': [{'boundingBox': bounds_1}]},
+        {'shows': [{'boundingBox': bounds_2}]}
+    ])
+    assert scene.find_bounds() == [bounds_1, bounds_2]
+    buffer = geometry.FLOOR_FEATURE_BOUNDS_BUFFER
+    bounds_3 = ObjectBounds(box_xz=[
+        Vector3d(x=2.5 + buffer, y=0, z=2.5 + buffer),
+        Vector3d(x=3.5 - buffer, y=0, z=2.5 + buffer),
+        Vector3d(x=3.5 - buffer, y=0, z=3.5 - buffer),
+        Vector3d(x=2.5 + buffer, y=0, z=3.5 - buffer)
+    ], max_y=100, min_y=0)
+    bounds_4 = ObjectBounds(box_xz=[
+        Vector3d(x=-3.5 + buffer, y=0, z=-3.5 + buffer),
+        Vector3d(x=-2.5 - buffer, y=0, z=-3.5 + buffer),
+        Vector3d(x=-2.5 - buffer, y=0, z=-2.5 - buffer),
+        Vector3d(x=-3.5 + buffer, y=0, z=-2.5 - buffer)
+    ], max_y=100, min_y=0)
+
+    # Case 4: 1 hole
+    scene = Scene(holes=[Vector2dInt(x=3, z=3)], objects=[])
+    assert scene.find_bounds() == [bounds_3]
+
+    # Case 5: 2 holes
+    scene = Scene(
+        holes=[Vector2dInt(x=3, z=3), Vector2dInt(x=-3, z=-3)],
+        objects=[]
+    )
+    assert scene.find_bounds() == [bounds_3, bounds_4]
+
+    # Case 6: holes and objects
+    scene = Scene(
+        holes=[Vector2dInt(x=3, z=3), Vector2dInt(x=-3, z=-3)],
+        objects=[
+            {'shows': [{'boundingBox': bounds_1}]},
+            {'shows': [{'boundingBox': bounds_2}]}
+        ]
+    )
+    assert scene.find_bounds() == [bounds_3, bounds_4, bounds_1, bounds_2]
+
+    # Case 7: floor textures
+    scene = Scene(floor_textures=[FloorTexturesConfig(
+        material='blue',
+        positions=[Vector2dInt(x=0, z=0)]
+    )], objects=[])
+    assert scene.find_bounds() == []
+
+    # Case 8: 1 lava area
+    scene = Scene(lava=[Vector2dInt(x=3, z=3)], objects=[])
+    assert scene.find_bounds() == [bounds_3]
+
+    # Case 9: 2 lava areas
+    scene = Scene(
+        lava=[Vector2dInt(x=3, z=3), Vector2dInt(x=-3, z=-3)],
+        objects=[]
+    )
+    assert scene.find_bounds() == [bounds_3, bounds_4]
+
+    # Case 10: lava areas and objects
+    scene = Scene(
+        lava=[Vector2dInt(x=3, z=3), Vector2dInt(x=-3, z=-3)],
+        objects=[
+            {'shows': [{'boundingBox': bounds_1}]},
+            {'shows': [{'boundingBox': bounds_2}]}
+        ]
+    )
+    assert scene.find_bounds() == [bounds_3, bounds_4, bounds_1, bounds_2]
+
+    # Case 11: everything
+    scene = Scene(floor_textures=FloorTexturesConfig(
+        material='blue',
+        positions=[Vector2dInt(x=0, z=0)]),
+        lava=[Vector2dInt(x=3, z=3)],
+        holes=[Vector2dInt(x=-3, z=-3)],
+        objects=[
+            {'shows': [{'boundingBox': bounds_1}]},
+            {'shows': [{'boundingBox': bounds_2}]}
+    ]
+    )
+    assert scene.find_bounds() == [bounds_4, bounds_3, bounds_1, bounds_2]
+
+
+def test_find_bounds_ignore_id():
+    bounds_1 = ObjectBounds(box_xz=[
+        Vector3d(x=1, y=0, z=1),
+        Vector3d(x=2, y=0, z=1),
+        Vector3d(x=2, y=0, z=2),
+        Vector3d(x=1, y=0, z=2)
+    ], max_y=1, min_y=0)
+    bounds_2 = ObjectBounds(box_xz=[
+        Vector3d(x=-1, y=0, z=-1),
+        Vector3d(x=-2, y=0, z=-1),
+        Vector3d(x=-2, y=0, z=-2),
+        Vector3d(x=-1, y=0, z=-2)
+    ], max_y=1, min_y=0)
+
+    # Case 1: 1 object, ignore 0
+    scene = Scene(objects=[
+        {'id': 'id_1', 'shows': [{'boundingBox': bounds_1}]}
+    ])
+    assert scene.find_bounds(ignore_ids='absent_id') == [bounds_1]
+
+    # Case 2: 1 object, ignore 1
+    scene = Scene(objects=[
+        {'id': 'id_1', 'shows': [{'boundingBox': bounds_1}]}
+    ])
+    assert scene.find_bounds(ignore_ids='id_1') == []
+
+    # Case 3: 2 objects, ignore 1
+    scene = Scene(objects=[
+        {'id': 'id_1', 'shows': [{'boundingBox': bounds_1}]},
+        {'id': 'id_2', 'shows': [{'boundingBox': bounds_2}]}
+    ])
+    assert scene.find_bounds(ignore_ids='id_1') == [bounds_2]
+
+    # Case 4: 2 objects, ignore 2
+    scene = Scene(objects=[
+        {'id': 'id_1', 'shows': [{'boundingBox': bounds_1}]},
+        {'id': 'id_2', 'shows': [{'boundingBox': bounds_2}]}
+    ])
+    assert scene.find_bounds(ignore_ids=['id_1', 'id_2']) == []

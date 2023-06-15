@@ -96,7 +96,23 @@ def _handle_delayed_actions(component_list, scene):
                 f"Failed to execute any delayed actions.  This can occur when"
                 f" a required label doesn't exist, a label is mispelled, or "
                 f"there is a circular dependency.  Please verify all spellings"
-                f".{nl}Reasons:{nl}  {f'{nl}  '.join(reasons)}")
+                f".{nl}Reasons:{nl}  {f'{nl}  '.join(reasons)}"
+            )
+
+        # Swap the GlobalSettingsComponent to be after ShortcutComponent so
+        # performer_look_at happens after any position change from
+        # shortcut_component
+        global_settings_component_index = component_list.index([
+            c for c in component_list if
+            isinstance(c, GlobalSettingsComponent)][0])
+        shortcut_component_index = component_list.index([
+            c for c in component_list if
+            isinstance(c, ShortcutComponent)][0])
+        temp = component_list[global_settings_component_index]
+        component_list[global_settings_component_index] = component_list[
+            shortcut_component_index]
+        component_list[shortcut_component_index] = temp
+
         # Loop through components and run delayed actions if the components
         # have any.
         for component in component_list:
@@ -129,6 +145,7 @@ def main(args):
         component_class(config_data) for component_class in ILE_COMPONENTS
     ]
 
+    max_tries = 1 if args.throw_error else MAX_TRIES
     suffix = ".json"
     for index in list(range(args.number)):
         scene = None
@@ -148,13 +165,13 @@ def main(args):
         # Try creating the scene multiple times, in case a randomized setup
         # doesn't work the first time.
         tries = 0
-        while tries < MAX_TRIES:
+        while tries < max_tries:
             tries += 1
             try:
                 if (tries > 1):
                     logger.info(
                         f'Retrying generaton of scene {index + 1} of '
-                        f'{args.number} (try {tries} / {MAX_TRIES}), '
+                        f'{args.number} (try {tries} / {max_tries}), '
                         f'filename: {scene_filename}{suffix}'
                     )
                 scene = generate_ile_scene(component_list, scene_index)
@@ -169,14 +186,14 @@ def main(args):
             ):
                 error_message = (
                     f'Failed to generate scene {index + 1} of '
-                    f'{args.number} (try {tries} / {MAX_TRIES}), '
+                    f'{args.number} (try {tries} / {max_tries}), '
                     f'filename: {scene_filename}{suffix}'
                 )
-                if logger.isEnabledFor(logging.DEBUG) or (tries >= MAX_TRIES):
+                if logger.isEnabledFor(logging.DEBUG) or (tries >= max_tries):
                     logging.exception(error_message)
                 else:
                     logger.info(error_message)
-                if tries >= MAX_TRIES:
+                if tries >= max_tries:
                     sys.exit(1)
 
         # If successful, save the normal and debug JSON scene files.

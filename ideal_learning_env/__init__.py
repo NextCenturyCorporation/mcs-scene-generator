@@ -27,7 +27,13 @@ from .feature_creation_service import (
 )
 from .global_settings_component import GlobalSettingsComponent
 from .goal_services import GoalConfig
-from .interactable_object_service import InteractableObjectConfig
+from .interactable_object_service import (
+    InteractableObjectConfig,
+    InteractableObjectCreationService,
+    TargetCreationService,
+    ToolConfig,
+    ToolCreationService
+)
 from .interactable_objects_component import (
     KeywordObjectsConfig,
     RandomInteractableObjectsComponent,

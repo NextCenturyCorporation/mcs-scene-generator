@@ -22,11 +22,13 @@ goal:
           rotation:
               - y: 0
 
-# Use a specific room size for this task.
+# Use a room with a specific width and a pseudo-variable depth.
 room_dimensions:
     x: 12
     y: 4
-    z: 24
+    z:
+      min: 18
+      max: 30
 
 # Generate an occluding wall containing two doors (called a "door occluder"),
 # a line of lava bisecting the room, and a platform at one side of the room,
@@ -39,7 +41,7 @@ shortcut_double_door_choice:
     start_drop_step:
         min: 1
         max: 10
-    occluder_wall_position_z: -5
+    occluder_distance_from_performer: 6.5
     # Allow only one door to be opened in each scene (forced choice).
     restrict_open_doors: true
 
@@ -70,8 +72,8 @@ structural_throwers:
       # Roll the green ball immediately as the scene begins with strong force.
       throw_step: 1
       throw_force:
-          min: 12.5
-          max: 15.0
+          min: 8.0
+          max: 12.0
 
 # Only the thrower's green ball can be green (not the walls or the floor).
 excluded_colors: green

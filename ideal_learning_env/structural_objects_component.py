@@ -2,9 +2,22 @@ import logging
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Union
 
-from generator import ALL_LARGE_BLOCK_TOOLS, materials
+from generator import materials
 from generator.scene import Scene
-from ideal_learning_env.structural_object_service import (
+
+from .choosers import choose_counts, choose_random
+from .components import ILEComponent
+from .decorators import ile_config_setter
+from .defs import (
+    TARGET_LABEL,
+    ILEDelayException,
+    RandomizableString,
+    find_bounds,
+    return_list
+)
+from .numerics import MinMaxInt, RandomizableInt
+from .object_services import KeywordLocationConfig, ObjectRepository
+from .structural_object_service import (
     DOOR_MATERIAL_RESTRICTIONS,
     DROPPER_SHAPES,
     PLACER_SHAPES,
@@ -27,18 +40,11 @@ from ideal_learning_env.structural_object_service import (
     StructuralPlatformConfig,
     StructuralRampConfig,
     StructuralThrowerConfig,
+    StructuralTubeOccluderConfig,
     StructuralTurntableConfig,
     StructuralWallConfig,
-    ToolConfig,
     WallSide
 )
-
-from .choosers import choose_counts, choose_random
-from .components import ILEComponent
-from .decorators import ile_config_setter
-from .defs import TARGET_LABEL, ILEDelayException, find_bounds, return_list
-from .numerics import MinMaxInt
-from .object_services import KeywordLocationConfig, ObjectRepository
 from .validators import ValidateNumber, ValidateOptions
 
 logger = logging.getLogger(__name__)
@@ -73,6 +79,8 @@ class RandomStructuralObjectConfig():
         - `throwers`: A random thrower that throws a random object between step
             0 and step 10.  Throw force is 500 to 1000 times the mass of the
             thrown object.
+        - `tube_occluders`: A random tube occluder.
+        - `turntables`: A random turntable.
         - `walls`: A random interior room wall.
     Default: All types
     - `num` (int, or list of ints, or [MinMaxInt](#MinMaxInt)): The number of
@@ -90,12 +98,12 @@ class RandomStructuralObjectConfig():
     structural object types.
     """
 
-    type: Union[str, List[str]] = None
-    num: Union[int, MinMaxInt, List[Union[int, MinMaxInt]]] = 0
+    type: RandomizableString = None
+    num: RandomizableInt = 0
     keyword_location: Union[KeywordLocationConfig,
                             List[KeywordLocationConfig]] = None
-    labels: Union[str, List[str]] = None
-    relative_object_label: Union[str, List[str]] = None
+    labels: RandomizableString = None
+    relative_object_label: RandomizableString = None
 
 
 class SpecificStructuralObjectsComponent(ILEComponent):
@@ -591,6 +599,43 @@ class SpecificStructuralObjectsComponent(ILEComponent):
     ```
     """
 
+    structural_tube_occluders: Union[
+        StructuralTubeOccluderConfig,
+        List[StructuralTubeOccluderConfig]
+    ] = None
+    """
+    ([StructuralTubeOccluderConfig](#StructuralTubeOccluderConfig), or list
+    of [StructuralTubeOccluderConfig](#StructuralTubeOccluderConfig) dict) --
+    One or more templates containing properties needed to generate tube
+    occluders. Default: None
+
+
+    Simple Example:
+    ```
+    structural_tube_occluders:
+        - num: 0
+    ```
+
+    Advanced Example:
+    ```
+    structural_tube_occluders:
+        - num:
+            min: 1
+            max: 3
+        - num: 1
+          position:
+            x: [1, 2]
+            y: 0
+            z:
+              min: -3
+              max: 3
+          radius: 4
+          material: WOOD_MATERIALS
+          down_step: 21
+          up_step: 81
+    ```
+    """
+
     structural_turntables: Union[StructuralTurntableConfig,
                                  List[StructuralTurntableConfig]] = 0
     """
@@ -643,50 +688,6 @@ class SpecificStructuralObjectsComponent(ILEComponent):
             step_end: 20
             rotation_y: 10
           material: AI2-THOR/Materials/Metals/BrushedAluminum_Blue
-
-
-    ```
-    """
-
-    tools: Union[ToolConfig, List[ToolConfig]] = 0
-    """
-    ([ToolConfig](#ToolConfig), or list of [ToolConfig](#ToolConfig) dict) --
-    Groups of large block tool configurations and how many should be generated
-    from the given options.
-    Default: 0
-
-
-    Simple Example:
-    ```
-    tools:
-        - num: 0
-    ```
-
-    Advanced Example:
-    ```
-    tools:
-        - num:
-            min: 1
-            max: 3
-        - num: 1
-          shape: tool_rect_1_00_x_9_00
-          position:
-            x: [1,2]
-            y: 0
-            z:
-              min: -3
-              max: 3
-        - num: [1, 3]
-          shape:
-            - tool_rect_0_50_x_4_00
-            - tool_rect_0_75_x_4_00
-            - tool_rect_1_00_x_4_00
-          position:
-            x: [4, 5]
-            y: 0
-            z:
-              min: -5
-              max: -4
 
 
     ```
@@ -843,6 +844,22 @@ class SpecificStructuralObjectsComponent(ILEComponent):
     def set_structural_occluding_walls(self, data: Any) -> None:
         self.structural_occluding_walls = data
 
+    @ile_config_setter(validator=ValidateNumber(
+        props=['down_step'], min_value=1, null_ok=True
+    ))
+    @ile_config_setter(validator=ValidateOptions(
+        props=['material'],
+        options=(materials.ALL_UNRESTRICTED_MATERIAL_LISTS_AND_STRINGS)
+    ))
+    @ile_config_setter(validator=ValidateNumber(
+        props=['radius'], min_value=0.5, null_ok=True
+    ))
+    @ile_config_setter(validator=ValidateNumber(
+        props=['up_step'], min_value=0, null_ok=True
+    ))
+    def set_structural_tube_occluders(self, data: Any) -> None:
+        self.structural_tube_occluders = data
+
     # cogs have the same material restrictions as doors
     @ile_config_setter(validator=ValidateOptions(
         props=['material'],
@@ -887,14 +904,8 @@ class SpecificStructuralObjectsComponent(ILEComponent):
     def set_doors(self, data: Any) -> None:
         self.doors = data
 
-    @ile_config_setter(validator=ValidateNumber(
-        props=['num'], min_value=0))
-    @ile_config_setter(validator=ValidateOptions(
-        props=['shape'], options=ALL_LARGE_BLOCK_TOOLS))
-    def set_tools(self, data: Any) -> None:
-        self.tools = data
-
     # Override
+
     def update_ile_scene(self, scene: Scene) -> Scene:
         logger.info('Configuring specific structural objects...')
         self._delayed_templates = []
@@ -916,8 +927,8 @@ class SpecificStructuralObjectsComponent(ILEComponent):
             (FeatureTypes.OCCLUDING_WALLS, self.structural_occluding_walls),
             (FeatureTypes.PLACERS, self.placers),
             (FeatureTypes.DOORS, self.doors),
+            (FeatureTypes.TUBE_OCCLUDERS, self.structural_tube_occluders),
             (FeatureTypes.TURNTABLES, self.structural_turntables),
-            (FeatureTypes.TOOLS, self.tools)
         ]
 
         for s_type, templates in structural_type_templates:
@@ -941,7 +952,7 @@ class SpecificStructuralObjectsComponent(ILEComponent):
     def get_num_delayed_actions(self) -> int:
         return len(self._delayed_templates)
 
-    def run_delayed_actions(self, scene: Dict[str, Any]) -> Dict[str, Any]:
+    def run_delayed_actions(self, scene: Scene) -> Scene:
         delayed = self._delayed_templates
         self._delayed_templates = []
         if delayed:
@@ -962,7 +973,8 @@ NON_STRUCTURAL_TYPES = [
     FeatureTypes.AGENT,
     FeatureTypes.INTERACTABLE,
     FeatureTypes.PARTITION_FLOOR,
-    FeatureTypes.TARGET
+    FeatureTypes.TARGET,
+    FeatureTypes.TOOLS
 ]
 ALL_STRUCTURAL_TYPES = [
     item.name.lower() for item in FeatureTypes
@@ -973,8 +985,7 @@ ALL_STRUCTURAL_TYPES_NO_TARGET = [
     item.name.lower() for item in FeatureTypes if item not in
     (STRUCTURAL_TYPES_NEEDING_TARGET + NON_STRUCTURAL_TYPES)
 ]
-# TODO MCS-1206 Include tools here for now, but move them to the default
-#      keyword_objects setting in the future since they're not structures.
+
 DEFAULT_VALUE = [RandomStructuralObjectConfig(
     ALL_STRUCTURAL_TYPES_NO_TARGET,
     MinMaxInt(2, 4)
@@ -1041,7 +1052,6 @@ class RandomStructuralObjectsComponent(ILEComponent):
           - platforms
           - ramps
           - throwers
-          - tools
           - turntables
           - walls
         num:
@@ -1058,7 +1068,7 @@ class RandomStructuralObjectsComponent(ILEComponent):
         super().__init__(data)
 
     # Override
-    def update_ile_scene(self, scene: Scene) -> Dict[str, Any]:
+    def update_ile_scene(self, scene: Scene) -> Scene:
         logger.info('Configuring random structural objects...')
 
         bounds = find_bounds(scene)
@@ -1138,10 +1148,10 @@ class RandomStructuralObjectsComponent(ILEComponent):
                 labels=template.labels,
                 projectile_labels=relative_object_label
             )
+        if structural_type == FeatureTypes.TUBE_OCCLUDERS:
+            return StructuralTubeOccluderConfig(labels=template.labels)
         if structural_type == FeatureTypes.TURNTABLES:
             return StructuralTurntableConfig(labels=template.labels)
-        if structural_type == FeatureTypes.TOOLS:
-            return ToolConfig(labels=template.labels)
         if structural_type == FeatureTypes.WALLS:
             return StructuralWallConfig(labels=template.labels)
         # Otherwise return None; defaults will be used automatically.

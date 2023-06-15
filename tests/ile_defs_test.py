@@ -138,18 +138,24 @@ def test_find_bounds():
     ], max_y=100, min_y=0)
 
     # Case 4: 1 hole
-    scene = Scene(holes=[{'x': 3, 'z': 3}], objects=[])
+    scene = Scene(holes=[Vector2dInt(x=3, z=3)], objects=[])
     assert find_bounds(scene) == [bounds_3]
 
     # Case 5: 2 holes
-    scene = Scene(holes=[{'x': 3, 'z': 3}, {'x': -3, 'z': -3}], objects=[])
+    scene = Scene(
+        holes=[Vector2dInt(x=3, z=3), Vector2dInt(x=-3, z=-3)],
+        objects=[]
+    )
     assert find_bounds(scene) == [bounds_3, bounds_4]
 
     # Case 6: holes and objects
-    scene = Scene(holes=[{'x': 3, 'z': 3}, {'x': -3, 'z': -3}], objects=[
-        {'shows': [{'boundingBox': bounds_1}]},
-        {'shows': [{'boundingBox': bounds_2}]}
-    ])
+    scene = Scene(
+        holes=[Vector2dInt(x=3, z=3), Vector2dInt(x=-3, z=-3)],
+        objects=[
+            {'shows': [{'boundingBox': bounds_1}]},
+            {'shows': [{'boundingBox': bounds_2}]}
+        ]
+    )
     assert find_bounds(scene) == [bounds_3, bounds_4, bounds_1, bounds_2]
 
     # Case 7: floor textures
@@ -160,28 +166,37 @@ def test_find_bounds():
     assert find_bounds(scene) == []
 
     # Case 8: 1 lava area
-    scene = Scene(lava=[{'x': 3, 'z': 3}], objects=[])
+    scene = Scene(lava=[Vector2dInt(x=3, z=3)], objects=[])
     assert find_bounds(scene) == [bounds_3]
 
     # Case 9: 2 lava areas
-    scene = Scene(lava=[{'x': 3, 'z': 3}, {'x': -3, 'z': -3}], objects=[])
+    scene = Scene(
+        lava=[Vector2dInt(x=3, z=3), Vector2dInt(x=-3, z=-3)],
+        objects=[]
+    )
     assert find_bounds(scene) == [bounds_3, bounds_4]
 
     # Case 10: lava areas and objects
-    scene = Scene(lava=[{'x': 3, 'z': 3}, {'x': -3, 'z': -3}], objects=[
-        {'shows': [{'boundingBox': bounds_1}]},
-        {'shows': [{'boundingBox': bounds_2}]}
-    ])
+    scene = Scene(
+        lava=[Vector2dInt(x=3, z=3), Vector2dInt(x=-3, z=-3)],
+        objects=[
+            {'shows': [{'boundingBox': bounds_1}]},
+            {'shows': [{'boundingBox': bounds_2}]}
+        ]
+    )
     assert find_bounds(scene) == [bounds_3, bounds_4, bounds_1, bounds_2]
 
     # Case 11: everything
     scene = Scene(floor_textures=FloorTexturesConfig(
         material='blue',
         positions=[Vector2dInt(x=0, z=0)]),
-        lava=[{'x': 3, 'z': 3}], holes=[{'x': -3, 'z': -3}], objects=[
-        {'shows': [{'boundingBox': bounds_1}]},
-        {'shows': [{'boundingBox': bounds_2}]}
-    ])
+        lava=[Vector2dInt(x=3, z=3)],
+        holes=[Vector2dInt(x=-3, z=-3)],
+        objects=[
+            {'shows': [{'boundingBox': bounds_1}]},
+            {'shows': [{'boundingBox': bounds_2}]}
+    ]
+    )
     assert find_bounds(scene) == [bounds_4, bounds_3, bounds_1, bounds_2]
 
 

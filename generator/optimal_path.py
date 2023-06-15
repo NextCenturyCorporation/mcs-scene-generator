@@ -17,6 +17,7 @@ from .geometry import (
     PERFORMER_CAMERA_Y,
     PERFORMER_HALF_WIDTH
 )
+from .objects import SceneObject
 
 plotting.EXPORT_SIZE_X = plotting.EXPORT_SIZE_Y
 
@@ -74,9 +75,10 @@ def _dilate_and_unify_object_bounds(
     if isinstance(merged_poly_list, Polygon):
         merged_poly_list = [merged_poly_list]
 
-    poly_coords_list = [
-        list(poly.exterior.coords) for poly in merged_poly_list
-    ]
+    poly_coords_list = [list(poly.exterior.coords) for poly in (
+        merged_poly_list.geoms if hasattr(merged_poly_list, 'geoms')
+        else merged_poly_list
+    )]
     # The polys returned by unary_union have the same first and last point,
     # but the shortest path code doesn't want them to have the repeated point.
     for coords in poly_coords_list:
@@ -109,9 +111,9 @@ def _dilate_target_bounds(
 
 
 def _find_target_or_parent_dict(
-    target_object: Dict[str, Any],
-    object_list: List[Dict[str, Any]]
-) -> Dict[str, Any]:
+    target_object: SceneObject,
+    object_list: List[SceneObject]
+) -> SceneObject:
     """Find and return the target object dict from the given object list."""
     logging.debug('target {target_object}')
     if 'locationParent' in target_object:
@@ -353,8 +355,8 @@ def _rotate_then_move(
 def find_possible_best_path_list(
     room_dimensions: Optional[Dict[str, float]],
     performer_start: Dict[str, Any],
-    target_dict: Dict[str, Any],
-    object_list: List[Dict[str, Any]],
+    target_dict: SceneObject,
+    object_list: List[SceneObject],
     save_path_plot_with_name: str = None
 ) -> Tuple[List[ShortestPath]]:
     """Find and return lists of MCS actions that each may be the shortest path
@@ -453,7 +455,7 @@ def look_at_target(
 def open_container_and_pickup_target(
     path: ShortestPath,
     target_id: str,
-    container_dict: Dict[str, Any]
+    container_dict: SceneObject
 ) -> None:
     """Update the given path to open the container with the given data and
     pickup the target with the given ID."""

@@ -12,6 +12,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 from machine_common_sense.config_manager import Vector3d
 
 from . import materials, tags
+from .objects import SceneObject
 
 MAX_SIZE_DIFF = 0.05
 
@@ -340,9 +341,12 @@ class ObjectDefinition(
 
     def _assign_chosen_option(self, choice: _DefinitionChoice) -> None:
         for prop in (choice.get_props() + choice.get_debug_props()):
-            if getattr(choice, prop) is not None:
+            data = getattr(choice, prop)
+            if data is not None:
+                if prop == 'massMultiplier' and self.massMultiplier:
+                    data *= self.massMultiplier
                 # This will override the existing property, if set.
-                setattr(self, prop, getattr(choice, prop))
+                setattr(self, prop, data)
 
 
 class ChosenMaterial(Enum):
@@ -579,19 +583,19 @@ def finalize_object_materials_and_colors(
 
 
 def _create_size_list(
-    definition_or_instance_1: Union[ObjectDefinition, Dict[str, Any]],
-    definition_or_instance_2: Union[ObjectDefinition, Dict[str, Any]],
+    definition_or_instance_1: Union[ObjectDefinition, SceneObject],
+    definition_or_instance_2: Union[ObjectDefinition, SceneObject],
     only_diagonal_size: bool
 ) -> List[Tuple[float, float]]:
 
-    # TODO MCS-697 Define an ObjectInstance class extending ObjectDefinition.
-    if isinstance(definition_or_instance_1, dict):
+    # TODO MCS-697 Use dot notation for SceneObject
+    if isinstance(definition_or_instance_1, (SceneObject, dict)):
         dimensions_1 = definition_or_instance_1['debug']['dimensions']
     else:
         dimensions_1 = vars(definition_or_instance_1.dimensions)
 
-    # TODO MCS-697 Define an ObjectInstance class extending ObjectDefinition.
-    if isinstance(definition_or_instance_2, dict):
+    # TODO MCS-697 Use dot notation for SceneObject
+    if isinstance(definition_or_instance_2, (SceneObject, dict)):
         dimensions_2 = definition_or_instance_2['debug']['dimensions']
     else:
         dimensions_2 = vars(definition_or_instance_2.dimensions)
@@ -626,15 +630,15 @@ def do_materials_match(
 
 
 def is_similar_except_in_color(
-    definition_or_instance_1: Union[ObjectDefinition, Dict[str, Any]],
-    definition_or_instance_2: Union[ObjectDefinition, Dict[str, Any]],
+    definition_or_instance_1: Union[ObjectDefinition, SceneObject],
+    definition_or_instance_2: Union[ObjectDefinition, SceneObject],
     only_diagonal_size: bool = False
 ) -> bool:
     """Return whether the two given objects are similar in shape
     (type) and size (dimensions) but not color."""
 
-    # TODO MCS-697 Define an ObjectInstance class extending ObjectDefinition.
-    if isinstance(definition_or_instance_1, dict):
+    # TODO MCS-697 Use dot notation for SceneObject
+    if isinstance(definition_or_instance_1, (SceneObject, dict)):
         type_1 = definition_or_instance_1['type']
         material_1 = definition_or_instance_1['materials'] or []
         color_1 = definition_or_instance_1['debug']['color'] or []
@@ -643,8 +647,8 @@ def is_similar_except_in_color(
         material_1 = definition_or_instance_1.materials or []
         color_1 = definition_or_instance_1.color or []
 
-    # TODO MCS-697 Define an ObjectInstance class extending ObjectDefinition.
-    if isinstance(definition_or_instance_2, dict):
+    # TODO MCS-697 Use dot notation for SceneObject
+    if isinstance(definition_or_instance_2, (SceneObject, dict)):
         type_2 = definition_or_instance_2['type']
         material_2 = definition_or_instance_2['materials'] or []
         color_2 = definition_or_instance_2['debug']['color'] or []
@@ -678,15 +682,15 @@ def is_similar_except_in_color(
 
 
 def is_similar_except_in_shape(
-    definition_or_instance_1: Union[ObjectDefinition, Dict[str, Any]],
-    definition_or_instance_2: Union[ObjectDefinition, Dict[str, Any]],
+    definition_or_instance_1: Union[ObjectDefinition, SceneObject],
+    definition_or_instance_2: Union[ObjectDefinition, SceneObject],
     only_diagonal_size: bool = False
 ) -> bool:
     """Return whether the two given objects are similar in color
     and size (dimensions) but not shape (type)."""
 
-    # TODO MCS-697 Define an ObjectInstance class extending ObjectDefinition.
-    if isinstance(definition_or_instance_1, dict):
+    # TODO MCS-697 Use dot notation for SceneObject
+    if isinstance(definition_or_instance_1, (SceneObject, dict)):
         type_1 = definition_or_instance_1['type']
         material_1 = definition_or_instance_1['materials'] or []
         color_1 = definition_or_instance_1['debug']['color'] or []
@@ -695,8 +699,8 @@ def is_similar_except_in_shape(
         material_1 = definition_or_instance_1.materials or []
         color_1 = definition_or_instance_1.color or []
 
-    # TODO MCS-697 Define an ObjectInstance class extending ObjectDefinition.
-    if isinstance(definition_or_instance_2, dict):
+    # TODO MCS-697 Use dot notation for SceneObject
+    if isinstance(definition_or_instance_2, (SceneObject, dict)):
         type_2 = definition_or_instance_2['type']
         material_2 = definition_or_instance_2['materials'] or []
         color_2 = definition_or_instance_2['debug']['color'] or []
@@ -730,15 +734,15 @@ def is_similar_except_in_shape(
 
 
 def is_similar_except_in_size(
-    definition_or_instance_1: Union[ObjectDefinition, Dict[str, Any]],
-    definition_or_instance_2: Union[ObjectDefinition, Dict[str, Any]],
+    definition_or_instance_1: Union[ObjectDefinition, SceneObject],
+    definition_or_instance_2: Union[ObjectDefinition, SceneObject],
     only_diagonal_size: bool = False
 ) -> bool:
     """Return whether the two given objects are similar in color
     and shape (type) but not size (dimensions)."""
 
-    # TODO MCS-697 Define an ObjectInstance class extending ObjectDefinition.
-    if isinstance(definition_or_instance_1, dict):
+    # TODO MCS-697 Use dot notation for SceneObject
+    if isinstance(definition_or_instance_1, (SceneObject, dict)):
         type_1 = definition_or_instance_1['type']
         material_1 = definition_or_instance_1['materials'] or []
         color_1 = definition_or_instance_1['debug']['color'] or []
@@ -747,8 +751,8 @@ def is_similar_except_in_size(
         material_1 = definition_or_instance_1.materials or []
         color_1 = definition_or_instance_1.color or []
 
-    # TODO MCS-697 Define an ObjectInstance class extending ObjectDefinition.
-    if isinstance(definition_or_instance_2, dict):
+    # TODO MCS-697 Use dot notation for SceneObject
+    if isinstance(definition_or_instance_2, (SceneObject, dict)):
         type_2 = definition_or_instance_2['type']
         material_2 = definition_or_instance_2['materials'] or []
         color_2 = definition_or_instance_2['debug']['color'] or []
@@ -782,7 +786,7 @@ def is_similar_except_in_size(
 
 
 def get_similar_definition(
-    target_object: Union[ObjectDefinition, Dict[str, Any]],
+    target_object: Union[ObjectDefinition, SceneObject],
     definition_dataset: DefinitionDataset,
     # We should only ever set unshuffled to True in a unit test.
     unshuffled: bool = False
@@ -1033,6 +1037,50 @@ class DefinitionDataset():
             return False
 
         return self.filter_on_custom(_callback)
+
+    def dataset_unique_shape_scale(self, keep: int = 1) -> DefinitionDataset:
+        """Function for unit tests: Return a new dataset containing all of the
+        definitions in this dataset, but only keep one (or the given number)
+        definition with the same shape and scale combination (ignore color)."""
+        unique = {}
+        groups = []
+        for definition_selections in self._definition_groups:
+            selections = []
+            for definition_variations in definition_selections:
+                variations = []
+                for definition in definition_variations[:keep]:
+                    if definition.type not in unique:
+                        unique[definition.type] = {}
+                    scale_str = str(definition.scale)
+                    if scale_str not in unique[definition.type]:
+                        unique[definition.type][scale_str] = 0
+                    if unique[definition.type][scale_str] < keep:
+                        unique[definition.type][scale_str] += 1
+                        variations.append(definition)
+                if variations:
+                    selections.append(variations)
+            if selections:
+                groups.append(selections)
+        return DefinitionDataset(groups)
+
+    def definitions_unique_shape_scale(self) -> List[ObjectDefinition]:
+        """Function for unit tests: Return a list of all of the object
+        definitions in this dataset, but only keep one definition with the same
+        shape and scale combination (ignore color)."""
+        unique = {}
+        output = []
+        for definition_selections in self._definition_groups:
+            for definition_variations in definition_selections:
+                for definition in definition_variations[:1]:
+                    if definition.type not in unique:
+                        unique[definition.type] = {}
+                    scale_str = str(definition.scale)
+                    if scale_str not in unique[definition.type]:
+                        unique[definition.type][scale_str] = 0
+                    if unique[definition.type][scale_str] < 1:
+                        unique[definition.type][scale_str] += 1
+                        output.append(ObjectDefinition(**definition._asdict()))
+        return output
 
 
 DATASETS: Dict[str, DefinitionDataset] = {}

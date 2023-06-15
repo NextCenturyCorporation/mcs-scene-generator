@@ -1,7 +1,7 @@
 import math
 
 import pytest
-from machine_common_sense.config_manager import PerformerStart, Vector3d
+from machine_common_sense.config_manager import Goal, PerformerStart, Vector3d
 from numpy import arange
 from shapely.geometry import Point, Polygon
 
@@ -79,9 +79,9 @@ def test_global_settings():
         is None
     assert isinstance(scene.floor_material, str)
     assert scene.floor_properties is None
-    assert scene.goal.get('last_step') is None
-    assert scene.goal.get('category') is None
-    assert scene.goal.get('metadata') == {}
+    assert scene.goal.last_step is None
+    assert scene.goal.category is None
+    assert scene.goal.metadata == {}
     dimensions = scene.room_dimensions
     assert dimensions.x >= 2 and dimensions.x <= 100
     assert dimensions.y >= 2 and dimensions.y <= 10
@@ -101,11 +101,11 @@ def test_global_settings():
     assert rotation.x == 0
     assert rotation.y >= 0 and rotation.y <= 360
     assert rotation.z == 0
-    wall_material = scene.room_materials['back']
+    wall_material = scene.room_materials.back
     assert isinstance(wall_material, str)
-    assert scene.room_materials['front'] == wall_material
-    assert scene.room_materials['left'] == wall_material
-    assert scene.room_materials['right'] == wall_material
+    assert scene.room_materials.front == wall_material
+    assert scene.room_materials.left == wall_material
+    assert scene.room_materials.right == wall_material
     assert scene.debug['ceilingColors']
     assert scene.debug['floorColors']
     assert scene.debug['wallColors']
@@ -278,7 +278,7 @@ def test_global_settings_configured():
     assert component.occluder_gap == 1.0
     assert component.occluder_gap_viewport == 1.0
     assert component.performer_start_position == VectorFloatConfig(-1, 0, 1)
-    assert component.performer_start_rotation == VectorIntConfig(-10, 90, 0)
+    assert component.performer_start_rotation == VectorFloatConfig(-10, 90, 0)
     assert component.restrict_open_doors
     assert component.restrict_open_objects
     assert component.room_dimensions == VectorIntConfig(5, 3, 10)
@@ -296,14 +296,14 @@ def test_global_settings_configured():
     assert shared_config.get_excluded_shapes() == ['ball', 'pacifier']
     assert scene.floor_material == 'Custom/Materials/GreyCarpetMCS'
     assert scene.floor_properties is None
-    assert scene.goal['category'] == 'retrieval'
-    assert scene.goal['description'] in [
+    assert scene.goal.category == 'retrieval'
+    assert scene.goal.description in [
         'Find and pick up the tiny light black white rubber ball.',
         'Find and pick up the medium light black white rubber ball.',
         'Find and pick up the small light black white rubber ball.'
     ]
-    assert scene.goal['last_step'] == 1000
-    assert scene.goal['metadata']['target']['id']
+    assert scene.goal.last_step == 1000
+    assert scene.goal.metadata['target']['id']
     assert ILESharedConfiguration.get_instance().get_occluder_gap() == 1.0
     assert ILESharedConfiguration.get_instance().get_occluder_gap_viewport() \
         == 1.0
@@ -312,12 +312,10 @@ def test_global_settings_configured():
     assert scene.restrict_open_doors is True
     assert scene.restrict_open_objects is True
     assert scene.room_dimensions == Vector3d(x=5, y=3, z=10)
-    assert scene.room_materials == {
-        'back': 'Custom/Materials/WhiteDrywallMCS',
-        'front': 'Custom/Materials/BlueDrywallMCS',
-        'left': 'Custom/Materials/GreenDrywallMCS',
-        'right': 'Custom/Materials/RedDrywallMCS'
-    }
+    assert scene.room_materials.front == 'Custom/Materials/BlueDrywallMCS'
+    assert scene.room_materials.back == 'Custom/Materials/WhiteDrywallMCS'
+    assert scene.room_materials.left == 'Custom/Materials/GreenDrywallMCS'
+    assert scene.room_materials.right == 'Custom/Materials/RedDrywallMCS'
     assert not scene.intuitive_physics
     assert len(scene.objects) == 1
     assert scene.objects[0]['type'] == 'soccer_ball'
@@ -371,7 +369,7 @@ def test_global_settings_passive_physics_scene():
     assert component.occluder_gap_viewport == 1.0
     assert component.passive_physics_scene is True
     assert component.performer_start_position == VectorFloatConfig(-1, 0, 1)
-    assert component.performer_start_rotation == VectorIntConfig(-10, 90, 0)
+    assert component.performer_start_rotation == VectorFloatConfig(-10, 90, 0)
     assert component.room_dimensions == VectorIntConfig(5, 3, 10)
     assert component.room_shape == 'square'
     assert component.wall_back_material == 'Custom/Materials/WhiteDrywallMCS'
@@ -396,21 +394,19 @@ def test_global_settings_passive_physics_scene():
     assert scene.floor_properties['drag'] == 0
     assert scene.floor_properties['dynamicFriction'] == 0.1
     assert scene.floor_properties['staticFriction'] == 0.1
-    assert scene.goal['category'] == 'intuitive physics'
-    assert scene.goal['description'] == ''
-    assert scene.goal['last_step'] == 1000
-    assert scene.goal['metadata'] == {}
+    assert scene.goal.category == 'intuitive physics'
+    assert scene.goal.description == ''
+    assert scene.goal.last_step == 1000
+    assert scene.goal.metadata == {}
     assert scene.performer_start == PerformerStart(
         position=Vector3d(x=0, y=0, z=-4.5),
         rotation=Vector3d(x=0, y=0, z=0)
     )
     assert scene.room_dimensions == Vector3d(x=20, y=10, z=20)
-    assert scene.room_materials == {
-        'back': 'Custom/Materials/WhiteDrywallMCS',
-        'front': 'Custom/Materials/BlueDrywallMCS',
-        'left': 'Custom/Materials/GreenDrywallMCS',
-        'right': 'Custom/Materials/RedDrywallMCS'
-    }
+    assert scene.room_materials.front == 'Custom/Materials/BlueDrywallMCS'
+    assert scene.room_materials.back == 'Custom/Materials/WhiteDrywallMCS'
+    assert scene.room_materials.left == 'Custom/Materials/GreenDrywallMCS'
+    assert scene.room_materials.right == 'Custom/Materials/RedDrywallMCS'
 
     # Cleanup
     shared_config.set_excluded_colors([])
@@ -426,17 +422,17 @@ def test_global_settings_side_wall_opposite_colors():
     assert component.side_wall_opposite_colors
 
     scene = component.update_ile_scene(prior_scene())
-    options = [item.material for item in materials.OPPOSITE_MATERIALS]
-    wall_material = scene.room_materials['back']
+    options = [item.material for item in materials.WALL_OPPOSITE_MATERIALS]
+    wall_material = scene.room_materials.back
     assert wall_material in options
     opposite_material = materials.OPPOSITE_SETS[wall_material].material
-    assert scene.room_materials['front'] == wall_material
+    assert scene.room_materials.front == wall_material
     assert (
-        scene.room_materials['left'] == wall_material and
-        scene.room_materials['right'] == opposite_material
+        scene.room_materials.left == wall_material and
+        scene.room_materials.right == opposite_material
     ) or (
-        scene.room_materials['right'] == wall_material and
-        scene.room_materials['left'] == opposite_material
+        scene.room_materials.right == wall_material and
+        scene.room_materials.left == opposite_material
     )
 
 
@@ -474,20 +470,18 @@ def test_global_settings_trapezoidal_room():
     assert scene.ceiling_material == 'Custom/Materials/GreyDrywallMCS'
     assert scene.floor_material == 'Custom/Materials/GreyCarpetMCS'
     assert scene.floor_properties is None
-    assert scene.goal['category'] == 'retrieval'
-    assert scene.goal['description'] in [
+    assert scene.goal.category == 'retrieval'
+    assert scene.goal.description in [
         'Find and pick up the tiny light black white rubber ball.',
         'Find and pick up the medium light black white rubber ball.',
         'Find and pick up the small light black white rubber ball.'
     ]
-    assert scene.goal['metadata']['target']['id']
+    assert scene.goal.metadata['target']['id']
     assert scene.room_dimensions == Vector3d(x=12, y=3, z=16)
-    assert scene.room_materials == {
-        'back': 'Custom/Materials/WhiteDrywallMCS',
-        'front': 'Custom/Materials/BlueDrywallMCS',
-        'left': 'Custom/Materials/GreenDrywallMCS',
-        'right': 'Custom/Materials/RedDrywallMCS'
-    }
+    assert scene.room_materials.front == 'Custom/Materials/BlueDrywallMCS'
+    assert scene.room_materials.back == 'Custom/Materials/WhiteDrywallMCS'
+    assert scene.room_materials.left == 'Custom/Materials/GreenDrywallMCS'
+    assert scene.room_materials.right == 'Custom/Materials/RedDrywallMCS'
     assert not scene.intuitive_physics
     assert len(scene.objects) == 3
     wall_left = scene.objects[0]
@@ -509,10 +503,10 @@ def test_global_settings_wall_material():
     assert component.wall_material == "Custom/Materials/BrownDrywallMCS"
 
     scene = component.update_ile_scene(prior_scene())
-    assert scene.room_materials['back'] == "Custom/Materials/BrownDrywallMCS"
-    assert scene.room_materials['front'] == "Custom/Materials/BrownDrywallMCS"
-    assert scene.room_materials['left'] == "Custom/Materials/BrownDrywallMCS"
-    assert scene.room_materials['right'] == "Custom/Materials/BrownDrywallMCS"
+    assert scene.room_materials.back == "Custom/Materials/BrownDrywallMCS"
+    assert scene.room_materials.front == "Custom/Materials/BrownDrywallMCS"
+    assert scene.room_materials.left == "Custom/Materials/BrownDrywallMCS"
+    assert scene.room_materials.right == "Custom/Materials/BrownDrywallMCS"
 
 
 def test_auto_last_step():
@@ -521,7 +515,7 @@ def test_auto_last_step():
         'room_dimensions': {'x': 5, 'y': 3, 'z': 10},
     })
     scene: Scene = component.update_ile_scene(prior_scene())
-    assert scene.goal['last_step'] == 2000
+    assert scene.goal.last_step == 2000
 
 
 def test_last_step_both_methods():
@@ -531,7 +525,7 @@ def test_last_step_both_methods():
         'room_dimensions': {'x': 5, 'y': 3, 'z': 10},
     })
     scene: Scene = component.update_ile_scene(prior_scene())
-    assert scene.goal['last_step'] == 987
+    assert scene.goal.last_step == 987
 
 
 def test_global_settings_fail_ceiling_material():
@@ -1086,6 +1080,9 @@ def test_global_settings_performer_starts_near():
             scene = component.update_ile_scene(
                 prior_scene_custom_start(10, 10))
             assert component.get_num_delayed_actions() == 1
+            room_dimensions = scene.room_dimensions
+            assert scene.performer_start.position.x == room_dimensions.x + 1
+            assert scene.performer_start.position.z == room_dimensions.z + 1
 
             object_comp = SpecificInteractableObjectsComponent(data)
             scene = object_comp.update_ile_scene(scene)
@@ -1209,12 +1206,12 @@ def test_global_settings_forced_choice_multi_retrieval_target_left():
         'forced_choice_multi_retrieval_target': 'soccer_ball'
     })
     scene = component.update_ile_scene(scene)
-    assert scene.goal == {'metadata': {}}
+    assert scene.goal == Goal(metadata={})
     scene = component.run_actions_at_end_of_scene_generation(scene)
     assert len(scene.objects) == 1
-    assert scene.goal['category'] == 'multi retrieval'
-    assert scene.goal['description']
-    assert scene.goal['metadata'] == {'targets': [
+    assert scene.goal.category == 'multi retrieval'
+    assert scene.goal.description
+    assert scene.goal.metadata == {'targets': [
         {'id': scene.objects[0]['id']}
     ]}
 
@@ -1238,12 +1235,12 @@ def test_global_settings_forced_choice_multi_retrieval_target_right():
         'forced_choice_multi_retrieval_target': 'soccer_ball'
     })
     scene = component.update_ile_scene(scene)
-    assert scene.goal == {'metadata': {}}
+    assert scene.goal == Goal(metadata={})
     scene = component.run_actions_at_end_of_scene_generation(scene)
     assert len(scene.objects) == 3
-    assert scene.goal['category'] == 'multi retrieval'
-    assert scene.goal['description']
-    assert scene.goal['metadata'] == {'targets': [
+    assert scene.goal.category == 'multi retrieval'
+    assert scene.goal.description
+    assert scene.goal.metadata == {'targets': [
         {'id': scene.objects[0]['id']},
         {'id': scene.objects[2]['id']}
     ]}
@@ -1270,12 +1267,12 @@ def test_global_settings_forced_choice_multi_retrieval_target_pickup():
         'forced_choice_multi_retrieval_target': 'soccer_ball'
     })
     scene = component.update_ile_scene(scene)
-    assert scene.goal == {'metadata': {}}
+    assert scene.goal == Goal(metadata={})
     scene = component.run_actions_at_end_of_scene_generation(scene)
     assert len(scene.objects) == 3
-    assert scene.goal['category'] == 'multi retrieval'
-    assert scene.goal['description']
-    assert scene.goal['metadata'] == {'targets': [
+    assert scene.goal.category == 'multi retrieval'
+    assert scene.goal.description
+    assert scene.goal.metadata == {'targets': [
         {'id': scene.objects[1]['id']}
     ]}
 

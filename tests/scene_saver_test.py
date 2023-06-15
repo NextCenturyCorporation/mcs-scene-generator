@@ -1,8 +1,8 @@
 import copy
 
-from machine_common_sense.config_manager import Vector3d
+from machine_common_sense.config_manager import Goal, Vector3d
 
-from generator import ObjectBounds, Scene
+from generator import ObjectBounds, Scene, SceneObject
 from generator.scene_saver import (
     _convert_non_serializable_data,
     _strip_debug_data,
@@ -15,7 +15,7 @@ from generator.scene_saver import (
 
 
 def create_test_object():
-    return {
+    return SceneObject({
         'id': 'thing1',
         'type': 'thing_1',
         'debug': {
@@ -50,7 +50,7 @@ def create_test_object():
                 Vector3d(x=2.5, y=0, z=3.5), Vector3d(x=2, y=0, z=3.5)
             ], max_y=1, min_y=0)
         }]
-    }
+    })
 
 
 def test_find_next_filename():
@@ -94,7 +94,7 @@ def test_find_next_filename():
 
 def test_convert_non_serializable_data():
     scene = Scene(objects=[create_test_object()])
-    expected_object = create_test_object()
+    expected_object = create_test_object().data
     expected_object['shows'][0]['boundingBox'] = [
         {'x': 2, 'y': 0, 'z': 3},
         {'x': 2.5, 'y': 0, 'z': 3},
@@ -117,50 +117,50 @@ def test_strip_debug_data():
             'wallColors': ['blue']
         },
         objects=[create_test_object()],
-        goal={
-            'category': 'test',
-            'domainsInfo': {
+        goal=Goal(
+            category='test',
+            domains_info={
                 'domainsTag': True
             },
-            'objectsInfo': {
+            objects_info={
                 'objectsTag': True
             },
-            'sceneInfo': {
+            scene_info={
                 'sceneTag': True
             },
-            'metadata': {
+            metadata={
                 'target': {
                     'id': 'golden_idol',
                     'info': ['gold', 'idol']
                 }
             }
-        }
-    )
+        )
+    ).to_dict()
     expected = Scene(
         debug=None,
-        objects=[{
+        objects=[SceneObject({
             'id': 'thing1',
             'type': 'thing_1',
             'shows': [{
                 'stepBegin': 0
             }]
-        }],
-        goal={
-            'category': 'test',
-            'metadata': {
+        })],
+        goal=Goal(
+            category='test',
+            metadata={
                 'target': {
                     'id': 'golden_idol'
                 }
             }
-        }
-    )
-    _strip_debug_data(scene)
-    assert scene == expected
+        )
+    ).to_dict()
+    actual = _strip_debug_data(scene)
+    assert actual == expected
 
 
 def test_strip_debug_misleading_data():
     obj = create_test_object()
-    expected = copy.deepcopy(obj)
+    expected = copy.deepcopy(obj.data)
     expected['debug']['movement'] = {
         'deepExit': {
             'key': 'value'

@@ -5,12 +5,13 @@ from typing import Any, Dict
 from . import exceptions, tags
 from .definitions import ObjectDefinition
 from .geometry import create_bounds
+from .objects import SceneObject
 
 
 def instantiate_object(
     definition: ObjectDefinition,
     object_location: Dict[str, Any]
-) -> Dict[str, Any]:
+) -> SceneObject:
     """Create a new object from an object definition (as from the objects.json
     file). object_location will be modified by this function."""
     if definition is None or object_location is None:
@@ -28,7 +29,7 @@ def instantiate_object(
         )
 
     # TODO MCS-697 Define and use an ObjectInstance class here.
-    instance = {
+    instance = SceneObject({
         'id': str(uuid.uuid4()),
         'type': definition.type,
         'mass': definition.mass * definition.massMultiplier,
@@ -41,7 +42,7 @@ def instantiate_object(
             'shape': definition.shape,
             'size': definition.size
         }
-    }
+    })
 
     if not definition.dimensions:
         raise exceptions.SceneException(
@@ -179,7 +180,7 @@ def instantiate_object(
     return instance
 
 
-def get_earliest_active_step(instance: Dict[str, Any]) -> int:
+def get_earliest_active_step(instance: SceneObject) -> int:
     """Return the last step on which the given instance is scripted to move,
     rotate, or have a force applied to it. Return -1 if the given instance is
     never scripted to move, rotate, or has a force applied to it."""
@@ -192,7 +193,7 @@ def get_earliest_active_step(instance: Dict[str, Any]) -> int:
     return min([item['stepBegin'] for item in actions])
 
 
-def get_last_move_or_rotate_step(instance: Dict[str, Any]) -> int:
+def get_last_move_or_rotate_step(instance: SceneObject) -> int:
     """Return the last step on which the given instance is scripted to move or
     rotate, or -1 if the given instance never moves or rotates. Does not work
     with scripted forces."""

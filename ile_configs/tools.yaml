@@ -10,6 +10,8 @@ shortcut_lava_target_tool:
     tool_rotation: [0, 15, 30, 45, 60, 75, 90]
     # Generate either a rectangular or a hooked (L-shaped) tool.
     tool_type: [rectangular, hooked]
+    # Whether to generate guide rails for the tool.
+    guide_rails: False
 
 # Sometimes (25%) make an extra tool that is "too small" to use effectively.
 # Remove this whole block if you do not wish to generate this extra tool.

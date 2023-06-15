@@ -1,5 +1,5 @@
 import pytest
-from machine_common_sense.config_manager import Vector3d
+from machine_common_sense.config_manager import Vector2dInt, Vector3d
 
 from generator import ObjectBounds
 from ideal_learning_env.defs import ILEException
@@ -71,7 +71,7 @@ def test_valid_path_blocked_by_holes():
     # create blocked by holes
     holes = scene.holes
     for i in range(11):
-        holes.append({'x': i - 5, 'z': 2})
+        holes.append(Vector2dInt(x=(i - 5), z=2))
 
     with pytest.raises(ILEException):
         component.update_ile_scene(scene)
@@ -82,7 +82,7 @@ def test_valid_path_blocked_by_lava():
     scene = prior_scene_with_target()
 
     # create blocked by lava
-    scene.lava = [{'x': i - 5, 'z': 2} for i in range(11)]
+    scene.lava = [Vector2dInt(x=(i - 5), z=2) for i in range(11)]
 
     with pytest.raises(ILEException):
         component.update_ile_scene(scene)
@@ -515,9 +515,9 @@ def test_valid_path_with_lava_and_holes():
     # create blocked by holes
     holes = scene.holes
     for i in range(8):
-        holes.append({'x': i - 5, 'z': 3})
+        holes.append(Vector2dInt(x=(i - 5), z=3))
 
-    scene.lava = [{'x': i - 3, 'z': 0} for i in range(8)]
+    scene.lava = [Vector2dInt(x=(i - 3), z=0) for i in range(8)]
 
     component.update_ile_scene(scene)
     assert component.last_distance == pytest.approx(15, 0.1)

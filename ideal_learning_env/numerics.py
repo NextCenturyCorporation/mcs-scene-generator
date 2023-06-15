@@ -164,6 +164,7 @@ def retrieve_all_vectors(
     )
 
 
+RandomizableVectorInt3d = Union[VectorIntConfig, List[VectorIntConfig]]
 RandomizableVectorFloat3d = Union[VectorFloatConfig, List[VectorFloatConfig]]
 RandomizableInt = Union[int, MinMaxInt, List[Union[int, MinMaxInt]]]
 RandomizableFloat = Union[float, MinMaxFloat, List[Union[float, MinMaxFloat]]]

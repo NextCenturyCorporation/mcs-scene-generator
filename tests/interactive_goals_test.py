@@ -1,6 +1,7 @@
 import uuid
 
 import pytest
+from machine_common_sense.config_manager import Goal
 
 from generator import RetrievalGoal, TransferralGoal, TraversalGoal, geometry
 
@@ -49,11 +50,11 @@ def test_RetrievalGoal_update_goal_template():
     }
 
     goal = RetrievalGoal('')
-    config = goal.update_goal_template({}, [target])
+    config = goal.update_goal_template(Goal(), [target])
 
-    assert config['description'] == 'Find and pick up the blue rubber ball.'
-    assert config['metadata']['target']['id'] == target['id']
-    assert config['metadata']['target']['info'] == [
+    assert config.description == 'Find and pick up the blue rubber ball.'
+    assert config.metadata['target']['id'] == target['id']
+    assert config.metadata['target']['info'] == [
         'blue', 'rubber', 'ball'
     ]
 
@@ -106,22 +107,22 @@ def test_TransferralGoal_update_goal_template():
     }
 
     goal = TransferralGoal('')
-    config = goal.update_goal_template({}, [target_1, target_2])
+    config = goal.update_goal_template(Goal(), [target_1, target_2])
 
-    relationship = config['metadata']['relationship']
+    relationship = config.metadata['relationship']
     relationship_type = relationship[1]
     assert relationship_type in [
         item.value for item in TransferralGoal.RelationshipType
     ]
 
-    assert config['description'] == 'Find and pick up the blue rubber ' + \
+    assert config.description == 'Find and pick up the blue rubber ' + \
         'ball and move it ' + relationship_type + ' the grey fabric sofa.'
-    assert config['metadata']['target_1']['id'] == target_1['id']
-    assert config['metadata']['target_1']['info'] == [
+    assert config.metadata['target_1']['id'] == target_1['id']
+    assert config.metadata['target_1']['info'] == [
         'blue', 'rubber', 'ball'
     ]
-    assert config['metadata']['target_2']['id'] == target_2['id']
-    assert config['metadata']['target_2']['info'] == [
+    assert config.metadata['target_2']['id'] == target_2['id']
+    assert config.metadata['target_2']['info'] == [
         'grey', 'fabric', 'sofa'
     ]
 
@@ -231,12 +232,12 @@ def test_TraversalGoal_update_goal_template():
     }
 
     goal = TraversalGoal('')
-    config = goal.update_goal_template({}, [target])
+    config = goal.update_goal_template(Goal(), [target])
 
-    assert config['description'] == 'Find the blue rubber ball and move ' + \
+    assert config.description == 'Find the blue rubber ball and move ' + \
         'near it.'
-    assert config['metadata']['target']['id'] == target['id']
-    assert config['metadata']['target']['info'] == [
+    assert config.metadata['target']['id'] == target['id']
+    assert config.metadata['target']['info'] == [
         'blue', 'rubber', 'ball'
     ]
 

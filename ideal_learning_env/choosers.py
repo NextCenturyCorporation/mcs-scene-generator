@@ -1,5 +1,5 @@
 import random
-from typing import Any, List, Optional, Tuple, Type, Union
+from typing import Any, List, Optional, Tuple, Type
 
 from machine_common_sense.config_manager import Vector3d
 
@@ -11,10 +11,16 @@ from generator import (
     materials
 )
 
-from .defs import ILEException, ILESharedConfiguration
+from .defs import ILEException, ILESharedConfiguration, RandomizableString
 from .defs import choose_random as _choose_random
 from .defs import return_list
-from .numerics import MinMaxFloat, VectorFloatConfig, VectorIntConfig
+from .numerics import (
+    MinMaxFloat,
+    RandomizableFloat,
+    RandomizableVectorFloat3d,
+    RandomizableVectorFloat3dOrFloat,
+    VectorFloatConfig
+)
 
 SOCCER_BALL_SCALE_MAX = 3
 SOCCER_BALL_SCALE_MIN = 1
@@ -47,7 +53,7 @@ def choose_counts(
 
 
 def choose_position(
-    position: Union[VectorFloatConfig, List[VectorFloatConfig]],
+    position: RandomizableVectorFloat3d,
     object_x: float = None,
     object_z: float = None,
     room_x: float = None,
@@ -85,7 +91,7 @@ def _get_min_max_room_dimensions(room_dim, object_dim):
 
 
 def _constrain_position_x_z(
-        position: Union[float, MinMaxFloat, List[float]] = None,
+        position: RandomizableFloat = None,
         object_dim: float = None,
         room_dim: float = None):
     constrained_position = position
@@ -126,7 +132,7 @@ def _constrain_position_x_z(
 
 
 def _constrain_position_y(
-        position: Union[float, MinMaxFloat, List[float]] = None,
+        position: RandomizableFloat = None,
         room_dim: float = None, is_placer_obj: bool = False):
     max_y = room_dim - geometry.PERFORMER_HEIGHT
 
@@ -205,13 +211,11 @@ def _constrain_min_max_pos_to_room_dimensions_x_z(
     return MinMaxFloat(constrained_min, constrained_max)
 
 
-def choose_rotation(
-    rotation: Union[VectorIntConfig, List[VectorIntConfig]]
-) -> Vector3d:
+def choose_rotation(rotation: RandomizableFloat) -> Vector3d:
     """Choose and return a random rotation for the given rotation config or,
     if it is null, a random object rotation."""
     if rotation is None:
-        rotation = VectorIntConfig()
+        rotation = VectorFloatConfig()
     rotation = rotation if isinstance(rotation, list) else [rotation]
     for rot in rotation:
         if rot.x is None:
@@ -224,7 +228,7 @@ def choose_rotation(
 
 
 def choose_material_tuple_from_material(
-    material_or_category: Union[str, List[str]],
+    material_or_category: RandomizableString,
     prohibited_material: str = None
 ) -> MaterialTuple:
     """Return a MaterialTuple chosen randomly from the given materials that can
@@ -283,9 +287,7 @@ def choose_material_tuple_from_material(
     return random.choice(random.choice(unprohibited_material_list))
 
 
-def _filter_scale_soccer_ball(
-    scale: Union[float, MinMaxFloat, VectorFloatConfig]
-) -> bool:
+def _filter_scale_soccer_ball(scale: RandomizableFloat) -> bool:
     if not scale:
         return False
     # Soccer balls are restricted to only specific scales.
@@ -310,13 +312,7 @@ def _filter_scale_soccer_ball(
     return False
 
 
-def choose_scale(
-    scale: Union[
-        float, MinMaxFloat, VectorFloatConfig,
-        List[Union[float, MinMaxFloat, VectorFloatConfig]]
-    ],
-    shape: str
-) -> float:
+def choose_scale(scale: RandomizableVectorFloat3dOrFloat, shape: str) -> float:
     """Return a randomly chosen scale for the given shape using the given
     scale options."""
     # Default scale is 1 if scale is None or 0.
@@ -333,8 +329,8 @@ def choose_scale(
 
 
 def choose_shape_material(
-    shape_list: Union[str, List[str]] = None,
-    material_or_category: Union[str, List[str]] = None,
+    shape_list: RandomizableString = None,
+    material_or_category: RandomizableString = None,
     prohibited_material: str = None
 ) -> Optional[Tuple[str, MaterialTuple]]:
     """Takes choices for shape and material_or_category and returns a valid

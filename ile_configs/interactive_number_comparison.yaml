@@ -64,6 +64,39 @@ room_dimensions:
 # Generate a platform bisecting the room.
 shortcut_bisecting_platform:
     is_short: true
+    is_thin: true
+
+# The performer agent is frozen until all the objects placers and moving_occluders are finished moving.
+freeze_while_moving: [left_occluder, right_occluder]
+
+# Generate two occluding walls that descend at the beginning of the scene to
+# completely occlude the objects positioned on each side of the room.
+# The performer agent must remember how many objects are on each side.
+# If you do not want occluders in your scenes, remove this entire config
+# option.
+structural_moving_occluders:
+    - num: 1
+      occluder_height: 1.5
+      occluder_thickness: 0.1
+      occluder_width: 2.5
+      origin: 'left'
+      position_x: -1.55
+      position_z: 0
+      reverse_direction: false
+      rotation_y: 0
+      labels: left_occluder
+      move_down_only: true
+    - num: 1
+      occluder_height: 1.5
+      occluder_thickness: 0.1
+      occluder_width: 2.5
+      origin: 'right'
+      position_x: 1.55
+      position_z: 0
+      reverse_direction: false
+      rotation_y: 0
+      labels: right_occluder
+      move_down_only: true
 
 # Generate one to four objects identical to the target objects but on the
 # opposite side of the room. There will always be fewer of these objects than

@@ -5,6 +5,8 @@ from abc import ABC, abstractmethod
 from enum import Enum
 from typing import Any, AnyStr, Dict, List, Tuple, Union
 
+from machine_common_sense.config_manager import Goal
+
 from . import exceptions, tags
 from .definitions import ObjectDefinition
 from .geometry import (
@@ -13,6 +15,7 @@ from .geometry import (
     calc_obj_pos,
     position_distance
 )
+from .objects import SceneObject
 from .specific_objects import (
     get_interactable_definition_dataset,
     get_pickupable_definition_dataset,
@@ -23,7 +26,7 @@ from .specific_objects import (
 NO_TARGET_IMAGES = True
 
 
-def generate_image_file_name(target: Dict[str, Any]) -> str:
+def generate_image_file_name(target: SceneObject) -> str:
     if 'materials' not in target or not target['materials']:
         return target['type']
 
@@ -33,12 +36,12 @@ def generate_image_file_name(target: Dict[str, Any]) -> str:
                              0 else '') + ('_'.join(material_name_list))
 
 
-def find_image_for_object(object_def: Dict[str, Any]) -> AnyStr:
+def find_image_for_object(target: SceneObject) -> AnyStr:
     image_file_name = ""
 
     try:
         image_file_name = '../images/' + \
-            generate_image_file_name(object_def) + '.txt'
+            generate_image_file_name(target) + '.txt'
 
         with open(image_file_name, 'r') as image_file:
             target_image = image_file.read()
@@ -50,7 +53,7 @@ def find_image_for_object(object_def: Dict[str, Any]) -> AnyStr:
             ' the image: ' + image_file_name)
 
 
-def find_image_name(target: Dict[str, Any]) -> str:
+def find_image_name(target: SceneObject) -> str:
     return generate_image_file_name(target) + '.png'
 
 
@@ -72,9 +75,9 @@ class InteractiveGoal(ABC):
     @abstractmethod
     def update_goal_template(
         self,
-        goal_template: Dict[str, Any],
-        target_list: List[Dict[str, Any]]
-    ) -> Dict[str, Any]:
+        goal_template: Goal,
+        target_list: List[SceneObject]
+    ) -> Goal:
         """Update and return the given goal config for a scene."""
         pass
 
@@ -83,7 +86,7 @@ class InteractiveGoal(ABC):
         self,
         target_number: int,
         target_location: Dict[str, Any],
-        previously_made_target_list: List[Dict[str, Any]],
+        previously_made_target_list: List[SceneObject],
         performer_start: Dict[str, Dict[str, float]]
     ) -> bool:
         """Return if a target can be positioned at the given location based on
@@ -102,7 +105,7 @@ class InteractiveGoal(ABC):
 
     def choose_location(
         self,
-        definition_or_instance: Union[ObjectDefinition, Dict[str, Any]],
+        definition_or_instance: Union[ObjectDefinition, SceneObject],
         performer_start: Dict[str, Dict[str, float]],
         bounds_list: List[ObjectBounds],
         is_target=False,
@@ -150,23 +153,23 @@ class RetrievalGoal(InteractiveGoal):
     # Override
     def update_goal_template(
         self,
-        goal_template: Dict[str, Any],
-        target_list: List[Dict[str, Any]]
-    ) -> Dict[str, Any]:
-        goal_template['metadata'] = {
+        goal_template: Goal,
+        target_list: List[SceneObject]
+    ) -> Goal:
+        goal_template.metadata = {
             'target': {
                 'id': target_list[0]['id'],
                 'info': target_list[0]['debug']['info']
             }
         }
-        goal_template['description'] = f'Find and pick up the ' \
+        goal_template.description = f'Find and pick up the ' \
             f'{target_list[0]["debug"]["goalString"]}.'
         if not NO_TARGET_IMAGES:
             image = find_image_for_object(target_list[0])
             image_name = find_image_name(target_list[0])
-            goal_template['metadata']['target']['image'] = image
-            goal_template['metadata']['target']['image_name'] = image_name
-            goal_template['metadata']['target']['match_image'] = True
+            goal_template.metadata['target']['image'] = image
+            goal_template.metadata['target']['image_name'] = image_name
+            goal_template.metadata['target']['match_image'] = True
         return goal_template
 
     # Override
@@ -174,7 +177,68 @@ class RetrievalGoal(InteractiveGoal):
         self,
         target_number: int,
         target_location: Dict[str, Any],
-        previously_made_target_list: List[Dict[str, Any]],
+        previously_made_target_list: List[SceneObject],
+        performer_start: Dict[str, Dict[str, float]]
+    ) -> bool:
+        return True
+
+
+class MultiRetrievalGoal(InteractiveGoal):
+    def __init__(self, hypercube_type: str):
+        super().__init__(tags.SCENE.MULTI_RETRIEVAL, hypercube_type)
+
+    # Override
+    def choose_target_definition(self, target_number: int) -> ObjectDefinition:
+        return self.choose_definition(must_be_pickupable=True)
+
+    # Override
+    def get_target_count(self, target_list) -> int:
+        return len(target_list)
+
+    # Override
+    def update_goal_template(
+        self,
+        goal_template: Goal,
+        target_list: List[SceneObject]
+    ) -> Goal:
+        goal_template.metadata = {'targets': []}
+
+        for target_item in target_list:
+            self._append_target(goal_template, target_item)
+
+        goal_strings = [i['debug']['goalString'] for i in target_list]
+        goal_strings = sorted(set(goal_strings))
+        goal_string = goal_strings[0] if len(goal_strings) == 1 else (
+            '; '.join(goal_strings[:-1]) + '; and ' + goal_strings[-1]
+        )
+        goal_template.description = (f'Find and pick up as many objects as'
+                                     f' possible of type: {goal_string}.')
+
+        return goal_template
+
+    def _append_target(self, goal_template: Goal, target_item: Any):
+        target_to_add = {
+            'id': target_item['id'],
+            'info': target_item['debug']['info']
+        }
+
+        if not NO_TARGET_IMAGES:
+            image = find_image_for_object(target_item)
+            image_name = find_image_name(target_item)
+            target_to_add['image'] = image
+            target_to_add['image_name'] = image_name
+            target_to_add['match_image'] = True
+
+        goal_template.metadata['targets'].append(target_to_add)
+
+        return goal_template
+
+    # Override
+    def validate_target_location(
+        self,
+        target_number: int,
+        target_location: Dict[str, Any],
+        previously_made_target_list: List[SceneObject],
         performer_start: Dict[str, Dict[str, float]]
     ) -> bool:
         return True
@@ -208,11 +272,11 @@ class TransferralGoal(InteractiveGoal):
     # Override
     def update_goal_template(
         self,
-        goal_template: Dict[str, Any],
-        target_list: List[Dict[str, Any]]
-    ) -> Dict[str, Any]:
+        goal_template: Goal,
+        target_list: List[SceneObject]
+    ) -> Goal:
         relationship = random.choice(list(self.RelationshipType))
-        goal_template['metadata'] = {
+        goal_template.metadata = {
             'target_1': {
                 'id': target_list[0]['id'],
                 'info': target_list[0]['debug']['info']
@@ -223,7 +287,7 @@ class TransferralGoal(InteractiveGoal):
             },
             'relationship': ['target_1', relationship.value, 'target_2']
         }
-        goal_template['description'] = f'Find and pick up the ' \
+        goal_template.description = f'Find and pick up the ' \
             f'{target_list[0]["debug"]["goalString"]} and move it ' \
             f'{relationship.value} the ' \
             f'{target_list[1]["debug"]["goalString"]}.'
@@ -232,12 +296,12 @@ class TransferralGoal(InteractiveGoal):
             image_2 = find_image_for_object(target_list[1])
             image_name_1 = find_image_name(target_list[0])
             image_name_2 = find_image_name(target_list[1])
-            goal_template['metadata']['target_1']['image'] = image_1
-            goal_template['metadata']['target_1']['image_name'] = image_name_1
-            goal_template['metadata']['target_1']['match_image'] = True
-            goal_template['metadata']['target_2']['image'] = image_2
-            goal_template['metadata']['target_2']['image_name'] = image_name_2
-            goal_template['metadata']['target_2']['match_image'] = True
+            goal_template.metadata['target_1']['image'] = image_1
+            goal_template.metadata['target_1']['image_name'] = image_name_1
+            goal_template.metadata['target_1']['match_image'] = True
+            goal_template.metadata['target_2']['image'] = image_2
+            goal_template.metadata['target_2']['image_name'] = image_name_2
+            goal_template.metadata['target_2']['match_image'] = True
         return goal_template
 
     # Override
@@ -245,7 +309,7 @@ class TransferralGoal(InteractiveGoal):
         self,
         target_number: int,
         target_location: Dict[str, Any],
-        previously_made_target_list: List[Dict[str, Any]],
+        previously_made_target_list: List[SceneObject],
         performer_start: Dict[str, Dict[str, float]]
     ) -> bool:
         if target_number == 0:
@@ -283,23 +347,23 @@ class TraversalGoal(InteractiveGoal):
     # Override
     def update_goal_template(
         self,
-        goal_template: Dict[str, Any],
-        target_list: List[Dict[str, Any]]
-    ) -> Dict[str, Any]:
-        goal_template['metadata'] = {
+        goal_template: Goal,
+        target_list: List[SceneObject]
+    ) -> Goal:
+        goal_template.metadata = {
             'target': {
                 'id': target_list[0]['id'],
                 'info': target_list[0]['debug']['info']
             }
         }
-        goal_template['description'] = f'Find the ' \
+        goal_template.description = f'Find the ' \
             f'{target_list[0]["debug"]["goalString"]} and move near it.'
         if not NO_TARGET_IMAGES:
             image = find_image_for_object(target_list[0])
             image_name = find_image_name(target_list[0])
-            goal_template['metadata']['target']['image'] = image
-            goal_template['metadata']['target']['image_name'] = image_name
-            goal_template['metadata']['target']['match_image'] = True
+            goal_template.metadata['target']['image'] = image
+            goal_template.metadata['target']['image_name'] = image_name
+            goal_template.metadata['target']['match_image'] = True
         return goal_template
 
     # Override
@@ -307,7 +371,7 @@ class TraversalGoal(InteractiveGoal):
         self,
         target_number: int,
         target_location: Dict[str, Any],
-        previously_made_target_list: List[Dict[str, Any]],
+        previously_made_target_list: List[SceneObject],
         performer_start: Dict[str, Dict[str, float]]
     ) -> bool:
         distance = position_distance(

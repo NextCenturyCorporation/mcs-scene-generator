@@ -65,7 +65,7 @@ def test_CollisionsHypercube_default_scene_move_across():
     ))
     scene = hypercube._create_default_scene(STARTER_SCENE, goal_template)
     verify_scene(scene, hypercube.is_move_across())
-    assert 'collisions' == scene.goal['sceneInfo']['tertiaryType']
+    assert 'collisions' == scene.goal.scene_info['tertiaryType']
 
 
 def test_CollisionsHypercube_scenes_move_across():
@@ -75,7 +75,7 @@ def test_CollisionsHypercube_scenes_move_across():
     )
     assert hypercube.is_move_across()
 
-    scene_list = hypercube.get_scenes()
+    scene_list = hypercube.generate_scenes()
     scene_dict = {}
     assert len(scene_list) == 3
 
@@ -83,9 +83,9 @@ def test_CollisionsHypercube_scenes_move_across():
     print(f'NON_TARGET={hypercube._distractor_list[0]}')
 
     for scene in scene_list:
-        scene_id = scene.goal['sceneInfo']['id'][0].lower()
+        scene_id = scene.goal.scene_info['id'][0].lower()
         scene_dict[scene_id] = scene
-        scene_name = scene.goal['sceneInfo']['name']
+        scene_name = scene.goal.scene_info['name']
         assert scene_name.startswith('COLL_')
 
     for i in ['a', 'c', 'h']:
@@ -233,7 +233,7 @@ def test_ObjectPermanenceHypercube_default_scene_fall_down():
     ))
     scene = hypercube._create_default_scene(STARTER_SCENE, goal_template)
     verify_scene(scene, hypercube.is_move_across())
-    assert 'object permanence' == scene.goal['sceneInfo']['tertiaryType']
+    assert 'object permanence' == scene.goal.scene_info['tertiaryType']
 
 
 def test_ShapeConstancyHypercube_default_objects_fall_down():
@@ -274,7 +274,7 @@ def test_ShapeConstancyHypercube_default_scene_fall_down():
     ))
     scene = hypercube._create_default_scene(STARTER_SCENE, goal_template)
     verify_scene(scene, hypercube.is_move_across())
-    assert 'shape constancy' == scene.goal['sceneInfo']['tertiaryType']
+    assert 'shape constancy' == scene.goal.scene_info['tertiaryType']
 
 
 @pytest.mark.skip(reason='Eval 3 version not used; please see Eval 4 version')
@@ -320,7 +320,7 @@ def test_SpatioTemporalContinuityHypercube_default_scene_move_across():
     verify_scene(scene, hypercube.is_move_across())
     assert (
         'spatio temporal continuity' ==
-        scene.goal['sceneInfo']['tertiaryType']
+        scene.goal.scene_info['tertiaryType']
     )
 
 
@@ -384,7 +384,7 @@ def test_GravitySupportHypercube_default_scene_fall_down():
     ))
     scene = hypercube._create_default_scene(STARTER_SCENE, goal_template)
     verify_scene(scene, hypercube.is_move_across(), last_step=100)
-    assert 'gravity support' == scene.goal['sceneInfo']['tertiaryType']
+    assert 'gravity support' == scene.goal.scene_info['tertiaryType']
 
 
 @pytest.mark.skip(reason='Eval 3 version not used; please see Eval 4 version')
@@ -396,7 +396,7 @@ def test_ObjectPermanenceHypercube_scenes_fall_down():
     )
     assert hypercube.is_fall_down()
 
-    scene_list = hypercube.get_scenes()
+    scene_list = hypercube.generate_scenes()
     scene_dict = {}
     target_dict = {}
     assert len(scene_list) == 90
@@ -405,10 +405,10 @@ def test_ObjectPermanenceHypercube_scenes_fall_down():
     print(f'TARGET_2={hypercube._target_list[1]}')
 
     for scene in scene_list:
-        scene_id = scene.goal['sceneInfo']['id'][0].lower()
+        scene_id = scene.goal.scene_info['id'][0].lower()
         scene_dict[scene_id] = scene
         target_dict[scene_id] = get_object_list(scene, 'target')
-        scene_name = scene.goal['sceneInfo']['name']
+        scene_name = scene.goal.scene_info['name']
         assert scene_name.startswith('OBJP_')
 
     for i in [
@@ -574,7 +574,7 @@ def test_ShapeConstancyHypercube_scenes_fall_down():
     )
     assert hypercube.is_fall_down()
 
-    scene_list = hypercube.get_scenes()
+    scene_list = hypercube.generate_scenes()
     scene_dict = {}
     target_dict = {}
     assert len(scene_list) == 10
@@ -583,11 +583,17 @@ def test_ShapeConstancyHypercube_scenes_fall_down():
     print(f'TARGET_2={hypercube._target_list[1]}')
 
     for scene in scene_list:
-        scene_id = scene.goal['sceneInfo']['id'][0].lower()
+        scene_id = scene.goal.scene_info['id'][0].lower()
         scene_dict[scene_id] = scene
         target_dict[scene_id] = get_object_list(scene, 'target')
-        scene_name = scene.goal['sceneInfo']['name']
+        scene_name = scene.goal.scene_info['name']
         assert scene_name.startswith('SHAP_')
+        assert scene.goal.scene_info[tags.SCENE.TIPSY] is False
+        for obj in scene.objects:
+            if obj['type'] in intuitive_physics_hypercubes.TIPSY_OBJECT_TYPES:
+                assert scene.goal.scene_info[tags.SCENE.TIPSY] is True
+            else:
+                assert scene.goal.scene_info[tags.SCENE.TIPSY] is False
 
     cell_list = ['a1', 'a2', 'e1', 'e2', 'e3',
                  'b1', 'd2', 'j1', 'l2', 'l4']
@@ -791,7 +797,7 @@ def test_SpatioTemporalContinuityHypercube_scenes_move_across():
     )
     assert hypercube.is_move_across()
 
-    scene_list = hypercube.get_scenes()
+    scene_list = hypercube.generate_scenes()
     scene_dict = {}
     target_dict = {}
     non_target_dict = {}
@@ -802,7 +808,7 @@ def test_SpatioTemporalContinuityHypercube_scenes_move_across():
     print(f'NON_TARGET={hypercube._distractor_list[0]}')
 
     for scene in scene_list:
-        scene_id = scene.goal['sceneInfo']['id'][0].lower()
+        scene_id = scene.goal.scene_info['id'][0].lower()
         scene_dict[scene_id] = scene
         target_dict[scene_id] = get_object_list(scene, 'target')
         non_target_dict[scene_id] = get_object_list(scene, 'non target')
@@ -810,7 +816,7 @@ def test_SpatioTemporalContinuityHypercube_scenes_move_across():
             scene,
             'intuitive physics occluder'
         )
-        scene_name = scene.goal['sceneInfo']['name']
+        scene_name = scene.goal.scene_info['name']
         assert scene_name.startswith('STC_')
 
     for i in [
@@ -938,7 +944,7 @@ def test_GravitySupportHypercube_scenes_fall_down():
     )
     assert hypercube.is_fall_down()
 
-    scene_list = hypercube.get_scenes()
+    scene_list = hypercube.generate_scenes()
     scene_dict = {}
     assert len(scene_list) == 16
 
@@ -956,9 +962,9 @@ def test_GravitySupportHypercube_scenes_fall_down():
     )['shows'][0]['position']['z']
 
     for scene in scene_list:
-        scene_id = scene.goal['sceneInfo']['id'][0].lower()
+        scene_id = scene.goal.scene_info['id'][0].lower()
         scene_dict[scene_id] = scene
-        scene_name = scene.goal['sceneInfo']['name']
+        scene_name = scene.goal.scene_info['name']
         assert scene_name.startswith('GRAV_')
 
     for i in [
@@ -968,7 +974,7 @@ def test_GravitySupportHypercube_scenes_fall_down():
         for j in [i + '1']:
             scene = scene_dict[j]
             is_positive = (
-                scene.goal['sceneInfo']['direction'] == 'right'
+                scene.goal.scene_info['direction'] == 'right'
             )
             print(f'SCENE_ID={j} IS_POSITIVE_DIRECTION={is_positive}')
 
@@ -987,7 +993,7 @@ def test_GravitySupportHypercube_scenes_fall_down():
             if i in []:
                 assert invisible_support
                 y_difference -= invisible_support['debug']['dimensions']['y']
-            move_step_count = int(y_difference / 0.25) - 1
+            move_step_count = round(y_difference / 0.25) - 1
 
             # Verify scene-agnostic target properties.
             assert verify_object_fall_down_position(target, 'TARGET', True)
@@ -1262,7 +1268,7 @@ def test_ObjectPermanenceHypercubeEval4_default_scene_move_across():
     ))
     scene = hypercube._create_default_scene(STARTER_SCENE, goal_template)
     verify_scene(scene, hypercube.is_move_across(), last_step=240)
-    assert 'object permanence' == scene.goal['sceneInfo']['tertiaryType']
+    assert 'object permanence' == scene.goal.scene_info['tertiaryType']
 
 
 def test_ObjectPermanenceHypercubeEval4_scenes_move_across():
@@ -1273,7 +1279,7 @@ def test_ObjectPermanenceHypercubeEval4_scenes_move_across():
     )
     assert hypercube.is_move_across()
 
-    scene_list = hypercube.get_scenes()
+    scene_list = hypercube.generate_scenes()
     scene_dict = {}
     target_dict = {}
     assert len(scene_list) == 2
@@ -1281,10 +1287,10 @@ def test_ObjectPermanenceHypercubeEval4_scenes_move_across():
     print(f'TARGET={hypercube._target_list[0]}')
 
     for scene in scene_list:
-        scene_id = scene.goal['sceneInfo']['id'][0].lower()
+        scene_id = scene.goal.scene_info['id'][0].lower()
         scene_dict[scene_id] = scene
         target_dict[scene_id] = get_object_list(scene, 'target')
-        scene_name = scene.goal['sceneInfo']['name']
+        scene_name = scene.goal.scene_info['name']
         assert scene_name.startswith('OBJP_')
 
     for i in ['j']:
@@ -1389,7 +1395,7 @@ def test_SpatioTemporalContinuityHypercubeEval4_default_scene_move_across():
     verify_scene(scene, hypercube.is_move_across())
     assert (
         'spatio temporal continuity' ==
-        scene.goal['sceneInfo']['tertiaryType']
+        scene.goal.scene_info['tertiaryType']
     )
 
 
@@ -1401,7 +1407,7 @@ def test_SpatioTemporalContinuityHypercubeEval4_scenes_move_across():
     )
     assert hypercube.is_move_across()
 
-    scene_list = hypercube.get_scenes()
+    scene_list = hypercube.generate_scenes()
     scene_dict = {}
     target_dict = {}
     non_target_dict = {}
@@ -1411,7 +1417,7 @@ def test_SpatioTemporalContinuityHypercubeEval4_scenes_move_across():
     print(f'TARGET={hypercube._target_list[0]}')
 
     for scene in scene_list:
-        scene_id = scene.goal['sceneInfo']['id'][0].lower()
+        scene_id = scene.goal.scene_info['id'][0].lower()
         scene_dict[scene_id] = scene
         target_dict[scene_id] = get_object_list(scene, 'target')
         non_target_dict[scene_id] = get_object_list(scene, 'non target')
@@ -1419,7 +1425,7 @@ def test_SpatioTemporalContinuityHypercubeEval4_scenes_move_across():
             scene,
             'intuitive physics occluder'
         )
-        scene_name = scene.goal['sceneInfo']['name']
+        scene_name = scene.goal.scene_info['name']
         assert scene_name.startswith('STC_')
 
     for i in ['a', 'e']:

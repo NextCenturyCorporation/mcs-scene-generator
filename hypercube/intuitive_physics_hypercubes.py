@@ -9,7 +9,7 @@ from abc import ABC, abstractmethod
 from types import SimpleNamespace
 from typing import Any, Dict, List, Optional, Tuple
 
-from machine_common_sense.config_manager import PerformerStart, Vector3d
+from machine_common_sense.config_manager import Goal, PerformerStart, Vector3d
 from shapely import affinity
 
 from generator import (
@@ -21,6 +21,7 @@ from generator import (
     ObjectDefinition,
     Scene,
     SceneException,
+    SceneObject,
     geometry,
     gravity_support_objects,
     instances,
@@ -42,7 +43,6 @@ from generator.intuitive_physics_objects import (
 )
 from generator.intuitive_physics_util import (
     COLLISION_SPEEDS,
-    MAX_TARGET_Y,
     MAX_TARGET_Z,
     MIN_TARGET_Z,
     choose_position_z,
@@ -74,6 +74,11 @@ EARLIEST_ACTION_STEP = occluders.OCCLUDER_MOVEMENT_TIME * 2 + 1
 BACKGROUND_MAX_X = 6.5
 BACKGROUND_MIN_Z = 3.25
 BACKGROUND_MAX_Z = 4.95
+
+TIPSY_OBJECT_TYPES = [
+    'rollable_4',
+    'rollable_6'
+]
 
 PERFORMER_START = PerformerStart(
     position=Vector3d(x=0, y=0, z=-4.5),
@@ -175,7 +180,7 @@ def adjust_movement_to_position(
 
 def choose_move_across_object_position(
     left_side: bool,
-    object_list: List[Dict[str, Any]],
+    object_list: List[SceneObject],
     min_z: float = MIN_TARGET_Z,
     max_z: float = MAX_TARGET_Z
 ) -> Optional[Dict[str, float]]:
@@ -266,14 +271,14 @@ class ObjectVariations():
     hypercube may use a variation of the object. Variations may be different in
     size, shape, position, color, etc."""
 
-    def __init__(self, name_to_instance: Dict[str, Dict[str, Any]]) -> None:
+    def __init__(self, name_to_instance: Dict[str, SceneObject]) -> None:
         self._instances = name_to_instance
 
-    def all(self) -> List[Dict[str, Any]]:
+    def all(self) -> List[SceneObject]:
         """Return a list of instances for all variations."""
         return list(self._instances.values())
 
-    def get(self, name) -> Dict[str, Any]:
+    def get(self, name) -> SceneObject:
         """Return an instance for the variation with the given name."""
         return self._instances.get(name)
 
@@ -347,7 +352,7 @@ class TargetVariations(ObjectVariations):
         return location_copy
 
 
-def retrieve_as_list(data: Dict[str, Any]) -> List[Dict[str, Any]]:
+def retrieve_as_list(data: Any) -> List[Any]:
     return [data]
 
 
@@ -356,7 +361,7 @@ class IntuitivePhysicsHypercube(Hypercube, ABC):
         self,
         name: str,
         starter_scene: Scene,
-        goal_template: Dict[str, Any],
+        goal_template: Goal,
         role_to_type: Dict[str, str],
         is_fall_down=False,
         is_move_across=False,
@@ -403,7 +408,7 @@ class IntuitivePhysicsHypercube(Hypercube, ABC):
     def _create_scenes(
         self,
         starter_scene: Scene,
-        goal_template: Dict[str, Any]
+        goal_template: Goal
     ) -> List[Scene]:
         default_scene = self._create_default_scene(
             starter_scene,
@@ -412,16 +417,16 @@ class IntuitivePhysicsHypercube(Hypercube, ABC):
         scenes = self._create_intuitive_physics_scenes(default_scene)
         for scene in scenes.values():
             # Update the scene info tags for the evaluation UI.
-            scene.goal['sceneInfo'][tags.SCENE.ID] = [
+            scene.goal.scene_info[tags.SCENE.ID] = [
                 scene_id.upper() for scene_id
-                in scene.goal['sceneInfo'][tags.SCENE.ID]
+                in scene.goal.scene_info[tags.SCENE.ID]
             ]
         return list(scenes.values())
 
     # Override
     def _get_training_scenes(self) -> List[Scene]:
         return [scene for scene in self._scenes if (
-            scene.goal['answer']['choice'] == PLAUSIBLE and
+            scene.goal.answer['choice'] == PLAUSIBLE and
             (not scene.debug['evaluationOnly'])
         )]
 
@@ -791,7 +796,8 @@ class IntuitivePhysicsHypercube(Hypercube, ABC):
 
         # Sometimes object variations must have colors that are completely
         # the same as or opposite to the trained variation's colors.
-        if 'opposite' in definitions[VARIATIONS.TRAINED].materialCategory:
+        material_categories = definitions[VARIATIONS.TRAINED].materialCategory
+        if 'object_opposite' in material_categories:
             base_material_list = []
             for material in definitions[VARIATIONS.TRAINED].materials:
                 opposite = materials.OPPOSITE_SETS[material][0]
@@ -947,7 +953,7 @@ class IntuitivePhysicsHypercube(Hypercube, ABC):
     def _create_default_scene(
         self,
         starter_scene: Scene,
-        goal_template: Dict[str, Any]
+        goal_template: Goal
     ) -> Scene:
         """Create and return this hypercube's default scene JSON using the
         given templates that will be shared by each scene in this hypercube."""
@@ -965,21 +971,21 @@ class IntuitivePhysicsHypercube(Hypercube, ABC):
         scene.debug['wallColors'] = room_wall_material_choice.color
 
         scene.goal = copy.deepcopy(goal_template)
-        scene.goal['answer'] = {
+        scene.goal.answer = {
             'choice': PLAUSIBLE
         }
-        scene.goal['sceneInfo'][tags.SCENE.FALL_DOWN] = self.is_fall_down()
-        scene.goal['sceneInfo'][tags.SCENE.MOVE_ACROSS] = (
+        scene.goal.scene_info[tags.SCENE.FALL_DOWN] = self.is_fall_down()
+        scene.goal.scene_info[tags.SCENE.MOVE_ACROSS] = (
             self.is_move_across()
         )
-        scene.goal['sceneInfo'][tags.SCENE.SETUP] = (
+        scene.goal.scene_info[tags.SCENE.SETUP] = (
             tags.tag_to_label(tags.SCENE.FALL_DOWN) if self.is_fall_down()
             else tags.tag_to_label(tags.SCENE.MOVE_ACROSS)
         )
-        scene.goal['last_step'] = self._last_step
-        scene.goal['action_list'] = [['Pass']] * scene.goal['last_step']
-        scene.goal['description'] = ''
-        scene.goal['metadata'] = {}
+        scene.goal.last_step = self._last_step
+        scene.goal.action_list = [['Pass']] * scene.goal.last_step
+        scene.goal.description = ''
+        scene.goal.metadata = {}
 
         role_to_object_list = self._create_default_objects(
             room_wall_material_choice
@@ -1106,7 +1112,7 @@ class IntuitivePhysicsHypercube(Hypercube, ABC):
             structural_object_material_list.append(filtered_material_list)
         return structural_object_material_list
 
-    def _generate_background_object_list(self) -> List[Dict[str, Any]]:
+    def _generate_background_object_list(self) -> List[SceneObject]:
         """Generate and return the list of background (a.k.a. context) objects,
         behind the moving objects, positioned near the room's back wall."""
 
@@ -1157,7 +1163,7 @@ class IntuitivePhysicsHypercube(Hypercube, ABC):
     def _generate_fall_down(
         self,
         occluder_wall_material_list: List[List[Tuple]]
-    ) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+    ) -> Tuple[List[SceneObject], List[SceneObject]]:
         """Generate and return fall-down objects and occluders."""
         object_list = None
         occluder_list = None
@@ -1179,10 +1185,10 @@ class IntuitivePhysicsHypercube(Hypercube, ABC):
             except SceneException as e:
                 latest_exception = e
         if not object_list or not occluder_list:
-            raise latest_exception
+            raise latest_exception from latest_exception
         return object_list, occluder_list
 
-    def _generate_fall_down_object_list(self) -> List[Dict[str, Any]]:
+    def _generate_fall_down_object_list(self) -> List[SceneObject]:
         """Generate and return fall-down objects."""
         object_list = []
         self._variations_list = []
@@ -1260,9 +1266,9 @@ class IntuitivePhysicsHypercube(Hypercube, ABC):
     def _generate_fall_down_paired_occluder(
         self,
         paired_variations: TargetVariations,
-        occluder_list: List[Dict[str, Any]],
+        occluder_list: List[SceneObject],
         occluder_wall_material_list: List[List[Tuple]]
-    ) -> List[Dict[str, Any]]:
+    ) -> List[SceneObject]:
         """Generate and return one fall-down paired occluder that must be
         positioned underneath the paired object."""
         paired_object = paired_variations.get(VARIATIONS.TRAINED)
@@ -1362,7 +1368,7 @@ class IntuitivePhysicsHypercube(Hypercube, ABC):
     def _generate_fall_down_paired_occluder_list(
         self,
         occluder_wall_material_list: List[List[Tuple]]
-    ) -> List[Dict[str, Any]]:
+    ) -> List[SceneObject]:
         """Generate and return needed fall-down paired occluders."""
         paired_list = self._find_fall_down_paired_list()
         occluder_list = []
@@ -1383,7 +1389,7 @@ class IntuitivePhysicsHypercube(Hypercube, ABC):
     def _generate_move_across(
         self,
         occluder_wall_material_list: List[List[Tuple]]
-    ) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+    ) -> Tuple[List[SceneObject], List[SceneObject]]:
         """Generate and return move-across objects and occluders."""
         object_list = None
         occluder_list = None
@@ -1410,13 +1416,13 @@ class IntuitivePhysicsHypercube(Hypercube, ABC):
             except SceneException as e:
                 latest_exception = e
         if not object_list or not occluder_list:
-            raise latest_exception
+            raise latest_exception from latest_exception
         return object_list, occluder_list
 
     def _generate_move_across_object_list(
         self,
         last_action_step: int
-    ) -> List[Dict[str, Any]]:
+    ) -> List[SceneObject]:
         """Generate and return move-across objects."""
         object_count = self._get_move_across_object_count()
         object_list = []
@@ -1528,10 +1534,10 @@ class IntuitivePhysicsHypercube(Hypercube, ABC):
     def _generate_move_across_paired_occluder(
         self,
         paired_variations: TargetVariations,
-        occluder_list: List[Dict[str, Any]],
+        occluder_list: List[SceneObject],
         occluder_wall_material_list: List[List[Tuple]],
         index: int
-    ) -> List[Dict[str, Any]]:
+    ) -> List[SceneObject]:
         """Generate and return one move-across paired occluder that must be
         positioned at one of the paired object's distance_by_step so that it
         will properly hide the paired object during the implausible event."""
@@ -1553,9 +1559,9 @@ class IntuitivePhysicsHypercube(Hypercube, ABC):
 
     def _generate_move_across_paired_occluder_list(
         self,
-        object_list: List[Dict[str, Any]],
+        object_list: List[SceneObject],
         occluder_wall_material_list: List[List[Tuple]]
-    ) -> List[Dict[str, Any]]:
+    ) -> List[SceneObject]:
         """Generate and return needed move-across paired occluders."""
         paired_list = self._find_move_across_paired_list(
             self._variations_list[0]
@@ -1578,10 +1584,10 @@ class IntuitivePhysicsHypercube(Hypercube, ABC):
 
     def _generate_occluder(
         self,
-        occluder_list: List[Dict[str, Any]],
+        occluder_list: List[SceneObject],
         occluder_wall_material_list: List[List[Tuple]],
         sideways: bool
-    ) -> List[Dict[str, Any]]:
+    ) -> List[SceneObject]:
         """Generate and return a single occluder."""
         successful = False
         for _ in range(MAX_TRIES):
@@ -1618,7 +1624,7 @@ class IntuitivePhysicsHypercube(Hypercube, ABC):
     def _generate_occluder_list(
         self,
         number: int,
-        occluder_list: List[Dict[str, Any]],
+        occluder_list: List[SceneObject],
         occluder_wall_material_list: List[List[Tuple]],
         sideways: bool
     ) -> None:
@@ -1685,8 +1691,8 @@ class IntuitivePhysicsHypercube(Hypercube, ABC):
 
     def _identify_targets_and_non_targets(
         self,
-        moving_object_list: List[Dict[str, Any]]
-    ) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+        moving_object_list: List[SceneObject]
+    ) -> Tuple[List[SceneObject], List[SceneObject]]:
         """Return the two separate target and non-target lists using the given
         moving object list."""
         return moving_object_list, []
@@ -1712,7 +1718,7 @@ class IntuitivePhysicsHypercube(Hypercube, ABC):
     def _update_object_tags(
         self,
         scene: Scene,
-        object_list: List[Dict[str, Any]],
+        object_list: List[SceneObject],
         role: str
     ) -> Scene:
         """Update and return the given scene with info from targets in the
@@ -1727,21 +1733,21 @@ class IntuitivePhysicsHypercube(Hypercube, ABC):
         ]
 
         for tag in important_tag_list:
-            scene.goal['sceneInfo'][tag][tags.role_to_key(role)] = False
+            scene.goal.scene_info[tag][tags.role_to_key(role)] = False
 
-        scene.goal['objectsInfo']['all'] = []
-        scene.goal['objectsInfo'][tags.role_to_key(role)] = []
+        scene.goal.objects_info['all'] = []
+        scene.goal.objects_info[tags.role_to_key(role)] = []
 
         for instance in object_list:
             role_to_object_list = {}
             role_to_object_list[role] = object_list
             tags.append_object_tags_of_type(
-                scene.goal['sceneInfo'],
-                scene.goal['objectsInfo'],
+                scene.goal.scene_info,
+                scene.goal.objects_info,
                 role_to_object_list,
                 role
             )
-            scene.goal['objectsInfo'][tags.role_to_key(role)].extend(
+            scene.goal.objects_info[tags.role_to_key(role)].extend(
                 instance['debug']['info']
             )
             instance['debug']['info'].append(role)
@@ -1767,7 +1773,11 @@ class IntuitivePhysicsHypercube(Hypercube, ABC):
                     if instance['debug']['role'] == role
                 ], role)
 
-            scene.goal['sceneInfo'][tags.SCENE.ID] = [scene_id]
+            scene.goal.scene_info[tags.SCENE.ID] = [scene_id]
+            scene.goal.scene_info[tags.SCENE.TIPSY] = False
+            for obj in scene.objects:
+                if obj['type'] in TIPSY_OBJECT_TYPES:
+                    scene.goal.scene_info[tags.SCENE.TIPSY] = True
 
     def _validate_in_view(
         self,
@@ -1819,8 +1829,8 @@ class CollisionsHypercube(IntuitivePhysicsHypercube):
 
     def _adjust_impact_position(
         self,
-        target: Dict[str, Any],
-        non_target: Dict[str, Any]
+        target: SceneObject,
+        non_target: SceneObject
     ) -> Dict[str, Any]:
         """Find and return an X position for the given non-target object so
         that the target object will impact the non-target object at the exact
@@ -1859,16 +1869,16 @@ class CollisionsHypercube(IntuitivePhysicsHypercube):
 
         # Initialize default collision tags in scenes.
         for scene in scenes.values():
-            scene.goal['sceneInfo'][
+            scene.goal.scene_info[
                 tags.TYPES.COLLISIONS_MOVES
             ] = tags.CELLS.COLLISIONS_MOVES.ONE
-            scene.goal['sceneInfo'][
+            scene.goal.scene_info[
                 tags.TYPES.COLLISIONS_OCCLUDERS
             ] = tags.CELLS.COLLISIONS_OCCLUDERS.NO
-            scene.goal['sceneInfo'][
+            scene.goal.scene_info[
                 tags.TYPES.COLLISIONS_TRAINED
             ] = tags.CELLS.COLLISIONS_TRAINED.YES
-            scene.goal['sceneInfo'][
+            scene.goal.scene_info[
                 tags.TYPES.COLLISIONS_REVEALS
             ] = tags.CELLS.COLLISIONS_REVEALS.EMPTY
             # Remove the occluder from each scene.
@@ -1882,7 +1892,7 @@ class CollisionsHypercube(IntuitivePhysicsHypercube):
 
         # Remove the non-target object from the scene.
         scene = scenes['a2']
-        scene.goal['sceneInfo'][
+        scene.goal.scene_info[
             tags.TYPES.COLLISIONS_REVEALS
         ] = tags.CELLS.COLLISIONS_REVEALS.EMPTY
         objects = scene.objects
@@ -1893,10 +1903,10 @@ class CollisionsHypercube(IntuitivePhysicsHypercube):
 
         # Reposition the non-target object to the target object's Z position.
         scene = scenes['h2']
-        scene.goal['sceneInfo'][
+        scene.goal.scene_info[
             tags.TYPES.COLLISIONS_MOVES
         ] = tags.CELLS.COLLISIONS_MOVES.TWO
-        scene.goal['sceneInfo'][
+        scene.goal.scene_info[
             tags.TYPES.COLLISIONS_REVEALS
         ] = tags.CELLS.COLLISIONS_REVEALS.ON_PATH
         for instance in scene.objects:
@@ -1961,8 +1971,8 @@ class CollisionsHypercube(IntuitivePhysicsHypercube):
     # Override
     def _identify_targets_and_non_targets(
         self,
-        target_object_list: List[Dict[str, Any]]
-    ) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+        target_object_list: List[SceneObject]
+    ) -> Tuple[List[SceneObject], List[SceneObject]]:
         """Return the two separate target and non-target lists using the given
         moving object list."""
         target_variations = self._variations_list[0]
@@ -2138,7 +2148,7 @@ class GravitySupportHypercube(IntuitivePhysicsHypercube):
     def _create_default_objects(
         self,
         room_wall_material: MaterialTuple
-    ) -> Dict[str, Any]:
+    ) -> SceneObject:
         """Generate and return this hypercube's objects in a dict of roles with
         their corresponding object lists."""
 
@@ -2150,14 +2160,20 @@ class GravitySupportHypercube(IntuitivePhysicsHypercube):
             self._target,
             structural_object_material_list
         )
-        # Adjust the target's starting Y position by the visible support's size
-        # so the target ends its movement directly above the visible support.
-        start_height = (
-            MAX_TARGET_Y - 0.5 +
-            self._visible_support['debug']['dimensions']['y']
-        )
 
         for instance in self._target.all():
+            # The bottom of the target object must be off-screen.
+            min_height = retrieve_off_screen_position_y(
+                instance['shows'][0]['position']['z']
+            )
+            # Adjust the target's starting Y position by the visible support's
+            # size so the target ends its movement directly above the visible
+            # support. (Subtract 0.5 because that's the minimum support size.)
+            start_height = (
+                min_height + instance['debug']['dimensions']['y'] +
+                self._visible_support['debug']['dimensions']['y'] - 0.5
+            )
+
             # Add downward movement and other properties to target.
             mechanisms.place_object(
                 instance=instance,
@@ -2270,7 +2286,7 @@ class GravitySupportHypercube(IntuitivePhysicsHypercube):
     def _create_pole(
         self,
         target_variations: TargetVariations,
-        visible_support: Dict[str, Any]
+        visible_support: SceneObject
     ) -> ObjectVariations:
         target_symmetric = target_variations.get(VARIATIONS.SYMMETRIC)
         target_asymmetric_left = target_variations.get(
@@ -2298,7 +2314,9 @@ class GravitySupportHypercube(IntuitivePhysicsHypercube):
                 placed_object_offset_y=target['debug']['positionY'],
                 activation_step=target['shows'][0]['stepBegin'],
                 end_height=visible_support['debug']['dimensions']['y'],
-                max_height=MAX_TARGET_Y,
+                # This just informs the length of the placer, which isn't
+                # really important, so just make it a large enough value.
+                max_height=10,
                 placed_object_placer_offset_y=placer_offset_y
             )
             # Each pole variation should have the same ID.
@@ -2323,7 +2341,7 @@ class GravitySupportHypercube(IntuitivePhysicsHypercube):
         self,
         target_variations: TargetVariations,
         structural_object_material_list: List[Tuple[str, List[str]]]
-    ) -> Dict[str, Any]:
+    ) -> SceneObject:
         target_symmetric = target_variations.get(VARIATIONS.SYMMETRIC)
         # Retrieve the finalized definition for the visible support.
         # Restrict the possible sizes to the same or bigger than the target.
@@ -2420,19 +2438,19 @@ class GravitySupportHypercube(IntuitivePhysicsHypercube):
         scenes = {}
         for i in self._get_scene_ids():
             scenes[i + '1'] = copy.deepcopy(default_scene)
-            scenes[i + '1'].goal['sceneInfo'][tags.SCENE.DIRECTION] = (
+            scenes[i + '1'].goal.scene_info[tags.SCENE.DIRECTION] = (
                 'right' if is_positive else 'left'
             )
 
         # Initialize gravity support tags in scenes.
         for scene in scenes.values():
-            scene.goal['sceneInfo'][
+            scene.goal.scene_info[
                 tags.TYPES.GRAVITY_SUPPORT_PLAUSIBLE
             ] = tags.CELLS.GRAVITY_SUPPORT_PLAUSIBLE.YES
-            scene.goal['sceneInfo'][
+            scene.goal.scene_info[
                 tags.TYPES.GRAVITY_SUPPORT_TARGET_POSITION
             ] = tags.CELLS.GRAVITY_SUPPORT_TARGET_POSITION.FULL
-            scene.goal['sceneInfo'][
+            scene.goal.scene_info[
                 tags.TYPES.GRAVITY_SUPPORT_TARGET_TYPE
             ] = tags.CELLS.GRAVITY_SUPPORT_TARGET_TYPE.SYMMETRIC
 
@@ -2447,31 +2465,31 @@ class GravitySupportHypercube(IntuitivePhysicsHypercube):
             x_position_multiplier = 0
             # Move target to its no-support X position.
             if i in self._get_scene_ids_target_support_none():
-                scene.goal['sceneInfo'][
+                scene.goal.scene_info[
                     tags.TYPES.GRAVITY_SUPPORT_TARGET_POSITION
                 ] = tags.CELLS.GRAVITY_SUPPORT_TARGET_POSITION.NONE
                 x_position_multiplier = no_support_multiplier
             # Move target to its minimal-support (5%) X position.
             if i in self._get_scene_ids_target_support_minimal():
-                scene.goal['sceneInfo'][
+                scene.goal.scene_info[
                     tags.TYPES.GRAVITY_SUPPORT_TARGET_POSITION
                 ] = tags.CELLS.GRAVITY_SUPPORT_TARGET_POSITION.MINIMAL
                 x_position_multiplier = 0.45
             # Move target to its 25%-supported X position.
             if i in self._get_scene_ids_target_support_25():
-                scene.goal['sceneInfo'][
+                scene.goal.scene_info[
                     tags.TYPES.GRAVITY_SUPPORT_TARGET_POSITION
                 ] = tags.CELLS.GRAVITY_SUPPORT_TARGET_POSITION.TWENTY_FIVE
                 x_position_multiplier = 0.25
             # Move target to its 49%-supported X position.
             if i in self._get_scene_ids_target_support_49():
-                scene.goal['sceneInfo'][
+                scene.goal.scene_info[
                     tags.TYPES.GRAVITY_SUPPORT_TARGET_POSITION
                 ] = tags.CELLS.GRAVITY_SUPPORT_TARGET_POSITION.FORTY_NINE
                 x_position_multiplier = 0.01
             # Move target to its 75%-supported X position.
             if i in self._get_scene_ids_target_support_75():
-                scene.goal['sceneInfo'][
+                scene.goal.scene_info[
                     tags.TYPES.GRAVITY_SUPPORT_TARGET_POSITION
                 ] = tags.CELLS.GRAVITY_SUPPORT_TARGET_POSITION.SEVENTY_FIVE
                 x_position_multiplier = -0.25
@@ -2496,8 +2514,8 @@ class GravitySupportHypercube(IntuitivePhysicsHypercube):
                 continue
             scene = scenes[i + '1']
             scene.debug['evaluationOnly'] = True
-            scene.goal['answer']['choice'] = IMPLAUSIBLE
-            scene.goal['sceneInfo'][
+            scene.goal.answer['choice'] = IMPLAUSIBLE
+            scene.goal.scene_info[
                 tags.TYPES.GRAVITY_SUPPORT_PLAUSIBLE
             ] = tags.CELLS.GRAVITY_SUPPORT_PLAUSIBLE.NO
             # Add an invisible support on the floor next to the visible one.
@@ -2574,7 +2592,7 @@ class GravitySupportHypercube(IntuitivePhysicsHypercube):
             if (i + '1') not in scenes:
                 continue
             scene = scenes[i + '1']
-            scene.goal['sceneInfo'][
+            scene.goal.scene_info[
                 tags.TYPES.GRAVITY_SUPPORT_TARGET_TYPE
             ] = tags.CELLS.GRAVITY_SUPPORT_TARGET_TYPE.ASYMMETRIC
             # Assume any asymmetric object is right-to-left (like an L).
@@ -2594,7 +2612,7 @@ class GravitySupportHypercube(IntuitivePhysicsHypercube):
 
     def _change_object_center_of_mass(
         self,
-        target: Dict[str, Any],
+        target: SceneObject,
         visible_support_height: float,
         is_positive: bool
     ) -> None:
@@ -2650,9 +2668,9 @@ class GravitySupportHypercube(IntuitivePhysicsHypercube):
     def _position_on_center_of_mass(
         self,
         target_asymmetric_definition: ObjectDefinition,
-        target_asymmetric: Dict[str, Any],
-        pole_asymmetric: Dict[str, Any],
-        target_symmetric: Dict[str, Any],
+        target_asymmetric: SceneObject,
+        pole_asymmetric: SceneObject,
+        target_symmetric: SceneObject,
         flip: bool
     ) -> None:
         asymmetric_center = self._find_center_of_mass_x(
@@ -2677,7 +2695,7 @@ class GravitySupportHypercube(IntuitivePhysicsHypercube):
     def _place_invisible_support_on_floor(
         self,
         scene: Scene,
-        target: Dict[str, Any],
+        target: SceneObject,
         is_positive: bool
     ) -> None:
         invisible_support = copy.deepcopy(self._visible_support)
@@ -2705,7 +2723,7 @@ class GravitySupportHypercube(IntuitivePhysicsHypercube):
 
     def _shove_target_off_its_support(
         self,
-        instance: Dict[str, Any],
+        instance: SceneObject,
         is_positive: bool
     ) -> None:
         wind_step = instance['togglePhysics'][0]['stepBegin'] + 1 + (
@@ -2727,8 +2745,8 @@ class GravitySupportHypercube(IntuitivePhysicsHypercube):
     def _stack_invisible_support_on_support(
         self,
         scene: Scene,
-        target: Dict[str, Any],
-        pole: Dict[str, Any],
+        target: SceneObject,
+        pole: SceneObject,
         implausible_support_y: float
     ) -> None:
         invisible_support = copy.deepcopy(self._visible_support)
@@ -2793,7 +2811,7 @@ class ObjectPermanenceHypercube(IntuitivePhysicsHypercube):
 
     def _appear_behind_occluder_fall_down(
         self,
-        target: Dict[str, Any]
+        target: SceneObject
     ) -> None:
         # Implausible event happens after target falls behind occluder.
         implausible_event_step = (
@@ -2809,7 +2827,7 @@ class ObjectPermanenceHypercube(IntuitivePhysicsHypercube):
 
     def _appear_behind_occluder_move_across(
         self,
-        target: Dict[str, Any]
+        target: SceneObject
     ) -> None:
         # Held back in Eval 4 (see override in secret file).
         pass
@@ -2833,7 +2851,7 @@ class ObjectPermanenceHypercube(IntuitivePhysicsHypercube):
 
     def _disappear_behind_occluder_fall_down(
         self,
-        target: Dict[str, Any]
+        target: SceneObject
     ) -> None:
         # Implausible event happens after target falls behind occluder.
         implausible_event_step = (
@@ -2846,7 +2864,7 @@ class ObjectPermanenceHypercube(IntuitivePhysicsHypercube):
 
     def _disappear_behind_occluder_move_across(
         self,
-        target: Dict[str, Any]
+        target: SceneObject
     ) -> None:
         # Held back in Eval 4 (see override in secret file).
         pass
@@ -2884,23 +2902,23 @@ class ObjectPermanenceHypercube(IntuitivePhysicsHypercube):
 
         # Initialize object permanence tags in scenes.
         for scene in scenes.values():
-            scene.goal['sceneInfo'][
+            scene.goal.scene_info[
                 tags.TYPES.OBJECT_PERMANENCE_OBJECT_ONE
             ] = tags.CELLS.OBJECT_PERMANENCE_OBJECT_ONE.NO_CHANGE
-            scene.goal['sceneInfo'][
+            scene.goal.scene_info[
                 tags.TYPES.OBJECT_PERMANENCE_OBJECT_TWO
             ] = tags.CELLS.OBJECT_PERMANENCE_OBJECT_TWO.NO_CHANGE
-            scene.goal['sceneInfo'][
+            scene.goal.scene_info[
                 tags.TYPES.OBJECT_PERMANENCE_NOVELTY_ONE
             ] = tags.CELLS.OBJECT_PERMANENCE_NOVELTY_ONE.NONE
-            scene.goal['sceneInfo'][
+            scene.goal.scene_info[
                 tags.TYPES.OBJECT_PERMANENCE_NOVELTY_TWO
             ] = tags.CELLS.OBJECT_PERMANENCE_NOVELTY_TWO.NONE
 
         # Remove object two completely.
         for i in ['a', 'b', 'c', 'j', 'k', 'l', 's', 't', 'u']:
             scene = scenes[i + '1']
-            scene.goal['sceneInfo'][
+            scene.goal.scene_info[
                 tags.TYPES.OBJECT_PERMANENCE_OBJECT_TWO
             ] = tags.CELLS.OBJECT_PERMANENCE_OBJECT_TWO.NONE
             for index in range(len(scene.objects)):
@@ -2915,7 +2933,7 @@ class ObjectPermanenceHypercube(IntuitivePhysicsHypercube):
                     continue
                 scene = scenes[j]
                 scene.debug['evaluationOnly'] = True
-                scene.goal['sceneInfo'][
+                scene.goal.scene_info[
                     tags.TYPES.OBJECT_PERMANENCE_NOVELTY_ONE
                 ] = tags.CELLS.OBJECT_PERMANENCE_NOVELTY_ONE.SIZE
                 for index in range(len(scene.objects)):
@@ -2932,7 +2950,7 @@ class ObjectPermanenceHypercube(IntuitivePhysicsHypercube):
                     continue
                 scene = scenes[j]
                 scene.debug['evaluationOnly'] = True
-                scene.goal['sceneInfo'][
+                scene.goal.scene_info[
                     tags.TYPES.OBJECT_PERMANENCE_NOVELTY_ONE
                 ] = tags.CELLS.OBJECT_PERMANENCE_NOVELTY_ONE.SHAPE
                 for index in range(len(scene.objects)):
@@ -2947,7 +2965,7 @@ class ObjectPermanenceHypercube(IntuitivePhysicsHypercube):
             for j in [i + '2', i + '3', i + '4']:
                 scene = scenes[j]
                 scene.debug['evaluationOnly'] = True
-                scene.goal['sceneInfo'][
+                scene.goal.scene_info[
                     tags.TYPES.OBJECT_PERMANENCE_NOVELTY_TWO
                 ] = tags.CELLS.OBJECT_PERMANENCE_NOVELTY_TWO.SIZE
                 for index in range(len(scene.objects)):
@@ -2962,7 +2980,7 @@ class ObjectPermanenceHypercube(IntuitivePhysicsHypercube):
             for j in [i + '2', i + '3', i + '4']:
                 scene = scenes[j]
                 scene.debug['evaluationOnly'] = True
-                scene.goal['sceneInfo'][
+                scene.goal.scene_info[
                     tags.TYPES.OBJECT_PERMANENCE_NOVELTY_TWO
                 ] = tags.CELLS.OBJECT_PERMANENCE_NOVELTY_TWO.SHAPE
                 for index in range(len(scene.objects)):
@@ -2979,8 +2997,8 @@ class ObjectPermanenceHypercube(IntuitivePhysicsHypercube):
                     continue
                 scene = scenes[j]
                 scene.debug['evaluationOnly'] = True
-                scene.goal['answer']['choice'] = IMPLAUSIBLE
-                scene.goal['sceneInfo'][
+                scene.goal.answer['choice'] = IMPLAUSIBLE
+                scene.goal.scene_info[
                     tags.TYPES.OBJECT_PERMANENCE_OBJECT_ONE
                 ] = tags.CELLS.OBJECT_PERMANENCE_OBJECT_ONE.DISAPPEAR
                 self._disappear_behind_occluder(scene, target_id_1)
@@ -2992,8 +3010,8 @@ class ObjectPermanenceHypercube(IntuitivePhysicsHypercube):
                     continue
                 scene = scenes[j]
                 scene.debug['evaluationOnly'] = True
-                scene.goal['answer']['choice'] = IMPLAUSIBLE
-                scene.goal['sceneInfo'][
+                scene.goal.answer['choice'] = IMPLAUSIBLE
+                scene.goal.scene_info[
                     tags.TYPES.OBJECT_PERMANENCE_OBJECT_ONE
                 ] = tags.CELLS.OBJECT_PERMANENCE_OBJECT_ONE.APPEAR
                 self._appear_behind_occluder(scene, target_id_1)
@@ -3006,8 +3024,8 @@ class ObjectPermanenceHypercube(IntuitivePhysicsHypercube):
             # Make object two disappear.
             scene = scenes[i + '4']
             scene.debug['evaluationOnly'] = True
-            scene.goal['answer']['choice'] = IMPLAUSIBLE
-            scene.goal['sceneInfo'][
+            scene.goal.answer['choice'] = IMPLAUSIBLE
+            scene.goal.scene_info[
                 tags.TYPES.OBJECT_PERMANENCE_OBJECT_TWO
             ] = tags.CELLS.OBJECT_PERMANENCE_OBJECT_TWO.DISAPPEAR
             self._disappear_behind_occluder(scene, target_id_2)
@@ -3015,8 +3033,8 @@ class ObjectPermanenceHypercube(IntuitivePhysicsHypercube):
             # Make object two appear.
             scene = scenes[i + '3']
             scene.debug['evaluationOnly'] = True
-            scene.goal['answer']['choice'] = IMPLAUSIBLE
-            scene.goal['sceneInfo'][
+            scene.goal.answer['choice'] = IMPLAUSIBLE
+            scene.goal.scene_info[
                 tags.TYPES.OBJECT_PERMANENCE_OBJECT_TWO
             ] = tags.CELLS.OBJECT_PERMANENCE_OBJECT_TWO.APPEAR
             self._appear_behind_occluder(scene, target_id_2)
@@ -3070,7 +3088,7 @@ class ShapeConstancyHypercube(IntuitivePhysicsHypercube):
         self,
         scene: Scene,
         target_id: str,
-        template_b: Dict[str, Any]
+        template_b: SceneObject
     ) -> None:
         target_a = [
             instance for instance in scene.objects
@@ -3152,16 +3170,16 @@ class ShapeConstancyHypercube(IntuitivePhysicsHypercube):
 
         # Initialize shape constancy tags in scenes.
         for scene in scenes.values():
-            scene.goal['sceneInfo'][
+            scene.goal.scene_info[
                 tags.TYPES.SHAPE_CONSTANCY_OBJECT_ONE
             ] = tags.CELLS.SHAPE_CONSTANCY_OBJECT_ONE.NO_CHANGE
-            scene.goal['sceneInfo'][
+            scene.goal.scene_info[
                 tags.TYPES.SHAPE_CONSTANCY_OBJECT_TWO
             ] = tags.CELLS.SHAPE_CONSTANCY_OBJECT_TWO.NO_CHANGE
-            scene.goal['sceneInfo'][
+            scene.goal.scene_info[
                 tags.TYPES.SHAPE_CONSTANCY_TRAINED_ONE
             ] = tags.CELLS.SHAPE_CONSTANCY_TRAINED_ONE.YES
-            scene.goal['sceneInfo'][
+            scene.goal.scene_info[
                 tags.TYPES.SHAPE_CONSTANCY_TRAINED_TWO
             ] = tags.CELLS.SHAPE_CONSTANCY_TRAINED_TWO.YES
 
@@ -3171,7 +3189,7 @@ class ShapeConstancyHypercube(IntuitivePhysicsHypercube):
             if j not in scenes:
                 continue
             scene = scenes[i + '1']
-            scene.goal['sceneInfo'][
+            scene.goal.scene_info[
                 tags.TYPES.SHAPE_CONSTANCY_OBJECT_TWO
             ] = tags.CELLS.SHAPE_CONSTANCY_OBJECT_TWO.NONE
             for index in range(len(scene.objects)):
@@ -3186,7 +3204,7 @@ class ShapeConstancyHypercube(IntuitivePhysicsHypercube):
                     continue
                 scene = scenes[j]
                 scene.debug['evaluationOnly'] = True
-                scene.goal['sceneInfo'][
+                scene.goal.scene_info[
                     tags.TYPES.SHAPE_CONSTANCY_TRAINED_ONE
                 ] = tags.CELLS.SHAPE_CONSTANCY_TRAINED_ONE.NO
                 for index in range(len(scene.objects)):
@@ -3203,7 +3221,7 @@ class ShapeConstancyHypercube(IntuitivePhysicsHypercube):
                     continue
                 scene = scenes[j]
                 scene.debug['evaluationOnly'] = True
-                scene.goal['sceneInfo'][
+                scene.goal.scene_info[
                     tags.TYPES.SHAPE_CONSTANCY_TRAINED_TWO
                 ] = tags.CELLS.SHAPE_CONSTANCY_TRAINED_TWO.NO
                 for index in range(len(scene.objects)):
@@ -3220,8 +3238,8 @@ class ShapeConstancyHypercube(IntuitivePhysicsHypercube):
                     continue
                 scene = scenes[j]
                 scene.debug['evaluationOnly'] = True
-                scene.goal['answer']['choice'] = IMPLAUSIBLE
-                scene.goal['sceneInfo'][
+                scene.goal.answer['choice'] = IMPLAUSIBLE
+                scene.goal.scene_info[
                     tags.TYPES.SHAPE_CONSTANCY_OBJECT_ONE
                 ] = tags.CELLS.SHAPE_CONSTANCY_OBJECT_ONE.TRAINED_SHAPE
                 self._turn_a_into_b(scene, target_id_1, trained_variation_1_b)
@@ -3233,8 +3251,8 @@ class ShapeConstancyHypercube(IntuitivePhysicsHypercube):
                     continue
                 scene = scenes[j]
                 scene.debug['evaluationOnly'] = True
-                scene.goal['answer']['choice'] = IMPLAUSIBLE
-                scene.goal['sceneInfo'][
+                scene.goal.answer['choice'] = IMPLAUSIBLE
+                scene.goal.scene_info[
                     tags.TYPES.SHAPE_CONSTANCY_OBJECT_ONE
                 ] = tags.CELLS.SHAPE_CONSTANCY_OBJECT_ONE.UNTRAINED_SHAPE
                 self._turn_a_into_b(
@@ -3250,8 +3268,8 @@ class ShapeConstancyHypercube(IntuitivePhysicsHypercube):
         # Object two transforms into a different trained shape.
         scene = scenes['e3']
         scene.debug['evaluationOnly'] = True
-        scene.goal['answer']['choice'] = IMPLAUSIBLE
-        scene.goal['sceneInfo'][
+        scene.goal.answer['choice'] = IMPLAUSIBLE
+        scene.goal.scene_info[
             tags.TYPES.SHAPE_CONSTANCY_OBJECT_TWO
         ] = tags.CELLS.SHAPE_CONSTANCY_OBJECT_TWO.TRAINED_SHAPE
         self._turn_a_into_b(scene, target_id_2, trained_variation_2_b)
@@ -3259,8 +3277,8 @@ class ShapeConstancyHypercube(IntuitivePhysicsHypercube):
         # Object two transforms into a different untrained shape.
         scene = scenes['l4']
         scene.debug['evaluationOnly'] = True
-        scene.goal['answer']['choice'] = IMPLAUSIBLE
-        scene.goal['sceneInfo'][
+        scene.goal.answer['choice'] = IMPLAUSIBLE
+        scene.goal.scene_info[
             tags.TYPES.SHAPE_CONSTANCY_OBJECT_TWO
         ] = tags.CELLS.SHAPE_CONSTANCY_OBJECT_TWO.UNTRAINED_SHAPE
         self._turn_a_into_b(
@@ -3382,19 +3400,19 @@ class SpatioTemporalContinuityHypercube(IntuitivePhysicsHypercube):
 
         # Initialize spatio temporal continuity tags in scenes.
         for scene in scenes.values():
-            scene.goal['sceneInfo'][
+            scene.goal.scene_info[
                 tags.TYPES.SPATIO_TEMPORAL_CONTINUITY_OBJECTS
             ] = tags.CELLS.SPATIO_TEMPORAL_CONTINUITY_OBJECTS.TWO
-            scene.goal['sceneInfo'][
+            scene.goal.scene_info[
                 tags.TYPES.SPATIO_TEMPORAL_CONTINUITY_OCCLUDERS
             ] = tags.CELLS.SPATIO_TEMPORAL_CONTINUITY_OCCLUDERS.THREE
-            scene.goal['sceneInfo'][
+            scene.goal.scene_info[
                 tags.TYPES.SPATIO_TEMPORAL_CONTINUITY_PLAUSIBLE
             ] = tags.CELLS.SPATIO_TEMPORAL_CONTINUITY_PLAUSIBLE.YES
-            scene.goal['sceneInfo'][
+            scene.goal.scene_info[
                 tags.TYPES.SPATIO_TEMPORAL_CONTINUITY_TARGET_TRAINED
             ] = tags.CELLS.SPATIO_TEMPORAL_CONTINUITY_TARGET_TRAINED.YES
-            scene.goal['sceneInfo'][
+            scene.goal.scene_info[
                 tags.TYPES.SPATIO_TEMPORAL_CONTINUITY_NON_TARGET_TRAINED
             ] = tags.CELLS.SPATIO_TEMPORAL_CONTINUITY_NON_TARGET_TRAINED.YES
 
@@ -3402,7 +3420,7 @@ class SpatioTemporalContinuityHypercube(IntuitivePhysicsHypercube):
         for i in ['a', 'd', 'g', 'j', 'm', 'p', 'b', 'e', 'h', 'k', 'n', 'q']:
             for j in [i + '1', i + '2', i + '3', i + '4']:
                 scene = scenes[j]
-                scene.goal['sceneInfo'][
+                scene.goal.scene_info[
                     tags.TYPES.SPATIO_TEMPORAL_CONTINUITY_OBJECTS
                 ] = tags.CELLS.SPATIO_TEMPORAL_CONTINUITY_OBJECTS.ONE
                 for index in range(len(scene.objects)):
@@ -3414,7 +3432,7 @@ class SpatioTemporalContinuityHypercube(IntuitivePhysicsHypercube):
         for i in ['a', 'd', 'g', 'j', 'm', 'p']:
             for j in [i + '1', i + '2', i + '3', i + '4']:
                 scene = scenes[j]
-                scene.goal['sceneInfo'][
+                scene.goal.scene_info[
                     tags.TYPES.SPATIO_TEMPORAL_CONTINUITY_OBJECTS
                 ] = tags.CELLS.SPATIO_TEMPORAL_CONTINUITY_OBJECTS.ZERO
                 for index in range(len(scene.objects)):
@@ -3426,7 +3444,7 @@ class SpatioTemporalContinuityHypercube(IntuitivePhysicsHypercube):
         for i in ['g', 'h', 'i', 'j', 'k', 'l']:
             for j in [i + '1', i + '2', i + '3', i + '4']:
                 scene = scenes[j]
-                scene.goal['sceneInfo'][
+                scene.goal.scene_info[
                     tags.TYPES.SPATIO_TEMPORAL_CONTINUITY_OCCLUDERS
                 ] = tags.CELLS.SPATIO_TEMPORAL_CONTINUITY_OCCLUDERS.TWO
                 remove_id_list = [
@@ -3442,7 +3460,7 @@ class SpatioTemporalContinuityHypercube(IntuitivePhysicsHypercube):
         for i in ['m', 'n', 'o', 'p', 'q', 'r']:
             for j in [i + '1', i + '2', i + '3', i + '4']:
                 scene = scenes[j]
-                scene.goal['sceneInfo'][
+                scene.goal.scene_info[
                     tags.TYPES.SPATIO_TEMPORAL_CONTINUITY_OCCLUDERS
                 ] = tags.CELLS.SPATIO_TEMPORAL_CONTINUITY_OCCLUDERS.ZERO
                 remove_id_list = [
@@ -3460,7 +3478,7 @@ class SpatioTemporalContinuityHypercube(IntuitivePhysicsHypercube):
             # Switch the target with its untrained variation.
             for j in [i + '2', i + '4']:
                 scene = scenes[j]
-                scene.goal['sceneInfo'][
+                scene.goal.scene_info[
                     tags.TYPES.SPATIO_TEMPORAL_CONTINUITY_TARGET_TRAINED
                 ] = tags.CELLS.SPATIO_TEMPORAL_CONTINUITY_TARGET_TRAINED.NO
                 scene.debug['evaluationOnly'] = True
@@ -3474,7 +3492,7 @@ class SpatioTemporalContinuityHypercube(IntuitivePhysicsHypercube):
             # Switch the non-target with its untrained variation.
             for j in [i + '3', i + '4']:
                 scene = scenes[j]
-                scene.goal['sceneInfo'][
+                scene.goal.scene_info[
                     tags.TYPES.SPATIO_TEMPORAL_CONTINUITY_NON_TARGET_TRAINED
                 ] = tags.CELLS.SPATIO_TEMPORAL_CONTINUITY_NON_TARGET_TRAINED.NO
                 scene.debug['evaluationOnly'] = True
@@ -3491,8 +3509,8 @@ class SpatioTemporalContinuityHypercube(IntuitivePhysicsHypercube):
             for j in [i + '1', i + '2', i + '3', i + '4']:
                 scene = scenes[j]
                 scene.debug['evaluationOnly'] = True
-                scene.goal['answer']['choice'] = IMPLAUSIBLE
-                scene.goal['sceneInfo'][
+                scene.goal.answer['choice'] = IMPLAUSIBLE
+                scene.goal.scene_info[
                     tags.TYPES.SPATIO_TEMPORAL_CONTINUITY_PLAUSIBLE
                 ] = tags.CELLS.SPATIO_TEMPORAL_CONTINUITY_PLAUSIBLE.NO
                 self._shroud_object(scene, target_id)
@@ -3508,12 +3526,12 @@ class SpatioTemporalContinuityHypercube(IntuitivePhysicsHypercube):
         # Consolidate specific redundant scenes (STC only).
         for i in ['a', 'd', 'g', 'j', 'm', 'p']:
             for j in [i + '2', i + '3', i + '4']:
-                scenes[i + '1'].goal['sceneInfo'][tags.SCENE.ID].append(j)
+                scenes[i + '1'].goal.scene_info[tags.SCENE.ID].append(j)
                 del scenes[j]
         for i in ['b', 'e', 'h', 'k', 'n', 'q']:
-            scenes[i + '1'].goal['sceneInfo'][tags.SCENE.ID].append(i + '3')
+            scenes[i + '1'].goal.scene_info[tags.SCENE.ID].append(i + '3')
             del scenes[i + '3']
-            scenes[i + '2'].goal['sceneInfo'][tags.SCENE.ID].append(i + '4')
+            scenes[i + '2'].goal.scene_info[tags.SCENE.ID].append(i + '4')
             del scenes[i + '4']
 
         return scenes
@@ -3547,8 +3565,8 @@ class SpatioTemporalContinuityHypercube(IntuitivePhysicsHypercube):
     # Override
     def _identify_targets_and_non_targets(
         self,
-        moving_object_list: List[Dict[str, Any]]
-    ) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+        moving_object_list: List[SceneObject]
+    ) -> Tuple[List[SceneObject], List[SceneObject]]:
         """Return the two separate target and non-target lists using the given
         moving object list."""
         # STC scenes will always have one target and one non-target in Eval 3.
@@ -3738,16 +3756,16 @@ class ObjectPermanenceHypercubeEval4(ObjectPermanenceHypercube):
 
         # Initialize object permanence tags in scenes.
         for scene in scenes.values():
-            scene.goal['sceneInfo'][
+            scene.goal.scene_info[
                 tags.TYPES.OBJECT_PERMANENCE_SETUP
             ] = tags.CELLS.OBJECT_PERMANENCE_SETUP.EXIT
-            scene.goal['sceneInfo'][
+            scene.goal.scene_info[
                 tags.TYPES.OBJECT_PERMANENCE_MOVEMENT
             ] = tags.CELLS.OBJECT_PERMANENCE_MOVEMENT.LINEAR
-            scene.goal['sceneInfo'][
+            scene.goal.scene_info[
                 tags.TYPES.OBJECT_PERMANENCE_OBJECT_ONE
             ] = tags.CELLS.OBJECT_PERMANENCE_OBJECT_ONE.NO_CHANGE
-            scene.goal['sceneInfo'][
+            scene.goal.scene_info[
                 tags.TYPES.OBJECT_PERMANENCE_NOVELTY_ONE
             ] = tags.CELLS.OBJECT_PERMANENCE_NOVELTY_ONE.NONE
 
@@ -3780,7 +3798,7 @@ class ObjectPermanenceHypercubeEval4(ObjectPermanenceHypercube):
 
         # Switch the "exit" movement with the "stop" movement.
         scene = scenes['j1']
-        scene.goal['sceneInfo'][
+        scene.goal.scene_info[
             tags.TYPES.OBJECT_PERMANENCE_SETUP
         ] = tags.CELLS.OBJECT_PERMANENCE_SETUP.STOP
         for instance in scene.objects:
@@ -3909,19 +3927,19 @@ class SpatioTemporalContinuityHypercubeEval4(
 
         # Initialize spatio temporal continuity tags in scenes.
         for scene in scenes.values():
-            scene.goal['sceneInfo'][
+            scene.goal.scene_info[
                 tags.TYPES.SPATIO_TEMPORAL_CONTINUITY_MOVEMENT
             ] = tags.CELLS.SPATIO_TEMPORAL_CONTINUITY_MOVEMENT.LINEAR
-            scene.goal['sceneInfo'][
+            scene.goal.scene_info[
                 tags.TYPES.SPATIO_TEMPORAL_CONTINUITY_OBJECTS
             ] = tags.CELLS.SPATIO_TEMPORAL_CONTINUITY_OBJECTS.ONE
-            scene.goal['sceneInfo'][
+            scene.goal.scene_info[
                 tags.TYPES.SPATIO_TEMPORAL_CONTINUITY_OCCLUDERS
             ] = tags.CELLS.SPATIO_TEMPORAL_CONTINUITY_OCCLUDERS.TWO
-            scene.goal['sceneInfo'][
+            scene.goal.scene_info[
                 tags.TYPES.SPATIO_TEMPORAL_CONTINUITY_PLAUSIBLE
             ] = tags.CELLS.SPATIO_TEMPORAL_CONTINUITY_PLAUSIBLE.YES
-            scene.goal['sceneInfo'][
+            scene.goal.scene_info[
                 tags.TYPES.SPATIO_TEMPORAL_CONTINUITY_TARGET_TRAINED
             ] = tags.CELLS.SPATIO_TEMPORAL_CONTINUITY_TARGET_TRAINED.YES
 
@@ -3948,7 +3966,7 @@ class SpatioTemporalContinuityHypercubeEval4(
     ) -> Dict[str, Scene]:
         # Remove every occluder.
         scene = scenes['e1']
-        scene.goal['sceneInfo'][
+        scene.goal.scene_info[
             tags.TYPES.SPATIO_TEMPORAL_CONTINUITY_OCCLUDERS
         ] = tags.CELLS.SPATIO_TEMPORAL_CONTINUITY_OCCLUDERS.ZERO
         remove_id_list = [

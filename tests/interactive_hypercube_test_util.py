@@ -1,13 +1,22 @@
-from generator import Scene
+from generator import Scene, tags
 from hypercube import scene_generator
 
 STARTER_SCENE = scene_generator.STARTER_SCENE
 
 
+def find_object(object_list, prefix):
+    results = list(filter(lambda x: x['type'].startswith(prefix), object_list))
+    return results[0] if len(results) else None
+
+
+def find_objects(object_list, prefix):
+    return list(filter(lambda x: x['type'].startswith(prefix), object_list))
+
+
 def map_id_to_scene(scenes):
     scene_dict = {}
     for index, scene in enumerate(scenes):
-        scene_id = scene.goal['sceneInfo']['id'][0].lower()
+        scene_id = scene.goal.scene_info['id'][0].lower()
         scene_dict[scene_id] = (scene, index)
     return scene_dict
 
@@ -21,13 +30,16 @@ def verify_scene(
     lava=False,
     partition_floor=False,
     position=None,
-    rotation=None
+    rotation=None,
+    category='retrieval',
+    passive=False
 ):
     assert scene
     assert scene.version == 2
-    assert scene.goal['category'] == 'retrieval'
-    assert scene.goal['description']
-    assert scene.goal['last_step']
+    assert (scene.goal.category == category)
+    assert not scene.goal.description if passive else \
+        scene.goal.description
+    assert scene.goal.last_step
 
     if dimensions:
         assert scene.room_dimensions.x == dimensions[0]
@@ -62,12 +74,23 @@ def verify_scene(
     assert bool(scene.holes) == holes
     assert bool(scene.lava) == lava
     assert bool(scene.partition_floor) == partition_floor
-    assert len(scene.goal['sceneInfo']['slices']) == slice_count
+    assert len(scene.goal.scene_info['slices']) == slice_count
 
-    assert scene.goal['sceneInfo']['primaryType'] == 'interactive'
-    assert scene.goal['sceneInfo']['secondaryType'] == 'retrieval'
-    assert scene.goal['sceneInfo']['tertiaryType'] == task_type
-    assert scene.goal['sceneInfo']['quaternaryType'] == (
-        'action variable' if bool(scene.goal.get('action_list')) else
+    assert (scene.goal.scene_info['primaryType'] == 'interactive' or
+            (scene.goal.scene_info['primaryType'] == 'passive' and passive))
+    # TODO: MCS-1683: verify secondaryType/newer categories within ingest/UI
+    assert (scene.goal.scene_info['secondaryType'] == category or
+            scene.goal.scene_info['secondaryType'] == 'retrieval' or
+            scene.goal.scene_info['secondaryType'] == 'passive' and passive)
+    assert scene.goal.scene_info['tertiaryType'] == task_type
+    assert scene.goal.scene_info['quaternaryType'] == (
+        'action none' if (
+            passive and scene.goal.scene_info['primaryType'] == 'passive')
+        else
+        'action variable' if bool(scene.goal.action_list) else
         'action full'
+    )
+
+    assert scene.goal.scene_info['domainType'] == (
+        tags.get_domain_type(task_type)
     )

@@ -3,7 +3,7 @@ import logging
 import random
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
-from machine_common_sense.config_manager import PerformerStart, Vector3d
+from machine_common_sense.config_manager import Goal, PerformerStart, Vector3d
 
 from generator import (
     MAX_TRIES,
@@ -14,6 +14,7 @@ from generator import (
     RetrievalGoal,
     Scene,
     SceneException,
+    SceneObject,
     base_objects,
     containers,
     definitions,
@@ -48,9 +49,11 @@ from .object_data import (
 
 logger = logging.getLogger(__name__)
 
-ROOM_SIZE_X = list(range(10, 16))
+ROOM_SIZE_XZ_MIN = 10
+ROOM_SIZE_XZ_MAX = 20
+ROOM_SIZE_X = list(range(ROOM_SIZE_XZ_MIN, ROOM_SIZE_XZ_MAX + 1))
 ROOM_SIZE_Y = list(range(3, 6))
-ROOM_SIZE_Z = list(range(10, 16))
+ROOM_SIZE_Z = list(range(ROOM_SIZE_XZ_MIN, ROOM_SIZE_XZ_MAX + 1))
 
 SMALL_CONTEXT_OBJECT_CHOICES = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
 SMALL_CONTEXT_OBJECT_WEIGHTS = [5, 5, 10, 10, 12.5, 15, 12.5, 10, 10, 5, 5]
@@ -64,7 +67,7 @@ WALL_DEPTH = 0.1
 WALL_SEPARATION = 1
 
 
-def retrieve_template_list(object_data: ObjectData) -> List[Dict[str, Any]]:
+def retrieve_template_list(object_data: ObjectData) -> List[SceneObject]:
     return [object_data.trained_template, object_data.untrained_template]
 
 
@@ -196,7 +199,7 @@ class InteractiveHypercube(Hypercube):
     def _create_scenes(
         self,
         starter_scene: Scene,
-        goal_template: Dict[str, Any]
+        goal_template: Goal
     ) -> List[Scene]:
 
         tries = 0
@@ -808,7 +811,7 @@ class InteractiveHypercube(Hypercube):
     def _choose_small_context_definition(
         self,
         target_confusor_data_list: List[ObjectData]
-    ) -> Dict[str, Any]:
+    ) -> ObjectDefinition:
         """Choose and return a small context object definition for the given
         target and confusor objects from the given definition list."""
         return specific_objects.choose_distractor_definition([
@@ -865,7 +868,7 @@ class InteractiveHypercube(Hypercube):
         target_definition: ObjectDefinition,
         definition_dataset: DefinitionDataset,
         is_occluder: bool
-    ) -> Dict[str, Any]:
+    ) -> ObjectDefinition:
         """Choose and return an obstacle or occluder definition for the given
         target object from the given definition list."""
 
@@ -959,7 +962,7 @@ class InteractiveHypercube(Hypercube):
         confusor_definition: Optional[ObjectDefinition],
         definition_dataset: DefinitionDataset,
         find_invalid_container: bool = False,
-    ) -> Tuple[Dict[str, Any], int, containers.Orientation, float, float]:
+    ) -> Tuple[ObjectDefinition, int, containers.Orientation, float, float]:
         """Choose and return a valid or an invalid container definition for the
         given target and confusor objects from the given definition list."""
 
@@ -1117,7 +1120,7 @@ class InteractiveHypercube(Hypercube):
         target_validation_list: List[Dict[str, float]],
         start_index: int = None,
         end_index: int = None
-    ) -> Tuple[List[Dict[str, Any]], List[ObjectBounds]]:
+    ) -> Tuple[List[SceneObject], List[ObjectBounds]]:
         """Create and return each of the goal's targets between the start_index
         and the end_index. Used if the goal needs more targets than are defined
         by the hypercube's plan. Changes the bounds_list."""
@@ -1697,10 +1700,10 @@ class InteractiveHypercube(Hypercube):
 
     def _move_distractor_into_receptacle(
         self,
-        object_instance: Dict[str, Any],
+        object_instance: SceneObject,
         performer_start: Dict[str, Dict[str, float]],
         bounds_list: List[ObjectBounds]
-    ) -> Dict[str, Any]:
+    ) -> SceneObject:
         """Create and return a receptacle object, moving the given object into
         the new receptacle. Changes the bounds_list."""
         # Only a pickupable object can be positioned inside a receptacle.
@@ -1740,10 +1743,10 @@ class InteractiveHypercube(Hypercube):
 
     def _move_distractor_onto_receptacle(
         self,
-        object_instance: Dict[str, Any],
+        object_instance: SceneObject,
         performer_start: Dict[str, Dict[str, float]],
         bounds_list: List[ObjectBounds]
-    ) -> Dict[str, Any]:
+    ) -> SceneObject:
         """Create and return a receptacle object, moving the given object onto
         the new receptacle. Changes the bounds_list."""
         # TODO MCS-146 Position objects on top of receptacles.
@@ -1753,7 +1756,7 @@ class InteractiveHypercube(Hypercube):
         self,
         scene: Scene,
         scene_index: int,
-        goal_template: Dict[str, Any]
+        goal_template: Goal
     ) -> None:
         """Update the given scene with its metadata like all of its objects."""
         scene_plan = self._plan_list[scene_index]
@@ -1786,7 +1789,7 @@ class InteractiveHypercube(Hypercube):
             [self._target_data.instance_list[scene_index]]
         )
 
-        scene.goal['last_step'] = get_step_limit_from_dimensions(
+        scene.goal.last_step = get_step_limit_from_dimensions(
             scene.room_dimensions.x,
             scene.room_dimensions.z
         )
@@ -1818,13 +1821,13 @@ class InteractiveHypercube(Hypercube):
         ]
         update_scene_objects(scene, role_to_object_list)
 
-        scene.goal['sceneInfo'][tags.SCENE.ID] = [
+        scene.goal.scene_info[tags.SCENE.ID] = [
             scene_plan.scene_id.upper()
         ]
-        scene.goal['sceneInfo'][tags.SCENE.SLICES] = []
+        scene.goal.scene_info[tags.SCENE.SLICES] = []
         for tag, value in scene_plan.slice_tags.items():
-            scene.goal['sceneInfo'][tag] = value
-            scene.goal['sceneInfo'][tags.SCENE.SLICES].append(
+            scene.goal.scene_info[tag] = value
+            scene.goal.scene_info[tags.SCENE.SLICES].append(
                 tags.tag_to_label(tag) + ' ' + str(value)
             )
 

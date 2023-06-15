@@ -2,6 +2,8 @@ import re
 from types import SimpleNamespace
 from typing import Any, Dict, List
 
+from .objects import SceneObject
+
 ALL = 'all'
 ANY = 'any'
 
@@ -17,12 +19,14 @@ GOAL_DICT = {
 ROLE_DICT = {
     'AGENT': 'agent',
     'BLOB': 'blob',
+    'COLLIDER': 'collider',
     'CONFUSOR': 'confusor',
     'CONTAINER': 'container',
     'CONTEXT': 'context',
     'HOME': 'home',
     'KEY': 'key',
     'INTUITIVE_PHYSICS_OCCLUDER': 'intuitive physics occluder',
+    'LID': 'lid',
     'NON_TARGET': 'non target',
     'OBSTACLE': 'obstacle',
     'OCCLUDER': 'occluder',
@@ -41,19 +45,41 @@ SCENE_BOOL_TAGS_DICT = {
 }
 
 SCENE_OPTIONAL_TAGS_DICT = {
+    # Multiple hypercubes
+    'AGENT_SKINTONE': 'skintone',
     'AMBIGUOUS': 'ambiguous',
     'ANGLE': 'angle',
     'CORNER': 'corner',
     'CORRECT_DOOR': 'correctDoor',
     'DIRECTION': 'direction',
-    'EXTENSION_SIDE': 'extensionSide',
     'FALL_DOWN': 'fallDown',
     'MOVE_ACROSS': 'moveAcross',
     'NUM_FLOOR_FEATURES': 'numFloorFeatures',
     'PATH_RATIO': 'pathRatio',
+    'ROTATION': 'rotation',
     'SETUP': 'sceneSetup',
     'TARGET_SIDE': 'targetSide',
-    'WALL': 'wall'
+    'TIPSY': 'tipsy',
+    # Arithmetic, Number Comparison
+    'REFERENCE_SIDE': 'referenceSide',
+    # Imitation
+    'CONTAINERS_SIDE': 'containersSide',
+    'CONTAINERS_KIDNAP_ROTATION': 'containersKidnapRotation',
+    'CONTAINER_TRIGGER_ORDER_SIDES': 'containerTriggerOrderSides',
+    # Seeing Leads to Knowing
+    'AGENT_FACING_DIRECTION': 'agentFacingDirection',
+    'TARGET_BIN_GLOBAL_LOCATION': 'targetBinGlobalLocation',
+    # Set Rotation
+    'TURNTABLE_CONTAINER_TARGET_SIDE': 'turntableContainerTargetSide',
+    # Shell Game
+    'SHELL_GAME_MOVEMENT_DIRECTION': 'shellGameMovementDirection',
+    'SHELL_GAME_CONTAINER_PICKED': 'shellGameContainerPicked',
+    # Solidity
+    'EXTENSION_SIDE': 'extensionSide',
+    # Spatial Reorientation
+    'STABLE_LANDMARK': 'stableLandmarkWall',
+    'UNSTABLE_LANDMARK_SIDE': 'unstableLandmarkStartingSide',
+    'UNSTABLE_LANDMARK_TYPE': 'unstableLandmarkType'
 }
 
 SCENE_ROLE_TAGS_DICT = {
@@ -95,6 +121,7 @@ SCENE = SimpleNamespace(
     SECONDARY='secondaryType',
     TERTIARY='tertiaryType',
     QUATERNARY='quaternaryType',
+    DOMAIN_TYPE='domainType',
 
     ID='id',
     NAME='name',
@@ -105,6 +132,12 @@ SCENE = SimpleNamespace(
     ACTION_VARIABLE='action variable',
     ACTION_FULL='action full',
 
+    INTERACTIVE_AGENTS='interactive agents',
+    INTERACTIVE_OBJECTS='interactive objects',
+    INTERACTIVE_PLACES='interactive places',
+    PASSIVE_AGENTS='passive agents',
+    PASSIVE_OBJECT='passive objects',
+
     INTUITIVE_PHYSICS='intuitive physics',
     COLLISIONS='collisions',
     GRAVITY_SUPPORT='gravity support',
@@ -113,15 +146,28 @@ SCENE = SimpleNamespace(
     SPATIO_TEMPORAL_CONTINUITY='spatio temporal continuity',
 
     AGENT_IDENTIFICATION='agent identification',
+    ARITHMETIC='arithmetic',
+    CONTAINER='container',
     HOLES='holes',
+    IMITATION_TASK='imitation task',
+    INTERACTIVE_COLLISION='interactive collision',
     INTERACTIVE_OBJECT_PERMANENCE='interactive object permanence',
     LAVA='lava',
     MOVING_TARGET_PREDICTION='moving target prediction',
+    NUMBER_COMPARISON='number comparison',
+    OCCLUDER='occluder',
+    OBSTACLE='obstacle',
     RAMP='ramp',
-    REORIENTATION='reorientation',
+    REFERENCE='spatial reference',
+    REORIENTATION='spatial reorientation',
+    SEEING_LEADS_TO_KNOWING='seeing leads to knowing',
+    SET_ROTATION='set rotation',
+    SHELL_GAME='shell game',
+    SOCIAL_REFERENCING='social referencing',
     SOLIDITY='solidity',
     SPATIAL_ELIMINATION='spatial elimination',
     SUPPORT_RELATIONS='support relations',
+    TRAJECTORY='trajectory',
     TOOL_USE='tool use',
 
     # For passive agent tasks:
@@ -174,23 +220,44 @@ TYPES = SimpleNamespace(
     INTERACTIVE_TARGET_HIDDEN='targetHidden',
     INTERACTIVE_TARGET_INSIDE='targetInside',
 
+    AGENT_BACKGROUND_AGENT_ONE_GOAL='agents agent one goal',
+    AGENT_BACKGROUND_AGENT_PREFERENCE='agents agent preference',
+    AGENT_BACKGROUND_COLLECT='agents collect',
     AGENT_BACKGROUND_INSTRUMENTAL_ACTION='agents instrumental action',
+    AGENT_BACKGROUND_INSTRUMENTAL_APPROACH='agents instrumental approach',
+    AGENT_BACKGROUND_INSTRUMENTAL_IMITATION='agents instrumental imitation',
     AGENT_BACKGROUND_MULTIPLE_AGENTS='agents multiple agents',
+    AGENT_BACKGROUND_NON_AGENT_ONE_GOAL='agents nonagent one goal',
+    AGENT_BACKGROUND_NON_AGENT_PREFERENCE='agents nonagent preference',
     AGENT_BACKGROUND_OBJECT_PREFERENCE='agents object preference',
     AGENT_BACKGROUND_SINGLE_OBJECT='agents single object',
+    AGENT_BACKGROUND_SOCIAL_APPROACH='agents social approach',
+    AGENT_BACKGROUND_SOCIAL_IMITATION='agents social imitation',
 
+    AGENT_EVALUATION_AGENT_NON_AGENT='agents agent nonagent',
+    AGENT_EVALUATION_APPROACH='agents approach',
     AGENT_EVALUATION_EFFICIENT_IRRATIONAL='agents efficient action irrational',
     AGENT_EVALUATION_EFFICIENT_PATH='agents efficient action path lure',
     AGENT_EVALUATION_EFFICIENT_TIME='agents efficient action time control',
+    AGENT_EVALUATION_IMITATION='agents imitation',
     AGENT_EVALUATION_INACCESSIBLE_GOAL='agents inaccessible goal',
     AGENT_EVALUATION_INSTRUMENTAL_BLOCKING_BARRIERS='agents instrumental action blocking barriers',  # noqa: E501
     AGENT_EVALUATION_INSTRUMENTAL_INCONSEQUENTIAL_BARRIERS='agents instrumental action inconsequential barriers',  # noqa: E501
     AGENT_EVALUATION_INSTRUMENTAL_NO_BARRIERS='agents instrumental action no barriers',  # noqa: E501
     AGENT_EVALUATION_MULTIPLE_AGENTS='agents multiple agents',
-    AGENT_EVALUATION_OBJECT_PREFERENCE='agents object preference'
+    AGENT_EVALUATION_OBJECT_PREFERENCE='agents object preference',
+
+    AGENT_EXAMPLE='agents examples'
 )
 
+
 CELLS = SimpleNamespace(
+    AGENT_SKINTONE=SimpleNamespace(
+        LIGHT='light',
+        MEDIUM='medium',
+        DARK='dark'
+    ),
+
     COLLISIONS_MOVES=SimpleNamespace(
         ONE='first object',
         TWO='second object'
@@ -349,9 +416,56 @@ CELLS = SimpleNamespace(
         YES='yes',
         NO='no'
     ),
-    TARGET_SIDE=SimpleNamespace(
+    REFERENCE_SIDE=SimpleNamespace(
         LEFT='left',
         RIGHT='right'
+    ),
+
+    TURNTABLE_CONTAINER_TARGET_SIDE=SimpleNamespace(
+        LEFT='left',
+        MIDDLE='middle',
+        RIGHT='right'
+    ),
+    ROTATION=SimpleNamespace(
+        CLOCKWISE='clockwise',
+        COUNTER_CLOCKWISE='counterClockwise'
+    ),
+    SIDE=SimpleNamespace(
+        LEFT='left',
+        RIGHT='right',
+        EITHER='either'
+    ),
+
+    CONTAINERS_SIDE=SimpleNamespace(
+        LEFT='left',
+        RIGHT='right'
+    ),
+    CONTAINERS_KIDNAP_ROTATION=SimpleNamespace(
+        FORTY_FIVE=45,
+        NINETY=90,
+        ONE_THIRTY_FIVE=135,
+        TWO_TWENTY_FIVE=225,
+        TWO_SEVENTY=270,
+        THREE_FIFTEEN=315
+    ),
+    SHELL_GAME_MOVEMENT_DIRECTION=SimpleNamespace(
+        LEFT='left',
+        RIGHT='right'
+    ),
+    SHELL_GAME_CONTAINER_PICKED=SimpleNamespace(
+        LEFT='left',
+        MIDDLE='middle',
+        RIGHT='right'
+    ),
+    TARGET_BIN_GLOBAL_LOCATION=SimpleNamespace(
+        FRONT_RIGHT='front_right',
+        BACK_RIGHT='back_right',
+        BACK_LEFT='back_left',
+        FRONT_LEFT='front_left'
+    ),
+    AGENT_FACING_DIRECTION=SimpleNamespace(
+        LEFT='left',
+        RIGHT='right',
     )
 )
 
@@ -380,26 +494,35 @@ ABBREV = SimpleNamespace(
     SPATIO_TEMPORAL_CONTINUITY='stc',
 
     AGENT_IDENTIFICATION='agident',
+    ARITHMETIC='arith',
     HOLES='holes',
+    IMITATION_TASK='imit',
+    INTERACTIVE_COLLISION='intcoll',
     INTERACTIVE_CONTAINER='intcon',
     INTERACTIVE_OBJECT_PERMANENCE='intobjp',
     INTERACTIVE_OBSTACLE='intobs',
     INTERACTIVE_OCCLUDER='intocc',
     LAVA='lava',
     MOVING_TARGET_PREDICTION='movtar',
+    NUMBER_COMPARISON='numcomp',
     RAMP='ramp',
+    REFERENCE='ref',
     REORIENTATION='reor',
+    SEEING_LEADS_TO_KNOWING='seeknow',
+    SET_ROTATION='setrot',
+    SHELL_GAME='shell',
     SOLIDITY='solidity',
     SPATIAL_ELIMINATION='spateli',
     SUPPORT_RELATIONS='suprel',
-    TOOL_USE='tool'
+    TRAJECTORY='traj',
+    TOOL_USE='tool',
 )
 
 
 def append_object_tags(
     scene_info: Dict[str, Any],
     objects_info: Dict[str, Any],
-    role_to_object_list: Dict[str, List[Dict[str, Any]]]
+    role_to_object_list: Dict[str, List[SceneObject]]
 ) -> None:
     """Appends object-specific tags from the given role_to_object_list onto
     the given scene_info and objects_info collections."""
@@ -418,7 +541,7 @@ def append_object_tags(
 def append_object_tags_of_type(
     scene_info: Dict[str, Any],
     objects_info: Dict[str, Any],
-    role_to_object_list: Dict[str, List[Dict[str, Any]]],
+    role_to_object_list: Dict[str, List[SceneObject]],
     role: str
 ) -> None:
     """Appends object-specific tags from the object_list in the given
@@ -459,7 +582,7 @@ def append_object_tags_of_type(
 def append_familiarity_object_tags(
     scene_info: Dict[str, Any],
     objects_info: Dict[str, Any],
-    instance: Dict[str, Any],
+    instance: SceneObject,
     role: str,
     trained_tag: str,
     untrained_tag: str
@@ -497,18 +620,53 @@ def tag_to_label(tag: str) -> str:
     return re.sub(r'(?<!^)(?=[A-Z])', ' ', tag).lower()
 
 
+def get_domain_type(task: str) -> str:
+    if (is_interactive_agents_task(task)):
+        return SCENE.INTERACTIVE_AGENTS
+    if (is_interactive_objects_task(task)):
+        return SCENE.INTERACTIVE_OBJECTS
+    if (is_interactive_places_task(task)):
+        return SCENE.INTERACTIVE_PLACES
+    if (is_passive_agent_task(task)):
+        return SCENE.PASSIVE_AGENTS
+    if (is_passive_physics_task(task)):
+        return SCENE.PASSIVE_OBJECT
+
+
 def is_passive_agent_task(task: str) -> bool:
     """Returns whether the given task is a passive agent task."""
     return task in [
+        TYPES.AGENT_BACKGROUND_AGENT_ONE_GOAL,
+        TYPES.AGENT_BACKGROUND_AGENT_PREFERENCE,
+        TYPES.AGENT_BACKGROUND_COLLECT,
+        TYPES.AGENT_BACKGROUND_INSTRUMENTAL_ACTION,
+        TYPES.AGENT_BACKGROUND_INSTRUMENTAL_APPROACH,
+        TYPES.AGENT_BACKGROUND_INSTRUMENTAL_IMITATION,
+        TYPES.AGENT_BACKGROUND_MULTIPLE_AGENTS,
+        TYPES.AGENT_BACKGROUND_NON_AGENT_ONE_GOAL,
+        TYPES.AGENT_BACKGROUND_NON_AGENT_PREFERENCE,
+        TYPES.AGENT_BACKGROUND_OBJECT_PREFERENCE,
+        TYPES.AGENT_BACKGROUND_SINGLE_OBJECT,
+        TYPES.AGENT_BACKGROUND_SOCIAL_APPROACH,
+        TYPES.AGENT_BACKGROUND_SOCIAL_IMITATION,
+        TYPES.AGENT_EVALUATION_AGENT_NON_AGENT,
+        TYPES.AGENT_EVALUATION_APPROACH,
         TYPES.AGENT_EVALUATION_EFFICIENT_IRRATIONAL,
         TYPES.AGENT_EVALUATION_EFFICIENT_PATH,
         TYPES.AGENT_EVALUATION_EFFICIENT_TIME,
+        TYPES.AGENT_EVALUATION_IMITATION,
         TYPES.AGENT_EVALUATION_INACCESSIBLE_GOAL,
         TYPES.AGENT_EVALUATION_INSTRUMENTAL_BLOCKING_BARRIERS,
         TYPES.AGENT_EVALUATION_INSTRUMENTAL_INCONSEQUENTIAL_BARRIERS,
         TYPES.AGENT_EVALUATION_INSTRUMENTAL_NO_BARRIERS,
         TYPES.AGENT_EVALUATION_MULTIPLE_AGENTS,
-        TYPES.AGENT_EVALUATION_OBJECT_PREFERENCE
+        TYPES.AGENT_EVALUATION_OBJECT_PREFERENCE,
+        TYPES.AGENT_EXAMPLE,
+        # While the Seeing Leads to Knowing hypercube will set its secondary
+        # type and goal category as "passive" (not "agents"), to differentiate
+        # it from the NYU passive agent tasks, its domain type should always
+        # be "passive agents", so keep it in this list.
+        SCENE.SEEING_LEADS_TO_KNOWING
     ]
 
 
@@ -518,6 +676,56 @@ def is_passive_physics_task(task: str) -> bool:
         SCENE.COLLISIONS,
         SCENE.GRAVITY_SUPPORT,
         SCENE.OBJECT_PERMANENCE,
+        SCENE.SEEING_LEADS_TO_KNOWING,
         SCENE.SHAPE_CONSTANCY,
         SCENE.SPATIO_TEMPORAL_CONTINUITY
+    ]
+
+
+def is_multi_retrieval(task: str) -> bool:
+    """Returns whether the given task is a multi-retrieval task."""
+    return task in [
+        SCENE.ARITHMETIC,
+        SCENE.NUMBER_COMPARISON
+    ]
+
+
+def is_interactive_places_task(task: str) -> bool:
+    """Returns whether the given task is a interactive places task."""
+    return task in [
+        SCENE.CONTAINER,
+        SCENE.HOLES,
+        SCENE.LAVA,
+        SCENE.OCCLUDER,
+        SCENE.OBSTACLE,
+        SCENE.RAMP,
+        SCENE.REORIENTATION,
+        SCENE.SET_ROTATION,
+        SCENE.SHELL_GAME,
+        SCENE.SPATIAL_ELIMINATION
+    ]
+
+
+def is_interactive_agents_task(task: str) -> bool:
+    """Returns whether the given task is a interactive agents task."""
+    return task in [
+        SCENE.AGENT_IDENTIFICATION,
+        SCENE.IMITATION_TASK,
+        SCENE.SOCIAL_REFERENCING,
+        SCENE.REFERENCE
+    ]
+
+
+def is_interactive_objects_task(task: str) -> bool:
+    """Returns whether the given task is a interactive objects task."""
+    return task in [
+        SCENE.ARITHMETIC,
+        SCENE.INTERACTIVE_COLLISION,
+        SCENE.INTERACTIVE_OBJECT_PERMANENCE,
+        SCENE.MOVING_TARGET_PREDICTION,
+        SCENE.NUMBER_COMPARISON,
+        SCENE.SOLIDITY,
+        SCENE.SUPPORT_RELATIONS,
+        SCENE.TRAJECTORY,
+        SCENE.TOOL_USE
     ]

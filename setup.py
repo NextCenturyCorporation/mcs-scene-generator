@@ -1,5 +1,4 @@
 import setuptools
-from machine_common_sense import _version as version
 
 with open('README.md', 'r') as readme_file:
     long_description = readme_file.read()
@@ -7,7 +6,7 @@ with open('README.md', 'r') as readme_file:
 
 setuptools.setup(
     name='mcs_scene_generator',
-    version=version.__version__,
+    version=1.9,
     maintainer='Next Century, a wholly owned subsidiary of CACI',
     maintainer_email='mcs-ta2@machinecommonsense.com',
     url='https://github.com/NextCenturyCorporation/mcs-scene-generator/',
@@ -24,7 +23,7 @@ setuptools.setup(
     python_requires=">=3.8",
     packages=setuptools.find_packages(),
     install_requires=[
-        'machine-common-sense>=0.6.4',
+        'machine-common-sense>=0.7.0',
         'pyyaml>=5.3.1',
         'shapely>=1.7.0'
     ],

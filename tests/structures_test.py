@@ -1,12 +1,7 @@
 import pytest
 from machine_common_sense.config_manager import Vector3d
 
-from generator import (
-    ALL_LARGE_BLOCK_TOOLS,
-    MaterialTuple,
-    ObjectBounds,
-    structures
-)
+from generator import MaterialTuple, ObjectBounds, structures
 
 
 def test_create_interior_wall():
@@ -1213,51 +1208,6 @@ def test_create_guilde_rail_around():
     assert rail1['materials'] == rail2['materials'] == [mat[0]]
 
 
-def test_create_tool():
-    tool_type = 'tool_rect_1_00_x_4_00'
-    assert tool_type in ALL_LARGE_BLOCK_TOOLS
-    tool = structures.create_tool(
-        object_type=tool_type,
-        position_x=1,
-        position_z=2,
-        rotation_y=180
-    )
-
-    assert tool['id'].startswith('tool_')
-    assert tool['type'] == tool_type
-    assert not tool.get('kinematic')
-    assert not tool.get('structure')
-    assert tool.get('moveable', True)
-    assert 'mass' not in tool
-    assert 'materials' not in tool
-    assert tool['debug']['color'] == ['grey', 'black']
-    assert tool['debug']['info'] == [
-        'grey', 'black', 'tool', 'grey tool', 'black tool',
-        'grey black tool'
-    ]
-
-    assert len(tool['shows']) == 1
-    assert tool['shows'][0]['stepBegin'] == 0
-    assert tool['shows'][0]['position'] == {'x': 1, 'y': 0.15, 'z': 2}
-    assert tool['shows'][0]['rotation'] == {'x': 0, 'y': 180, 'z': 0}
-    assert tool['shows'][0]['scale'] == {'x': 1, 'y': 1, 'z': 1}
-    tool_bounds = tool['shows'][0]['boundingBox']
-    assert vars(tool_bounds.box_xz[0]) == pytest.approx(
-        {'x': 0.5, 'y': 0, 'z': 0}
-    )
-    assert vars(tool_bounds.box_xz[1]) == pytest.approx(
-        {'x': 0.5, 'y': 0, 'z': 4}
-    )
-    assert vars(tool_bounds.box_xz[2]) == pytest.approx(
-        {'x': 1.5, 'y': 0, 'z': 4}
-    )
-    assert vars(tool_bounds.box_xz[3]) == pytest.approx(
-        {'x': 1.5, 'y': 0, 'z': 0}
-    )
-    assert tool_bounds.max_y == 0.3
-    assert tool_bounds.min_y == 0
-
-
 def test_create_turntable():
     turntable_type = 'rotating_cog'
     mat = MaterialTuple("test_material", ["brown", "blue"])
@@ -1273,7 +1223,7 @@ def test_create_turntable():
         step_end=12,
         movement_rotation=15,
         material_tuple=mat
-    )[0]
+    )
 
     assert turntable['id'].startswith('turntable_')
     assert turntable['type'] == turntable_type
@@ -1314,3 +1264,59 @@ def test_create_turntable():
     assert turntable['rotates'][0]['stepBegin'] == 2
     assert turntable['rotates'][0]['stepEnd'] == 12
     assert turntable['rotates'][0]['vector'] == {'x': 0, 'y': 15, 'z': 0}
+
+
+def test_tube_occluder():
+    material_tuple = MaterialTuple("test_material", ["brown", "blue"])
+
+    tube = structures.create_tube_occluder(
+        position_x=1,
+        position_z=2,
+        radius=3,
+        room_height=4,
+        material_tuple=material_tuple,
+        down_step=6,
+        up_step=61
+    )
+
+    assert tube['id'].startswith('tube_occluder_')
+    assert tube['type'] == 'tube_wide'
+    assert tube.get('kinematic', True)
+    assert tube.get('structure', True)
+    assert not tube.get('moveable')
+    assert not tube.get('pickupable')
+    assert tube.get('materials', material_tuple)
+    assert tube['debug']['color'] == ["brown", "blue"]
+    assert tube['debug']['info'] == [
+        'brown', 'blue', 'tube_occluder', 'brown tube_occluder',
+        'blue tube_occluder', 'brown blue tube_occluder'
+    ]
+
+    assert len(tube['shows']) == 1
+    assert tube['shows'][0]['stepBegin'] == 0
+    assert tube['shows'][0]['position'] == {'x': 1, 'y': 5.75, 'z': 2}
+    assert tube['shows'][0]['rotation'] == {'x': 0, 'y': 0, 'z': 0}
+    assert tube['shows'][0]['scale'] == {'x': 3, 'y': 4.0, 'z': 3}
+    tube_bounds = tube['shows'][0]['boundingBox']
+    assert vars(tube_bounds.box_xz[0]) == pytest.approx(
+        {'x': 2.5, 'y': 0.0, 'z': 3.5}
+    )
+    assert vars(tube_bounds.box_xz[1]) == pytest.approx(
+        {'x': 2.5, 'y': 0.0, 'z': 0.5}
+    )
+    assert vars(tube_bounds.box_xz[2]) == pytest.approx(
+        {'x': -0.5, 'y': 0.0, 'z': 0.5}
+    )
+    assert vars(tube_bounds.box_xz[3]) == pytest.approx(
+        {'x': -0.5, 'y': 0.0, 'z': 3.5}
+    )
+    assert tube_bounds.min_y == -4
+    assert tube_bounds.max_y == -0.25
+
+    assert len(tube['moves']) == 2
+    assert tube['moves'][0]['stepBegin'] == 6
+    assert tube['moves'][0]['stepEnd'] == 20
+    assert tube['moves'][0]['vector'] == {'x': 0, 'y': -0.25, 'z': 0}
+    assert tube['moves'][1]['stepBegin'] == 61
+    assert tube['moves'][1]['stepEnd'] == 75
+    assert tube['moves'][1]['vector'] == {'x': 0, 'y': 0.25, 'z': 0}

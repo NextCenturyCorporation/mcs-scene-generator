@@ -3,24 +3,32 @@ import math
 import pytest
 from machine_common_sense.config_manager import Vector3d
 
-from generator import base_objects, materials
+from generator import base_objects, instances, materials, tools
 from ideal_learning_env import (
     ILEException,
     ILESharedConfiguration,
+    InstanceDefinitionLocationTuple,
     InteractableObjectConfig,
     KeywordLocation,
     KeywordLocationConfig,
+    MinMaxFloat,
     ObjectRepository,
     VectorFloatConfig,
     VectorIntConfig
 )
 from ideal_learning_env.interactable_object_service import (
     InteractableObjectCreationService,
-    TargetCreationService
+    TargetCreationService,
+    ToolConfig,
+    ToolCreationService
 )
 from ideal_learning_env.object_services import DEBUG_FINAL_POSITION_KEY
 
-from .ile_helper import prior_scene, prior_scene_custom_size
+from .ile_helper import (
+    prior_scene,
+    prior_scene_custom_size,
+    prior_scene_with_target
+)
 
 
 @pytest.fixture(autouse=True)
@@ -824,6 +832,531 @@ def test_interactable_object_service_create_keyword_location_adjacent_failed():
         )
 
 
+def test_interactable_object_service_create_keyword_adjacent_corner():
+    srv = InteractableObjectCreationService()
+    scene = prior_scene()
+    klc = KeywordLocationConfig(
+        KeywordLocation.ADJACENT_TO_CORNER)
+    config = InteractableObjectConfig(
+        keyword_location=klc,
+        material='AI2-THOR/Materials/Plastics/OrangePlastic',
+        rotation=VectorFloatConfig(0, 0, 0),
+        scale=1,
+        shape='ball'
+    )
+    reconciled = srv.reconcile(scene, config)
+    instance = srv.create_feature_from_specific_values(
+        scene=scene, reconciled=reconciled, source_template=config)
+    assert instance['type'] == 'ball'
+    assert instance['debug'][DEBUG_FINAL_POSITION_KEY]
+    assert instance['materials'] == [
+        'AI2-THOR/Materials/Plastics/OrangePlastic']
+    assert instance['shows'][0]['position']['y'] == 0.5
+    x_pos = instance['shows'][0]['position']['x']
+    z_pos = instance['shows'][0]['position']['z']
+    assert (
+        abs(x_pos) == pytest.approx(4.45, 0.1) and
+        abs(z_pos) == pytest.approx(4.45, 0.1)
+    )
+    assert instance['shows'][0]['scale'] == {'x': 1, 'y': 1, 'z': 1}
+
+
+def test_interactable_object_service_create_keyword_adjacent_corner_with_label():  # noqa: E501
+    srv = InteractableObjectCreationService()
+    scene = prior_scene()
+    klc = KeywordLocationConfig(
+        KeywordLocation.ADJACENT_TO_CORNER, relative_object_label="back_right")
+    config = InteractableObjectConfig(
+        keyword_location=klc,
+        material='AI2-THOR/Materials/Plastics/OrangePlastic',
+        rotation=VectorFloatConfig(0, 0, 0),
+        scale=1,
+        shape='ball'
+    )
+    reconciled = srv.reconcile(scene, config)
+    instance = srv.create_feature_from_specific_values(
+        scene=scene, reconciled=reconciled, source_template=config)
+    assert instance['type'] == 'ball'
+    assert instance['debug'][DEBUG_FINAL_POSITION_KEY]
+    assert instance['materials'] == [
+        'AI2-THOR/Materials/Plastics/OrangePlastic']
+    assert instance['shows'][0]['position']['y'] == 0.5
+    x_pos = instance['shows'][0]['position']['x']
+    z_pos = instance['shows'][0]['position']['z']
+    assert (
+        x_pos == pytest.approx(4.45, 0.1) and
+        z_pos == pytest.approx(-4.45, 0.1)
+    )
+    assert instance['shows'][0]['scale'] == {'x': 1, 'y': 1, 'z': 1}
+
+
+def test_interactable_object_service_create_keyword_adjacent_corner_with_label_and_distance():  # noqa: E501
+    srv = InteractableObjectCreationService()
+    scene = prior_scene()
+    klc = KeywordLocationConfig(
+        KeywordLocation.ADJACENT_TO_CORNER,
+        relative_object_label="front_right",
+        adjacent_distance=VectorFloatConfig(2, 0, 1.5))
+    config = InteractableObjectConfig(
+        keyword_location=klc,
+        material='AI2-THOR/Materials/Plastics/OrangePlastic',
+        rotation=VectorFloatConfig(0, 0, 0),
+        scale=1,
+        shape='ball'
+    )
+    reconciled = srv.reconcile(scene, config)
+    instance = srv.create_feature_from_specific_values(
+        scene=scene, reconciled=reconciled, source_template=config)
+    assert instance['type'] == 'ball'
+    assert instance['debug'][DEBUG_FINAL_POSITION_KEY]
+    assert instance['materials'] == [
+        'AI2-THOR/Materials/Plastics/OrangePlastic']
+    assert instance['shows'][0]['position']['y'] == 0.5
+    x_pos = instance['shows'][0]['position']['x']
+    z_pos = instance['shows'][0]['position']['z']
+    assert (
+        x_pos == pytest.approx(2.5, 0.1) and
+        z_pos == pytest.approx(3.0, 0.1)
+    )
+    assert instance['shows'][0]['scale'] == {'x': 1, 'y': 1, 'z': 1}
+
+
+def test_interactable_object_service_create_keyword_adjacent_corner_with_distance():  # noqa: E501
+    srv = InteractableObjectCreationService()
+    scene = prior_scene()
+    klc = KeywordLocationConfig(
+        KeywordLocation.ADJACENT_TO_CORNER,
+        adjacent_distance=VectorFloatConfig(1.5, 0, 2.0))
+    config = InteractableObjectConfig(
+        keyword_location=klc,
+        material='AI2-THOR/Materials/Plastics/OrangePlastic',
+        rotation=VectorFloatConfig(0, 0, 0),
+        scale=1,
+        shape='ball'
+    )
+    reconciled = srv.reconcile(scene, config)
+    instance = srv.create_feature_from_specific_values(
+        scene=scene, reconciled=reconciled, source_template=config)
+    assert instance['type'] == 'ball'
+    assert instance['debug'][DEBUG_FINAL_POSITION_KEY]
+    assert instance['materials'] == [
+        'AI2-THOR/Materials/Plastics/OrangePlastic']
+    assert instance['shows'][0]['position']['y'] == 0.5
+    x_pos = instance['shows'][0]['position']['x']
+    z_pos = instance['shows'][0]['position']['z']
+    assert (
+        abs(x_pos) == pytest.approx(3.0, 0.1) and
+        abs(z_pos) == pytest.approx(2.5, 0.1)
+    )
+    assert instance['shows'][0]['scale'] == {'x': 1, 'y': 1, 'z': 1}
+
+
+def test_interactable_object_service_create_keyword_adjacent_corner_with_distance_list():  # noqa: E501
+    srv = InteractableObjectCreationService()
+    scene = prior_scene()
+    klc = KeywordLocationConfig(
+        KeywordLocation.ADJACENT_TO_CORNER,
+        adjacent_distance=[
+            VectorFloatConfig(3, 0, 0),
+            VectorFloatConfig(0, 0, 4)
+        ]
+    )
+    config = InteractableObjectConfig(
+        keyword_location=klc,
+        material='AI2-THOR/Materials/Plastics/OrangePlastic',
+        rotation=VectorFloatConfig(0, 0, 0),
+        scale=1,
+        shape='ball'
+    )
+    reconciled = srv.reconcile(scene, config)
+    instance = srv.create_feature_from_specific_values(
+        scene=scene, reconciled=reconciled, source_template=config)
+    assert instance['type'] == 'ball'
+    assert instance['debug'][DEBUG_FINAL_POSITION_KEY]
+    assert instance['materials'] == [
+        'AI2-THOR/Materials/Plastics/OrangePlastic']
+    assert instance['shows'][0]['position']['y'] == 0.5
+    x_pos = instance['shows'][0]['position']['x']
+    z_pos = instance['shows'][0]['position']['z']
+    assert ((
+        abs(x_pos) == pytest.approx(1.5, 0.1) and
+        abs(z_pos) == pytest.approx(4.5, 0.1)
+    ) or
+        (
+        abs(x_pos) == pytest.approx(4.5, 0.1) and
+        abs(z_pos) == pytest.approx(0.5, 0.1)
+    ))
+    assert instance['shows'][0]['scale'] == {'x': 1, 'y': 1, 'z': 1}
+
+
+def test_interactable_object_service_create_keyword_adjacent_corner_failed():
+    srv = InteractableObjectCreationService()
+    scene = prior_scene()
+    klc = KeywordLocationConfig(
+        KeywordLocation.ADJACENT_TO_CORNER,
+        adjacent_distance=VectorFloatConfig(10, 0, 10),
+        relative_object_label="back_left"
+    )
+    config = InteractableObjectConfig(
+        keyword_location=klc,
+        rotation=VectorFloatConfig(0, 0, 0),
+        scale=1,
+        shape='ball'
+    )
+    reconciled = srv.reconcile(scene, config)
+    with pytest.raises(ILEException):
+        srv.create_feature_from_specific_values(
+            scene=scene,
+            reconciled=reconciled,
+            source_template=config
+        )
+
+
+def test_interactable_object_service_surrounded_by_lava():
+    srv = InteractableObjectCreationService()
+    scene = prior_scene()
+    klc = KeywordLocationConfig(
+        KeywordLocation.ADJACENT_TO_CORNER,
+        adjacent_distance=VectorFloatConfig(2, 0, 2),
+        relative_object_label="back_left"
+    )
+    config = InteractableObjectConfig(
+        keyword_location=klc,
+        material='AI2-THOR/Materials/Plastics/OrangePlastic',
+        rotation=VectorFloatConfig(0, 0, 0),
+        scale=0.5,
+        shape='ball',
+        surrounded_by_lava=True,
+        surrounding_lava_size=2
+    )
+    reconciled = srv.reconcile(scene, config)
+    instance = srv.create_feature_from_specific_values(
+        scene=scene, reconciled=reconciled, source_template=config)
+    assert instance['type'] == 'ball'
+    assert instance['debug'][DEBUG_FINAL_POSITION_KEY]
+    assert instance['materials'] == [
+        'AI2-THOR/Materials/Plastics/OrangePlastic']
+    assert instance['shows'][0]['position']['y'] == 0.25
+    x_pos = instance['shows'][0]['position']['x']
+    z_pos = instance['shows'][0]['position']['z']
+    assert (
+        x_pos == pytest.approx(-3.0, 0.1) and
+        z_pos == pytest.approx(-3.0, 0.1)
+    )
+
+    assert instance['shows'][0]['scale'] == {'x': 0.5, 'y': 0.5, 'z': 0.5}
+
+    # Make sure lava isn't officially added until add_to_scene is called
+    assert not scene.lava
+    assert instance['debug']['surroundingLava']
+    assert len(instance['debug']['surroundingLava']) == 24
+    for square in instance['debug']['surroundingLava']:
+        assert square['x'] in [-5, -4, -3, -2, -1]
+        assert square['z'] in [-5, -4, -3, -2, -1]
+        assert not (square['x'] == -3 and square['z'] == -3)
+
+    instances, _ = srv.add_to_scene(
+        scene=scene, source_template=config, bounds=[])
+
+    instance = instances[0]
+    assert scene.lava
+    assert len(scene.lava) == 24
+    # check that 'surroundingLava' array was deleted
+    # after lava was placed
+    assert 'surroundingLava' not in instance['debug']
+
+    for square in scene.lava:
+        assert square.x in [-5, -4, -3, -2, -1]
+        assert square.z in [-5, -4, -3, -2, -1]
+        assert not (square.x == -3 and square.z == -3)
+
+
+def test_interactable_object_service_larger_object_surrounded_by_lava():
+    srv = InteractableObjectCreationService()
+    scene = prior_scene()
+
+    # move performer out of the way of object and lava so there are no errors
+    scene.performer_start.position.x = 3
+    scene.performer_start.position.z = 3
+
+    klc = KeywordLocationConfig(
+        KeywordLocation.ADJACENT_TO_CORNER,
+        adjacent_distance=VectorFloatConfig(3, 0, 3),
+        relative_object_label="back_left"
+    )
+    config = InteractableObjectConfig(
+        keyword_location=klc,
+        material='AI2-THOR/Materials/Plastics/OrangePlastic',
+        rotation=VectorFloatConfig(0, 0, 0),
+        scale=2.0,
+        shape='ball',
+        surrounded_by_lava=True,
+        surrounding_lava_size=1
+    )
+    reconciled = srv.reconcile(scene, config)
+    instance = srv.create_feature_from_specific_values(
+        scene=scene, reconciled=reconciled, source_template=config)
+    assert instance['type'] == 'ball'
+    assert instance['debug'][DEBUG_FINAL_POSITION_KEY]
+    assert instance['materials'] == [
+        'AI2-THOR/Materials/Plastics/OrangePlastic']
+    assert instance['shows'][0]['position']['y'] == 1.0
+    x_pos = instance['shows'][0]['position']['x']
+    z_pos = instance['shows'][0]['position']['z']
+
+    assert (
+        x_pos == pytest.approx(-1.0, 0.1) and
+        z_pos == pytest.approx(-1.0, 0.1)
+    )
+
+    assert instance['shows'][0]['scale'] == {'x': 2.0, 'y': 2.0, 'z': 2.0}
+
+    assert not scene.lava
+    assert instance['debug']['surroundingLava']
+    assert len(instance['debug']['surroundingLava']) == 16
+    for square in instance['debug']['surroundingLava']:
+        assert square['x'] in [-3, -2, -1, 0, 1]
+        assert square['z'] in [-3, -2, -1, 0, 1]
+        assert not (square['x'] == -2 and square['z'] == -2)
+        assert not (square['x'] == -2 and square['z'] == -1)
+        assert not (square['x'] == -2 and square['z'] == 0)
+        assert not (square['x'] == -1 and square['z'] == -2)
+        assert not (square['x'] == -1 and square['z'] == -1)
+        assert not (square['x'] == -1 and square['z'] == 0)
+        assert not (square['x'] == 0 and square['z'] == -2)
+        assert not (square['x'] == 0 and square['z'] == -1)
+        assert not (square['x'] == 0 and square['z'] == 0)
+
+    instances, _ = srv.add_to_scene(
+        scene=scene, source_template=config, bounds=[])
+
+    instance = instances[0]
+    assert scene.lava
+    assert len(scene.lava) == 16
+    assert 'surroundingLava' not in instance['debug']
+
+    for square in scene.lava:
+        assert square.x in [-3, -2, -1, 0, 1]
+        assert square.z in [-3, -2, -1, 0, 1]
+        assert not (square.x == -2 and square.z == -2)
+        assert not (square.x == -2 and square.z == -1)
+        assert not (square.x == -2 and square.z == 0)
+        assert not (square.x == -1 and square.z == -2)
+        assert not (square.x == -1 and square.z == -1)
+        assert not (square.x == -1 and square.z == 0)
+        assert not (square.x == 0 and square.z == -2)
+        assert not (square.x == 0 and square.z == -1)
+        assert not (square.x == 0 and square.z == 0)
+
+
+def test_interactable_object_service_surrounded_by_lava_fail_perf_start():
+    srv = InteractableObjectCreationService()
+    scene = prior_scene()
+
+    # should overlap with performer_start, so should fail
+    klc = KeywordLocationConfig(
+        KeywordLocation.ADJACENT_TO_CORNER,
+        adjacent_distance=VectorFloatConfig(3, 0, 3),
+        relative_object_label="back_left"
+    )
+    config = InteractableObjectConfig(
+        keyword_location=klc,
+        material='AI2-THOR/Materials/Plastics/OrangePlastic',
+        rotation=VectorFloatConfig(0, 0, 0),
+        scale=2.0,
+        shape='ball',
+        surrounded_by_lava=True,
+        surrounding_lava_size=1
+    )
+    reconciled = srv.reconcile(scene, config)
+
+    with pytest.raises(ILEException):
+        srv.create_feature_from_specific_values(
+            scene=scene,
+            reconciled=reconciled,
+            source_template=config
+        )
+
+
+def test_interactable_object_service_surrounded_by_lava_fail_object_overlap():
+    srv = InteractableObjectCreationService()
+    # target will overlap with new keyword object, should throw error
+    scene = prior_scene_with_target()
+
+    # move performer out of the way of objects
+    scene.performer_start.position.x = 3
+    scene.performer_start.position.z = 3
+
+    klc = KeywordLocationConfig(
+        KeywordLocation.ADJACENT_TO_CORNER,
+        adjacent_distance=VectorFloatConfig(3, 0, 2),
+        relative_object_label="front_left"
+    )
+    config = InteractableObjectConfig(
+        keyword_location=klc,
+        material='AI2-THOR/Materials/Plastics/OrangePlastic',
+        rotation=VectorFloatConfig(0, 0, 0),
+        scale=2.0,
+        shape='ball',
+        surrounded_by_lava=True,
+        surrounding_lava_size=1
+    )
+    reconciled = srv.reconcile(scene, config)
+
+    with pytest.raises(ILEException):
+        srv.create_feature_from_specific_values(
+            scene=scene,
+            reconciled=reconciled,
+            source_template=config
+        )
+        srv.add_to_scene(
+            scene=scene, source_template=config, bounds=[])
+
+
+def test_interactable_object_service_surrounded_by_lava_default_lava_size():
+    srv = InteractableObjectCreationService()
+    scene = prior_scene()
+    klc = KeywordLocationConfig(
+        KeywordLocation.ADJACENT_TO_CORNER,
+        adjacent_distance=VectorFloatConfig(2, 0, 2),
+        relative_object_label="back_left"
+    )
+    config = InteractableObjectConfig(
+        keyword_location=klc,
+        material='AI2-THOR/Materials/Plastics/OrangePlastic',
+        rotation=VectorFloatConfig(0, 0, 0),
+        scale=0.5,
+        shape='ball',
+        surrounded_by_lava=True
+    )
+    reconciled = srv.reconcile(scene, config)
+    instance = srv.create_feature_from_specific_values(
+        scene=scene, reconciled=reconciled, source_template=config)
+    assert instance['type'] == 'ball'
+    assert instance['debug'][DEBUG_FINAL_POSITION_KEY]
+    assert instance['materials'] == [
+        'AI2-THOR/Materials/Plastics/OrangePlastic']
+    assert instance['shows'][0]['position']['y'] == 0.25
+    x_pos = instance['shows'][0]['position']['x']
+    z_pos = instance['shows'][0]['position']['z']
+    assert (
+        x_pos == pytest.approx(-3.0, 0.1) and
+        z_pos == pytest.approx(-3.0, 0.1)
+    )
+
+    assert instance['shows'][0]['scale'] == {'x': 0.5, 'y': 0.5, 'z': 0.5}
+
+    assert not scene.lava
+    assert instance['debug']['surroundingLava']
+    assert len(instance['debug']['surroundingLava']) == 8
+    for square in scene.lava:
+        assert square['x'] in [-4, -3, -2]
+        assert square['z'] in [-4, -3, -2]
+        assert not (square['x'] == -3 and square['z'] == -3)
+
+    instances, _ = srv.add_to_scene(
+        scene=scene, source_template=config, bounds=[])
+
+    instance = instances[0]
+    assert scene.lava
+    assert len(scene.lava) == 8
+
+    assert 'surroundingLava' not in instance['debug']
+    for square in scene.lava:
+        assert square.x in [-4, -3, -2]
+        assert square.z in [-4, -3, -2]
+        assert not (square.x == -3 and square.z == -3)
+
+
+def test_interactable_object_service_surrounded_by_lava_lava_size_list():
+    srv = InteractableObjectCreationService()
+    scene = prior_scene()
+    klc = KeywordLocationConfig(
+        KeywordLocation.ADJACENT_TO_CORNER,
+        adjacent_distance=VectorFloatConfig(2, 0, 2),
+        relative_object_label="back_left"
+    )
+    config = InteractableObjectConfig(
+        keyword_location=klc,
+        material='AI2-THOR/Materials/Plastics/OrangePlastic',
+        rotation=VectorFloatConfig(0, 0, 0),
+        scale=0.5,
+        shape='ball',
+        surrounded_by_lava=True,
+        surrounding_lava_size=[1, 2]
+    )
+    reconciled = srv.reconcile(scene, config)
+    instance = srv.create_feature_from_specific_values(
+        scene=scene, reconciled=reconciled, source_template=config)
+    assert instance['type'] == 'ball'
+    assert instance['debug'][DEBUG_FINAL_POSITION_KEY]
+    assert instance['materials'] == [
+        'AI2-THOR/Materials/Plastics/OrangePlastic']
+    assert instance['shows'][0]['position']['y'] == 0.25
+    x_pos = instance['shows'][0]['position']['x']
+    z_pos = instance['shows'][0]['position']['z']
+
+    assert (
+        x_pos == pytest.approx(-3.0, 1) and
+        z_pos == pytest.approx(-3.0, 1)
+    )
+
+    assert instance['shows'][0]['scale'] == {'x': 0.5, 'y': 0.5, 'z': 0.5}
+
+    assert not scene.lava
+    assert instance['debug']['surroundingLava']
+    assert len(instance['debug']['surroundingLava']) in [8, 24]
+
+    instances, _ = srv.add_to_scene(
+        scene=scene, source_template=config, bounds=[])
+
+    instance = instances[0]
+    assert scene.lava
+    assert len(scene.lava) in [8, 24]
+    assert 'surroundingLava' not in instance['debug']
+
+
+def test_interactable_object_service_surrounded_by_lava_default_false():
+    srv = InteractableObjectCreationService()
+    scene = prior_scene()
+    klc = KeywordLocationConfig(
+        KeywordLocation.ADJACENT_TO_CORNER,
+        adjacent_distance=VectorFloatConfig(2, 0, 2),
+        relative_object_label="back_left"
+    )
+    config = InteractableObjectConfig(
+        keyword_location=klc,
+        material='AI2-THOR/Materials/Plastics/OrangePlastic',
+        rotation=VectorFloatConfig(0, 0, 0),
+        scale=1,
+        shape='ball',
+        surrounded_by_lava=False
+    )
+    reconciled = srv.reconcile(scene, config)
+    instance = srv.create_feature_from_specific_values(
+        scene=scene, reconciled=reconciled, source_template=config)
+    assert instance['type'] == 'ball'
+    assert instance['debug'][DEBUG_FINAL_POSITION_KEY]
+    assert instance['materials'] == [
+        'AI2-THOR/Materials/Plastics/OrangePlastic']
+    assert instance['shows'][0]['position']['y'] == 0.5
+    x_pos = instance['shows'][0]['position']['x']
+    z_pos = instance['shows'][0]['position']['z']
+    assert (
+        x_pos == pytest.approx(-2.5, 0.1) and
+        z_pos == pytest.approx(-2.5, 0.1)
+    )
+
+    assert instance['shows'][0]['scale'] == {'x': 1, 'y': 1, 'z': 1}
+    assert not scene.lava
+    assert 'surroundingLava' not in instance['debug']
+
+    srv.add_to_scene(
+        scene=scene, source_template=config, bounds=[])
+
+    assert not scene.lava
+
+
 def test_interactable_object_service_create_keyword_location_in():
     chest_config = InteractableObjectConfig(
         material='AI2-THOR/Materials/Plastics/WhitePlastic',
@@ -1273,3 +1806,717 @@ def test_target_creation_service():
     assert instance['shows'][0]['scale'] == {'x': 3, 'y': 3, 'z': 3}
     assert ObjectRepository.get_instance().has_label('target')
     assert ObjectRepository.get_instance().has_label('test_label')
+
+
+def test_tool_creation_reconcile():
+    scene = prior_scene()
+    srv = ToolCreationService()
+    tmp = ToolConfig(1)
+    r1: ToolConfig = srv.reconcile(scene, tmp)
+    assert r1.num == 1
+    assert -5 < r1.position.x < 5
+    assert r1.position.y == 0
+    assert -5 < r1.position.z < 5
+    assert 0 <= r1.rotation_y < 360
+    assert r1.shape in base_objects.ALL_LARGE_BLOCK_TOOLS
+
+    tmp2 = ToolConfig(
+        num=[2, 3],
+        position=VectorFloatConfig([3, 2], MinMaxFloat(0, 2), 3),
+        rotation_y=[90, 180],
+        shape=['tool_rect_1_00_x_9_00', 'tool_hooked_0_50_x_4_00']
+    )
+    srv = ToolCreationService()
+    r2: ToolConfig = srv.reconcile(scene, tmp2)
+
+    assert r2.num in [2, 3]
+    assert r2.position.x in [2, 3]
+    assert 0 <= r2.position.y <= 2
+    assert r2.position.z == 3
+    assert r2.rotation_y in [90, 180]
+    assert r2.shape in ["tool_rect_1_00_x_9_00", "tool_hooked_0_50_x_4_00"]
+
+
+def test_tool_creation_reconcile_by_size():
+    scene = prior_scene()
+    template = ToolConfig(num=1, width=0.75, length=6)
+    srv = ToolCreationService()
+    r1: ToolConfig = srv.reconcile(scene, template)
+
+    assert r1.num == 1
+    assert r1.shape in ['tool_rect_0_75_x_6_00', 'tool_hooked_0_75_x_6_00']
+
+    template2 = ToolConfig(num=1, length=6)
+    srv = ToolCreationService()
+    r2: ToolConfig = srv.reconcile(scene, template2)
+
+    assert r2.num == 1
+    assert r2.shape in [
+        'tool_rect_0_50_x_6_00',
+        'tool_rect_0_75_x_6_00',
+        'tool_rect_1_00_x_6_00',
+        'tool_hooked_0_50_x_6_00',
+        'tool_hooked_0_75_x_6_00',
+        'tool_hooked_1_00_x_6_00']
+
+
+def test_tool_creation_reconcile_by_size_error():
+    scene = prior_scene()
+    template = ToolConfig(num=1, width=0.76, length=6)
+    srv = ToolCreationService()
+    with pytest.raises(ILEException):
+        srv.reconcile(scene, template)
+
+
+def test_tool_create():
+    temp = ToolConfig(
+        position=VectorFloatConfig(1.1, 1.2, 1.3), rotation_y=34,
+        shape='tool_rect_0_75_x_4_00', material=materials.TOOL_MATERIALS[0])
+    tool = ToolCreationService().create_feature_from_specific_values(
+        prior_scene(), temp, None)
+
+    assert tool
+    assert tool['id'].startswith('tool_')
+    assert tool['type'] == 'tool_rect_0_75_x_4_00'
+    assert tool['materials'] == [materials.TOOL_MATERIALS[0].material]
+    show = tool['shows'][0]
+    pos = show['position']
+    rot = show['rotation']
+    scale = show['scale']
+    assert pos == {'x': 1.1, 'y': 0.15, 'z': 1.3}
+    assert rot == {'x': 0, 'y': 34, 'z': 0}
+    assert scale == {'x': 1, 'y': 1, 'z': 1}
+
+
+def test_tool_create_hooked():
+    temp = ToolConfig(
+        num=1, width=0.76, length=6,
+        position=VectorFloatConfig(1.1, 1.2, 1.3), rotation_y=34,
+        shape='tool_hooked_0_75_x_4_00')
+    temp.material = materials.TOOL_MATERIALS[1]
+    tool = ToolCreationService().create_feature_from_specific_values(
+        prior_scene(), temp, None)
+
+    assert tool
+    assert tool['id'].startswith('tool_')
+    assert tool['type'] == 'tool_hooked_0_75_x_4_00'
+    show = tool['shows'][0]
+    pos = show['position']
+    rot = show['rotation']
+    scale = show['scale']
+    assert pos == {'x': 1.1, 'y': 0.15, 'z': 1.3}
+    assert rot == {'x': 0, 'y': 34, 'z': 0}
+    assert scale == {'x': 1, 'y': 1, 'z': 1}
+
+
+def test_tool_create_short():
+    temp = ToolConfig(
+        position=VectorFloatConfig(1.1, 1.2, 1.3), rotation_y=34,
+        shape='tool_rect_0_75_x_1_00', material=materials.TOOL_MATERIALS[0])
+    tool = ToolCreationService().create_feature_from_specific_values(
+        prior_scene(), temp, None)
+
+    assert tool
+    assert tool['id'].startswith('tool_')
+    assert tool['type'] == 'tool_rect_0_75_x_1_00'
+    show = tool['shows'][0]
+    pos = show['position']
+    rot = show['rotation']
+    scale = show['scale']
+    assert pos == {'x': 1.1, 'y': 0.15, 'z': 1.3}
+    assert rot == {'x': 0, 'y': 34, 'z': 0}
+    assert scale == {'x': 1, 'y': 1, 'z': 1}
+
+
+def test_tool_create_aligned_with_rect_tool():
+    config = ToolConfig(
+        align_distance=2,
+        shape='tool_rect_0_75_x_4_00',
+        # Should override configured position and rotation.
+        position=VectorFloatConfig(1.1, 1.2, 1.3),
+        rotation_y=34
+    )
+    service = ToolCreationService()
+    scene = prior_scene()
+
+    instance_1 = tools.create_tool('tool_rect_0_75_x_6_00', 0, 0, 0)
+    assert instance_1['shows'][0]['rotation']['y'] == 0
+    assert instance_1['debug'].get('originalRotation', {'y': 0})['y'] == 0
+    location_1 = instance_1['shows'][0]
+    scene.objects.append(instance_1)
+    idl_1 = InstanceDefinitionLocationTuple(instance_1, None, location_1)
+    ObjectRepository.get_instance().add_to_labeled_objects(idl_1, 'tool_1')
+
+    config.align_with = 'tool_1'
+    reconciled = service.reconcile(scene, config)
+    assert reconciled.position.x == 0
+    assert reconciled.position.z == -7
+    assert reconciled.rotation_y == 0
+
+    tool = service.create_feature_from_specific_values(
+        scene=scene,
+        reconciled=reconciled,
+        source_template=config
+    )
+    assert tool['id'].startswith('tool_')
+    assert tool['type'] == 'tool_rect_0_75_x_4_00'
+    assert tool['shows'][0]['position'] == {'x': 0, 'y': 0.15, 'z': -7}
+    assert tool['shows'][0]['rotation'] == {'x': 0, 'y': 0, 'z': 0}
+    assert tool['shows'][0]['scale'] == {'x': 1, 'y': 1, 'z': 1}
+
+    instance_2 = tools.create_tool('tool_rect_0_75_x_6_00', 0, 0, 45)
+    location_2 = instance_2['shows'][0]
+    scene.objects.append(instance_2)
+    idl_2 = InstanceDefinitionLocationTuple(instance_2, None, location_2)
+    ObjectRepository.get_instance().add_to_labeled_objects(idl_2, 'tool_2')
+
+    config.align_with = 'tool_2'
+    reconciled = service.reconcile(scene, config)
+    assert reconciled.position.x == -4.9497
+    assert reconciled.position.z == -4.9497
+    assert reconciled.rotation_y == 45
+
+    tool = service.create_feature_from_specific_values(
+        scene=scene,
+        reconciled=reconciled,
+        source_template=config
+    )
+    assert tool['id'].startswith('tool_')
+    assert tool['type'] == 'tool_rect_0_75_x_4_00'
+    assert tool['shows'][0]['position'] == {
+        'x': -4.9497,
+        'y': 0.15,
+        'z': -4.9497
+    }
+    assert tool['shows'][0]['rotation'] == {'x': 0, 'y': 45, 'z': 0}
+    assert tool['shows'][0]['scale'] == {'x': 1, 'y': 1, 'z': 1}
+
+    instance_3 = tools.create_tool('tool_rect_0_75_x_6_00', 0, 0, 90)
+    location_3 = instance_3['shows'][0]
+    scene.objects.append(instance_3)
+    idl_3 = InstanceDefinitionLocationTuple(instance_3, None, location_3)
+    ObjectRepository.get_instance().add_to_labeled_objects(idl_3, 'tool_3')
+
+    config.align_with = 'tool_3'
+    reconciled = service.reconcile(scene, config)
+    assert reconciled.position.x == -7
+    assert reconciled.position.z == 0
+    assert reconciled.rotation_y == 90
+
+    tool = service.create_feature_from_specific_values(
+        scene=scene,
+        reconciled=reconciled,
+        source_template=config
+    )
+    assert tool['id'].startswith('tool_')
+    assert tool['type'] == 'tool_rect_0_75_x_4_00'
+    assert tool['shows'][0]['position'] == {'x': -7, 'y': 0.15, 'z': 0}
+    assert tool['shows'][0]['rotation'] == {'x': 0, 'y': 90, 'z': 0}
+    assert tool['shows'][0]['scale'] == {'x': 1, 'y': 1, 'z': 1}
+
+
+def test_tool_create_aligned_with_hooked_tool():
+    config = ToolConfig(
+        align_distance=2,
+        shape='tool_rect_0_75_x_4_00',
+        # Should override configured position and rotation.
+        position=VectorFloatConfig(1.1, 1.2, 1.3),
+        rotation_y=34
+    )
+    service = ToolCreationService()
+    scene = prior_scene()
+
+    instance_1 = tools.create_tool('tool_hooked_0_75_x_6_00', 0, 0, 0)
+    assert instance_1['shows'][0]['rotation']['y'] == 0
+    assert instance_1['debug'].get('originalRotation', {'y': 0})['y'] == 0
+    location_1 = instance_1['shows'][0]
+    scene.objects.append(instance_1)
+    idl_1 = InstanceDefinitionLocationTuple(instance_1, None, location_1)
+    ObjectRepository.get_instance().add_to_labeled_objects(idl_1, 'tool_1')
+
+    config.align_with = 'tool_1'
+    reconciled = service.reconcile(scene, config)
+    assert reconciled.position.x == 0.75
+    assert reconciled.position.z == -7
+    assert reconciled.rotation_y == 0
+
+    tool = service.create_feature_from_specific_values(
+        scene=scene,
+        reconciled=reconciled,
+        source_template=config
+    )
+    assert tool['id'].startswith('tool_')
+    assert tool['type'] == 'tool_rect_0_75_x_4_00'
+    assert tool['shows'][0]['position'] == {'x': 0.75, 'y': 0.15, 'z': -7}
+    assert tool['shows'][0]['rotation'] == {'x': 0, 'y': 0, 'z': 0}
+    assert tool['shows'][0]['scale'] == {'x': 1, 'y': 1, 'z': 1}
+
+    instance_2 = tools.create_tool('tool_hooked_0_75_x_6_00', 0, 0, 45)
+    location_2 = instance_2['shows'][0]
+    scene.objects.append(instance_2)
+    idl_2 = InstanceDefinitionLocationTuple(instance_2, None, location_2)
+    ObjectRepository.get_instance().add_to_labeled_objects(idl_2, 'tool_2')
+
+    config.align_with = 'tool_2'
+    reconciled = service.reconcile(scene, config)
+    assert reconciled.position.x == -4.4194
+    assert reconciled.position.z == -5.4801
+    assert reconciled.rotation_y == 45
+
+    tool = service.create_feature_from_specific_values(
+        scene=scene,
+        reconciled=reconciled,
+        source_template=config
+    )
+    assert tool['id'].startswith('tool_')
+    assert tool['type'] == 'tool_rect_0_75_x_4_00'
+    assert tool['shows'][0]['position'] == {
+        'x': -4.4194,
+        'y': 0.15,
+        'z': -5.4801
+    }
+    assert tool['shows'][0]['rotation'] == {'x': 0, 'y': 45, 'z': 0}
+    assert tool['shows'][0]['scale'] == {'x': 1, 'y': 1, 'z': 1}
+
+    instance_3 = tools.create_tool('tool_hooked_0_75_x_6_00', 0, 0, 90)
+    location_3 = instance_3['shows'][0]
+    scene.objects.append(instance_3)
+    idl_3 = InstanceDefinitionLocationTuple(instance_3, None, location_3)
+    ObjectRepository.get_instance().add_to_labeled_objects(idl_3, 'tool_3')
+
+    config.align_with = 'tool_3'
+    reconciled = service.reconcile(scene, config)
+    assert reconciled.position.x == -7
+    assert reconciled.position.z == -0.75
+    assert reconciled.rotation_y == 90
+
+    tool = service.create_feature_from_specific_values(
+        scene=scene,
+        reconciled=reconciled,
+        source_template=config
+    )
+    assert tool['id'].startswith('tool_')
+    assert tool['type'] == 'tool_rect_0_75_x_4_00'
+    assert tool['shows'][0]['position'] == {'x': -7, 'y': 0.15, 'z': -0.75}
+    assert tool['shows'][0]['rotation'] == {'x': 0, 'y': 90, 'z': 0}
+    assert tool['shows'][0]['scale'] == {'x': 1, 'y': 1, 'z': 1}
+
+
+def test_tool_create_aligned_with_isosceles_tool():
+    config = ToolConfig(
+        align_distance=2,
+        shape='tool_rect_0_75_x_4_00',
+        # Should override configured position and rotation.
+        position=VectorFloatConfig(1.1, 1.2, 1.3),
+        rotation_y=34
+    )
+    service = ToolCreationService()
+    scene = prior_scene()
+
+    instance_1 = tools.create_tool('tool_isosceles_0_75_x_6_00', 0, 0, 0)
+    assert instance_1['shows'][0]['rotation']['y'] == 0
+    assert instance_1['debug'].get('originalRotation', {'y': 0})['y'] == 0
+    location_1 = instance_1['shows'][0]
+    scene.objects.append(instance_1)
+    idl_1 = InstanceDefinitionLocationTuple(instance_1, None, location_1)
+    ObjectRepository.get_instance().add_to_labeled_objects(idl_1, 'tool_1')
+
+    config.align_with = 'tool_1'
+    reconciled = service.reconcile(scene, config)
+    assert reconciled.position.x == 2.625
+    assert reconciled.position.z == -7
+    assert reconciled.rotation_y == 0
+
+    tool = service.create_feature_from_specific_values(
+        scene=scene,
+        reconciled=reconciled,
+        source_template=config
+    )
+    assert tool['id'].startswith('tool_')
+    assert tool['type'] == 'tool_rect_0_75_x_4_00'
+    assert tool['shows'][0]['position'] == {'x': 2.625, 'y': 0.15, 'z': -7}
+    assert tool['shows'][0]['rotation'] == {'x': 0, 'y': 0, 'z': 0}
+    assert tool['shows'][0]['scale'] == {'x': 1, 'y': 1, 'z': 1}
+
+    instance_2 = tools.create_tool('tool_isosceles_0_75_x_6_00', 0, 0, 45)
+    location_2 = instance_2['shows'][0]
+    scene.objects.append(instance_2)
+    idl_2 = InstanceDefinitionLocationTuple(instance_2, None, location_2)
+    ObjectRepository.get_instance().add_to_labeled_objects(idl_2, 'tool_2')
+
+    config.align_with = 'tool_2'
+    reconciled = service.reconcile(scene, config)
+    assert reconciled.position.x == -3.0936
+    assert reconciled.position.z == -6.8059
+    assert reconciled.rotation_y == 45
+
+    tool = service.create_feature_from_specific_values(
+        scene=scene,
+        reconciled=reconciled,
+        source_template=config
+    )
+    assert tool['id'].startswith('tool_')
+    assert tool['type'] == 'tool_rect_0_75_x_4_00'
+    assert tool['shows'][0]['position'] == {
+        'x': -3.0936,
+        'y': 0.15,
+        'z': -6.8059
+    }
+    assert tool['shows'][0]['rotation'] == {'x': 0, 'y': 45, 'z': 0}
+    assert tool['shows'][0]['scale'] == {'x': 1, 'y': 1, 'z': 1}
+
+    instance_3 = tools.create_tool('tool_isosceles_0_75_x_6_00', 0, 0, 90)
+    location_3 = instance_3['shows'][0]
+    scene.objects.append(instance_3)
+    idl_3 = InstanceDefinitionLocationTuple(instance_3, None, location_3)
+    ObjectRepository.get_instance().add_to_labeled_objects(idl_3, 'tool_3')
+
+    config.align_with = 'tool_3'
+    reconciled = service.reconcile(scene, config)
+    assert reconciled.position.x == -7
+    assert reconciled.position.z == -2.625
+    assert reconciled.rotation_y == 90
+
+    tool = service.create_feature_from_specific_values(
+        scene=scene,
+        reconciled=reconciled,
+        source_template=config
+    )
+    assert tool['id'].startswith('tool_')
+    assert tool['type'] == 'tool_rect_0_75_x_4_00'
+    assert tool['shows'][0]['position'] == {'x': -7, 'y': 0.15, 'z': -2.625}
+    assert tool['shows'][0]['rotation'] == {'x': 0, 'y': 90, 'z': 0}
+    assert tool['shows'][0]['scale'] == {'x': 1, 'y': 1, 'z': 1}
+
+
+def test_tool_create_aligned_with_normal_toy():
+    config = ToolConfig(
+        align_distance=2,
+        shape='tool_rect_0_75_x_4_00',
+        # Should override configured position and rotation.
+        position=VectorFloatConfig(1.1, 1.2, 1.3),
+        rotation_y=34
+    )
+    service = ToolCreationService()
+    scene = prior_scene()
+    material_tuple = materials.ORANGE_PLASTIC
+    definition = base_objects.create_specific_definition_from_base(
+        'ball',
+        material_tuple.color,
+        [material_tuple.material],
+        None,
+        1
+    )
+
+    location_1 = {
+        'position': {'x': 0, 'y': definition.positionY, 'z': 0},
+        'rotation': {'x': 0, 'y': 0, 'z': 0}
+    }
+    instance_1 = instances.instantiate_object(definition, location_1)
+    assert instance_1['shows'][0]['rotation']['y'] == 0
+    assert instance_1['debug']['originalRotation']['y'] == 0
+    scene.objects.append(instance_1)
+    idl_1 = InstanceDefinitionLocationTuple(instance_1, definition, location_1)
+    ObjectRepository.get_instance().add_to_labeled_objects(idl_1, 'toy_1')
+
+    config.align_with = 'toy_1'
+    reconciled = service.reconcile(scene, config)
+    assert reconciled.position.x == -4.5
+    assert reconciled.position.z == 0
+    assert reconciled.rotation_y == 90
+
+    tool = service.create_feature_from_specific_values(
+        scene=scene,
+        reconciled=reconciled,
+        source_template=config
+    )
+    assert tool['id'].startswith('tool_')
+    assert tool['type'] == 'tool_rect_0_75_x_4_00'
+    assert tool['shows'][0]['position'] == {'x': -4.5, 'y': 0.15, 'z': 0}
+    assert tool['shows'][0]['rotation'] == {'x': 0, 'y': 90, 'z': 0}
+    assert tool['shows'][0]['scale'] == {'x': 1, 'y': 1, 'z': 1}
+
+    location_2 = {
+        'position': {'x': 0, 'y': definition.positionY, 'z': 0},
+        'rotation': {'x': 0, 'y': 45, 'z': 0}
+    }
+    instance_2 = instances.instantiate_object(definition, location_2)
+    scene.objects.append(instance_2)
+    idl_2 = InstanceDefinitionLocationTuple(instance_2, definition, location_2)
+    ObjectRepository.get_instance().add_to_labeled_objects(idl_2, 'toy_2')
+
+    config.align_with = 'toy_2'
+    reconciled = service.reconcile(scene, config)
+    assert reconciled.position.x == -3.182
+    assert reconciled.position.z == 3.182
+    assert reconciled.rotation_y == 135
+
+    tool = service.create_feature_from_specific_values(
+        scene=scene,
+        reconciled=reconciled,
+        source_template=config
+    )
+    assert tool['id'].startswith('tool_')
+    assert tool['type'] == 'tool_rect_0_75_x_4_00'
+    assert tool['shows'][0]['position'] == {
+        'x': -3.182,
+        'y': 0.15,
+        'z': 3.182
+    }
+    assert tool['shows'][0]['rotation'] == {'x': 0, 'y': 135, 'z': 0}
+    assert tool['shows'][0]['scale'] == {'x': 1, 'y': 1, 'z': 1}
+
+    location_3 = {
+        'position': {'x': 0, 'y': definition.positionY, 'z': 0},
+        'rotation': {'x': 0, 'y': 90, 'z': 0}
+    }
+    instance_3 = instances.instantiate_object(definition, location_3)
+    scene.objects.append(instance_3)
+    idl_3 = InstanceDefinitionLocationTuple(instance_3, definition, location_3)
+    ObjectRepository.get_instance().add_to_labeled_objects(idl_3, 'toy_3')
+
+    config.align_with = 'toy_3'
+    reconciled = service.reconcile(scene, config)
+    assert reconciled.position.x == 0
+    assert reconciled.position.z == 4.5
+    assert reconciled.rotation_y == 180
+
+    tool = service.create_feature_from_specific_values(
+        scene=scene,
+        reconciled=reconciled,
+        source_template=config
+    )
+    assert tool['id'].startswith('tool_')
+    assert tool['type'] == 'tool_rect_0_75_x_4_00'
+    assert tool['shows'][0]['position'] == {'x': 0, 'y': 0.15, 'z': 4.5}
+    assert tool['shows'][0]['rotation'] == {'x': 0, 'y': 180, 'z': 0}
+    assert tool['shows'][0]['scale'] == {'x': 1, 'y': 1, 'z': 1}
+
+
+def test_tool_create_aligned_with_sideways_toy():
+    config = ToolConfig(
+        align_distance=2,
+        shape='tool_rect_0_75_x_4_00',
+        # Should override configured position and rotation.
+        position=VectorFloatConfig(1.1, 1.2, 1.3),
+        rotation_y=34
+    )
+    service = ToolCreationService()
+    scene = prior_scene()
+    material_tuple = materials.ORANGE_PLASTIC
+    definition = base_objects.create_specific_definition_from_base(
+        'car_1',
+        material_tuple.color,
+        [material_tuple.material],
+        None,
+        1
+    )
+
+    location_1 = {
+        'position': {'x': 0, 'y': definition.positionY, 'z': 0},
+        'rotation': {'x': 0, 'y': 0, 'z': 0}
+    }
+    instance_1 = instances.instantiate_object(definition, location_1)
+    assert instance_1['shows'][0]['rotation']['y'] == 90
+    assert instance_1['debug']['originalRotation']['y'] == 90
+    scene.objects.append(instance_1)
+    idl_1 = InstanceDefinitionLocationTuple(instance_1, definition, location_1)
+    ObjectRepository.get_instance().add_to_labeled_objects(idl_1, 'toy_1')
+
+    config.align_with = 'toy_1'
+    reconciled = service.reconcile(scene, config)
+    assert reconciled.position.x == -4.0375
+    assert reconciled.position.z == 0
+    assert reconciled.rotation_y == 90
+
+    tool = service.create_feature_from_specific_values(
+        scene=scene,
+        reconciled=reconciled,
+        source_template=config
+    )
+    assert tool['id'].startswith('tool_')
+    assert tool['type'] == 'tool_rect_0_75_x_4_00'
+    assert tool['shows'][0]['position'] == {'x': -4.0375, 'y': 0.15, 'z': 0}
+    assert tool['shows'][0]['rotation'] == {'x': 0, 'y': 90, 'z': 0}
+    assert tool['shows'][0]['scale'] == {'x': 1, 'y': 1, 'z': 1}
+
+    location_2 = {
+        'position': {'x': 0, 'y': definition.positionY, 'z': 0},
+        'rotation': {'x': 0, 'y': 45, 'z': 0}
+    }
+    instance_2 = instances.instantiate_object(definition, location_2)
+    scene.objects.append(instance_2)
+    idl_2 = InstanceDefinitionLocationTuple(instance_2, definition, location_2)
+    ObjectRepository.get_instance().add_to_labeled_objects(idl_2, 'toy_2')
+
+    config.align_with = 'toy_2'
+    reconciled = service.reconcile(scene, config)
+    assert reconciled.position.x == -2.8549
+    assert reconciled.position.z == 2.8549
+    assert reconciled.rotation_y == 135
+
+    tool = service.create_feature_from_specific_values(
+        scene=scene,
+        reconciled=reconciled,
+        source_template=config
+    )
+    assert tool['id'].startswith('tool_')
+    assert tool['type'] == 'tool_rect_0_75_x_4_00'
+    assert tool['shows'][0]['position'] == {
+        'x': -2.8549,
+        'y': 0.15,
+        'z': 2.8549
+    }
+    assert tool['shows'][0]['rotation'] == {'x': 0, 'y': 135, 'z': 0}
+    assert tool['shows'][0]['scale'] == {'x': 1, 'y': 1, 'z': 1}
+
+    location_3 = {
+        'position': {'x': 0, 'y': definition.positionY, 'z': 0},
+        'rotation': {'x': 0, 'y': 90, 'z': 0}
+    }
+    instance_3 = instances.instantiate_object(definition, location_3)
+    scene.objects.append(instance_3)
+    idl_3 = InstanceDefinitionLocationTuple(instance_3, definition, location_3)
+    ObjectRepository.get_instance().add_to_labeled_objects(idl_3, 'toy_3')
+
+    config.align_with = 'toy_3'
+    reconciled = service.reconcile(scene, config)
+    assert reconciled.position.x == 0
+    assert reconciled.position.z == 4.0375
+    assert reconciled.rotation_y == 180
+
+    tool = service.create_feature_from_specific_values(
+        scene=scene,
+        reconciled=reconciled,
+        source_template=config
+    )
+    assert tool['id'].startswith('tool_')
+    assert tool['type'] == 'tool_rect_0_75_x_4_00'
+    assert tool['shows'][0]['position'] == {'x': 0, 'y': 0.15, 'z': 4.0375}
+    assert tool['shows'][0]['rotation'] == {'x': 0, 'y': 180, 'z': 0}
+    assert tool['shows'][0]['scale'] == {'x': 1, 'y': 1, 'z': 1}
+
+
+def test_tool_create_aligned_with_error_invalid_distance():
+    config = ToolConfig(
+        align_distance=20,
+        align_with='toy',
+        shape='tool_rect_0_75_x_4_00'
+    )
+    service = ToolCreationService()
+    scene = prior_scene()
+    material_tuple = materials.ORANGE_PLASTIC
+    definition = base_objects.create_specific_definition_from_base(
+        'ball',
+        material_tuple.color,
+        [material_tuple.material],
+        None,
+        1
+    )
+    location = {
+        'position': {'x': 0, 'y': definition.positionY, 'z': 0},
+        'rotation': {'x': 0, 'y': 0, 'z': 0}
+    }
+    instance = instances.instantiate_object(definition, location)
+    scene.objects.append(instance)
+    idl = InstanceDefinitionLocationTuple(instance, definition, location)
+    ObjectRepository.get_instance().add_to_labeled_objects(idl, 'toy')
+
+    with pytest.raises(Exception):
+        service.add_to_scene(
+            scene=scene,
+            source_template=config,
+            bounds=[]
+        )
+
+
+def test_tool_create_with_lava_surrounding():
+    scene = prior_scene()
+    # move performer out of the way of tool and lava so there are no errors
+    scene.performer_start.position.x = -4
+    scene.performer_start.position.z = -4
+    temp = ToolConfig(
+        surrounded_by_lava=True,
+        shape='tool_hooked_0_50_x_5_00',
+        rotation_y=0,
+        position=VectorFloatConfig(1, 0, 1)
+    )
+    temp.material = materials.TOOL_MATERIALS[1]
+    tool = ToolCreationService().create_feature_from_specific_values(
+        scene, temp, None)
+
+    assert tool
+    assert tool['id'].startswith('tool_')
+    assert tool['type'] == 'tool_hooked_0_50_x_5_00'
+    show = tool['shows'][0]
+    pos = show['position']
+    rot = show['rotation']
+    scale = show['scale']
+    assert pos == {'x': 1, 'y': 0.15, 'z': 1}
+    assert rot == {'x': 0, 'y': 0, 'z': 0}
+    assert scale == {'x': 1, 'y': 1, 'z': 1}
+
+    # Make sure lava isn't officially added until add_to_scene is called
+    assert not scene.lava
+    assert tool['debug']['surroundingLava']
+    assert len(tool['debug']['surroundingLava']) == 20
+    for square in tool['debug']['surroundingLava']:
+        assert square['x'] in [-1, 0, 1, 2, 3]
+        assert square['z'] in [-2, -1, 0, 1, 2, 3, 4]
+        assert not (square['x'] in [0, 1, 2] and
+                    square['z'] in [-1, 0, 1, 2, 3])
+
+    instances, _ = ToolCreationService().add_to_scene(
+        scene=scene, source_template=temp, bounds=[])
+
+    tool = instances[0]
+    assert scene.lava
+    assert len(scene.lava) == 20
+    # check that 'surroundingLava' array was deleted
+    # after lava was placed
+    assert 'surroundingLava' not in tool['debug']
+
+    for square in scene.lava:
+        assert square.x in [-1, 0, 1, 2, 3]
+        assert square.z in [-2, -1, 0, 1, 2, 3, 4]
+        assert not (square.x in [0, 1, 2] and square.z in [-1, 0, 1, 2, 3])
+
+
+def test_tool_create_with_lava_surrounding_fail_perf_start():
+    scene = prior_scene()
+
+    temp = ToolConfig(
+        surrounded_by_lava=True,
+        shape='tool_hooked_0_50_x_5_00',
+        rotation_y=0,
+        position=VectorFloatConfig(1, 0, 1)
+    )
+    temp.material = materials.TOOL_MATERIALS[1]
+
+    with pytest.raises(ILEException):
+        ToolCreationService().create_feature_from_specific_values(
+            scene, temp, None
+        )
+
+
+def test_tool_create_with_lava_surrounding_fail_object_overlap():
+    scene = prior_scene_with_target()
+
+    # move performer out of the way of tool and lava so there are no errors
+    scene.performer_start.position.x = -4
+    scene.performer_start.position.z = -4
+
+    temp = ToolConfig(
+        surrounded_by_lava=True,
+        shape='tool_hooked_0_50_x_5_00',
+        rotation_y=0,
+        position=VectorFloatConfig(1, 0, 1)
+    )
+    temp.material = materials.TOOL_MATERIALS[1]
+
+    with pytest.raises(ILEException):
+        ToolCreationService().create_feature_from_specific_values(
+            scene=scene, reconciled=temp, source_template=None
+        )
+        ToolCreationService().add_to_scene(
+            scene=scene, source_template=temp, bounds=[])

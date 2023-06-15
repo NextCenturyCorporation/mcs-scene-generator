@@ -10,7 +10,7 @@ from typing import Any, Dict
 
 from machine_common_sense.logging_config import LoggingConfig
 
-from generator import Scene, materials, tags
+from generator import MAX_TRIES, Scene, SceneException, materials, tags
 from generator.scene_saver import find_next_filename, save_scene_files
 
 STARTER_SCENE = Scene(
@@ -69,6 +69,8 @@ class SceneGenerator():
         stop_on_error: bool,
         role_to_type: Dict[str, str]
     ) -> None:
+        logger = logging.getLogger(__name__)
+
         # If the file prefix is in a folder, ensure that folder exists.
         folder_name = os.path.dirname(prefix)
         if folder_name != '':
@@ -82,8 +84,8 @@ class SceneGenerator():
         if not hypercube_factory:
             raise ValueError(f'Failed to find {type_name} hypercube factory')
 
-        # Generate all of the needed hypercubes.
-        hypercubes = hypercube_factory.build(
+        # Create all of the needed hypercubes.
+        hypercubes = hypercube_factory.generate_hypercubes(
             total,
             self.generate_starter_scene,
             role_to_type,
@@ -91,8 +93,12 @@ class SceneGenerator():
             sort_hypercube
         )
 
+        logger.info(f'Generating {len(hypercubes)} {type_name} hypercubes')
+        index = -1
         hypercube_index = 1
-        for hypercube in hypercubes:
+        failed_info = []
+        count = 0
+        for index, hypercube in enumerate(hypercubes):
             # Identify the next available file name index.
             base_filename, hypercube_index = find_next_filename(
                 f'{prefix}_',
@@ -101,8 +107,29 @@ class SceneGenerator():
                 suffix='_01.json'
             )
 
-            # Retrieve all of the scenes from this hypercubes.
-            scenes = hypercube.get_scenes()
+            # Create and retrieve all of the scenes from this hypercubes.
+            scenes = None
+            for try_index in range(MAX_TRIES + 1):
+                try:
+                    scenes = hypercube.generate_scenes()
+                    break
+                except (
+                    SceneException,
+                    RuntimeError,
+                    TypeError,
+                    ValueError,
+                    ZeroDivisionError
+                ) as e:
+                    if stop_on_error:
+                        raise e from e
+                    logger.exception(f'Failed to make a {type_name} hypercube')
+                    info = hypercube.get_info()
+                    if info and info not in failed_info:
+                        failed_info.append(info)
+
+            if not scenes:
+                logger.warn('Skipping hypercube...')
+                continue
 
             # Randomly shuffle the scenes.
             if not sort_hypercube:
@@ -125,6 +152,21 @@ class SceneGenerator():
                     filename,
                     no_scene_id=bool(eval_name)
                 )
+
+            count += 1
+            logger.info(
+                f'Saved {type_name} hypercube {count} / {total} '
+                f'({len(scenes)} scenes): {base_filename}'
+            )
+            if count == total:
+                break
+
+        logger.info(f'Finished {count} {type_name} hypercubes')
+
+        if failed_info:
+            logger.warn('The following hypercubes failed:')
+            for info in failed_info:
+                logger.warn(f'{info}')
 
     def generate_scenes_from_args(self, argv) -> None:
         parser = argparse.ArgumentParser(

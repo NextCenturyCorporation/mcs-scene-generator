@@ -91,162 +91,164 @@ def create_tags_test_object_2():
     }
 
 
-def test_Hypercube_create_scenes_on_init():
+def test_Hypercube_does_not_generate_scenes_on_init():
     hypercube = MockHypercube()
-    assert len(hypercube._scenes) == 1
+    assert len(hypercube._scenes) == 0
 
 
-def test_Hypercube_init_scenes():
+def test_Hypercube_generate_scenes():
     hypercube = MockHypercube()
-    scene = hypercube.get_scenes()[0]
-    assert 'category' in scene.goal
-    assert 'domainsInfo' in scene.goal
-    assert 'objectsInfo' in scene.goal
-    assert 'sceneInfo' in scene.goal
+    scenes = hypercube.generate_scenes()
+    assert len(scenes) == 1
+    scene = scenes[0]
+    assert scene.goal.category
+    assert scene.goal.domains_info
+    assert scene.goal.objects_info
+    assert scene.goal.scene_info
 
 
 def test_Hypercube_tags():
     hypercube = MockHypercube()
     target = create_tags_test_object_1()
-    scene = hypercube.get_scenes()[0]
+    scene = hypercube.generate_scenes()[0]
     print(f'{scene}')
     scene = update_scene_objects(scene, {'target': [target]})
 
-    assert set(scene.goal['objectsInfo']['all']) == {
+    assert set(scene.goal.objects_info['all']) == {
         'target',
         'tiny', 'light', 'blue', 'plastic', 'ball',
         'trained category', 'trained color', 'trained combination',
         'trained shape', 'trained size', 'uncontained'
     }
-    assert set(scene.goal['objectsInfo']['target']) == {
+    assert set(scene.goal.objects_info['target']) == {
         'tiny', 'light', 'blue', 'plastic', 'ball',
         'trained category', 'trained color', 'trained combination',
         'trained shape', 'trained size', 'uncontained'
     }
 
-    assert not scene.goal['sceneInfo']['contained']['target']
-    assert not scene.goal['sceneInfo']['untrainedCategory']['target']
-    assert not scene.goal['sceneInfo']['untrainedColor']['target']
-    assert not scene.goal['sceneInfo']['untrainedCombination']['target']
-    assert not scene.goal['sceneInfo']['untrainedShape']['target']
-    assert not scene.goal['sceneInfo']['untrainedSize']['target']
+    assert not scene.goal.scene_info['contained']['target']
+    assert not scene.goal.scene_info['untrainedCategory']['target']
+    assert not scene.goal.scene_info['untrainedColor']['target']
+    assert not scene.goal.scene_info['untrainedCombination']['target']
+    assert not scene.goal.scene_info['untrainedShape']['target']
+    assert not scene.goal.scene_info['untrainedSize']['target']
 
-    assert scene.goal['sceneInfo']['present']['target']
-    assert scene.goal['sceneInfo']['trainedCategory']['target']
-    assert scene.goal['sceneInfo']['trainedColor']['target']
-    assert scene.goal['sceneInfo']['trainedCombination']['target']
-    assert scene.goal['sceneInfo']['trainedShape']['target']
-    assert scene.goal['sceneInfo']['trainedSize']['target']
-    assert scene.goal['sceneInfo']['uncontained']['target']
+    assert scene.goal.scene_info['present']['target']
+    assert scene.goal.scene_info['trainedCategory']['target']
+    assert scene.goal.scene_info['trainedColor']['target']
+    assert scene.goal.scene_info['trainedCombination']['target']
+    assert scene.goal.scene_info['trainedShape']['target']
+    assert scene.goal.scene_info['trainedSize']['target']
+    assert scene.goal.scene_info['uncontained']['target']
 
-    assert scene.goal['sceneInfo']['count']['all'] == 1
-    assert scene.goal['sceneInfo']['count']['target'] == 1
+    assert scene.goal.scene_info['count']['all'] == 1
+    assert scene.goal.scene_info['count']['target'] == 1
 
 
 def test_Hypercube_tags_multiple_target():
     hypercube = MockHypercube()
     target_1 = create_tags_test_object_1()
     target_2 = create_tags_test_object_2()
-    scene = hypercube.get_scenes()[0]
+    scene = hypercube.generate_scenes()[0]
     print(f'{scene}')
     scene = update_scene_objects(
         scene,
         {'target': [target_1, target_2]}
     )
 
-    assert set(scene.goal['objectsInfo']['all']) == {
+    assert set(scene.goal.objects_info['all']) == {
         'target',
         'tiny', 'light', 'blue', 'plastic', 'ball',
         'medium', 'light', 'yellow', 'plastic', 'cube',
         'trained category', 'trained color', 'trained combination',
         'trained shape', 'trained size', 'uncontained'
     }
-    assert set(scene.goal['objectsInfo']['target']) == {
+    assert set(scene.goal.objects_info['target']) == {
         'tiny', 'light', 'blue', 'plastic', 'ball',
         'medium', 'light', 'yellow', 'plastic', 'cube',
         'trained category', 'trained color', 'trained combination',
         'trained shape', 'trained size', 'uncontained'
     }
 
-    assert not scene.goal['sceneInfo']['contained']['target']
-    assert not scene.goal['sceneInfo']['untrainedCategory']['target']
-    assert not scene.goal['sceneInfo']['untrainedColor']['target']
-    assert not scene.goal['sceneInfo']['untrainedCombination']['target']
-    assert not scene.goal['sceneInfo']['untrainedShape']['target']
-    assert not scene.goal['sceneInfo']['untrainedSize']['target']
+    assert not scene.goal.scene_info['contained']['target']
+    assert not scene.goal.scene_info['untrainedCategory']['target']
+    assert not scene.goal.scene_info['untrainedColor']['target']
+    assert not scene.goal.scene_info['untrainedCombination']['target']
+    assert not scene.goal.scene_info['untrainedShape']['target']
+    assert not scene.goal.scene_info['untrainedSize']['target']
 
-    assert scene.goal['sceneInfo']['present']['target']
-    assert scene.goal['sceneInfo']['trainedCategory']['target']
-    assert scene.goal['sceneInfo']['trainedColor']['target']
-    assert scene.goal['sceneInfo']['trainedCombination']['target']
-    assert scene.goal['sceneInfo']['trainedShape']['target']
-    assert scene.goal['sceneInfo']['trainedSize']['target']
-    assert scene.goal['sceneInfo']['uncontained']['target']
+    assert scene.goal.scene_info['present']['target']
+    assert scene.goal.scene_info['trainedCategory']['target']
+    assert scene.goal.scene_info['trainedColor']['target']
+    assert scene.goal.scene_info['trainedCombination']['target']
+    assert scene.goal.scene_info['trainedShape']['target']
+    assert scene.goal.scene_info['trainedSize']['target']
+    assert scene.goal.scene_info['uncontained']['target']
 
-    assert scene.goal['sceneInfo']['count']['all'] == 2
-    assert scene.goal['sceneInfo']['count']['target'] == 2
+    assert scene.goal.scene_info['count']['all'] == 2
+    assert scene.goal.scene_info['count']['target'] == 2
 
 
 def test_Hypercube_tags_with_obstacle():
     hypercube = MockHypercube()
     target = create_tags_test_object_1()
     obstacle = create_tags_test_object_2()
-    scene = hypercube.get_scenes()[0]
+    scene = hypercube.generate_scenes()[0]
     print(f'{scene}')
     scene = update_scene_objects(
         scene,
         {'target': [target], 'obstacle': [obstacle]}
     )
 
-    assert set(scene.goal['objectsInfo']['all']) == {
+    assert set(scene.goal.objects_info['all']) == {
         'target', 'obstacle',
         'tiny', 'light', 'blue', 'plastic', 'ball',
         'medium', 'light', 'yellow', 'plastic', 'cube',
         'trained category', 'trained color', 'trained combination',
         'trained shape', 'trained size', 'uncontained'
     }
-    assert set(scene.goal['objectsInfo']['obstacle']) == {
+    assert set(scene.goal.objects_info['obstacle']) == {
         'medium', 'light', 'yellow', 'plastic', 'cube',
         'trained category', 'trained color', 'trained combination',
         'trained shape', 'trained size', 'uncontained'
     }
-    assert set(scene.goal['objectsInfo']['target']) == {
+    assert set(scene.goal.objects_info['target']) == {
         'tiny', 'light', 'blue', 'plastic', 'ball',
         'trained category', 'trained color', 'trained combination',
         'trained shape', 'trained size', 'uncontained'
     }
 
-    assert not scene.goal['sceneInfo']['contained']['obstacle']
-    assert not scene.goal['sceneInfo']['contained']['target']
-    assert not scene.goal['sceneInfo']['untrainedCategory']['obstacle']
-    assert not scene.goal['sceneInfo']['untrainedCategory']['target']
-    assert not scene.goal['sceneInfo']['untrainedColor']['obstacle']
-    assert not scene.goal['sceneInfo']['untrainedColor']['target']
-    assert not scene.goal['sceneInfo']['untrainedCombination']['obstacle']
-    assert not scene.goal['sceneInfo']['untrainedCombination']['target']
-    assert not scene.goal['sceneInfo']['untrainedShape']['obstacle']
-    assert not scene.goal['sceneInfo']['untrainedShape']['target']
-    assert not scene.goal['sceneInfo']['untrainedSize']['obstacle']
-    assert not scene.goal['sceneInfo']['untrainedSize']['target']
+    assert not scene.goal.scene_info['contained']['obstacle']
+    assert not scene.goal.scene_info['contained']['target']
+    assert not scene.goal.scene_info['untrainedCategory']['obstacle']
+    assert not scene.goal.scene_info['untrainedCategory']['target']
+    assert not scene.goal.scene_info['untrainedColor']['obstacle']
+    assert not scene.goal.scene_info['untrainedColor']['target']
+    assert not scene.goal.scene_info['untrainedCombination']['obstacle']
+    assert not scene.goal.scene_info['untrainedCombination']['target']
+    assert not scene.goal.scene_info['untrainedShape']['obstacle']
+    assert not scene.goal.scene_info['untrainedShape']['target']
+    assert not scene.goal.scene_info['untrainedSize']['obstacle']
+    assert not scene.goal.scene_info['untrainedSize']['target']
 
-    assert scene.goal['sceneInfo']['present']['obstacle']
-    assert scene.goal['sceneInfo']['present']['target']
-    assert scene.goal['sceneInfo']['trainedCategory']['obstacle']
-    assert scene.goal['sceneInfo']['trainedCategory']['target']
-    assert scene.goal['sceneInfo']['trainedColor']['obstacle']
-    assert scene.goal['sceneInfo']['trainedColor']['target']
-    assert scene.goal['sceneInfo']['trainedCombination']['obstacle']
-    assert scene.goal['sceneInfo']['trainedCombination']['target']
-    assert scene.goal['sceneInfo']['trainedShape']['obstacle']
-    assert scene.goal['sceneInfo']['trainedShape']['target']
-    assert scene.goal['sceneInfo']['trainedSize']['obstacle']
-    assert scene.goal['sceneInfo']['trainedSize']['target']
-    assert scene.goal['sceneInfo']['uncontained']['obstacle']
-    assert scene.goal['sceneInfo']['uncontained']['target']
+    assert scene.goal.scene_info['present']['obstacle']
+    assert scene.goal.scene_info['present']['target']
+    assert scene.goal.scene_info['trainedCategory']['obstacle']
+    assert scene.goal.scene_info['trainedCategory']['target']
+    assert scene.goal.scene_info['trainedColor']['obstacle']
+    assert scene.goal.scene_info['trainedColor']['target']
+    assert scene.goal.scene_info['trainedCombination']['obstacle']
+    assert scene.goal.scene_info['trainedCombination']['target']
+    assert scene.goal.scene_info['trainedShape']['obstacle']
+    assert scene.goal.scene_info['trainedShape']['target']
+    assert scene.goal.scene_info['trainedSize']['obstacle']
+    assert scene.goal.scene_info['trainedSize']['target']
+    assert scene.goal.scene_info['uncontained']['obstacle']
+    assert scene.goal.scene_info['uncontained']['target']
 
-    assert scene.goal['sceneInfo']['count']['all'] == 2
-    assert scene.goal['sceneInfo']['count']['obstacle'] == 1
-    assert scene.goal['sceneInfo']['count']['target'] == 1
+    assert scene.goal.scene_info['count']['all'] == 2
+    assert scene.goal.scene_info['count']['obstacle'] == 1
+    assert scene.goal.scene_info['count']['target'] == 1
 
 
 def test_Hypercube_tags_multiple_target_multiple_obstacle():
@@ -255,7 +257,7 @@ def test_Hypercube_tags_multiple_target_multiple_obstacle():
     target_2 = create_tags_test_object_1()
     obstacle_1 = create_tags_test_object_2()
     obstacle_2 = create_tags_test_object_2()
-    scene = hypercube.get_scenes()[0]
+    scene = hypercube.generate_scenes()[0]
     print(f'{scene}')
     scene = update_scene_objects(
         scene,
@@ -265,55 +267,55 @@ def test_Hypercube_tags_multiple_target_multiple_obstacle():
         }
     )
 
-    assert set(scene.goal['objectsInfo']['all']) == {
+    assert set(scene.goal.objects_info['all']) == {
         'target', 'obstacle',
         'tiny', 'light', 'blue', 'plastic', 'ball',
         'medium', 'light', 'yellow', 'plastic', 'cube',
         'trained category', 'trained color', 'trained combination',
         'trained shape', 'trained size', 'uncontained'
     }
-    assert set(scene.goal['objectsInfo']['obstacle']) == {
+    assert set(scene.goal.objects_info['obstacle']) == {
         'medium', 'light', 'yellow', 'plastic', 'cube',
         'trained category', 'trained color', 'trained combination',
         'trained shape', 'trained size', 'uncontained'
     }
-    assert set(scene.goal['objectsInfo']['target']) == {
+    assert set(scene.goal.objects_info['target']) == {
         'tiny', 'light', 'blue', 'plastic', 'ball',
         'trained category', 'trained color', 'trained combination',
         'trained shape', 'trained size', 'uncontained'
     }
 
-    assert not scene.goal['sceneInfo']['contained']['obstacle']
-    assert not scene.goal['sceneInfo']['contained']['target']
-    assert not scene.goal['sceneInfo']['untrainedCategory']['obstacle']
-    assert not scene.goal['sceneInfo']['untrainedCategory']['target']
-    assert not scene.goal['sceneInfo']['untrainedColor']['obstacle']
-    assert not scene.goal['sceneInfo']['untrainedColor']['target']
-    assert not scene.goal['sceneInfo']['untrainedCombination']['obstacle']
-    assert not scene.goal['sceneInfo']['untrainedCombination']['target']
-    assert not scene.goal['sceneInfo']['untrainedShape']['obstacle']
-    assert not scene.goal['sceneInfo']['untrainedShape']['target']
-    assert not scene.goal['sceneInfo']['untrainedSize']['obstacle']
-    assert not scene.goal['sceneInfo']['untrainedSize']['target']
+    assert not scene.goal.scene_info['contained']['obstacle']
+    assert not scene.goal.scene_info['contained']['target']
+    assert not scene.goal.scene_info['untrainedCategory']['obstacle']
+    assert not scene.goal.scene_info['untrainedCategory']['target']
+    assert not scene.goal.scene_info['untrainedColor']['obstacle']
+    assert not scene.goal.scene_info['untrainedColor']['target']
+    assert not scene.goal.scene_info['untrainedCombination']['obstacle']
+    assert not scene.goal.scene_info['untrainedCombination']['target']
+    assert not scene.goal.scene_info['untrainedShape']['obstacle']
+    assert not scene.goal.scene_info['untrainedShape']['target']
+    assert not scene.goal.scene_info['untrainedSize']['obstacle']
+    assert not scene.goal.scene_info['untrainedSize']['target']
 
-    assert scene.goal['sceneInfo']['present']['obstacle']
-    assert scene.goal['sceneInfo']['present']['target']
-    assert scene.goal['sceneInfo']['trainedCategory']['obstacle']
-    assert scene.goal['sceneInfo']['trainedCategory']['target']
-    assert scene.goal['sceneInfo']['trainedColor']['obstacle']
-    assert scene.goal['sceneInfo']['trainedColor']['target']
-    assert scene.goal['sceneInfo']['trainedCombination']['obstacle']
-    assert scene.goal['sceneInfo']['trainedCombination']['target']
-    assert scene.goal['sceneInfo']['trainedShape']['obstacle']
-    assert scene.goal['sceneInfo']['trainedShape']['target']
-    assert scene.goal['sceneInfo']['trainedSize']['obstacle']
-    assert scene.goal['sceneInfo']['trainedSize']['target']
-    assert scene.goal['sceneInfo']['uncontained']['obstacle']
-    assert scene.goal['sceneInfo']['uncontained']['target']
+    assert scene.goal.scene_info['present']['obstacle']
+    assert scene.goal.scene_info['present']['target']
+    assert scene.goal.scene_info['trainedCategory']['obstacle']
+    assert scene.goal.scene_info['trainedCategory']['target']
+    assert scene.goal.scene_info['trainedColor']['obstacle']
+    assert scene.goal.scene_info['trainedColor']['target']
+    assert scene.goal.scene_info['trainedCombination']['obstacle']
+    assert scene.goal.scene_info['trainedCombination']['target']
+    assert scene.goal.scene_info['trainedShape']['obstacle']
+    assert scene.goal.scene_info['trainedShape']['target']
+    assert scene.goal.scene_info['trainedSize']['obstacle']
+    assert scene.goal.scene_info['trainedSize']['target']
+    assert scene.goal.scene_info['uncontained']['obstacle']
+    assert scene.goal.scene_info['uncontained']['target']
 
-    assert scene.goal['sceneInfo']['count']['all'] == 4
-    assert scene.goal['sceneInfo']['count']['obstacle'] == 2
-    assert scene.goal['sceneInfo']['count']['target'] == 2
+    assert scene.goal.scene_info['count']['all'] == 4
+    assert scene.goal.scene_info['count']['obstacle'] == 2
+    assert scene.goal.scene_info['count']['target'] == 2
 
 
 def test_Hypercube_tags_with_intuitive_physics_occluder():
@@ -322,7 +324,7 @@ def test_Hypercube_tags_with_intuitive_physics_occluder():
     occluder_wall = {'debug': {'info': ['white']}}
     occluder_pole = {'debug': {'info': ['brown']}}
     occluder_tag = 'intuitive_physics_occluder'
-    scene = hypercube.get_scenes()[0]
+    scene = hypercube.generate_scenes()[0]
     print(f'{scene}')
     scene = update_scene_objects(
         scene,
@@ -332,280 +334,280 @@ def test_Hypercube_tags_with_intuitive_physics_occluder():
         }
     )
 
-    assert set(scene.goal['objectsInfo']['all']) == {
+    assert set(scene.goal.objects_info['all']) == {
         'target', 'intuitive physics occluder',
         'tiny', 'light', 'blue', 'plastic', 'ball',
         'white', 'brown',
         'trained category', 'trained color', 'trained combination',
         'trained shape', 'trained size', 'uncontained'
     }
-    assert set(scene.goal['objectsInfo'][occluder_tag]) == {
+    assert set(scene.goal.objects_info[occluder_tag]) == {
         'white', 'brown'
     }
-    assert set(scene.goal['objectsInfo']['target']) == {
+    assert set(scene.goal.objects_info['target']) == {
         'tiny', 'light', 'blue', 'plastic', 'ball',
         'trained category', 'trained color', 'trained combination',
         'trained shape', 'trained size', 'uncontained'
     }
 
-    assert not scene.goal['sceneInfo']['contained'][occluder_tag]
-    assert not scene.goal['sceneInfo']['contained']['target']
-    assert not scene.goal['sceneInfo']['untrainedCategory'][occluder_tag]
-    assert not scene.goal['sceneInfo']['untrainedCategory']['target']
-    assert not scene.goal['sceneInfo']['untrainedColor'][occluder_tag]
-    assert not scene.goal['sceneInfo']['untrainedColor']['target']
-    assert not scene.goal['sceneInfo']['untrainedCombination'][occluder_tag]
-    assert not scene.goal['sceneInfo']['untrainedCombination']['target']
-    assert not scene.goal['sceneInfo']['untrainedShape'][occluder_tag]
-    assert not scene.goal['sceneInfo']['untrainedShape']['target']
-    assert not scene.goal['sceneInfo']['untrainedSize'][occluder_tag]
-    assert not scene.goal['sceneInfo']['untrainedSize']['target']
+    assert not scene.goal.scene_info['contained'][occluder_tag]
+    assert not scene.goal.scene_info['contained']['target']
+    assert not scene.goal.scene_info['untrainedCategory'][occluder_tag]
+    assert not scene.goal.scene_info['untrainedCategory']['target']
+    assert not scene.goal.scene_info['untrainedColor'][occluder_tag]
+    assert not scene.goal.scene_info['untrainedColor']['target']
+    assert not scene.goal.scene_info['untrainedCombination'][occluder_tag]
+    assert not scene.goal.scene_info['untrainedCombination']['target']
+    assert not scene.goal.scene_info['untrainedShape'][occluder_tag]
+    assert not scene.goal.scene_info['untrainedShape']['target']
+    assert not scene.goal.scene_info['untrainedSize'][occluder_tag]
+    assert not scene.goal.scene_info['untrainedSize']['target']
 
-    assert scene.goal['sceneInfo']['trainedCategory']['target']
-    assert scene.goal['sceneInfo']['trainedColor']['target']
-    assert scene.goal['sceneInfo']['trainedCombination']['target']
-    assert scene.goal['sceneInfo']['trainedShape']['target']
-    assert scene.goal['sceneInfo']['trainedSize']['target']
-    assert scene.goal['sceneInfo']['count']['all'] == 2
-    assert scene.goal['sceneInfo']['count'][occluder_tag] == 1
-    assert scene.goal['sceneInfo']['count']['target'] == 1
-    assert scene.goal['sceneInfo']['present'][occluder_tag]
-    assert scene.goal['sceneInfo']['present']['target']
-    assert scene.goal['sceneInfo']['uncontained']['target']
+    assert scene.goal.scene_info['trainedCategory']['target']
+    assert scene.goal.scene_info['trainedColor']['target']
+    assert scene.goal.scene_info['trainedCombination']['target']
+    assert scene.goal.scene_info['trainedShape']['target']
+    assert scene.goal.scene_info['trainedSize']['target']
+    assert scene.goal.scene_info['count']['all'] == 2
+    assert scene.goal.scene_info['count'][occluder_tag] == 1
+    assert scene.goal.scene_info['count']['target'] == 1
+    assert scene.goal.scene_info['present'][occluder_tag]
+    assert scene.goal.scene_info['present']['target']
+    assert scene.goal.scene_info['uncontained']['target']
 
 
 def test_Hypercube_tags_target_enclosed():
     hypercube = MockHypercube()
     target = create_tags_test_object_1()
     target['locationParent'] = 'parent'
-    scene = hypercube.get_scenes()[0]
+    scene = hypercube.generate_scenes()[0]
     print(f'{scene}')
     scene = update_scene_objects(scene, {'target': [target]})
 
-    assert set(scene.goal['objectsInfo']['all']) == {
+    assert set(scene.goal.objects_info['all']) == {
         'target',
         'tiny', 'light', 'blue', 'plastic', 'ball',
         'trained category', 'trained color', 'trained combination',
         'trained shape', 'trained size', 'contained'
     }
-    assert set(scene.goal['objectsInfo']['target']) == {
+    assert set(scene.goal.objects_info['target']) == {
         'tiny', 'light', 'blue', 'plastic', 'ball',
         'trained category', 'trained color', 'trained combination',
         'trained shape', 'trained size', 'contained'
     }
 
-    assert not scene.goal['sceneInfo']['uncontained']['target']
-    assert not scene.goal['sceneInfo']['untrainedCategory']['target']
-    assert not scene.goal['sceneInfo']['untrainedColor']['target']
-    assert not scene.goal['sceneInfo']['untrainedCombination']['target']
-    assert not scene.goal['sceneInfo']['untrainedShape']['target']
-    assert not scene.goal['sceneInfo']['untrainedSize']['target']
+    assert not scene.goal.scene_info['uncontained']['target']
+    assert not scene.goal.scene_info['untrainedCategory']['target']
+    assert not scene.goal.scene_info['untrainedColor']['target']
+    assert not scene.goal.scene_info['untrainedCombination']['target']
+    assert not scene.goal.scene_info['untrainedShape']['target']
+    assert not scene.goal.scene_info['untrainedSize']['target']
 
-    assert scene.goal['sceneInfo']['contained']['target']
-    assert scene.goal['sceneInfo']['present']['target']
-    assert scene.goal['sceneInfo']['trainedCategory']['target']
-    assert scene.goal['sceneInfo']['trainedColor']['target']
-    assert scene.goal['sceneInfo']['trainedCombination']['target']
-    assert scene.goal['sceneInfo']['trainedShape']['target']
-    assert scene.goal['sceneInfo']['trainedSize']['target']
+    assert scene.goal.scene_info['contained']['target']
+    assert scene.goal.scene_info['present']['target']
+    assert scene.goal.scene_info['trainedCategory']['target']
+    assert scene.goal.scene_info['trainedColor']['target']
+    assert scene.goal.scene_info['trainedCombination']['target']
+    assert scene.goal.scene_info['trainedShape']['target']
+    assert scene.goal.scene_info['trainedSize']['target']
 
-    assert scene.goal['sceneInfo']['count']['all'] == 1
-    assert scene.goal['sceneInfo']['count']['target'] == 1
+    assert scene.goal.scene_info['count']['all'] == 1
+    assert scene.goal.scene_info['count']['target'] == 1
 
 
 def test_Hypercube_tags_target_untrained_category():
     hypercube = MockHypercube()
     target = create_tags_test_object_1()
     target['debug']['untrainedCategory'] = True
-    scene = hypercube.get_scenes()[0]
+    scene = hypercube.generate_scenes()[0]
     print(f'{scene}')
     scene = update_scene_objects(scene, {'target': [target]})
 
-    assert set(scene.goal['objectsInfo']['all']) == {
+    assert set(scene.goal.objects_info['all']) == {
         'target',
         'tiny', 'light', 'blue', 'plastic', 'ball',
         'untrained category', 'trained color', 'trained shape', 'trained size',
         'uncontained', 'trained combination'
     }
-    assert set(scene.goal['objectsInfo']['target']) == {
+    assert set(scene.goal.objects_info['target']) == {
         'tiny', 'light', 'blue', 'plastic', 'ball',
         'untrained category', 'trained color', 'trained shape', 'trained size',
         'uncontained', 'trained combination'
     }
 
-    assert not scene.goal['sceneInfo']['contained']['target']
-    assert not scene.goal['sceneInfo']['trainedCategory']['target']
-    assert not scene.goal['sceneInfo']['untrainedColor']['target']
-    assert not scene.goal['sceneInfo']['untrainedCombination']['target']
-    assert not scene.goal['sceneInfo']['untrainedShape']['target']
-    assert not scene.goal['sceneInfo']['untrainedSize']['target']
+    assert not scene.goal.scene_info['contained']['target']
+    assert not scene.goal.scene_info['trainedCategory']['target']
+    assert not scene.goal.scene_info['untrainedColor']['target']
+    assert not scene.goal.scene_info['untrainedCombination']['target']
+    assert not scene.goal.scene_info['untrainedShape']['target']
+    assert not scene.goal.scene_info['untrainedSize']['target']
 
-    assert scene.goal['sceneInfo']['present']['target']
-    assert scene.goal['sceneInfo']['trainedColor']['target']
-    assert scene.goal['sceneInfo']['trainedCombination']['target']
-    assert scene.goal['sceneInfo']['trainedShape']['target']
-    assert scene.goal['sceneInfo']['trainedSize']['target']
-    assert scene.goal['sceneInfo']['uncontained']['target']
-    assert scene.goal['sceneInfo']['untrainedCategory']['target']
+    assert scene.goal.scene_info['present']['target']
+    assert scene.goal.scene_info['trainedColor']['target']
+    assert scene.goal.scene_info['trainedCombination']['target']
+    assert scene.goal.scene_info['trainedShape']['target']
+    assert scene.goal.scene_info['trainedSize']['target']
+    assert scene.goal.scene_info['uncontained']['target']
+    assert scene.goal.scene_info['untrainedCategory']['target']
 
-    assert scene.goal['sceneInfo']['count']['all'] == 1
-    assert scene.goal['sceneInfo']['count']['target'] == 1
+    assert scene.goal.scene_info['count']['all'] == 1
+    assert scene.goal.scene_info['count']['target'] == 1
 
 
 def test_Hypercube_tags_target_untrained_color():
     hypercube = MockHypercube()
     target = create_tags_test_object_1()
     target['debug']['untrainedColor'] = True
-    scene = hypercube.get_scenes()[0]
+    scene = hypercube.generate_scenes()[0]
     print(f'{scene}')
     scene = update_scene_objects(scene, {'target': [target]})
 
-    assert set(scene.goal['objectsInfo']['all']) == {
+    assert set(scene.goal.objects_info['all']) == {
         'target',
         'tiny', 'light', 'blue', 'plastic', 'ball',
         'trained category', 'untrained color', 'trained shape', 'trained size',
         'uncontained', 'trained combination'
     }
-    assert set(scene.goal['objectsInfo']['target']) == {
+    assert set(scene.goal.objects_info['target']) == {
         'tiny', 'light', 'blue', 'plastic', 'ball',
         'trained category', 'untrained color', 'trained shape', 'trained size',
         'uncontained', 'trained combination'
     }
 
-    assert not scene.goal['sceneInfo']['contained']['target']
-    assert not scene.goal['sceneInfo']['trainedColor']['target']
-    assert not scene.goal['sceneInfo']['untrainedCategory']['target']
-    assert not scene.goal['sceneInfo']['untrainedCombination']['target']
-    assert not scene.goal['sceneInfo']['untrainedShape']['target']
-    assert not scene.goal['sceneInfo']['untrainedSize']['target']
+    assert not scene.goal.scene_info['contained']['target']
+    assert not scene.goal.scene_info['trainedColor']['target']
+    assert not scene.goal.scene_info['untrainedCategory']['target']
+    assert not scene.goal.scene_info['untrainedCombination']['target']
+    assert not scene.goal.scene_info['untrainedShape']['target']
+    assert not scene.goal.scene_info['untrainedSize']['target']
 
-    assert scene.goal['sceneInfo']['present']['target']
-    assert scene.goal['sceneInfo']['trainedCategory']['target']
-    assert scene.goal['sceneInfo']['trainedCombination']['target']
-    assert scene.goal['sceneInfo']['trainedShape']['target']
-    assert scene.goal['sceneInfo']['trainedSize']['target']
-    assert scene.goal['sceneInfo']['uncontained']['target']
-    assert scene.goal['sceneInfo']['untrainedColor']['target']
+    assert scene.goal.scene_info['present']['target']
+    assert scene.goal.scene_info['trainedCategory']['target']
+    assert scene.goal.scene_info['trainedCombination']['target']
+    assert scene.goal.scene_info['trainedShape']['target']
+    assert scene.goal.scene_info['trainedSize']['target']
+    assert scene.goal.scene_info['uncontained']['target']
+    assert scene.goal.scene_info['untrainedColor']['target']
 
-    assert scene.goal['sceneInfo']['count']['all'] == 1
-    assert scene.goal['sceneInfo']['count']['target'] == 1
+    assert scene.goal.scene_info['count']['all'] == 1
+    assert scene.goal.scene_info['count']['target'] == 1
 
 
 def test_Hypercube_tags_target_untrained_combination():
     hypercube = MockHypercube()
     target = create_tags_test_object_1()
     target['debug']['untrainedCombination'] = True
-    scene = hypercube.get_scenes()[0]
+    scene = hypercube.generate_scenes()[0]
     print(f'{scene}')
     scene = update_scene_objects(scene, {'target': [target]})
 
-    assert set(scene.goal['objectsInfo']['all']) == {
+    assert set(scene.goal.objects_info['all']) == {
         'target',
         'tiny', 'light', 'blue', 'plastic', 'ball',
         'trained category', 'trained color', 'untrained combination',
         'trained shape', 'trained size', 'uncontained'
     }
-    assert set(scene.goal['objectsInfo']['target']) == {
+    assert set(scene.goal.objects_info['target']) == {
         'tiny', 'light', 'blue', 'plastic', 'ball',
         'trained category', 'trained color', 'untrained combination',
         'trained shape', 'trained size', 'uncontained'
     }
 
-    assert not scene.goal['sceneInfo']['trainedCombination']['target']
-    assert not scene.goal['sceneInfo']['contained']['target']
-    assert not scene.goal['sceneInfo']['untrainedCategory']['target']
-    assert not scene.goal['sceneInfo']['untrainedColor']['target']
-    assert not scene.goal['sceneInfo']['untrainedShape']['target']
-    assert not scene.goal['sceneInfo']['untrainedSize']['target']
+    assert not scene.goal.scene_info['trainedCombination']['target']
+    assert not scene.goal.scene_info['contained']['target']
+    assert not scene.goal.scene_info['untrainedCategory']['target']
+    assert not scene.goal.scene_info['untrainedColor']['target']
+    assert not scene.goal.scene_info['untrainedShape']['target']
+    assert not scene.goal.scene_info['untrainedSize']['target']
 
-    assert scene.goal['sceneInfo']['present']['target']
-    assert scene.goal['sceneInfo']['trainedCategory']['target']
-    assert scene.goal['sceneInfo']['trainedColor']['target']
-    assert scene.goal['sceneInfo']['trainedShape']['target']
-    assert scene.goal['sceneInfo']['trainedSize']['target']
-    assert scene.goal['sceneInfo']['uncontained']['target']
-    assert scene.goal['sceneInfo']['untrainedCombination']['target']
+    assert scene.goal.scene_info['present']['target']
+    assert scene.goal.scene_info['trainedCategory']['target']
+    assert scene.goal.scene_info['trainedColor']['target']
+    assert scene.goal.scene_info['trainedShape']['target']
+    assert scene.goal.scene_info['trainedSize']['target']
+    assert scene.goal.scene_info['uncontained']['target']
+    assert scene.goal.scene_info['untrainedCombination']['target']
 
-    assert scene.goal['sceneInfo']['count']['all'] == 1
-    assert scene.goal['sceneInfo']['count']['target'] == 1
+    assert scene.goal.scene_info['count']['all'] == 1
+    assert scene.goal.scene_info['count']['target'] == 1
 
 
 def test_Hypercube_tags_target_untrained_shape():
     hypercube = MockHypercube()
     target = create_tags_test_object_1()
     target['debug']['untrainedShape'] = True
-    scene = hypercube.get_scenes()[0]
+    scene = hypercube.generate_scenes()[0]
     print(f'{scene}')
     scene = update_scene_objects(scene, {'target': [target]})
 
-    assert set(scene.goal['objectsInfo']['all']) == {
+    assert set(scene.goal.objects_info['all']) == {
         'target',
         'tiny', 'light', 'blue', 'plastic', 'ball',
         'trained category', 'trained color', 'untrained shape',
         'trained size', 'uncontained', 'trained combination'
     }
-    assert set(scene.goal['objectsInfo']['target']) == {
+    assert set(scene.goal.objects_info['target']) == {
         'tiny', 'light', 'blue', 'plastic', 'ball',
         'trained category', 'trained color', 'untrained shape',
         'trained size', 'uncontained', 'trained combination'
     }
 
-    assert not scene.goal['sceneInfo']['contained']['target']
-    assert not scene.goal['sceneInfo']['trainedShape']['target']
-    assert not scene.goal['sceneInfo']['untrainedCategory']['target']
-    assert not scene.goal['sceneInfo']['untrainedColor']['target']
-    assert not scene.goal['sceneInfo']['untrainedCombination']['target']
-    assert not scene.goal['sceneInfo']['untrainedSize']['target']
+    assert not scene.goal.scene_info['contained']['target']
+    assert not scene.goal.scene_info['trainedShape']['target']
+    assert not scene.goal.scene_info['untrainedCategory']['target']
+    assert not scene.goal.scene_info['untrainedColor']['target']
+    assert not scene.goal.scene_info['untrainedCombination']['target']
+    assert not scene.goal.scene_info['untrainedSize']['target']
 
-    assert scene.goal['sceneInfo']['present']['target']
-    assert scene.goal['sceneInfo']['trainedCategory']['target']
-    assert scene.goal['sceneInfo']['trainedColor']['target']
-    assert scene.goal['sceneInfo']['trainedCombination']['target']
-    assert scene.goal['sceneInfo']['trainedSize']['target']
-    assert scene.goal['sceneInfo']['uncontained']['target']
-    assert scene.goal['sceneInfo']['untrainedShape']['target']
+    assert scene.goal.scene_info['present']['target']
+    assert scene.goal.scene_info['trainedCategory']['target']
+    assert scene.goal.scene_info['trainedColor']['target']
+    assert scene.goal.scene_info['trainedCombination']['target']
+    assert scene.goal.scene_info['trainedSize']['target']
+    assert scene.goal.scene_info['uncontained']['target']
+    assert scene.goal.scene_info['untrainedShape']['target']
 
-    assert scene.goal['sceneInfo']['count']['all'] == 1
-    assert scene.goal['sceneInfo']['count']['target'] == 1
+    assert scene.goal.scene_info['count']['all'] == 1
+    assert scene.goal.scene_info['count']['target'] == 1
 
 
 def test_Hypercube_tags_target_untrained_size():
     hypercube = MockHypercube()
     target = create_tags_test_object_1()
     target['debug']['untrainedSize'] = True
-    scene = hypercube.get_scenes()[0]
+    scene = hypercube.generate_scenes()[0]
     print(f'{scene}')
     scene = update_scene_objects(scene, {'target': [target]})
 
-    assert set(scene.goal['objectsInfo']['all']) == {
+    assert set(scene.goal.objects_info['all']) == {
         'target',
         'tiny', 'light', 'blue', 'plastic', 'ball',
         'trained category', 'trained color', 'trained combination',
         'trained shape', 'untrained size', 'uncontained'
     }
-    assert set(scene.goal['objectsInfo']['target']) == {
+    assert set(scene.goal.objects_info['target']) == {
         'tiny', 'light', 'blue', 'plastic', 'ball',
         'trained category', 'trained color', 'trained combination',
         'trained shape', 'untrained size', 'uncontained'
     }
 
-    assert not scene.goal['sceneInfo']['contained']['target']
-    assert not scene.goal['sceneInfo']['trainedSize']['target']
-    assert not scene.goal['sceneInfo']['untrainedCategory']['target']
-    assert not scene.goal['sceneInfo']['untrainedColor']['target']
-    assert not scene.goal['sceneInfo']['untrainedCombination']['target']
-    assert not scene.goal['sceneInfo']['untrainedShape']['target']
+    assert not scene.goal.scene_info['contained']['target']
+    assert not scene.goal.scene_info['trainedSize']['target']
+    assert not scene.goal.scene_info['untrainedCategory']['target']
+    assert not scene.goal.scene_info['untrainedColor']['target']
+    assert not scene.goal.scene_info['untrainedCombination']['target']
+    assert not scene.goal.scene_info['untrainedShape']['target']
 
-    assert scene.goal['sceneInfo']['present']['target']
-    assert scene.goal['sceneInfo']['trainedCategory']['target']
-    assert scene.goal['sceneInfo']['trainedColor']['target']
-    assert scene.goal['sceneInfo']['trainedCombination']['target']
-    assert scene.goal['sceneInfo']['trainedShape']['target']
-    assert scene.goal['sceneInfo']['uncontained']['target']
-    assert scene.goal['sceneInfo']['untrainedSize']['target']
+    assert scene.goal.scene_info['present']['target']
+    assert scene.goal.scene_info['trainedCategory']['target']
+    assert scene.goal.scene_info['trainedColor']['target']
+    assert scene.goal.scene_info['trainedCombination']['target']
+    assert scene.goal.scene_info['trainedShape']['target']
+    assert scene.goal.scene_info['uncontained']['target']
+    assert scene.goal.scene_info['untrainedSize']['target']
 
-    assert scene.goal['sceneInfo']['count']['all'] == 1
-    assert scene.goal['sceneInfo']['count']['target'] == 1
+    assert scene.goal.scene_info['count']['all'] == 1
+    assert scene.goal.scene_info['count']['target'] == 1
 
 
 def test_Hypercube_tags_target_enclosed_untrained_everything():
@@ -616,39 +618,39 @@ def test_Hypercube_tags_target_enclosed_untrained_everything():
     target['debug']['untrainedColor'] = True
     target['debug']['untrainedShape'] = True
     target['debug']['untrainedSize'] = True
-    scene = hypercube.get_scenes()[0]
+    scene = hypercube.generate_scenes()[0]
     print(f'{scene}')
     scene = update_scene_objects(scene, {'target': [target]})
 
-    assert set(scene.goal['objectsInfo']['all']) == {
+    assert set(scene.goal.objects_info['all']) == {
         'target',
         'tiny', 'light', 'blue', 'plastic', 'ball',
         'untrained category', 'untrained color', 'untrained shape',
         'untrained size', 'contained', 'trained combination'
     }
-    assert set(scene.goal['objectsInfo']['target']) == {
+    assert set(scene.goal.objects_info['target']) == {
         'tiny', 'light', 'blue', 'plastic', 'ball',
         'untrained category', 'untrained color', 'untrained shape',
         'untrained size', 'contained', 'trained combination'
     }
 
-    assert not scene.goal['sceneInfo']['trainedCategory']['target']
-    assert not scene.goal['sceneInfo']['trainedColor']['target']
-    assert not scene.goal['sceneInfo']['trainedShape']['target']
-    assert not scene.goal['sceneInfo']['trainedSize']['target']
-    assert not scene.goal['sceneInfo']['untrainedCombination']['target']
-    assert not scene.goal['sceneInfo']['uncontained']['target']
+    assert not scene.goal.scene_info['trainedCategory']['target']
+    assert not scene.goal.scene_info['trainedColor']['target']
+    assert not scene.goal.scene_info['trainedShape']['target']
+    assert not scene.goal.scene_info['trainedSize']['target']
+    assert not scene.goal.scene_info['untrainedCombination']['target']
+    assert not scene.goal.scene_info['uncontained']['target']
 
-    assert scene.goal['sceneInfo']['contained']['target']
-    assert scene.goal['sceneInfo']['present']['target']
-    assert scene.goal['sceneInfo']['trainedCombination']['target']
-    assert scene.goal['sceneInfo']['untrainedCategory']['target']
-    assert scene.goal['sceneInfo']['untrainedColor']['target']
-    assert scene.goal['sceneInfo']['untrainedShape']['target']
-    assert scene.goal['sceneInfo']['untrainedSize']['target']
+    assert scene.goal.scene_info['contained']['target']
+    assert scene.goal.scene_info['present']['target']
+    assert scene.goal.scene_info['trainedCombination']['target']
+    assert scene.goal.scene_info['untrainedCategory']['target']
+    assert scene.goal.scene_info['untrainedColor']['target']
+    assert scene.goal.scene_info['untrainedShape']['target']
+    assert scene.goal.scene_info['untrainedSize']['target']
 
-    assert scene.goal['sceneInfo']['count']['all'] == 1
-    assert scene.goal['sceneInfo']['count']['target'] == 1
+    assert scene.goal.scene_info['count']['all'] == 1
+    assert scene.goal.scene_info['count']['target'] == 1
 
 
 def test_Hypercube_tags_obstacle_enclosed():
@@ -656,63 +658,63 @@ def test_Hypercube_tags_obstacle_enclosed():
     target = create_tags_test_object_1()
     obstacle = create_tags_test_object_2()
     obstacle['locationParent'] = 'parent'
-    scene = hypercube.get_scenes()[0]
+    scene = hypercube.generate_scenes()[0]
     print(f'{scene}')
     scene = update_scene_objects(
         scene,
         {'target': [target], 'obstacle': [obstacle]}
     )
 
-    assert set(scene.goal['objectsInfo']['all']) == {
+    assert set(scene.goal.objects_info['all']) == {
         'target', 'obstacle',
         'tiny', 'light', 'blue', 'plastic', 'ball',
         'medium', 'light', 'yellow', 'plastic', 'cube',
         'trained category', 'trained color', 'trained combination',
         'trained shape', 'trained size', 'contained', 'uncontained'
     }
-    assert set(scene.goal['objectsInfo']['obstacle']) == {
+    assert set(scene.goal.objects_info['obstacle']) == {
         'medium', 'light', 'yellow', 'plastic', 'cube',
         'trained category', 'trained color', 'trained combination',
         'trained shape', 'trained size', 'contained'
     }
-    assert set(scene.goal['objectsInfo']['target']) == {
+    assert set(scene.goal.objects_info['target']) == {
         'tiny', 'light', 'blue', 'plastic', 'ball',
         'trained category', 'trained color', 'trained combination',
         'trained shape', 'trained size', 'uncontained'
     }
 
-    assert not scene.goal['sceneInfo']['contained']['target']
-    assert not scene.goal['sceneInfo']['uncontained']['obstacle']
-    assert not scene.goal['sceneInfo']['untrainedCategory']['obstacle']
-    assert not scene.goal['sceneInfo']['untrainedCategory']['target']
-    assert not scene.goal['sceneInfo']['untrainedColor']['target']
-    assert not scene.goal['sceneInfo']['untrainedColor']['obstacle']
-    assert not scene.goal['sceneInfo']['untrainedColor']['target']
-    assert not scene.goal['sceneInfo']['untrainedCombination']['obstacle']
-    assert not scene.goal['sceneInfo']['untrainedCombination']['target']
-    assert not scene.goal['sceneInfo']['untrainedShape']['obstacle']
-    assert not scene.goal['sceneInfo']['untrainedShape']['target']
-    assert not scene.goal['sceneInfo']['untrainedSize']['obstacle']
-    assert not scene.goal['sceneInfo']['untrainedSize']['target']
+    assert not scene.goal.scene_info['contained']['target']
+    assert not scene.goal.scene_info['uncontained']['obstacle']
+    assert not scene.goal.scene_info['untrainedCategory']['obstacle']
+    assert not scene.goal.scene_info['untrainedCategory']['target']
+    assert not scene.goal.scene_info['untrainedColor']['target']
+    assert not scene.goal.scene_info['untrainedColor']['obstacle']
+    assert not scene.goal.scene_info['untrainedColor']['target']
+    assert not scene.goal.scene_info['untrainedCombination']['obstacle']
+    assert not scene.goal.scene_info['untrainedCombination']['target']
+    assert not scene.goal.scene_info['untrainedShape']['obstacle']
+    assert not scene.goal.scene_info['untrainedShape']['target']
+    assert not scene.goal.scene_info['untrainedSize']['obstacle']
+    assert not scene.goal.scene_info['untrainedSize']['target']
 
-    assert scene.goal['sceneInfo']['contained']['obstacle']
-    assert scene.goal['sceneInfo']['present']['obstacle']
-    assert scene.goal['sceneInfo']['present']['target']
-    assert scene.goal['sceneInfo']['trainedCategory']['obstacle']
-    assert scene.goal['sceneInfo']['trainedCategory']['target']
-    assert scene.goal['sceneInfo']['trainedColor']['obstacle']
-    assert scene.goal['sceneInfo']['trainedColor']['target']
-    assert scene.goal['sceneInfo']['trainedCombination']['obstacle']
-    assert scene.goal['sceneInfo']['trainedCombination']['target']
-    assert scene.goal['sceneInfo']['trainedShape']['obstacle']
-    assert scene.goal['sceneInfo']['trainedShape']['target']
-    assert scene.goal['sceneInfo']['trainedSize']['obstacle']
-    assert scene.goal['sceneInfo']['trainedSize']['target']
-    assert scene.goal['sceneInfo']['uncontained']['target']
+    assert scene.goal.scene_info['contained']['obstacle']
+    assert scene.goal.scene_info['present']['obstacle']
+    assert scene.goal.scene_info['present']['target']
+    assert scene.goal.scene_info['trainedCategory']['obstacle']
+    assert scene.goal.scene_info['trainedCategory']['target']
+    assert scene.goal.scene_info['trainedColor']['obstacle']
+    assert scene.goal.scene_info['trainedColor']['target']
+    assert scene.goal.scene_info['trainedCombination']['obstacle']
+    assert scene.goal.scene_info['trainedCombination']['target']
+    assert scene.goal.scene_info['trainedShape']['obstacle']
+    assert scene.goal.scene_info['trainedShape']['target']
+    assert scene.goal.scene_info['trainedSize']['obstacle']
+    assert scene.goal.scene_info['trainedSize']['target']
+    assert scene.goal.scene_info['uncontained']['target']
 
-    assert scene.goal['sceneInfo']['count']['all'] == 2
-    assert scene.goal['sceneInfo']['count']['obstacle'] == 1
-    assert scene.goal['sceneInfo']['count']['target'] == 1
+    assert scene.goal.scene_info['count']['all'] == 2
+    assert scene.goal.scene_info['count']['obstacle'] == 1
+    assert scene.goal.scene_info['count']['target'] == 1
 
 
 def test_Hypercube_tags_obstacle_untrained_category():
@@ -720,62 +722,62 @@ def test_Hypercube_tags_obstacle_untrained_category():
     target = create_tags_test_object_1()
     obstacle = create_tags_test_object_2()
     obstacle['debug']['untrainedCategory'] = True
-    scene = hypercube.get_scenes()[0]
+    scene = hypercube.generate_scenes()[0]
     print(f'{scene}')
     scene = update_scene_objects(
         scene,
         {'target': [target], 'obstacle': [obstacle]}
     )
 
-    assert set(scene.goal['objectsInfo']['all']) == {
+    assert set(scene.goal.objects_info['all']) == {
         'target', 'obstacle',
         'tiny', 'light', 'blue', 'plastic', 'ball',
         'medium', 'light', 'yellow', 'plastic', 'cube',
         'trained category', 'trained color', 'trained combination',
         'trained shape', 'trained size', 'uncontained', 'untrained category'
     }
-    assert set(scene.goal['objectsInfo']['obstacle']) == {
+    assert set(scene.goal.objects_info['obstacle']) == {
         'medium', 'light', 'yellow', 'plastic', 'cube',
         'untrained category', 'trained color', 'trained shape',
         'trained size', 'uncontained', 'trained combination'
     }
-    assert set(scene.goal['objectsInfo']['target']) == {
+    assert set(scene.goal.objects_info['target']) == {
         'tiny', 'light', 'blue', 'plastic', 'ball',
         'trained category', 'trained color', 'trained combination',
         'trained shape', 'trained size', 'uncontained'
     }
 
-    assert not scene.goal['sceneInfo']['contained']['obstacle']
-    assert not scene.goal['sceneInfo']['contained']['target']
-    assert not scene.goal['sceneInfo']['trainedCategory']['obstacle']
-    assert not scene.goal['sceneInfo']['untrainedCategory']['target']
-    assert not scene.goal['sceneInfo']['untrainedColor']['obstacle']
-    assert not scene.goal['sceneInfo']['untrainedColor']['target']
-    assert not scene.goal['sceneInfo']['untrainedCombination']['obstacle']
-    assert not scene.goal['sceneInfo']['untrainedCombination']['target']
-    assert not scene.goal['sceneInfo']['untrainedShape']['obstacle']
-    assert not scene.goal['sceneInfo']['untrainedShape']['target']
-    assert not scene.goal['sceneInfo']['untrainedSize']['obstacle']
-    assert not scene.goal['sceneInfo']['untrainedSize']['target']
+    assert not scene.goal.scene_info['contained']['obstacle']
+    assert not scene.goal.scene_info['contained']['target']
+    assert not scene.goal.scene_info['trainedCategory']['obstacle']
+    assert not scene.goal.scene_info['untrainedCategory']['target']
+    assert not scene.goal.scene_info['untrainedColor']['obstacle']
+    assert not scene.goal.scene_info['untrainedColor']['target']
+    assert not scene.goal.scene_info['untrainedCombination']['obstacle']
+    assert not scene.goal.scene_info['untrainedCombination']['target']
+    assert not scene.goal.scene_info['untrainedShape']['obstacle']
+    assert not scene.goal.scene_info['untrainedShape']['target']
+    assert not scene.goal.scene_info['untrainedSize']['obstacle']
+    assert not scene.goal.scene_info['untrainedSize']['target']
 
-    assert scene.goal['sceneInfo']['present']['obstacle']
-    assert scene.goal['sceneInfo']['present']['target']
-    assert scene.goal['sceneInfo']['trainedCategory']['target']
-    assert scene.goal['sceneInfo']['trainedColor']['obstacle']
-    assert scene.goal['sceneInfo']['trainedColor']['target']
-    assert scene.goal['sceneInfo']['trainedCombination']['obstacle']
-    assert scene.goal['sceneInfo']['trainedCombination']['target']
-    assert scene.goal['sceneInfo']['trainedShape']['obstacle']
-    assert scene.goal['sceneInfo']['trainedShape']['target']
-    assert scene.goal['sceneInfo']['trainedSize']['obstacle']
-    assert scene.goal['sceneInfo']['trainedSize']['target']
-    assert scene.goal['sceneInfo']['uncontained']['obstacle']
-    assert scene.goal['sceneInfo']['uncontained']['target']
-    assert scene.goal['sceneInfo']['untrainedCategory']['obstacle']
+    assert scene.goal.scene_info['present']['obstacle']
+    assert scene.goal.scene_info['present']['target']
+    assert scene.goal.scene_info['trainedCategory']['target']
+    assert scene.goal.scene_info['trainedColor']['obstacle']
+    assert scene.goal.scene_info['trainedColor']['target']
+    assert scene.goal.scene_info['trainedCombination']['obstacle']
+    assert scene.goal.scene_info['trainedCombination']['target']
+    assert scene.goal.scene_info['trainedShape']['obstacle']
+    assert scene.goal.scene_info['trainedShape']['target']
+    assert scene.goal.scene_info['trainedSize']['obstacle']
+    assert scene.goal.scene_info['trainedSize']['target']
+    assert scene.goal.scene_info['uncontained']['obstacle']
+    assert scene.goal.scene_info['uncontained']['target']
+    assert scene.goal.scene_info['untrainedCategory']['obstacle']
 
-    assert scene.goal['sceneInfo']['count']['all'] == 2
-    assert scene.goal['sceneInfo']['count']['obstacle'] == 1
-    assert scene.goal['sceneInfo']['count']['target'] == 1
+    assert scene.goal.scene_info['count']['all'] == 2
+    assert scene.goal.scene_info['count']['obstacle'] == 1
+    assert scene.goal.scene_info['count']['target'] == 1
 
 
 def test_Hypercube_tags_obstacle_untrained_color():
@@ -783,62 +785,62 @@ def test_Hypercube_tags_obstacle_untrained_color():
     target = create_tags_test_object_1()
     obstacle = create_tags_test_object_2()
     obstacle['debug']['untrainedColor'] = True
-    scene = hypercube.get_scenes()[0]
+    scene = hypercube.generate_scenes()[0]
     print(f'{scene}')
     scene = update_scene_objects(
         scene,
         {'target': [target], 'obstacle': [obstacle]}
     )
 
-    assert set(scene.goal['objectsInfo']['all']) == {
+    assert set(scene.goal.objects_info['all']) == {
         'target', 'obstacle',
         'tiny', 'light', 'blue', 'plastic', 'ball',
         'medium', 'light', 'yellow', 'plastic', 'cube',
         'trained category', 'trained color', 'trained combination',
         'trained shape', 'trained size', 'uncontained', 'untrained color',
     }
-    assert set(scene.goal['objectsInfo']['obstacle']) == {
+    assert set(scene.goal.objects_info['obstacle']) == {
         'medium', 'light', 'yellow', 'plastic', 'cube',
         'trained category', 'untrained color', 'trained shape', 'trained size',
         'uncontained', 'trained combination'
     }
-    assert set(scene.goal['objectsInfo']['target']) == {
+    assert set(scene.goal.objects_info['target']) == {
         'tiny', 'light', 'blue', 'plastic', 'ball',
         'trained category', 'trained color', 'trained combination',
         'trained shape', 'trained size', 'uncontained'
     }
 
-    assert not scene.goal['sceneInfo']['contained']['obstacle']
-    assert not scene.goal['sceneInfo']['contained']['target']
-    assert not scene.goal['sceneInfo']['trainedColor']['obstacle']
-    assert not scene.goal['sceneInfo']['untrainedCategory']['obstacle']
-    assert not scene.goal['sceneInfo']['untrainedCategory']['target']
-    assert not scene.goal['sceneInfo']['untrainedColor']['target']
-    assert not scene.goal['sceneInfo']['untrainedCombination']['obstacle']
-    assert not scene.goal['sceneInfo']['untrainedCombination']['target']
-    assert not scene.goal['sceneInfo']['untrainedShape']['obstacle']
-    assert not scene.goal['sceneInfo']['untrainedShape']['target']
-    assert not scene.goal['sceneInfo']['untrainedSize']['obstacle']
-    assert not scene.goal['sceneInfo']['untrainedSize']['target']
+    assert not scene.goal.scene_info['contained']['obstacle']
+    assert not scene.goal.scene_info['contained']['target']
+    assert not scene.goal.scene_info['trainedColor']['obstacle']
+    assert not scene.goal.scene_info['untrainedCategory']['obstacle']
+    assert not scene.goal.scene_info['untrainedCategory']['target']
+    assert not scene.goal.scene_info['untrainedColor']['target']
+    assert not scene.goal.scene_info['untrainedCombination']['obstacle']
+    assert not scene.goal.scene_info['untrainedCombination']['target']
+    assert not scene.goal.scene_info['untrainedShape']['obstacle']
+    assert not scene.goal.scene_info['untrainedShape']['target']
+    assert not scene.goal.scene_info['untrainedSize']['obstacle']
+    assert not scene.goal.scene_info['untrainedSize']['target']
 
-    assert scene.goal['sceneInfo']['present']['obstacle']
-    assert scene.goal['sceneInfo']['present']['target']
-    assert scene.goal['sceneInfo']['trainedCategory']['obstacle']
-    assert scene.goal['sceneInfo']['trainedCategory']['target']
-    assert scene.goal['sceneInfo']['trainedColor']['target']
-    assert scene.goal['sceneInfo']['trainedCombination']['obstacle']
-    assert scene.goal['sceneInfo']['trainedCombination']['target']
-    assert scene.goal['sceneInfo']['trainedShape']['obstacle']
-    assert scene.goal['sceneInfo']['trainedShape']['target']
-    assert scene.goal['sceneInfo']['trainedSize']['obstacle']
-    assert scene.goal['sceneInfo']['trainedSize']['target']
-    assert scene.goal['sceneInfo']['uncontained']['obstacle']
-    assert scene.goal['sceneInfo']['uncontained']['target']
-    assert scene.goal['sceneInfo']['untrainedColor']['obstacle']
+    assert scene.goal.scene_info['present']['obstacle']
+    assert scene.goal.scene_info['present']['target']
+    assert scene.goal.scene_info['trainedCategory']['obstacle']
+    assert scene.goal.scene_info['trainedCategory']['target']
+    assert scene.goal.scene_info['trainedColor']['target']
+    assert scene.goal.scene_info['trainedCombination']['obstacle']
+    assert scene.goal.scene_info['trainedCombination']['target']
+    assert scene.goal.scene_info['trainedShape']['obstacle']
+    assert scene.goal.scene_info['trainedShape']['target']
+    assert scene.goal.scene_info['trainedSize']['obstacle']
+    assert scene.goal.scene_info['trainedSize']['target']
+    assert scene.goal.scene_info['uncontained']['obstacle']
+    assert scene.goal.scene_info['uncontained']['target']
+    assert scene.goal.scene_info['untrainedColor']['obstacle']
 
-    assert scene.goal['sceneInfo']['count']['all'] == 2
-    assert scene.goal['sceneInfo']['count']['obstacle'] == 1
-    assert scene.goal['sceneInfo']['count']['target'] == 1
+    assert scene.goal.scene_info['count']['all'] == 2
+    assert scene.goal.scene_info['count']['obstacle'] == 1
+    assert scene.goal.scene_info['count']['target'] == 1
 
 
 def test_Hypercube_tags_obstacle_untrained_combination():
@@ -846,62 +848,62 @@ def test_Hypercube_tags_obstacle_untrained_combination():
     target = create_tags_test_object_1()
     obstacle = create_tags_test_object_2()
     obstacle['debug']['untrainedCombination'] = True
-    scene = hypercube.get_scenes()[0]
+    scene = hypercube.generate_scenes()[0]
     print(f'{scene}')
     scene = update_scene_objects(
         scene,
         {'target': [target], 'obstacle': [obstacle]}
     )
 
-    assert set(scene.goal['objectsInfo']['all']) == {
+    assert set(scene.goal.objects_info['all']) == {
         'target', 'obstacle',
         'tiny', 'light', 'blue', 'plastic', 'ball',
         'medium', 'light', 'yellow', 'plastic', 'cube',
         'trained category', 'trained color', 'trained combination',
         'trained shape', 'trained size', 'uncontained', 'untrained combination'
     }
-    assert set(scene.goal['objectsInfo']['obstacle']) == {
+    assert set(scene.goal.objects_info['obstacle']) == {
         'medium', 'light', 'yellow', 'plastic', 'cube',
         'trained category', 'trained color', 'untrained combination',
         'trained shape', 'trained size', 'uncontained'
     }
-    assert set(scene.goal['objectsInfo']['target']) == {
+    assert set(scene.goal.objects_info['target']) == {
         'tiny', 'light', 'blue', 'plastic', 'ball',
         'trained category', 'trained color', 'trained combination',
         'trained shape', 'trained size', 'uncontained'
     }
 
-    assert not scene.goal['sceneInfo']['contained']['obstacle']
-    assert not scene.goal['sceneInfo']['contained']['target']
-    assert not scene.goal['sceneInfo']['trainedCombination']['obstacle']
-    assert not scene.goal['sceneInfo']['untrainedCategory']['obstacle']
-    assert not scene.goal['sceneInfo']['untrainedCategory']['target']
-    assert not scene.goal['sceneInfo']['untrainedColor']['obstacle']
-    assert not scene.goal['sceneInfo']['untrainedColor']['target']
-    assert not scene.goal['sceneInfo']['untrainedCombination']['target']
-    assert not scene.goal['sceneInfo']['untrainedShape']['obstacle']
-    assert not scene.goal['sceneInfo']['untrainedShape']['target']
-    assert not scene.goal['sceneInfo']['untrainedSize']['obstacle']
-    assert not scene.goal['sceneInfo']['untrainedSize']['target']
+    assert not scene.goal.scene_info['contained']['obstacle']
+    assert not scene.goal.scene_info['contained']['target']
+    assert not scene.goal.scene_info['trainedCombination']['obstacle']
+    assert not scene.goal.scene_info['untrainedCategory']['obstacle']
+    assert not scene.goal.scene_info['untrainedCategory']['target']
+    assert not scene.goal.scene_info['untrainedColor']['obstacle']
+    assert not scene.goal.scene_info['untrainedColor']['target']
+    assert not scene.goal.scene_info['untrainedCombination']['target']
+    assert not scene.goal.scene_info['untrainedShape']['obstacle']
+    assert not scene.goal.scene_info['untrainedShape']['target']
+    assert not scene.goal.scene_info['untrainedSize']['obstacle']
+    assert not scene.goal.scene_info['untrainedSize']['target']
 
-    assert scene.goal['sceneInfo']['present']['obstacle']
-    assert scene.goal['sceneInfo']['present']['target']
-    assert scene.goal['sceneInfo']['trainedCategory']['obstacle']
-    assert scene.goal['sceneInfo']['trainedCategory']['target']
-    assert scene.goal['sceneInfo']['trainedColor']['obstacle']
-    assert scene.goal['sceneInfo']['trainedColor']['target']
-    assert scene.goal['sceneInfo']['trainedCombination']['target']
-    assert scene.goal['sceneInfo']['trainedShape']['obstacle']
-    assert scene.goal['sceneInfo']['trainedShape']['target']
-    assert scene.goal['sceneInfo']['trainedSize']['obstacle']
-    assert scene.goal['sceneInfo']['trainedSize']['target']
-    assert scene.goal['sceneInfo']['uncontained']['obstacle']
-    assert scene.goal['sceneInfo']['uncontained']['target']
-    assert scene.goal['sceneInfo']['untrainedCombination']['obstacle']
+    assert scene.goal.scene_info['present']['obstacle']
+    assert scene.goal.scene_info['present']['target']
+    assert scene.goal.scene_info['trainedCategory']['obstacle']
+    assert scene.goal.scene_info['trainedCategory']['target']
+    assert scene.goal.scene_info['trainedColor']['obstacle']
+    assert scene.goal.scene_info['trainedColor']['target']
+    assert scene.goal.scene_info['trainedCombination']['target']
+    assert scene.goal.scene_info['trainedShape']['obstacle']
+    assert scene.goal.scene_info['trainedShape']['target']
+    assert scene.goal.scene_info['trainedSize']['obstacle']
+    assert scene.goal.scene_info['trainedSize']['target']
+    assert scene.goal.scene_info['uncontained']['obstacle']
+    assert scene.goal.scene_info['uncontained']['target']
+    assert scene.goal.scene_info['untrainedCombination']['obstacle']
 
-    assert scene.goal['sceneInfo']['count']['all'] == 2
-    assert scene.goal['sceneInfo']['count']['obstacle'] == 1
-    assert scene.goal['sceneInfo']['count']['target'] == 1
+    assert scene.goal.scene_info['count']['all'] == 2
+    assert scene.goal.scene_info['count']['obstacle'] == 1
+    assert scene.goal.scene_info['count']['target'] == 1
 
 
 def test_Hypercube_tags_obstacle_untrained_shape():
@@ -909,14 +911,14 @@ def test_Hypercube_tags_obstacle_untrained_shape():
     target = create_tags_test_object_1()
     obstacle = create_tags_test_object_2()
     obstacle['debug']['untrainedShape'] = True
-    scene = hypercube.get_scenes()[0]
+    scene = hypercube.generate_scenes()[0]
     print(f'{scene}')
     scene = update_scene_objects(
         scene,
         {'target': [target], 'obstacle': [obstacle]}
     )
 
-    assert set(scene.goal['objectsInfo']['all']) == {
+    assert set(scene.goal.objects_info['all']) == {
         'target', 'obstacle',
         'tiny', 'light', 'blue', 'plastic', 'ball',
         'medium', 'light', 'yellow', 'plastic', 'cube',
@@ -924,48 +926,48 @@ def test_Hypercube_tags_obstacle_untrained_shape():
         'trained shape', 'trained size', 'uncontained',
         'untrained shape'
     }
-    assert set(scene.goal['objectsInfo']['obstacle']) == {
+    assert set(scene.goal.objects_info['obstacle']) == {
         'medium', 'light', 'yellow', 'plastic', 'cube',
         'trained category', 'trained color', 'untrained shape',
         'trained size', 'uncontained', 'trained combination'
     }
-    assert set(scene.goal['objectsInfo']['target']) == {
+    assert set(scene.goal.objects_info['target']) == {
         'tiny', 'light', 'blue', 'plastic', 'ball',
         'trained category', 'trained color', 'trained combination',
         'trained shape', 'trained size', 'uncontained'
     }
 
-    assert not scene.goal['sceneInfo']['contained']['obstacle']
-    assert not scene.goal['sceneInfo']['contained']['target']
-    assert not scene.goal['sceneInfo']['trainedShape']['obstacle']
-    assert not scene.goal['sceneInfo']['untrainedCategory']['obstacle']
-    assert not scene.goal['sceneInfo']['untrainedCategory']['target']
-    assert not scene.goal['sceneInfo']['untrainedColor']['obstacle']
-    assert not scene.goal['sceneInfo']['untrainedColor']['target']
-    assert not scene.goal['sceneInfo']['untrainedCombination']['obstacle']
-    assert not scene.goal['sceneInfo']['untrainedCombination']['target']
-    assert not scene.goal['sceneInfo']['untrainedShape']['target']
-    assert not scene.goal['sceneInfo']['untrainedSize']['obstacle']
-    assert not scene.goal['sceneInfo']['untrainedSize']['target']
+    assert not scene.goal.scene_info['contained']['obstacle']
+    assert not scene.goal.scene_info['contained']['target']
+    assert not scene.goal.scene_info['trainedShape']['obstacle']
+    assert not scene.goal.scene_info['untrainedCategory']['obstacle']
+    assert not scene.goal.scene_info['untrainedCategory']['target']
+    assert not scene.goal.scene_info['untrainedColor']['obstacle']
+    assert not scene.goal.scene_info['untrainedColor']['target']
+    assert not scene.goal.scene_info['untrainedCombination']['obstacle']
+    assert not scene.goal.scene_info['untrainedCombination']['target']
+    assert not scene.goal.scene_info['untrainedShape']['target']
+    assert not scene.goal.scene_info['untrainedSize']['obstacle']
+    assert not scene.goal.scene_info['untrainedSize']['target']
 
-    assert scene.goal['sceneInfo']['present']['obstacle']
-    assert scene.goal['sceneInfo']['present']['target']
-    assert scene.goal['sceneInfo']['trainedColor']['obstacle']
-    assert scene.goal['sceneInfo']['trainedCategory']['obstacle']
-    assert scene.goal['sceneInfo']['trainedCategory']['target']
-    assert scene.goal['sceneInfo']['trainedColor']['target']
-    assert scene.goal['sceneInfo']['trainedCombination']['obstacle']
-    assert scene.goal['sceneInfo']['trainedCombination']['target']
-    assert scene.goal['sceneInfo']['trainedShape']['target']
-    assert scene.goal['sceneInfo']['trainedSize']['obstacle']
-    assert scene.goal['sceneInfo']['trainedSize']['target']
-    assert scene.goal['sceneInfo']['uncontained']['obstacle']
-    assert scene.goal['sceneInfo']['uncontained']['target']
-    assert scene.goal['sceneInfo']['untrainedShape']['obstacle']
+    assert scene.goal.scene_info['present']['obstacle']
+    assert scene.goal.scene_info['present']['target']
+    assert scene.goal.scene_info['trainedColor']['obstacle']
+    assert scene.goal.scene_info['trainedCategory']['obstacle']
+    assert scene.goal.scene_info['trainedCategory']['target']
+    assert scene.goal.scene_info['trainedColor']['target']
+    assert scene.goal.scene_info['trainedCombination']['obstacle']
+    assert scene.goal.scene_info['trainedCombination']['target']
+    assert scene.goal.scene_info['trainedShape']['target']
+    assert scene.goal.scene_info['trainedSize']['obstacle']
+    assert scene.goal.scene_info['trainedSize']['target']
+    assert scene.goal.scene_info['uncontained']['obstacle']
+    assert scene.goal.scene_info['uncontained']['target']
+    assert scene.goal.scene_info['untrainedShape']['obstacle']
 
-    assert scene.goal['sceneInfo']['count']['all'] == 2
-    assert scene.goal['sceneInfo']['count']['obstacle'] == 1
-    assert scene.goal['sceneInfo']['count']['target'] == 1
+    assert scene.goal.scene_info['count']['all'] == 2
+    assert scene.goal.scene_info['count']['obstacle'] == 1
+    assert scene.goal.scene_info['count']['target'] == 1
 
 
 def test_Hypercube_tags_obstacle_untrained_size():
@@ -973,62 +975,62 @@ def test_Hypercube_tags_obstacle_untrained_size():
     target = create_tags_test_object_1()
     obstacle = create_tags_test_object_2()
     obstacle['debug']['untrainedSize'] = True
-    scene = hypercube.get_scenes()[0]
+    scene = hypercube.generate_scenes()[0]
     print(f'{scene}')
     scene = update_scene_objects(
         scene,
         {'target': [target], 'obstacle': [obstacle]}
     )
 
-    assert set(scene.goal['objectsInfo']['all']) == {
+    assert set(scene.goal.objects_info['all']) == {
         'target', 'obstacle',
         'tiny', 'light', 'blue', 'plastic', 'ball',
         'medium', 'light', 'yellow', 'plastic', 'cube',
         'trained category', 'trained color', 'trained combination',
         'trained shape', 'trained size', 'uncontained', 'untrained size'
     }
-    assert set(scene.goal['objectsInfo']['obstacle']) == {
+    assert set(scene.goal.objects_info['obstacle']) == {
         'medium', 'light', 'yellow', 'plastic', 'cube',
         'trained category', 'trained color', 'trained combination',
         'trained shape', 'untrained size', 'uncontained'
     }
-    assert set(scene.goal['objectsInfo']['target']) == {
+    assert set(scene.goal.objects_info['target']) == {
         'tiny', 'light', 'blue', 'plastic', 'ball',
         'trained category', 'trained color', 'trained combination',
         'trained shape', 'trained size', 'uncontained'
     }
 
-    assert not scene.goal['sceneInfo']['contained']['obstacle']
-    assert not scene.goal['sceneInfo']['contained']['target']
-    assert not scene.goal['sceneInfo']['trainedSize']['obstacle']
-    assert not scene.goal['sceneInfo']['untrainedCategory']['obstacle']
-    assert not scene.goal['sceneInfo']['untrainedCategory']['target']
-    assert not scene.goal['sceneInfo']['untrainedColor']['obstacle']
-    assert not scene.goal['sceneInfo']['untrainedColor']['target']
-    assert not scene.goal['sceneInfo']['untrainedCombination']['obstacle']
-    assert not scene.goal['sceneInfo']['untrainedCombination']['target']
-    assert not scene.goal['sceneInfo']['untrainedShape']['obstacle']
-    assert not scene.goal['sceneInfo']['untrainedShape']['target']
-    assert not scene.goal['sceneInfo']['untrainedSize']['target']
+    assert not scene.goal.scene_info['contained']['obstacle']
+    assert not scene.goal.scene_info['contained']['target']
+    assert not scene.goal.scene_info['trainedSize']['obstacle']
+    assert not scene.goal.scene_info['untrainedCategory']['obstacle']
+    assert not scene.goal.scene_info['untrainedCategory']['target']
+    assert not scene.goal.scene_info['untrainedColor']['obstacle']
+    assert not scene.goal.scene_info['untrainedColor']['target']
+    assert not scene.goal.scene_info['untrainedCombination']['obstacle']
+    assert not scene.goal.scene_info['untrainedCombination']['target']
+    assert not scene.goal.scene_info['untrainedShape']['obstacle']
+    assert not scene.goal.scene_info['untrainedShape']['target']
+    assert not scene.goal.scene_info['untrainedSize']['target']
 
-    assert scene.goal['sceneInfo']['present']['obstacle']
-    assert scene.goal['sceneInfo']['present']['target']
-    assert scene.goal['sceneInfo']['trainedCategory']['obstacle']
-    assert scene.goal['sceneInfo']['trainedCategory']['target']
-    assert scene.goal['sceneInfo']['trainedColor']['obstacle']
-    assert scene.goal['sceneInfo']['trainedColor']['target']
-    assert scene.goal['sceneInfo']['trainedCombination']['obstacle']
-    assert scene.goal['sceneInfo']['trainedCombination']['target']
-    assert scene.goal['sceneInfo']['trainedShape']['obstacle']
-    assert scene.goal['sceneInfo']['trainedShape']['target']
-    assert scene.goal['sceneInfo']['trainedSize']['target']
-    assert scene.goal['sceneInfo']['uncontained']['obstacle']
-    assert scene.goal['sceneInfo']['uncontained']['target']
-    assert scene.goal['sceneInfo']['untrainedSize']['obstacle']
+    assert scene.goal.scene_info['present']['obstacle']
+    assert scene.goal.scene_info['present']['target']
+    assert scene.goal.scene_info['trainedCategory']['obstacle']
+    assert scene.goal.scene_info['trainedCategory']['target']
+    assert scene.goal.scene_info['trainedColor']['obstacle']
+    assert scene.goal.scene_info['trainedColor']['target']
+    assert scene.goal.scene_info['trainedCombination']['obstacle']
+    assert scene.goal.scene_info['trainedCombination']['target']
+    assert scene.goal.scene_info['trainedShape']['obstacle']
+    assert scene.goal.scene_info['trainedShape']['target']
+    assert scene.goal.scene_info['trainedSize']['target']
+    assert scene.goal.scene_info['uncontained']['obstacle']
+    assert scene.goal.scene_info['uncontained']['target']
+    assert scene.goal.scene_info['untrainedSize']['obstacle']
 
-    assert scene.goal['sceneInfo']['count']['all'] == 2
-    assert scene.goal['sceneInfo']['count']['obstacle'] == 1
-    assert scene.goal['sceneInfo']['count']['target'] == 1
+    assert scene.goal.scene_info['count']['all'] == 2
+    assert scene.goal.scene_info['count']['obstacle'] == 1
+    assert scene.goal.scene_info['count']['target'] == 1
 
 
 def test_Hypercube_tags_obstacle_enclosed_untrained_everything():
@@ -1040,14 +1042,14 @@ def test_Hypercube_tags_obstacle_enclosed_untrained_everything():
     obstacle['debug']['untrainedColor'] = True
     obstacle['debug']['untrainedShape'] = True
     obstacle['debug']['untrainedSize'] = True
-    scene = hypercube.get_scenes()[0]
+    scene = hypercube.generate_scenes()[0]
     print(f'{scene}')
     scene = update_scene_objects(
         scene,
         {'target': [target], 'obstacle': [obstacle]}
     )
 
-    assert set(scene.goal['objectsInfo']['all']) == {
+    assert set(scene.goal.objects_info['all']) == {
         'target', 'obstacle',
         'tiny', 'light', 'blue', 'plastic', 'ball',
         'medium', 'light', 'yellow', 'plastic', 'cube',
@@ -1056,48 +1058,48 @@ def test_Hypercube_tags_obstacle_enclosed_untrained_everything():
         'untrained category', 'untrained color', 'untrained shape',
         'untrained size'
     }
-    assert set(scene.goal['objectsInfo']['obstacle']) == {
+    assert set(scene.goal.objects_info['obstacle']) == {
         'medium', 'light', 'yellow', 'plastic', 'cube',
         'untrained category', 'untrained color', 'untrained shape',
         'untrained size', 'contained', 'trained combination'
     }
-    assert set(scene.goal['objectsInfo']['target']) == {
+    assert set(scene.goal.objects_info['target']) == {
         'tiny', 'light', 'blue', 'plastic', 'ball',
         'trained category', 'trained color', 'trained combination',
         'trained shape', 'trained size', 'uncontained'
     }
 
-    assert not scene.goal['sceneInfo']['contained']['target']
-    assert not scene.goal['sceneInfo']['trainedCategory']['obstacle']
-    assert not scene.goal['sceneInfo']['trainedColor']['obstacle']
-    assert not scene.goal['sceneInfo']['trainedShape']['obstacle']
-    assert not scene.goal['sceneInfo']['trainedSize']['obstacle']
-    assert not scene.goal['sceneInfo']['uncontained']['obstacle']
-    assert not scene.goal['sceneInfo']['untrainedCategory']['target']
-    assert not scene.goal['sceneInfo']['untrainedColor']['target']
-    assert not scene.goal['sceneInfo']['untrainedCombination']['obstacle']
-    assert not scene.goal['sceneInfo']['untrainedCombination']['target']
-    assert not scene.goal['sceneInfo']['untrainedShape']['target']
-    assert not scene.goal['sceneInfo']['untrainedSize']['target']
+    assert not scene.goal.scene_info['contained']['target']
+    assert not scene.goal.scene_info['trainedCategory']['obstacle']
+    assert not scene.goal.scene_info['trainedColor']['obstacle']
+    assert not scene.goal.scene_info['trainedShape']['obstacle']
+    assert not scene.goal.scene_info['trainedSize']['obstacle']
+    assert not scene.goal.scene_info['uncontained']['obstacle']
+    assert not scene.goal.scene_info['untrainedCategory']['target']
+    assert not scene.goal.scene_info['untrainedColor']['target']
+    assert not scene.goal.scene_info['untrainedCombination']['obstacle']
+    assert not scene.goal.scene_info['untrainedCombination']['target']
+    assert not scene.goal.scene_info['untrainedShape']['target']
+    assert not scene.goal.scene_info['untrainedSize']['target']
 
-    assert scene.goal['sceneInfo']['contained']['obstacle']
-    assert scene.goal['sceneInfo']['present']['obstacle']
-    assert scene.goal['sceneInfo']['present']['target']
-    assert scene.goal['sceneInfo']['trainedCategory']['target']
-    assert scene.goal['sceneInfo']['trainedColor']['target']
-    assert scene.goal['sceneInfo']['trainedCombination']['obstacle']
-    assert scene.goal['sceneInfo']['trainedCombination']['target']
-    assert scene.goal['sceneInfo']['trainedShape']['target']
-    assert scene.goal['sceneInfo']['trainedSize']['target']
-    assert scene.goal['sceneInfo']['uncontained']['target']
-    assert scene.goal['sceneInfo']['untrainedCategory']['obstacle']
-    assert scene.goal['sceneInfo']['untrainedColor']['obstacle']
-    assert scene.goal['sceneInfo']['untrainedShape']['obstacle']
-    assert scene.goal['sceneInfo']['untrainedSize']['obstacle']
+    assert scene.goal.scene_info['contained']['obstacle']
+    assert scene.goal.scene_info['present']['obstacle']
+    assert scene.goal.scene_info['present']['target']
+    assert scene.goal.scene_info['trainedCategory']['target']
+    assert scene.goal.scene_info['trainedColor']['target']
+    assert scene.goal.scene_info['trainedCombination']['obstacle']
+    assert scene.goal.scene_info['trainedCombination']['target']
+    assert scene.goal.scene_info['trainedShape']['target']
+    assert scene.goal.scene_info['trainedSize']['target']
+    assert scene.goal.scene_info['uncontained']['target']
+    assert scene.goal.scene_info['untrainedCategory']['obstacle']
+    assert scene.goal.scene_info['untrainedColor']['obstacle']
+    assert scene.goal.scene_info['untrainedShape']['obstacle']
+    assert scene.goal.scene_info['untrainedSize']['obstacle']
 
-    assert scene.goal['sceneInfo']['count']['all'] == 2
-    assert scene.goal['sceneInfo']['count']['obstacle'] == 1
-    assert scene.goal['sceneInfo']['count']['target'] == 1
+    assert scene.goal.scene_info['count']['all'] == 2
+    assert scene.goal.scene_info['count']['obstacle'] == 1
+    assert scene.goal.scene_info['count']['target'] == 1
 
 
 def test_Hypercube_tags_target_obstacle_enclosed_untrained_everything():
@@ -1114,62 +1116,62 @@ def test_Hypercube_tags_target_obstacle_enclosed_untrained_everything():
     obstacle['debug']['untrainedColor'] = True
     obstacle['debug']['untrainedShape'] = True
     obstacle['debug']['untrainedSize'] = True
-    scene = hypercube.get_scenes()[0]
+    scene = hypercube.generate_scenes()[0]
     print(f'{scene}')
     scene = update_scene_objects(
         scene,
         {'target': [target], 'obstacle': [obstacle]}
     )
 
-    assert set(scene.goal['objectsInfo']['all']) == {
+    assert set(scene.goal.objects_info['all']) == {
         'target', 'obstacle',
         'tiny', 'light', 'blue', 'plastic', 'ball',
         'medium', 'light', 'yellow', 'plastic', 'cube',
         'untrained category', 'untrained color', 'untrained shape',
         'untrained size', 'contained', 'trained combination'
     }
-    assert set(scene.goal['objectsInfo']['obstacle']) == {
+    assert set(scene.goal.objects_info['obstacle']) == {
         'medium', 'light', 'yellow', 'plastic', 'cube',
         'untrained category', 'untrained color', 'untrained shape',
         'untrained size', 'contained', 'trained combination'
     }
-    assert set(scene.goal['objectsInfo']['target']) == {
+    assert set(scene.goal.objects_info['target']) == {
         'tiny', 'light', 'blue', 'plastic', 'ball',
         'untrained category', 'untrained color', 'untrained shape',
         'untrained size', 'contained', 'trained combination'
     }
 
-    assert not scene.goal['sceneInfo']['trainedCategory']['obstacle']
-    assert not scene.goal['sceneInfo']['trainedCategory']['target']
-    assert not scene.goal['sceneInfo']['trainedColor']['obstacle']
-    assert not scene.goal['sceneInfo']['trainedColor']['target']
-    assert not scene.goal['sceneInfo']['trainedShape']['obstacle']
-    assert not scene.goal['sceneInfo']['trainedShape']['target']
-    assert not scene.goal['sceneInfo']['trainedSize']['obstacle']
-    assert not scene.goal['sceneInfo']['trainedSize']['target']
-    assert not scene.goal['sceneInfo']['uncontained']['obstacle']
-    assert not scene.goal['sceneInfo']['uncontained']['target']
-    assert not scene.goal['sceneInfo']['untrainedCombination']['obstacle']
-    assert not scene.goal['sceneInfo']['untrainedCombination']['target']
+    assert not scene.goal.scene_info['trainedCategory']['obstacle']
+    assert not scene.goal.scene_info['trainedCategory']['target']
+    assert not scene.goal.scene_info['trainedColor']['obstacle']
+    assert not scene.goal.scene_info['trainedColor']['target']
+    assert not scene.goal.scene_info['trainedShape']['obstacle']
+    assert not scene.goal.scene_info['trainedShape']['target']
+    assert not scene.goal.scene_info['trainedSize']['obstacle']
+    assert not scene.goal.scene_info['trainedSize']['target']
+    assert not scene.goal.scene_info['uncontained']['obstacle']
+    assert not scene.goal.scene_info['uncontained']['target']
+    assert not scene.goal.scene_info['untrainedCombination']['obstacle']
+    assert not scene.goal.scene_info['untrainedCombination']['target']
 
-    assert scene.goal['sceneInfo']['contained']['obstacle']
-    assert scene.goal['sceneInfo']['contained']['target']
-    assert scene.goal['sceneInfo']['present']['obstacle']
-    assert scene.goal['sceneInfo']['present']['target']
-    assert scene.goal['sceneInfo']['trainedCombination']['obstacle']
-    assert scene.goal['sceneInfo']['trainedCombination']['target']
-    assert scene.goal['sceneInfo']['untrainedCategory']['obstacle']
-    assert scene.goal['sceneInfo']['untrainedCategory']['target']
-    assert scene.goal['sceneInfo']['untrainedColor']['obstacle']
-    assert scene.goal['sceneInfo']['untrainedColor']['target']
-    assert scene.goal['sceneInfo']['untrainedShape']['obstacle']
-    assert scene.goal['sceneInfo']['untrainedShape']['target']
-    assert scene.goal['sceneInfo']['untrainedSize']['obstacle']
-    assert scene.goal['sceneInfo']['untrainedSize']['target']
+    assert scene.goal.scene_info['contained']['obstacle']
+    assert scene.goal.scene_info['contained']['target']
+    assert scene.goal.scene_info['present']['obstacle']
+    assert scene.goal.scene_info['present']['target']
+    assert scene.goal.scene_info['trainedCombination']['obstacle']
+    assert scene.goal.scene_info['trainedCombination']['target']
+    assert scene.goal.scene_info['untrainedCategory']['obstacle']
+    assert scene.goal.scene_info['untrainedCategory']['target']
+    assert scene.goal.scene_info['untrainedColor']['obstacle']
+    assert scene.goal.scene_info['untrainedColor']['target']
+    assert scene.goal.scene_info['untrainedShape']['obstacle']
+    assert scene.goal.scene_info['untrainedShape']['target']
+    assert scene.goal.scene_info['untrainedSize']['obstacle']
+    assert scene.goal.scene_info['untrainedSize']['target']
 
-    assert scene.goal['sceneInfo']['count']['all'] == 2
-    assert scene.goal['sceneInfo']['count']['obstacle'] == 1
-    assert scene.goal['sceneInfo']['count']['target'] == 1
+    assert scene.goal.scene_info['count']['all'] == 2
+    assert scene.goal.scene_info['count']['obstacle'] == 1
+    assert scene.goal.scene_info['count']['target'] == 1
 
 
 def retrieve_object_list_from_data(object_data):

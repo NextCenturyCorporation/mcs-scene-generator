@@ -4,6 +4,9 @@ room_dimensions:
     y: 4
     z: 6
 
+# The performer agent is frozen until all the agents and turntables are finished moving.
+freeze_while_moving: [agent, turntables]
+
 # Generate a short, thin platform bisecting the room, and another platform on
 # the far wall of the room.
 shortcut_bisecting_platform:

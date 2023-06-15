@@ -14,6 +14,7 @@ from .definitions import (
     ImmutableObjectDefinition,
     ObjectDefinition
 )
+from .objects import SceneObject
 from .separating_axis_theorem import sat_entry
 
 MAX_TRIES = 50
@@ -44,6 +45,11 @@ FRONT_WALL_LABEL = "front_wall"
 BACK_WALL_LABEL = "back_wall"
 LEFT_WALL_LABEL = "left_wall"
 RIGHT_WALL_LABEL = "right_wall"
+
+FRONT_RIGHT_CORNER = "front_right"
+FRONT_LEFT_CORNER = "front_left"
+BACK_RIGHT_CORNER = "back_right"
+BACK_LEFT_CORNER = "back_left"
 
 ORIGIN = {
     "x": 0.0,
@@ -123,7 +129,6 @@ def __dict_to_vector(data: Dict[str, float]) -> Vector3d:
 
 
 def create_bounds(
-    # TODO MCS-697 MCS-698 Use Vector3d instead of Dict
     dimensions: Dict[str, float],
     offset: Optional[Dict[str, float]],
     position: Dict[str, float],
@@ -132,7 +137,7 @@ def create_bounds(
 ) -> ObjectBounds:
     """Creates and returns an ObjectBounds for the object with the given size
     properties in the given location."""
-    # TODO MCS-697 MCS-698 Use class props directly instead of converting
+    # TODO MCS-697 Use class props directly instead of converting
     dimensions = __dict_to_vector(dimensions)
     offset = __dict_to_vector(offset) if offset else Vector3d()
     position = __dict_to_vector(position)
@@ -202,8 +207,7 @@ def random_rotation() -> float:
 def calc_obj_pos(
     performer_position: Dict[str, float],
     bounds_list: List[ObjectBounds],
-    # TODO MCS-697 Define an ObjectInstance class extending ObjectDefinition.
-    definition_or_instance: Union[ObjectDefinition, Dict[str, Any]],
+    definition_or_instance: Union[ObjectDefinition, SceneObject],
     x_func: Callable[[Dict[str, float]], float] = random_position_x,
     z_func: Callable[[Dict[str, float]], float] = random_position_z,
     rotation_func: Callable[[], float] = None,
@@ -213,8 +217,8 @@ def calc_obj_pos(
     """Returns new object with rotation & position if we can place the
     object in the frame, None otherwise."""
 
-    # TODO MCS-697 Define an ObjectInstance class extending ObjectDefinition.
-    if isinstance(definition_or_instance, dict):
+    # TODO MCS-697 Use dot notation for SceneObject
+    if isinstance(definition_or_instance, (SceneObject, dict)):
         debug = definition_or_instance['debug']
         dimensions = debug['dimensions']
         offset = debug.get('offset', {'x': 0, 'z': 0})
@@ -313,8 +317,7 @@ def _get_visible_segment(
 
 def get_location_in_front_of_performer(
     performer_start: Dict[str, Dict[str, float]],
-    # TODO MCS-697 Define an ObjectInstance class extending ObjectDefinition.
-    target_definition_or_instance: Union[ObjectDefinition, Dict[str, Any]],
+    target_definition_or_instance: Union[ObjectDefinition, SceneObject],
     rotation_func: Callable[[], float] = random_rotation,
     room_dimensions: Dict[str, float] = None
 ) -> Optional[Dict[str, Any]]:
@@ -345,16 +348,15 @@ def get_location_in_front_of_performer(
 
 def get_location_in_back_of_performer(
     performer_start: Dict[str, Dict[str, float]],
-    # TODO MCS-697 Define an ObjectInstance class extending ObjectDefinition.
-    target_definition_or_instance: Union[ObjectDefinition, Dict[str, Any]],
+    target_definition_or_instance: Union[ObjectDefinition, SceneObject],
     rotation_func: Callable[[], float] = random_rotation,
     room_dimensions: Dict[str, float] = None
 ) -> Optional[Dict[str, Any]]:
     """Return a random location in the 180-degree-arc directly in back of the
     performer agent's starting position and rotation."""
 
-    # TODO MCS-697 Define an ObjectInstance class extending ObjectDefinition.
-    if isinstance(target_definition_or_instance, dict):
+    # TODO MCS-697 Use dot notation for SceneObject
+    if isinstance(target_definition_or_instance, (SceneObject, dict)):
         debug = target_definition_or_instance['debug']
         dimensions = debug['dimensions']
         offset = debug.get('offset', {'x': 0, 'z': 0})
@@ -451,8 +453,7 @@ def get_location_in_back_of_performer(
 
 def get_location_adjacent_to_performer(
     performer_start: Dict[str, Dict[str, float]],
-    # TODO MCS-697 Define an ObjectInstance class extending ObjectDefinition.
-    target_definition_or_instance: Union[ObjectDefinition, Dict[str, Any]],
+    target_definition_or_instance: Union[ObjectDefinition, SceneObject],
     distance: float, direction_rotation: int,
     room_dimensions: Dict[str, float] = None
 ) -> Optional[Dict[str, Any]]:
@@ -460,7 +461,7 @@ def get_location_adjacent_to_performer(
     placed in a direction based on the `direction_rotation` relative to the
     performers starting rotation.  The `distance` field is the dimensions edge
     to edge distance."""
-    if isinstance(target_definition_or_instance, dict):
+    if isinstance(target_definition_or_instance, (SceneObject, dict)):
         debug = target_definition_or_instance['debug']
         dimensions = debug['dimensions']
         offset = debug.get('offset', {'x': 0, 'z': 0})
@@ -506,9 +507,70 @@ def get_location_adjacent_to_performer(
     )
 
 
+def get_location_adjacent_to_corner(
+        performer_start: Dict[str, Dict[str, float]],
+        instance: SceneObject,
+        room_dimensions: Dict[str, Any],
+        distance_from_corner: Vector3d,
+        corner_label: str) -> Dict[str, Any]:
+    """returns an object with a new location near a specified corner
+    for a given room."""
+    dimensions = instance['debug']['dimensions']
+    offset_x = instance['debug']['offset']['x']
+    offset_z = instance['debug']['offset']['z']
+
+    def compute_xz(_room_dimensions: Dict[str, float]) -> Tuple[float, float]:
+        return get_adjacent_to_corner_xz(
+            corner_label, _room_dimensions, dimensions, offset_x, offset_z,
+            distance_from_corner.x, distance_from_corner.z)
+
+    return calc_obj_pos(
+        performer_start['position'],
+        [],
+        instance,
+        xz_func=compute_xz,
+        room_dimensions=(room_dimensions or DEFAULT_ROOM_DIMENSIONS)
+    )
+
+
+def get_adjacent_to_corner_xz(
+        corner_label, room_dimensions, object_dimensions,
+        offset_x=0, offset_z=0, distance_from_corner_x=0,
+        distance_from_corner_z=0):
+    """Return an x, z coordinate for a location adjacent to a corner."""
+
+    x_limit = room_dimensions['x'] / 2
+    z_limit = room_dimensions['z'] / 2
+
+    obj_dim_x = object_dimensions['x']
+    obj_dim_z = object_dimensions['z']
+
+    x_min = -x_limit + obj_dim_x / 2 + offset_x + abs(distance_from_corner_x)
+    x_max = x_limit - obj_dim_x / 2 - offset_x - abs(distance_from_corner_x)
+    z_min = -z_limit + obj_dim_z / 2 + offset_z + abs(distance_from_corner_z)
+    z_max = z_limit - obj_dim_z / 2 - offset_z - abs(distance_from_corner_z)
+
+    if corner_label == FRONT_LEFT_CORNER:
+        x = x_min
+        z = z_max
+    elif corner_label == FRONT_RIGHT_CORNER:
+        x = x_max
+        z = z_max
+    elif corner_label == BACK_LEFT_CORNER:
+        x = x_min
+        z = z_min
+    elif corner_label == BACK_RIGHT_CORNER:
+        x = x_max
+        z = z_min
+    else:
+        raise Exception(f"{corner_label} is not a valid corner label.")
+
+    return x, z
+
+
 def get_location_along_wall(
         performer_start: Dict[str, Dict[str, float]],
-        wall: str, instance: Dict[str, Any],
+        wall: str, instance: SceneObject,
         room_dimensions: Dict[str, Any]) -> Dict[str, Any]:
     """returns an object with a new location along a wall for a given room.
     The `wall` parameter must be either `back_wall`, `front_wall`,
@@ -567,10 +629,8 @@ def get_along_wall_xz(wall_label, room_dimensions, dimensions,
 
 
 def generate_location_adjacent_to(
-    # TODO MCS-697 Define an ObjectInstance class extending ObjectDefinition.
-    adjacent_instance: Dict[str, Any],
-    # TODO MCS-697 Define an ObjectInstance class extending ObjectDefinition.
-    relative_instance: Dict[str, Any],
+    adjacent_instance: SceneObject,
+    relative_instance: SceneObject,
     distance_x: float,
     distance_z: float,
     performer_start: Dict[str, Dict[str, float]],
@@ -662,23 +722,22 @@ def generate_location_adjacent_to(
 
 
 def generate_location_on_object(
-    # TODO MCS-697 Define an ObjectInstance class extending ObjectDefinition.
-    object_definition_or_instance: Union[ObjectDefinition, Dict[str, Any]],
-    # TODO MCS-697 Define an ObjectInstance class extending ObjectDefinition.
-    static_instance: Dict[str, Any],
+    object_definition_or_instance: Union[ObjectDefinition, SceneObject],
+    static_instance: SceneObject,
     performer_start: Dict[str, Dict[str, float]],
     bounds_list: List[ObjectBounds],
     room_dimensions: Dict[str, float] = None,
     center: bool = False,
     position_relative_to_start: Dict[str, float] = None
 ) -> Dict[str, Any]:
-    """Creates a location for the object to place it on top of the static object.
+    """Creates a location for the object to place it on top of the static
+    object.
 
     Returns:
         Dict[str, Any]: Location dict or None if it cannot be determined.
     """
-    # TODO MCS-697 Define an ObjectInstance class extending ObjectDefinition.
-    if isinstance(object_definition_or_instance, dict):
+    # TODO MCS-697 Use dot notation for SceneObject
+    if isinstance(object_definition_or_instance, (SceneObject, dict)):
         debug = object_definition_or_instance['debug']
         dimensions = debug['dimensions']
         offset = debug.get('offset', {'x': 0, 'y': 0, 'z': 0})
@@ -690,7 +749,7 @@ def generate_location_on_object(
         position_y = object_definition_or_instance.positionY
         rotation = vars(object_definition_or_instance.rotation)
 
-    if not isinstance(static_instance, dict):
+    if not isinstance(static_instance, (SceneObject, dict)):
         raise Exception(
             "Generate_location_on_object() must be passed a static instance")
 
@@ -706,7 +765,7 @@ def generate_location_on_object(
         if center:
             x, z = static_bounds.polygon_xz.centroid.coords[0]
 
-            if(position_relative_to_start is not None):
+            if (position_relative_to_start is not None):
                 relative_obj_dim = static_instance['debug']['dimensions']
                 buffer = max(dimensions['x'], dimensions['z']) / 2.0
 
@@ -793,10 +852,8 @@ def generate_location_on_object(
 
 
 def generate_location_in_line_with_object(
-    # TODO MCS-697 Define an ObjectInstance class extending ObjectDefinition.
-    object_definition_or_instance: Union[ObjectDefinition, Dict[str, Any]],
-    # TODO MCS-697 Define an ObjectInstance class extending ObjectDefinition.
-    static_definition_or_instance: Union[ObjectDefinition, Dict[str, Any]],
+    object_definition_or_instance: Union[ObjectDefinition, SceneObject],
+    static_definition_or_instance: Union[ObjectDefinition, SceneObject],
     static_location: Dict[str, Any],
     performer_start: Dict[str, Dict[str, float]],
     bounds_list: List[ObjectBounds],
@@ -816,11 +873,11 @@ def generate_location_in_line_with_object(
     object so that the performer cannot reach the static object. Assume only
     one bool flag is ever used."""
 
-    # TODO MCS-697 Define an ObjectInstance class extending ObjectDefinition.
-    if isinstance(object_definition_or_instance, dict):
+    # TODO MCS-697 Use dot notation for SceneObject
+    if isinstance(object_definition_or_instance, (SceneObject, dict)):
         debug = object_definition_or_instance['debug']
         dimensions = debug['dimensions']
-        offset = debug.get('offset', {'x': 0, 'z': 0})
+        offset = debug.get('offset', {'x': 0, 'y': 0, 'z': 0})
         position_y = debug.get('positionY', 0)
         rotation = debug.get('rotation', {'x': 0, 'y': 0, 'z': 0})
     else:
@@ -829,8 +886,8 @@ def generate_location_in_line_with_object(
         position_y = object_definition_or_instance.positionY
         rotation = vars(object_definition_or_instance.rotation)
 
-    # TODO MCS-697 Define an ObjectInstance class extending ObjectDefinition.
-    if isinstance(static_definition_or_instance, dict):
+    # TODO MCS-697 Use dot notation for SceneObject
+    if isinstance(static_definition_or_instance, (SceneObject, dict)):
         static_debug = static_definition_or_instance['debug']
         static_dimensions = static_debug['dimensions']
         static_offset = static_debug.get('offset', {'x': 0, 'y': 0, 'z': 0})
@@ -983,8 +1040,7 @@ def generate_location_in_line_with_object(
 
 
 def retrieve_obstacle_occluder_definition_list(
-    # TODO MCS-697 Define an ObjectInstance class extending ObjectDefinition.
-    target_definition_or_instance: Union[ObjectDefinition, Dict[str, Any]],
+    target_definition_or_instance: Union[ObjectDefinition, SceneObject],
     definition_dataset: DefinitionDataset,
     is_occluder: bool
 ) -> Optional[Tuple[ObjectDefinition, int]]:
@@ -994,8 +1050,8 @@ def retrieve_obstacle_occluder_definition_list(
     is returned. If is_occluder is True, each matching definition must be an
     occluder; otherwise, each matching definition must be an obstacle."""
 
-    # TODO MCS-697 Define an ObjectInstance class extending ObjectDefinition.
-    if isinstance(target_definition_or_instance, dict):
+    # TODO MCS-697 Use dot notation for SceneObject
+    if isinstance(target_definition_or_instance, (SceneObject, dict)):
         debug = target_definition_or_instance['debug']
         target_dimensions = debug['dimensions']
     else:
@@ -1048,7 +1104,7 @@ def retrieve_obstacle_occluder_definition_list(
 
 
 def get_bounding_polygon(
-    object_or_location: Dict[str, Any]
+    object_or_location: Union[SceneObject, Dict[str, Any]]
 ) -> geometry.Polygon:
     if 'boundingBox' in object_or_location:
         return object_or_location['boundingBox'].polygon_xz
@@ -1057,7 +1113,7 @@ def get_bounding_polygon(
         return show['boundingBox'].polygon_xz
 
 
-def are_adjacent(obj_a: Dict[str, Any], obj_b: Dict[str, Any],
+def are_adjacent(obj_a: SceneObject, obj_b: SceneObject,
                  distance: float = MAX_OBJECTS_ADJACENT_DISTANCE) -> bool:
     poly_a = get_bounding_polygon(obj_a)
     poly_b = get_bounding_polygon(obj_b)
@@ -1092,7 +1148,7 @@ def find_performer_bounds(
 
 
 def does_fully_obstruct_target(performer_start_position: Dict[str, float],
-                               target_or_location: Dict[str, Any],
+                               target_or_location: Union[SceneObject, dict],
                                object_poly: geometry.Polygon) -> bool:
     """Returns whether the given object_poly obstructs each line between the
     given performer_start_position and
@@ -1107,7 +1163,7 @@ def does_fully_obstruct_target(performer_start_position: Dict[str, float],
 
 
 def does_partly_obstruct_target(performer_start_position: Dict[str, float],
-                                target_or_location: Dict[str, Any],
+                                target_or_location: Union[SceneObject, dict],
                                 object_poly: geometry.Polygon) -> bool:
     """Returns whether the given object_poly obstructs one line between the
     given performer_start_position and
@@ -1122,7 +1178,7 @@ def does_partly_obstruct_target(performer_start_position: Dict[str, float],
 
 
 def _does_obstruct_target_helper(performer_start_position: Dict[str, float],
-                                 target_or_location: Dict[str, Any],
+                                 target_or_location: Union[SceneObject, dict],
                                  object_poly: geometry.Polygon,
                                  fully: bool = False) -> bool:
 
@@ -1197,24 +1253,34 @@ def validate_location_rect(
 
 
 def move_to_location(
-    object_instance: Dict[str, Any],
+    object_instance: SceneObject,
     object_location: Dict[str, Any]
-) -> Dict[str, Any]:
+) -> SceneObject:
     """Move the given object to the given location and return the object."""
     location = copy.deepcopy(object_location)
-    location['position']['x'] -= object_instance['debug']['offset']['x']
-    location['position']['z'] -= object_instance['debug']['offset']['z']
+    offset = {'x': 0, 'y': 0, 'z': 0}
+    standing_y = object_instance['shows'][0]['position']['y']
+
+    if ('offset' in object_instance['debug']):
+        offset = object_instance['debug']['offset']
+        location['position']['x'] -= object_instance['debug']['offset']['x']
+        location['position']['z'] -= object_instance['debug']['offset']['z']
+
+    if ('positionY' in object_instance['debug']):
+        standing_y = object_instance['debug']['positionY']
+
     original_rotation = object_instance['debug'].get('originalRotation', {})
     for axis in ['x', 'y', 'z']:
         location['rotation'][axis] += original_rotation.get(axis, 0)
     object_instance['shows'][0]['position'] = location['position']
     object_instance['shows'][0]['rotation'] = location['rotation']
+
     object_instance['shows'][0]['boundingBox'] = create_bounds(
         dimensions=object_instance['debug']['dimensions'],
-        offset=object_instance['debug']['offset'],
+        offset=offset,
         position=location['position'],
         rotation=location['rotation'],
-        standing_y=object_instance['debug']['positionY']
+        standing_y=standing_y
     )
     return object_instance
 
@@ -1487,7 +1553,7 @@ def get_position_distance_away_from_hooked_tool(
 
     raise Exception(
         f"Failed to find valid performer location "
-        f"with distance away: ({distance}) from object: ({tool['id']})"
+        f"with distance away: ({distance}) from object: ({tool['id']}) "
         f"because location is obstructed or outside of room bounds")
 
 
@@ -1518,11 +1584,13 @@ def get_valid_starts_near_position_on_perimeter(
         segment = ops.substring(
             line, i, i + seperation_between_spawn_points)
         mp = mp.union(segment.boundary)
-    x = [point.x for point in mp]
-    y = [point.y for point in mp]
+    x = [point.x for point in (mp.geoms if hasattr(mp, 'geoms') else mp)]
+    y = [point.y for point in (mp.geoms if hasattr(mp, 'geoms') else mp)]
     pos = Vector3d(x=0, y=0, z=0)
-    for _ in range(MAX_TRIES):
-        index = random.randint(0, len(x) - 1)
+    indexes = list(range(len(x)))
+    random.shuffle(indexes)
+    for i in range(len(indexes)):
+        index = indexes[i]
         pos.x = x[index]
         pos.z = y[index]
         """
@@ -1563,7 +1631,7 @@ def get_valid_starts_near_position_on_perimeter(
         """
         (valid, start_difference) = \
             distance_between_point_and_bounding_box_is_valid(
-                pos.x, pos.z, polygon, distance_away)
+            pos.x, pos.z, polygon, distance_away)
         if not valid:
             valid = shift_point_closer_to_polygon(
                 directions, start_difference, polygon, distance_away, pos)
@@ -1605,16 +1673,13 @@ def shift_point_closer_to_polygon(
         directions, start_difference, polygon, distance_away, pos):
     for direction in directions:
         shift_amount = start_difference
-        shift_amount = start_difference
         for _ in range(MAX_TRIES):
-            reverse_x = -direction.x * shift_amount
-            reverse_z = -direction.z * shift_amount
-            new_pos_x = pos.x + reverse_x
-            new_pos_z = pos.z + reverse_z
+            new_pos_x = pos.x + (direction.x * shift_amount)
+            new_pos_z = pos.z + (direction.z * shift_amount)
             (valid, difference_after_shift) = \
-                distance_between_point_and_bounding_box_is_valid(  # noqa
-                    new_pos_x, new_pos_z, polygon, distance_away)
-            shift_amount += 0.01
+                distance_between_point_and_bounding_box_is_valid(
+                new_pos_x, new_pos_z, polygon, distance_away)
+            shift_amount += difference_after_shift
             # the shift is in the wrong direction
             if difference_after_shift > start_difference:
                 break
@@ -1652,7 +1717,7 @@ def get_normalized_vector_from_two_points(
     return normalized_vector
 
 
-def is_above(above: Dict[str, Any], below: Dict[str, Any]) -> bool:
+def is_above(above: SceneObject, below: SceneObject) -> bool:
     """Returns whether the first given object instance is at least partially
     above the second."""
     above_bounds = above['shows'][0]['boundingBox']
@@ -1673,3 +1738,112 @@ def rotate_point_around_origin(origin_x, origin_z, point_x, point_z, rotation):
     result_z = origin_z + math.sin(rotation) * (point_x - origin_x) + \
         math.cos(rotation) * (point_z - origin_z)
     return result_x, result_z
+
+
+def _nearby_equidistant_locations_helper(
+    x_1: float,
+    z_1: float,
+    start_x: float,
+    start_z: float,
+    x_min: float,
+    x_max: float,
+    z_min: float,
+    z_max: float
+) -> Tuple[float, float]:
+    # Calculate the distance to this position.
+    d_1 = math.hypot(abs(x_1 - start_x), abs(z_1 - start_z))
+    # The second position should be far enough away from the first so that the
+    # performer agent cannot reach both objects from a single location.
+    circle = geometry.Point((x_1, z_1)).buffer(MAX_REACH_DISTANCE + 0.5)
+    # Use the points in this circle as options for the second position.
+    points = [
+        (round(x, 4), round(z, 4)) for x, z in list(circle.exterior.coords)
+        if x_min <= x <= x_max and z_min <= z <= z_max
+    ]
+    random.shuffle(points)
+    # Calculate the distances to all the other positions.
+    data = list(sorted([(
+        x,
+        z,
+        round(abs(d_1 - math.hypot(abs(x - start_x), abs(z - start_z))), 4)
+    ) for x, z in points], key=lambda i: i[2]))
+    # Choose the shortest distance.
+    nearest_point = data[0] if data else (None, None, None)
+    x_2, z_2, distance_diff = nearest_point
+    # Scale how near the two distances must be based on the distance.
+    near_enough = max(d_1 / 20.0, 0.5)
+    # If it's near enough to the first distance, then use this position.
+    if distance_diff is not None and distance_diff <= near_enough:
+        return x_2, z_2
+    return None, None
+
+
+def nearby_equidistant_locations(
+    start_x: float,
+    start_z: float,
+    x_min: float,
+    x_max: float,
+    z_min: float,
+    z_max: float,
+    iterator: int = 0
+) -> Tuple[float, float, float, float]:
+    """Returns two pairs of X/Z positions within the given min/max ranges that
+    are both "near" to each other (but far enough away so the performer agent
+    cannot reach both objects from a single location) and roughly "equidistant"
+    from the given start position (the two distances are within 0.5)."""
+    # Choose a random X/Z location.
+    x_1 = round(random.uniform(x_min, x_max), 4)
+    z_1 = round(random.uniform(z_min, z_max), 4)
+    # Find a corresponding nearby equidistant location.
+    x_2, z_2 = _nearby_equidistant_locations_helper(
+        x_1,
+        z_1,
+        start_x,
+        start_z,
+        x_min,
+        x_max,
+        z_min,
+        z_max
+    )
+    # If a second valid location exists, return both of them.
+    if x_2 is not None and z_2 is not None:
+        return x_1, z_1, x_2, z_2
+    # Otherwise try choosing a different location.
+    if iterator >= MAX_TRIES:
+        raise Exception(
+            f'Cannot find any nearby equidistant locations: start=({start_x}, '
+            f'{start_z}), x_range=({x_min}, {x_max}), z_range=({z_min}, '
+            f'{z_max}), point_1=({x_1}, {z_1})'
+        )
+    return nearby_equidistant_locations(
+        start_x, start_z, x_min, x_max, z_min, z_max, iterator + 1
+    )
+
+
+def calculate_aligned_position(
+    position_x: float,
+    position_z: float,
+    rotation_y: float,
+    size_1: float,
+    size_2: float,
+    separation: float,
+    axis: str = 'z',
+    offset_x: float = 0,
+    offset_z: float = 0
+) -> Tuple[float, float]:
+    """Calculate and return a position aligned with the given position and
+    rotation for two objects with the given sizes at the given separation
+    distance."""
+    distance = (size_1 + size_2) / 2.0 + separation
+    line = geometry.LineString([[0, 0], [distance, 0]])
+    rotation = -(rotation_y + (90 if axis == 'z' else 180))
+    line = affinity.rotate(line, rotation, origin=(0, 0))
+    line = affinity.translate(line, position_x, position_z)
+    if offset_x or offset_z:
+        offset = geometry.LineString([[0, 0], [offset_x, offset_z]])
+        offset = affinity.rotate(offset, -rotation_y, origin=(0, 0))
+        endpoint = offset.coords[1]
+        line = affinity.translate(line, endpoint[0], endpoint[1])
+    x = round(line.coords[1][0], 4)
+    z = round(line.coords[1][1], 4)
+    return x, z

@@ -2,14 +2,45 @@ import pytest
 from machine_common_sense.config_manager import Vector3d
 
 from generator.agents import (
+    FAMILIAR_AGENTS_FEMALE,
+    FAMILIAR_AGENTS_MALE,
+    NOVEL_AGENTS_FEMALE,
+    NOVEL_AGENTS_MALE,
+    WALL_MATERIALS_DARK_SKIN,
+    WALL_MATERIALS_LIGHT_SKIN,
+    WALL_MATERIALS_NO_AGENTS,
     add_agent_action,
     add_agent_pointing,
     create_agent,
-    create_blob
+    create_blob,
+    get_random_agent_settings
 )
 from generator.exceptions import SceneException
-from generator.materials import MaterialTuple
+from generator.materials import ROOM_WALL_MATERIALS, MaterialTuple
 from ideal_learning_env.agent_service import AgentSettings
+
+
+def test_agent_types():
+    assert len(FAMILIAR_AGENTS_FEMALE)
+    assert len(FAMILIAR_AGENTS_MALE)
+    assert len(NOVEL_AGENTS_FEMALE)
+    assert len(NOVEL_AGENTS_MALE)
+    for agent_type in FAMILIAR_AGENTS_FEMALE:
+        assert agent_type not in FAMILIAR_AGENTS_MALE
+        assert agent_type not in NOVEL_AGENTS_FEMALE
+        assert agent_type not in NOVEL_AGENTS_MALE
+    for agent_type in FAMILIAR_AGENTS_MALE:
+        assert agent_type not in FAMILIAR_AGENTS_FEMALE
+        assert agent_type not in NOVEL_AGENTS_FEMALE
+        assert agent_type not in NOVEL_AGENTS_MALE
+    for agent_type in NOVEL_AGENTS_FEMALE:
+        assert agent_type not in FAMILIAR_AGENTS_FEMALE
+        assert agent_type not in FAMILIAR_AGENTS_MALE
+        assert agent_type not in NOVEL_AGENTS_MALE
+    for agent_type in NOVEL_AGENTS_MALE:
+        assert agent_type not in FAMILIAR_AGENTS_FEMALE
+        assert agent_type not in FAMILIAR_AGENTS_MALE
+        assert agent_type not in NOVEL_AGENTS_FEMALE
 
 
 def test_create_agent():
@@ -153,7 +184,8 @@ def test_create_blob_simple():
         position_x=1,
         position_z=2,
         rotation_y=0,
-        material_tuple=MaterialTuple('test_material', ['test_color'])
+        material_tuple=MaterialTuple('test_material', ['test_color']),
+        height=0.9
     )
 
     assert blob['id'].startswith('blob')
@@ -221,7 +253,8 @@ def test_create_blob_type_with_standing_y():
         position_x=1,
         position_z=2,
         rotation_y=0,
-        material_tuple=MaterialTuple('test_material', ['test_color'])
+        material_tuple=MaterialTuple('test_material', ['test_color']),
+        height=0.9
     )
 
     assert blob['id'].startswith('blob')
@@ -246,3 +279,161 @@ def test_create_blob_type_with_standing_y():
     ]
     assert blob['shows'][0]['boundingBox'].min_y == 0
     assert blob['shows'][0]['boundingBox'].max_y == 0.9
+
+
+def test_create_blob_with_nose():
+    blob = create_blob(
+        type='blob_02',
+        position_x=1,
+        position_z=2,
+        rotation_y=0,
+        material_tuple=MaterialTuple('test_material', ['test_color']),
+        height=0.9,
+        with_nose=True
+    )
+
+    assert blob['id'].startswith('blob')
+    assert blob['type'] == 'blob_02_nose'
+    assert blob['physics'] is True
+    assert blob['mass']
+    assert blob['materials'] == ['test_material']
+    assert blob['debug']['color'] == ['test_color']
+    assert blob['shows'][0]['position'] == {'x': 1, 'y': 0.45, 'z': 2}
+    assert blob['shows'][0]['rotation'] == {'x': 0, 'y': 0, 'z': 0}
+    assert blob['shows'][0]['scale'] == {'x': 1.1538, 'y': 1.1538, 'z': 1.1538}
+    assert blob['debug']['dimensions'] == {
+        'x': 0.3808,
+        'y': 0.9,
+        'z': 0.3808
+    }
+    assert blob['shows'][0]['boundingBox'].box_xz == [
+        Vector3d(x=1.1904, y=0, z=2.1904),
+        Vector3d(x=1.1904, y=0, z=1.8096),
+        Vector3d(x=0.8096, y=0, z=1.8096),
+        Vector3d(x=0.8096, y=0, z=2.1904),
+    ]
+    assert blob['shows'][0]['boundingBox'].min_y == 0
+    assert blob['shows'][0]['boundingBox'].max_y == 0.9
+
+
+def verify_agent_settings(settings):
+    assert settings['chest'] is not None
+    assert settings['chestMaterial'] is not None
+    assert settings['eyes'] is not None
+    assert settings['feet'] is not None
+    assert settings['feetMaterial'] is not None
+    assert settings['hair'] is not None
+    assert settings['hairMaterial'] is not None
+    assert settings['hatMaterial'] is not None
+    assert settings['legs'] is not None
+    assert settings['legsMaterial'] is not None
+    assert settings['skin'] is not None
+    assert settings['hideHair'] in [True, False]
+    assert settings['isElder'] in [True, False]
+    assert settings['glasses'] == 0
+    assert settings['jacket'] == 0
+    assert settings['jacketMaterial'] == 0
+    assert settings['tie'] == 0
+    assert settings['tieMaterial'] == 0
+    assert settings['showBeard'] is False
+    assert settings['showGlasses'] is False
+    assert settings['showJacket'] is False
+    assert settings['showTie'] is False
+
+
+def test_get_random_agent_settings_male():
+    settings = get_random_agent_settings('agent_male_01')
+    verify_agent_settings(settings)
+
+
+def test_get_random_agent_settings_female():
+    settings = get_random_agent_settings('agent_female_01')
+    verify_agent_settings(settings)
+
+
+def test_get_random_agent_settings_male_teen():
+    settings = get_random_agent_settings('agent_male_08')
+    verify_agent_settings(settings)
+    assert settings['isElder'] is False
+
+
+def test_get_random_agent_settings_female_teen():
+    settings = get_random_agent_settings('agent_female_05')
+    verify_agent_settings(settings)
+    assert settings['isElder'] is False
+
+
+def test_get_random_agent_settings_short_sleeves_male():
+    settings = get_random_agent_settings(
+        'agent_male_01',
+        short_sleeves_only=True
+    )
+    assert settings['chest'] in [1, 3, 6]
+    verify_agent_settings(settings)
+
+
+def test_get_random_agent_settings_short_sleeves_female():
+    settings = get_random_agent_settings(
+        'agent_female_01',
+        short_sleeves_only=True
+    )
+    assert settings['chest'] in [0, 1, 3, 5, 8]
+    verify_agent_settings(settings)
+
+
+def test_get_random_agent_settings_custom_settings():
+    settings = get_random_agent_settings(
+        'agent_male_01',
+        settings={'chest': 1, 'skin': 3}
+    )
+    assert settings['chest'] == 1
+    assert settings['skin'] == 3
+    verify_agent_settings(settings)
+
+
+def test_get_random_agent_settings_custom_settings_override():
+    settings = get_random_agent_settings('agent_male_01', settings={
+        'glasses': 1,
+        'jacket': 1,
+        'jacketMaterial': 1,
+        'showBeard': True,
+        'showGlasses': True,
+        'showJacket': True,
+        'showTie': True,
+        'tie': 1,
+        'tieMaterial': 1
+    })
+    assert settings['chest'] is not None
+    assert settings['chestMaterial'] is not None
+    assert settings['eyes'] is not None
+    assert settings['feet'] is not None
+    assert settings['feetMaterial'] is not None
+    assert settings['hair'] is not None
+    assert settings['hairMaterial'] is not None
+    assert settings['hatMaterial'] is not None
+    assert settings['legs'] is not None
+    assert settings['legsMaterial'] is not None
+    assert settings['skin'] is not None
+    assert settings['hideHair'] in [True, False]
+    assert settings['isElder'] in [True, False]
+    assert settings['glasses'] == 1
+    assert settings['jacket'] == 1
+    assert settings['jacketMaterial'] == 1
+    assert settings['tie'] == 1
+    assert settings['tieMaterial'] == 1
+    assert settings['showBeard'] is True
+    assert settings['showGlasses'] is True
+    assert settings['showJacket'] is True
+    assert settings['showTie'] is True
+
+
+def test_wall_materials():
+    assert len(ROOM_WALL_MATERIALS)
+    assert len(WALL_MATERIALS_DARK_SKIN)
+    assert len(WALL_MATERIALS_LIGHT_SKIN)
+    for wall_material in ROOM_WALL_MATERIALS:
+        assert (
+            wall_material in WALL_MATERIALS_DARK_SKIN or
+            wall_material in WALL_MATERIALS_LIGHT_SKIN or
+            wall_material in WALL_MATERIALS_NO_AGENTS
+        )

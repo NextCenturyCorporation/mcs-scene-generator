@@ -45,6 +45,7 @@ placers:
           y: 7.305
           z: 0.75
       placed_object_rotation: [0, 180]
+      placed_object_scale: 0.75
       placed_object_shape:
           - container_symmetric_01
           - container_symmetric_02
@@ -67,7 +68,6 @@ placers:
           - container_asymmetric_07
           - container_asymmetric_08
           - container_asymmetric_09
-          - container_asymmetric_10
           - container_asymmetric_11
           - container_asymmetric_12
       # The placer activates on the first action/step, and deactivates
