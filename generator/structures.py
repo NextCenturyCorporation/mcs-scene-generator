@@ -1,6 +1,7 @@
 import copy
 import math
 import uuid
+from random import choice
 from typing import Dict, List, Tuple
 
 from machine_common_sense.config_manager import Vector3d
@@ -245,6 +246,11 @@ TURNTABLE_MOVEMENT_TEMPLATE = {
     }
 }
 
+DOOR_TYPES = [
+    'door_4',
+    'door_4b'
+]
+
 DOOR_TEMPLATE = {
     'id': 'door_',
     'type': 'door_4',
@@ -440,7 +446,7 @@ def create_interior_wall(
     wall['shows'][0]['scale'] = {
         'x': width,
         'y': height,
-        'z': thickness
+        'z': thickness or 0.1
     }
     return finalize_structural_object(
         [wall],
@@ -464,7 +470,10 @@ def create_l_occluder(
     flip: bool = False
 ) -> List[SceneObject]:
     """Create and return an instance of an L-shaped occluder. If flip is True,
-    the side part of the L will be on the left side (like a backwards L)."""
+    the side part of the L will be on the left side (like a backwards L).
+    Note that the given position_x and position_z will represent the center
+    point of the bounding box for both parts of the L occluder combined (both
+    the front and the side)."""
     occluder = [
         SceneObject(part) for part in copy.deepcopy(L_OCCLUDER_TEMPLATE)
     ]
@@ -700,6 +709,8 @@ def create_door(
             side_wall_scale_x=side_wall_scale_x)
 
     door = SceneObject(copy.deepcopy(DOOR_TEMPLATE))
+    door['type'] = choice(DOOR_TYPES)
+
     door['shows'][0]['position'] = {
         'x': position_x,
         'y': position_y,
@@ -883,7 +894,7 @@ def _get_door_wall_objects(
     # only add top wall if the scale is greater than 0
     if top_wall_scale_x > 0 and top_wall_scale_y > 0:
         objs.append(SceneObject({
-            "id": "wall_top",
+            "id": "wall_top_",
             "type": "cube",
             "mass": 10,
             "materials": [wall_material_str],
@@ -916,7 +927,7 @@ def _get_door_wall_objects(
         }))
     if side_wall_scale_x > 0:
         objs += [SceneObject({
-            "id": "wall_left",
+            "id": "wall_left_",
             "type": "cube",
             "mass": 10,
             "materials": [wall_material_str],
@@ -947,7 +958,7 @@ def _get_door_wall_objects(
                 }
             ]
         }), SceneObject({
-            "id": "wall_right",
+            "id": "wall_right_",
             "type": "cube",
             "mass": 10,
             "materials": [wall_material_str],

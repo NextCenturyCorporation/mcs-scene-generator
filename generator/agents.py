@@ -10,7 +10,7 @@ from machine_common_sense.config_manager import Vector3d
 
 from generator.exceptions import SceneException
 
-from . import materials
+from . import geometry, materials
 from .geometry import create_bounds
 from .objects import SceneObject
 
@@ -622,7 +622,8 @@ def create_agent(
     position_z: float,
     rotation_y: float,
     settings: dict = None,
-    position_y_modifier: float = 0
+    position_y_modifier: float = 0,
+    labels: str = ""
 ) -> SceneObject:
     """Create and return an instance of an agent without any actions."""
     agent = SceneObject(copy.deepcopy(AGENT_TEMPLATE))
@@ -648,6 +649,7 @@ def create_agent(
         rotation=agent['shows'][0]['rotation'],
         standing_y=0
     )
+    agent['labels'] = labels
     agent['debug']['dimensions'] = copy.deepcopy(AGENT_DIMENSIONS)
     if type in NOVEL_AGENTS:
         agent['debug']['untrainedShape'] = True
@@ -790,24 +792,118 @@ def add_agent_movement(
     }
 
 
-def add_agent_pointing(agent: SceneObject, step_begin: int) -> None:
+def add_agent_rotate_then_point(
+        agent: SceneObject,
+        step_begin: int,
+        target_object: SceneObject
+) -> None:
+    actions = agent.get('actions', [])
+    _check_steps(actions, step_begin, None, True)
+    agent_angle = agent['shows'][0]['rotation']['y']
+
+    object_position = target_object['shows'][0]['position']
+    if ('moveToPosition' in target_object['debug']):
+        if (int(target_object['debug']['moveToPositionBy']) <= step_begin):
+            object_position = target_object['debug']['moveToPosition']
+
+    pointing_step_begin = step_begin
+
+    rotation_amount = geometry.calculate_rotation_amount(
+        agent_angle,
+        Vector3d(**agent['shows'][0]['position']),
+        Vector3d(**object_position)
+    )
+
+    if rotation_amount:
+        steps = math.ceil(abs(rotation_amount) / 5)
+        step_size = (rotation_amount / steps)
+        step_end = step_begin + steps - 1
+        pointing_step_begin = step_end + 1
+
+        agent['rotates'] = [{
+            'stepBegin': step_begin,
+            'stepEnd': step_end,
+            'vector': {
+                'x': 0,
+                'y': step_size,
+                'z': 0
+            }
+        }]
+
+    add_agent_pointing(agent, pointing_step_begin, set_pointing_angle(
+        agent['shows'][0]['position']['y'],
+        target_object['shows'][0]['position']['y'])
+    )
+
+
+def add_agent_pointing(agent: SceneObject,
+                       step_begin: int,
+                       pointing_angle: int = 0
+                       ) -> None:
     """Adds a pointing animation (the agent points in whatever direction it's
     facing) that begins at the given step and is held indefinitely."""
 
     actions = agent.get('actions', [])
     _check_steps(actions, step_begin, None, True)
 
-    actions.extend([{
-        'id': 'Point_start_index_finger',
-        'stepBegin': step_begin,
-        'stepEnd': step_begin + POINT_START_FRAME_COUNT
-    }, {
-        'id': 'Point_hold_index_finger',
-        'stepBegin': step_begin + POINT_START_FRAME_COUNT,
-        'isLoopAnimation': True
-    }])
+    if pointing_angle == 0:
+        actions.extend([{
+            'id': 'Point_start_index_finger',
+            'stepBegin': step_begin,
+            'stepEnd': step_begin + POINT_START_FRAME_COUNT
+        }, {
+            'id': 'Point_hold_index_finger',
+            'stepBegin': step_begin + POINT_START_FRAME_COUNT,
+            'isLoopAnimation': True
+        }])
+    elif pointing_angle == 15:
+        actions.extend([{
+            'id': 'Point_start_index_finger_15',
+            'stepBegin': step_begin,
+            'stepEnd': step_begin + POINT_START_FRAME_COUNT
+        }, {
+            'id': 'Point_hold_index_finger_15',
+            'stepBegin': step_begin + POINT_START_FRAME_COUNT,
+            'isLoopAnimation': True
+        }])
+    elif pointing_angle == 30:
+        actions.extend([{
+            'id': 'Point_start_index_finger_30',
+            'stepBegin': step_begin,
+            'stepEnd': step_begin + POINT_START_FRAME_COUNT
+        }, {
+            'id': 'Point_hold_index_finger_30',
+            'stepBegin': step_begin + POINT_START_FRAME_COUNT,
+            'isLoopAnimation': True
+        }])
+    elif pointing_angle == 45:
+        actions.extend([{
+            'id': 'Point_start_index_finger_45',
+            'stepBegin': step_begin,
+            'stepEnd': step_begin + POINT_START_FRAME_COUNT
+        }, {
+            'id': 'Point_hold_index_finger_45',
+            'stepBegin': step_begin + POINT_START_FRAME_COUNT,
+            'isLoopAnimation': True
+        }])
 
     agent['actions'] = sorted(actions, key=lambda x: x['stepBegin'])
+
+
+def set_pointing_angle(agent_y: float, object_y: float = 0):
+    if object is None:
+        return 0
+    angle = 0
+    y_delta = agent_y - object_y
+
+    if y_delta >= 1.5:
+        angle = 45
+    elif y_delta >= 1.0:
+        angle = 30
+    elif y_delta >= 0.5:
+        angle = 15
+
+    return angle
 
 
 def estimate_move_step_length(begin: dict, end: dict) -> int:

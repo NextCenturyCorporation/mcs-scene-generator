@@ -76,3 +76,35 @@ def test_choose_distractor_definition():
             assert specific_objects.choose_distractor_definition(
                 [definition.shape]
             )
+
+
+def test_wide_obstacles():
+    dataset = specific_objects.get_obstacle_definition_dataset()
+    trained_dataset = dataset.filter_on_trained()
+    definitions = trained_dataset.definitions_unique_shape_scale()
+    definitions = sorted(definitions, key=lambda x: x.type)
+    options = []
+    for definition in definitions:
+        if definition.dimensions.x >= 1.5:
+            options.append((definition, definition.dimensions.x, False))
+        if definition.dimensions.z >= 1.5:
+            options.append((definition, definition.dimensions.z, True))
+    for option in options:
+        print(f'type={option[0].type} size={option[1]} sideways={option[2]}')
+    assert len(options)
+
+
+def test_wide_occluders():
+    dataset = specific_objects.get_occluder_definition_dataset()
+    trained_dataset = dataset.filter_on_trained()
+    definitions = trained_dataset.definitions_unique_shape_scale()
+    definitions = sorted(definitions, key=lambda x: x.type)
+    options = []
+    for definition in definitions:
+        if definition.dimensions.x >= 1.5:
+            options.append((definition, definition.dimensions.x, False))
+        if definition.dimensions.z >= 1.5:
+            options.append((definition, definition.dimensions.z, True))
+    for option in options:
+        print(f'type={option[0].type} size={option[1]} sideways={option[2]}')
+    assert len(options)

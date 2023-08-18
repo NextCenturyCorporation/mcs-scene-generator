@@ -474,6 +474,11 @@ object will be surrounded by lava. Default: False
 surrounding lava. Only used if `surrounded_by_lava` is set to True. In
 that case, default is 1, otherwise the value will be None. Note that
 this value will need to fit within room bounds, otherwise may error.
+- `surrounding_safe_zone`: (bool, or list of bools): If set to True
+and `surrounded_by_lava` is True, a buffer area (at least 0.5) will
+be set around the surrounding lava to ensure that it does not touch any
+other sections of lava or room walls/corners, and therefore allowing
+the performer to move around the surrounding lava's perimeter.
 - `rotate_cylinders` (bool): Whether or not to rotate cylindrical shapes
 along their x axis so that they are placed on their round sides (needed
 for collision scenes). This would only apply to these shapes: 'cylinder',
@@ -699,6 +704,19 @@ VectorFloatConfig dicts): The rotation of these objects in each scene. If
 given a list, a rotation will be randomly chosen for each object and each
 scene. Is overridden by the `keyword_location`. Default: random
 
+#### KnowledgeableAgentPairConfig
+
+Defines all of the configurable options for
+[knowledgeable_agent_pair]
+(#knowledgeable_agent_pair).
+- `position_1` (Vector3): One possible location for an agent to be.
+- `position_2` (Vector3): One possible location for an agent to be.
+- `pointing_step` (int): Starting step of pointing action.
+- `target_labels` (str): Label for the knowledgeable agent to use to find
+the goal.
+- `non_target_labels` (str): Label so the non-knowledgeable agent to use to
+find what it should be pointing to.
+
 #### LavaTargetToolConfig
 
 Defines details of the shortcut_lava_target_tool shortcut.  This shortcut
@@ -830,6 +848,30 @@ Example:
 label: container
 distance: 0.1
 ```
+
+#### PlacersWithDecoyConfig
+
+Defines the configureable options for [placers_with_decoy]
+(#placers_with_decoy)
+- `activation_step` List[int]: A list of steps that the placer/decoy can
+be activated.
+- `object_end_position_x` List[float]: A list of x positions that the
+placer/decoy can move to.
+- `decoy_y_modifier` float: The distance that the decoy should stop short
+so it doesn't go all the way to the ground. Should be the height of the
+target object.
+- `placed_object_position` RandomizableVectorFloat3d: Starting position of
+the placer/decoy.
+- `labels` RandomizableString: The labels that should be applied the to
+placer/decoy.
+- `move_object_y` RandomizableFloat: A modifier to the release height of
+the target object.
+- `move_object_z` RandomizableFloat: A modifier to the release depth of
+the target object.
+- `placed_object_labels` RandomizableString: Labels to be applied to the
+target object.
+- `placed_object_rotation` RandomizableFloat: Rotation to be applied to
+the target object during release.
 
 #### RandomStructuralObjectConfig
 
@@ -1149,6 +1191,16 @@ wall; only used if any `origin` is set to `top`.  Default is 0 to 359.
 - `wall_material` (string, or list of strings): Material of the occluder
 wall (cube)
 
+#### StructuralNotchedOccluderConfig
+
+- `height` (float): The overall height of the occluder.
+- `material`(string): The material the occluder is made of.
+- `position_z` (float): The occulders z position within the room.
+- `down_step` (int): The step the occluder will start to move down.
+- `up_step` (int): The step the occluder will start to return up.
+- `notch_height` (float): The height of the occluder notch.
+- `notch_width` (float): The width of the occluder notch.
+
 #### StructuralObjectMovementConfig
 
 Represents what movements the structural object will make. Currently
@@ -1236,8 +1288,11 @@ dict, or list of MinMaxInt dicts): Step on which the placer should release
 its held object. This number must be a step after the end of the placer's
 downward movement. Default: At the end of the placer's downward movement
 - `empty_placer` (bool, or list of bools): If True, the placer will not
-hold/drop an object. Cannot be used in combination with any of the
-placed_object_* config options. Default: False
+hold, drop, or move an object. Use 'placed_object_position' to set the
+placer's starting X/Z position if needed. Cannot be used in combination
+with any of the following config options: 'placed_object_labels',
+'placed_object_material', 'placed_object_rotation', 'placed_object_scale',
+'placed_object_shape'. Default: False
 - `end_height`: (float, or list of floats, or [MinMaxFloat](#MinMaxFloat)
 dict): Height at which the placer should release its held object.
 Alternatively, one can use the `end_height_relative_object_label`.
@@ -1254,19 +1309,26 @@ automatically generate a new object and assign it all the
 `placed_object_labels`. Default: False
 - `labels` (string, or list of strings): A label or labels to be assigned
 to this object. Always automatically assigned "placers"
-- `move_object` (bool): If True, a placer will be
-generated to pickup an object. Default: False
+- `move_object` (bool): If True, the placer will move the object on the X
+axis from its `placed_object_position` to `move_object_end_position`.
+Default: False
 - `move_object_end_position`: ([VectorFloatConfig](#VectorFloatConfig)
-dict, or list of VectorFloatConfig dicts): The placed object's end
-position after being moved by a placer
-- `move_object_y`: The placer will raise the object by this value
-    during the move object event.
-    Default: 0
-- `move_object_z`: The placer will move the object along the z-axis,
-    slide along the x-axis and move back.
-    Default: 1.5
-- `pickup_object` (bool): If True, a placer will be
-generated to pickup an object. Default: False
+dict, or list of VectorFloatConfig dicts): If `move_object` is True,
+the placer will move the object from its `placed_object_position` to the
+X position in `move_object_end_position`. Note that the Y and Z positions
+in `move_object_end_position` are ignored; the Y and Z positions set in
+`placed_object_position` are kept the same. (This option remains a Vector
+for backwards compatibility.)
+- `move_object_y`: If `move_object` is True, the placer will raise the
+object by this amount before moving it on the X/Z axes, and lower it by
+the same amount afterward. Default: `0`
+- `move_object_z`: If `move_object` is True, the placer will move the
+object by this amount in the -Z direction after raising it on the Y axis
+but before moving it on the X axis, and move it by the same amount again
+in the +Z direction after moving it on the X axis and before lowering it
+on the Y axis. Default: `1.5`
+- `pickup_object` (bool): If True, the placer will pickup the object.
+Default: False
 - `placed_object_above` (string, or list of strings): A label for an
 existing object in your configuration whose X/Z position will be used for
 this placer's (and the placed object's) starting position. Overrides
@@ -1603,6 +1665,19 @@ VectorFloatConfig dicts): The structure's position in the scene
 dict, or list of MinMaxFloat dicts): The structure's rotation in the scene
 - `width` (float, or list of floats, or [MinMaxFloat](#MinMaxFloat) dict,
 or list of MinMaxFloat dicts): The width of the wall.
+Default: Between 5% and 50% of the room's maximum dimensions.
+- `thickness` (float, or list of floats, or [MinMaxFloat](#MinMaxFloat)
+dict, or list of MinMaxFloat dicts): The thickness of the wall.
+Default: 0.1
+- `height` (float, or list of floats, or [MinMaxFloat](#MinMaxFloat)
+dict, or list of MinMaxFloat dicts): The height of the wall.
+Default: The room's height.
+- `same_material_as_room` (bool, or list of bools): Whether to use the same
+material as the room's walls. If true, will ignore any `material`
+configured on this wall. Default: false
+- `ignore_bounds` (bool, or list of bools): Whether to ignore the bounds of
+all other objects that have already been generated at the moment this wall
+is being generated. Default: false
 
 #### TeleportConfig
 
@@ -1684,6 +1759,15 @@ Default: TOOL_MATERIALS
 - `surrounded_by_lava` (bool, or list of bools): Whether or not this
 tool will be surrounded by lava. If True, width of lava will be 1.
 Default: False
+- `surrounding_lava_size`: (int, or list of ints): The width of the
+surrounding lava. Only used if `surrounded_by_lava` is set to True. In
+that case, default is 1, otherwise the value will be None. Note that
+this value will need to fit within room bounds, otherwise may error.
+- `surrounding_safe_zone`: (bool, or list of bools): If set to True
+and `surrounded_by_lava` is True, a buffer area (at least 0.5) will
+be set around the surrounding lava to ensure that it does not touch any
+other sections of lava or room walls/corners, and therefore allowing
+the performer to move around the surrounding lava's perimeter.
 
 #### TripleDoorConfig
 
@@ -1726,6 +1810,10 @@ will result in a forced choice by the performer.  Default: True
 or list of MinMaxInt dicts): Step number to start dropping the bisecting
 wall with doors.  If None or less than 1, the wall will start in position.
 Default: None
+- `wall_height` (float, or list of floats, or
+[MinMaxFloat](#MinMaxFloat) dict, or list of MinMaxFloat dicts): The
+height for the wall. The height for the center door will be -2 to
+account for being on top of the platform.
 - `wall_material` (string, or list of strings): The material or material
 type for the wall.
 
@@ -2207,6 +2295,40 @@ keyword_objects:
 
 Note: Creating too many random objects can increase the chance of failure.
 
+#### knowledgeable_agent_pair
+
+(bool, KnowledgeableAgentPairConfig): Config to create a pair of agents.
+One agent will be knowledgeable (will know where the goal is), the other
+won't know and will point into space.
+
+Simple Example:
+```
+knowledgeable_agent_pair:
+        position_1:
+            x: 1.0
+            y: 0
+            z: 0
+        position_2:
+            x: -1.0
+            y: 0
+            z: 0
+```
+
+Advanced Example
+Simple Example:
+```
+knowledgeable_agent_pair:
+    position_1:
+        x: 1.0
+        y: 0
+        z: 0
+    position_2:
+        x: -1.0
+        y: 0
+        z: 0
+    pointing_step: 10,
+    target_labels: target
+
 #### last_step
 
 (int, or list of ints): The last possible action step, or list of last
@@ -2543,6 +2665,44 @@ placers:
       placed_object_material: AI2-THOR/Materials/Plastics/BlueRubber
       placed_object_shape: ball
 
+```
+
+#### placers_with_decoy
+
+(bool): Creates one placer to move and the target object and another that
+is a decoy that pretends to move something. The placers have the order
+and location they will move to randomized.
+Default: False
+
+Simple Example:
+```
+placers_with_decoy: False
+```
+
+Advanced Example 1:
+```
+'placers_with_decoy': {
+        'activation_step': [13, 59],
+        'object_end_position_x': [2.0, -2.0],
+        'placed_object_position': VectorFloatConfig(x=1, y=0.501, z=2),
+        'decoy_y_modifier': 0.22
+    }
+```
+
+Advanced Example 2:
+```
+placers_with_decoy:
+    'placers_with_decoy': {
+        'activation_step': [13, 59],
+        'object_end_position_x': [2.0, -2.0],
+        'labels': 'target_placers',
+        'move_object_y': 0,
+        'move_object_z': 0,
+        'placed_object_labels': 'target',
+        'placed_object_position': VectorFloatConfig(x=1, y=0.501, z=2),
+        'placed_object_rotation': 0.0,
+        'decoy_y_modifier': 0.22
+    }
 ```
 
 #### random_structural_objects
@@ -3192,6 +3352,34 @@ structural_moving_occluders:
   repeat_movement: true
   repeat_interval: 5
   rotation_y: 90
+```
+
+#### structural_notched_occluders
+
+([StructuralNotchedOccluderConfig](#StructuralNotchedOccluderConfig), or
+list of [StructuralNotchedOccluderConfig](#StructuralNotchedOccluderConfig)
+dict) --
+Occluders made of 3 cube. Formed with a notch in the middle to leave space
+for a platform to pass under.
+
+Simple Example:
+```
+structural_notched_occluders:
+    num: 1
+```
+
+Advanced Example
+```
+structural_notched_occluders:
+    num: 1
+    labels: [test_label]
+    material: AI2-THOR/Materials/Metals/BrushedAluminum_Blue
+    height: 2
+    position_z: 2
+    down_step: 6
+    up_step: 61
+    notch_width: 2
+    notch_height: 2
 ```
 
 #### structural_occluding_walls

@@ -5,6 +5,7 @@ from machine_common_sense.config_manager import Goal, Vector3d
 
 from generator import ObjectBounds, Scene
 from generator.base_objects import create_soccer_ball
+from generator.geometry import calculate_rotations
 from generator.instances import instantiate_object
 from ideal_learning_env.agent_component import SpecificAgentComponent
 from ideal_learning_env.defs import TARGET_LABEL
@@ -56,6 +57,47 @@ def prior_passive_scene(last_step: int = None):
     if last_step:
         scene.goal.last_step = last_step
     return scene
+
+
+def check_rotation(agent, object):
+    a_steps, a_step_size, a_shift = 0, 0, 0
+    object_position = object['shows'][0]['position']
+    if ('rotates' in agent):
+        a_steps = agent['rotates'][0]['stepEnd'] - \
+            agent['rotates'][0]['stepBegin'] + 1
+        a_step_size = agent['rotates'][0]['vector']['y']
+        a_shift = a_step_size * a_steps
+
+        if ('moveToPosition' in object['debug']):
+            if (int(object['debug']['moveToPositionBy']) <=
+                    agent['rotates'][0]['stepBegin']):
+                object_position = object['debug']['moveToPosition']
+
+    else:
+        a_shift = 0
+        a_step_size = 0
+        a_steps = 0
+
+    _, target_rotation = calculate_rotations(
+        Vector3d(**agent['shows'][0]['position']),
+        Vector3d(**object_position),
+        True
+    )
+
+    curr_rotation = round(agent['shows'][0]['rotation']['y'], 0)
+    target_rotation = round(target_rotation, 0)
+    a_shift = round(a_shift, 0)
+
+    if (a_shift > 0):
+        # Clockwise rotation
+        return (curr_rotation + a_shift % 360) == (target_rotation)
+    elif (a_shift < 0):
+        # Counter-Clockwise rotation
+        # Negative angles make this complicated.
+        if (abs(a_shift) < abs(curr_rotation)):
+            return (curr_rotation + a_shift) == target_rotation
+        else:
+            return ((curr_rotation + a_shift + 360) % 360 == target_rotation)
 
 
 def prior_scene_with_target(

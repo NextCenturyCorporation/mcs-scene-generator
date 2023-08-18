@@ -1955,18 +1955,14 @@ def test_specific_objects_separate_container_lid_placer():
     container_show = container['shows'][0]
     placer_show = placer['shows'][0]
     assert lid_show['position']['x'] == container_show['position']['x']
-    assert lid_show['position']['y'] == (
-        scene.room_dimensions.y +
-        container_show['position']['y'] + container_show['scale']['y']
-    )
+    max_y = scene.room_dimensions.y - lid['debug']['dimensions']['y']
+    assert (max_y - 0.5) <= lid_show['position']['y'] <= max_y
     assert lid_show['position']['z'] == container_show['position']['z']
     assert lid_show['rotation']['y'] == container_show['rotation']['y']
     assert lid_show['scale'] == container_show['scale']
     assert placer_show['position']['x'] == container_show['position']['x']
-    assert placer_show['position']['y'] == (
-        scene.room_dimensions.y + placer_show['scale']['y'] +
-        container['debug']['dimensions']['y'] + lid['debug']['dimensions']['y']
-    )
+    placer_max_y = max_y + placer_show['scale']['y']
+    assert (placer_max_y - 0.5) <= placer_show['position']['y'] <= placer_max_y
     assert placer_show['position']['z'] == container_show['position']['z']
 
     assert len(lid['moves']) == 1
@@ -2007,18 +2003,14 @@ def test_specific_objects_separate_container_lid_placer_after():
     container_show = container['shows'][0]
     placer_show = placer['shows'][0]
     assert lid_show['position']['x'] == container_show['position']['x']
-    assert lid_show['position']['y'] == (
-        scene.room_dimensions.y +
-        container_show['position']['y'] + container_show['scale']['y']
-    )
+    max_y = scene.room_dimensions.y - lid['debug']['dimensions']['y']
+    assert (max_y - 0.5) <= lid_show['position']['y'] <= max_y
     assert lid_show['position']['z'] == container_show['position']['z']
     assert lid_show['rotation']['y'] == container_show['rotation']['y']
     assert lid_show['scale'] == container_show['scale']
     assert placer_show['position']['x'] == container_show['position']['x']
-    assert placer_show['position']['y'] == (
-        scene.room_dimensions.y + placer_show['scale']['y'] +
-        container['debug']['dimensions']['y'] + lid['debug']['dimensions']['y']
-    )
+    placer_max_y = max_y + placer_show['scale']['y']
+    assert (placer_max_y - 0.5) <= placer_show['position']['y'] <= placer_max_y
     assert placer_show['position']['z'] == container_show['position']['z']
 
     assert len(lid['moves']) == 1

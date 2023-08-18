@@ -16,6 +16,15 @@ goal: null
 holes:
     - num: 0
 keyword_objects: null
+knowledgeable_agent_pair:
+        position_1:
+            x: 1.0
+            y: 0
+            z: 0
+        position_2:
+            x: -1.0
+            y: 0
+            z: 0
 last_step: null
 lava:
     - num: 0
@@ -31,6 +40,7 @@ performer_start_rotation: null
 performer_starts_near: null
 placers:
     - num: 0
+placers_with_decoy: False
 random_structural_objects: null
 restrict_open_doors: False
 restrict_open_objects: False
@@ -54,6 +64,8 @@ structural_droppers:
   num: 0
 structural_moving_occluders:
   num: 0
+structural_notched_occluders:
+    num: 1
 structural_occluding_walls:
   num: 0
 structural_platforms:

@@ -102,6 +102,7 @@ def _handle_delayed_actions(component_list, scene):
         # Swap the GlobalSettingsComponent to be after ShortcutComponent so
         # performer_look_at happens after any position change from
         # shortcut_component
+        component_list = component_list.copy()
         global_settings_component_index = component_list.index([
             c for c in component_list if
             isinstance(c, GlobalSettingsComponent)][0])

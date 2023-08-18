@@ -79,6 +79,22 @@ python ile.py -c ile_config.yaml -n 10 -p scene
 
 ### Latest Release Notes
 
+#### Release 1.10
+
+Changelog:
+- Added `ile_configs/interactive_knowledgeable_agents.yaml`
+- Added the `knowledgeable_agent_pair` option to generate a pair of knowledgeable and non-knowledgeable agents.
+- Added the `placers_with_decoy` option to generate a pair of placers, one of which being a decoy.
+- Added the `structural_notched_occluders` option to generate notched occluders (like in the Knowledgeable Agents task).
+- Added the `empty_placer` option to configure placers which don't hold, pick up, and/or move anything else.
+- Added the `surrounded_by_lava` and `surrounding_lava_size` options, previously only available for interactable objects, for configuring tools surrounded by lava.
+- Added the `surrounding_safe_zone` option for configuring safe zones around tools and interactable objects which are surrounded by lava.
+- Added the `wall_height` option for configuring triple door occluders.
+- Agents configured to point at an object now correctly rotate to face that object before starting to point.
+- Agents configured to point at an object positioned underneath them now point at a downward angle.
+- Agents configured to point at an object which is moved by a placer now point at that object's new position.
+- Doors may now have knobs on the right side and open to the left.
+
 #### Release 1.9
 
 Changelog:
@@ -437,10 +453,11 @@ Eval 7 Tasks:
 | Eval 7 Task | MCS Core Domains | Example Config Files |
 | --- | --- | --- |
 | Hidden Set Rotation (Interactive) | O1, O4, P5 | [interactive_hidden_set_rotation.yaml](./ile_configs/interactive_hidden_set_rotation.yaml) |
-| Knowledgeable Agents (Interactive) | TODO | TODO |
+| Knowledgeable Agents (Interactive) | TODO | [interactive_knowledgeable_agents.yaml](./ile_configs/interactive_knowledgeable_agents.yaml) |
 | Multi-Tool-Use (Interactive) | O5 | [interactive_multi_tool_use.yaml](./ile_configs/interactive_multi_tool_use.yaml) |
 
 - [interactive_hidden_set_rotation.yaml](./ile_configs/interactive_hidden_set_rotation.yaml) Generates scenes similar to the interactive hidden set rotation eval tasks: start in a room with one or more identical containers positioned on top of a turntable (giant cog); a soccer ball retrieval target is placed inside a container; lids are placed on all containers; a giant "tube occluder" occludes the turntable and containers while the turntable rotates between 90 and 360 degrees (alternatively, the performer agent is forced to move around the turntable between 90 and 360 degrees).
+- [interactive_knowledgeable_agents.yaml](./ile_configs/interactive_knowledgeable_agents.yaml) Generates scenes similar to the interactive knowledgeable agents eval tasks: start in a room with platforms, two containers, two agents, and a soccer ball retrieval target; one agent is looking at the containers (knowledgeable), and the other is not (non-knowledgeable); an occluder comes down, and then two placers come down, moving the soccer ball into one of the two containers; the knowledgeable agent points at the container holding the soccer ball, and the non-knowledgeable agents points at a random container.
 - [interactive_multi_tool_use.yaml](./ile_configs/interactive_multi_tool_use.yaml) Generates scenes similar to the interactive multi tool use eval tasks: a soccer ball retrieval target starts in a corner of the room and surrounded by lava; a hooked tool starts in the middle of the room and surrounded by lava; a rectangular tool starts somewhere in the room; you must first use the rectangular tool to push the hooked tool out from the lava, then use the hooked tool to pull the soccer ball out from the lava.
 
 ## Scene Validation

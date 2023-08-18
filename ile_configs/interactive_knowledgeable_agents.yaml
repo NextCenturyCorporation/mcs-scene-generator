@@ -1,0 +1,165 @@
+# Add a Retrieval goal with a soccer ball as the target object.
+goal:
+    category: retrieval
+    target:
+        shape: soccer_ball
+        scale: 1.0
+        # It starts on top of the platform bisecting the room.
+        position:
+            x: 0
+            y: 0.501
+            z: 0
+
+# Use a specific room size for this task.
+room_dimensions:
+    x: 6
+    y: 5
+    z: 9
+
+# Generate a short, thin platform bisecting the room, and two other platforms
+# on each end of the room, all with the same height and color/texture.
+# The performer agent starts on top of the bisecting platform.
+shortcut_bisecting_platform:
+    has_blocking_wall: false
+    is_short: true
+    is_thin: true
+    other_platforms:
+        - num: 1
+          position:
+              x: 0
+              y: 0
+              z: 2
+          rotation_y: 0
+          scale:
+              x: 6
+              y: 0.5
+              z: 1
+        - num: 1
+          position:
+              x: 0
+              y: 0
+              z: -4
+          rotation_y: 0
+          scale:
+              x: 6
+              y: 0.5
+              z: 1
+
+specific_interactable_objects:
+    # Generate two containers on either side of the bisecting platform with the
+    # same shape and scale. The target object will be placed into one of them.
+    - num: 1
+      labels: left_container
+      scale: 0.4
+      shape: separate_container
+      position:
+          x: -2.0
+          y: 0
+          z: 0
+      rotation:
+          x: 0
+          y: 0
+          z: 0
+      # The container's lid descends after the target_placers finish moving.
+      separate_lid_after: target_placers
+    - num: 1
+      labels: right_container
+      scale: 0.4
+      shape: separate_container
+      position:
+          x: 2.0
+          y: 0
+          z: 0
+      rotation:
+          x: 0
+          y: 0
+          z: 0
+      # The container's lid descends after the target_placers finish moving.
+      separate_lid_after: target_placers
+
+# Generate a notched occluder that comes down at the beginning of the scene to
+# hide the target object and the two containers, then goes back up after all
+# placers have finished moving. Note the occluder is short enough to see the
+# heads/faces of both agents.
+structural_notched_occluders:
+    - num: 1
+      height: 0.9
+      position_z: -0.5
+      down_step: 1
+      up_step: 151
+      notch_height: 0.5
+      notch_width: 0.5
+
+# Generate two placers that come down from the ceiling, appear to grab onto
+# the target object, carry it to one of the two containers, release it into
+# the container, and goes back up into the ceiling. One of the placers is a
+# decoy and does not actually grab onto the target object.
+placers_with_decoy:
+    # Each placer (decoy and non-decoy) will be randomly assigned an activation
+    # step and ending X position from the corresponding lists here.
+    activation_step: [13, 63]
+    labels: target_placers
+    # The target (soccer ball) will be released above one of the containers.
+    object_end_position_x: [2.0, -2.0]
+    placed_object_labels: target
+    placed_object_position:
+        x: 0
+        y: 0.501
+        z: 0
+    placed_object_rotation: 0
+    # The height of a scale 1 soccer ball.
+    decoy_y_modifier: 0.22
+    # Only move the target along the X axis.
+    move_object_y: 0
+    move_object_z: 0
+
+# Generate two agents, one of which is "knowledgeable", and one is not. The
+# knowledgeable agent starts looking at the target object and two containers.
+# The non-knowledgeable agent cannot see the target object or either container.
+# Both agents start pointing on the same step: the knowledgeable agent points
+# at the target object, and the non-knowledgeable agent points at one of the
+# two containers, chosen randomly.
+knowledgeable_agent_pair:
+    # Position for the 1st agent (either knowledgeable or non-knowledgeable).
+    position_1:
+        - x: -1.5
+          y: 0.51
+          z: 2
+        - x: -1.5
+          y: 0.01
+          z: 1
+    # Position for the 2nd agent (either knowledgeable or non-knowledgeable).
+    position_2:
+        - x: 1.5
+          y: 0.51
+          z: 2
+        - x: 1.5
+          y: 0.01
+          z: 1
+    pointing_step: 163
+    target_labels: target
+    non_target_labels: [left_container, right_container]
+
+# Generate a wall "facade" to ensure the room has the correct dimensions.
+structural_walls:
+    - num: 1
+      ignore_bounds: true
+      same_material_as_room: true
+      position:
+          x: 0
+          y: 0
+          z: 2.75
+      rotation_y: 0
+      width: 6
+      height: 5
+      thickness: 0.5
+
+# The performer agent is frozen until all objects/agents are finished moving.
+freeze_while_moving: [agent, notched_occluders, placers]
+
+# Override the defaults to avoid randomly generating any unnecessary objects.
+# Remove these lines if you want additional randomly generated objects.
+random_structural_objects:
+    - num: 0
+keyword_objects:
+    - num: 0

@@ -23,7 +23,11 @@ from generator import (
 )
 from generator.base_objects import LARGE_BLOCK_TOOLS_TO_DIMENSIONS
 from generator.materials import MaterialTuple
-from generator.mechanisms import CYLINDRICAL_SHAPES, create_placer
+from generator.mechanisms import (
+    CYLINDRICAL_SHAPES,
+    create_placer,
+    place_object
+)
 from generator.scene import Scene
 
 from .choosers import (
@@ -118,6 +122,15 @@ class ToolConfig(BaseFeatureConfig):
     - `surrounded_by_lava` (bool, or list of bools): Whether or not this
     tool will be surrounded by lava. If True, width of lava will be 1.
     Default: False
+    - `surrounding_lava_size`: (int, or list of ints): The width of the
+    surrounding lava. Only used if `surrounded_by_lava` is set to True. In
+    that case, default is 1, otherwise the value will be None. Note that
+    this value will need to fit within room bounds, otherwise may error.
+    - `surrounding_safe_zone`: (bool, or list of bools): If set to True
+    and `surrounded_by_lava` is True, a buffer area (at least 0.5) will
+    be set around the surrounding lava to ensure that it does not touch any
+    other sections of lava or room walls/corners, and therefore allowing
+    the performer to move around the surrounding lava's perimeter.
     """
     position: RandomizableVectorFloat3d = None
     rotation_y: RandomizableFloat = None
@@ -129,6 +142,8 @@ class ToolConfig(BaseFeatureConfig):
     tool_type: RandomizableString = None
     material: RandomizableString = None
     surrounded_by_lava: RandomizableBool = None
+    surrounding_lava_size: RandomizableInt = None
+    surrounding_safe_zone: RandomizableBool = None
 
 
 DEFAULT_TEMPLATE_TOOL = ToolConfig(
@@ -174,7 +189,9 @@ class ToolCreationService(BaseObjectCreationService):
         obj['debug']['labels'] = [self._get_type().lower()] + labels
 
         if (reconciled.surrounded_by_lava is True):
-            create_surrounding_lava_positions(scene, obj)
+            create_surrounding_lava_positions(
+                scene, obj, reconciled.surrounding_lava_size,
+                reconciled.surrounding_safe_zone)
 
         return obj
 
@@ -191,7 +208,22 @@ class ToolCreationService(BaseObjectCreationService):
                 source_template.surrounded_by_lava, list) else
             source_template.surrounded_by_lava)
 
-        reconciled.surrounded_by_lava = True if surrounded_by_lava else False
+        if (surrounded_by_lava is True):
+            reconciled.surrounded_by_lava = True
+
+            surrounding_safe_zone = (
+                random.choice(source_template.surrounding_safe_zone)
+                if isinstance(
+                    source_template.surrounding_safe_zone, list) else
+                source_template.surrounding_safe_zone)
+
+            reconciled.surrounding_safe_zone = surrounding_safe_zone
+
+            lava_size = (random.choice(source_template.surrounding_lava_size)
+                         if isinstance(source_template.surrounding_lava_size,
+                                       list) else
+                         source_template.surrounding_lava_size)
+            reconciled.surrounding_lava_size = lava_size if isinstance(lava_size, int) else 1  # noqa: E501
 
         if not source_template.shape and (
             reconciled.width or reconciled.length or reconciled.tool_type
@@ -368,6 +400,11 @@ class InteractableObjectConfig(BaseFeatureConfig):
     surrounding lava. Only used if `surrounded_by_lava` is set to True. In
     that case, default is 1, otherwise the value will be None. Note that
     this value will need to fit within room bounds, otherwise may error.
+    - `surrounding_safe_zone`: (bool, or list of bools): If set to True
+    and `surrounded_by_lava` is True, a buffer area (at least 0.5) will
+    be set around the surrounding lava to ensure that it does not touch any
+    other sections of lava or room walls/corners, and therefore allowing
+    the performer to move around the surrounding lava's perimeter.
     - `rotate_cylinders` (bool): Whether or not to rotate cylindrical shapes
     along their x axis so that they are placed on their round sides (needed
     for collision scenes). This would only apply to these shapes: 'cylinder',
@@ -445,6 +482,7 @@ class InteractableObjectConfig(BaseFeatureConfig):
     separate_lid_after: RandomizableString = None
     surrounded_by_lava: RandomizableBool = False
     surrounding_lava_size: RandomizableInt = None
+    surrounding_safe_zone: RandomizableBool = None
 
 
 @dataclass
@@ -540,6 +578,15 @@ class InteractableObjectCreationService(BaseObjectCreationService):
 
         if (surrounded_by_lava is True):
             reconciled.surrounded_by_lava = True
+
+            surrounding_safe_zone = (
+                random.choice(source_template.surrounding_safe_zone)
+                if isinstance(
+                    source_template.surrounding_safe_zone, list) else
+                source_template.surrounding_safe_zone)
+
+            reconciled.surrounding_safe_zone = surrounding_safe_zone
+
             lava_size = (random.choice(source_template.surrounding_lava_size)
                          if isinstance(source_template.surrounding_lava_size,
                                        list) else
@@ -571,7 +618,8 @@ class InteractableObjectCreationService(BaseObjectCreationService):
                         create_surrounding_lava_positions(
                             scene,
                             idl.instance,
-                            reconciled.surrounding_lava_size)
+                            reconciled.surrounding_lava_size,
+                            reconciled.surrounding_safe_zone)
                     return idl.instance
             except ILEException as e:
                 # If location can't be found, try again and therefore log
@@ -604,7 +652,8 @@ class InteractableObjectCreationService(BaseObjectCreationService):
                     if (reconciled.surrounded_by_lava is True):
                         create_surrounding_lava_positions(
                             scene, self.idl.instance,
-                            reconciled.surrounding_lava_size)
+                            reconciled.surrounding_lava_size,
+                            reconciled.surrounding_safe_zone)
                     return self.idl.instance
                 else:
                     msg = (f"Failed to create instance. template="
@@ -701,17 +750,33 @@ class InteractableObjectCreationService(BaseObjectCreationService):
     ) -> None:
         scene.debug['containsSeparateLids'] = True
         end_height = lid['shows'][0]['position']['y']
-        lid['shows'][0]['position']['y'] = end_height + scene.room_dimensions.y
+
+        # Give the lid a Y position slightly underneath the ceiling.
+        lid['shows'][0]['position']['y'] = (
+            scene.room_dimensions.y - lid['debug']['dimensions']['y'] - 0.25
+        )
+
+        # Add the movement to the lid. Adjust its Y position if neeeded.
+        place_object(lid, step_begin, end_height=end_height)
+
+        # The lidAttachment property will override these properties.
+        del lid['kinematic']
+        del lid['togglePhysics']
+
+        # Create the placer object.
         placer = create_placer(
             lid['shows'][0]['position'],
             lid['debug']['dimensions'],
             0,
             step_begin,
             end_height,
-            scene.room_dimensions.y)
-        lid['moves'] = [placer['moves'][0]]
+            scene.room_dimensions.y
+        )
+
+        # Set the placer data for the lid and container objects.
         lid['lidAttachment']['stepBegin'] = placer['moves'][0]['stepEnd']
         container['debug']['lidPlacerId'] = placer['id']
+
         scene.objects.append(placer)
         object_repo = ObjectRepository.get_instance()
         object_repo.add_to_labeled_objects(
@@ -914,7 +979,8 @@ def create_user_configured_interactable_object(
     return obj
 
 
-def create_surrounding_lava_positions(scene, instance, lava_size=1):
+def create_surrounding_lava_positions(scene, instance, lava_size=1,
+                                      has_safe_zone=False):
     x_island_dim, z_island_dim = get_lava_island_dimensions(instance)
 
     current_obj_pos = instance["shows"][0]["position"]
@@ -997,6 +1063,40 @@ def create_surrounding_lava_positions(scene, instance, lava_size=1):
         raise ILEException(
             'Cannot place surrounding lava around performer start.'
         )
+
+    # buffer zone only needed if has_safe_zone is True
+    if (has_safe_zone):
+        # use values -1/+1 around surrounding lava
+        x_buffer_vals = range(min_lava_x - 1, max_lava_x + 2)
+        z_buffer_vals = range(min_lava_z - 1, max_lava_z + 2)
+
+        for x_buffer in x_buffer_vals:
+            for z_buffer in z_buffer_vals:
+                if ((x_buffer <= max_lava_x and
+                     x_buffer >= min_lava_x) and
+                    (z_buffer <= max_lava_z and
+                        z_buffer >= min_lava_z)):
+                    continue
+
+                floor_section = Vector2dInt(x=x_buffer, z=z_buffer)
+
+                # only need to check room dimensions and scene.lava
+                # here, hence the empty list for bounds
+                valid, bb = validate_floor_position(
+                    scene_copy, floor_section,
+                    'lava', False, [])
+
+                if (valid is False):
+                    logger.debug(
+                        f'Not enough buffer area found around surrounding\n'
+                        f'lava section at position: '
+                        f'floor section: X = {x_buffer}, Z = {z_buffer}\n'
+                        f'room dimensions: {scene_copy.room_dimensions}\n'
+                    )
+                    raise ILEException(
+                        'Error placing surrounding lava around object '
+                        '(no surrounding safe zone).'
+                    )
 
     for x_value in x_range:
         for z_value in z_range:

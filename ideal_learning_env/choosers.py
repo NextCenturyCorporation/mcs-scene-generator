@@ -54,12 +54,12 @@ def choose_counts(
 
 def choose_position(
     position: RandomizableVectorFloat3d,
-    object_x: float = None,
-    object_z: float = None,
+    object_x: float = 0,
+    object_z: float = 0,
     room_x: float = None,
     room_y: float = None,
     room_z: float = None,
-    is_placer_obj: bool = False
+    not_platform: bool = False
 ) -> Vector3d:
     """Choose and return a random position for the given position config or,
     if it is null, a random object position within the room bounds."""
@@ -74,7 +74,7 @@ def choose_position(
         if room_x is not None:
             constrained_x = _constrain_position_x_z(pos.x, object_x, room_x)
         if room_y is not None:
-            constrained_y = _constrain_position_y(pos.y, room_y, is_placer_obj)
+            constrained_y = _constrain_position_y(pos.y, room_y, not_platform)
         if room_z is not None:
             constrained_z = _constrain_position_x_z(pos.z, object_z, room_z)
         constrained_position = VectorFloatConfig(
@@ -92,7 +92,7 @@ def _get_min_max_room_dimensions(room_dim, object_dim):
 
 def _constrain_position_x_z(
         position: RandomizableFloat = None,
-        object_dim: float = None,
+        object_dim: float = 0,
         room_dim: float = None):
     constrained_position = position
     if position is None:
@@ -133,14 +133,9 @@ def _constrain_position_x_z(
 
 def _constrain_position_y(
         position: RandomizableFloat = None,
-        room_dim: float = None, is_placer_obj: bool = False):
-    max_y = room_dim - geometry.PERFORMER_HEIGHT
-
-    # if placer object, just check against room dimensions (don't need to
-    # worry about performer being able to reach the top, since placer
-    # will come down anyway)
-    if is_placer_obj:
-        max_y = room_dim
+        room_dim: float = None, not_platform: bool = False):
+    # Make room for the performer agent to stand on top of platforms.
+    max_y = room_dim if not_platform else room_dim - geometry.PERFORMER_HEIGHT
 
     constrained_y = position
     if position is None:
@@ -190,7 +185,7 @@ def _constrain_float_list_y_to_room_height(
 
 def _constrain_float_list_to_room_dimension_x_z(
     pos: float = None,
-    object_dim: float = None,
+    object_dim: float = 0,
     room_dim: float = None
 ) -> float:
     min, max = _get_min_max_room_dimensions(room_dim, object_dim)
@@ -200,7 +195,7 @@ def _constrain_float_list_to_room_dimension_x_z(
 
 def _constrain_min_max_pos_to_room_dimensions_x_z(
     pos: MinMaxFloat = None,
-    object_dim: float = None,
+    object_dim: float = 0,
     room_dim: float = None
 ) -> MinMaxFloat:
     min, max = _get_min_max_room_dimensions(room_dim, object_dim)

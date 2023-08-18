@@ -47,7 +47,10 @@ from generator.intuitive_physics_util import (
     retrieve_off_screen_position_y
 )
 from generator.movements import BASE_MOVE_LIST, TOSS_MOVE_LIST
-from generator.occluders import occluder_gap_positioning
+from generator.occluders import (
+    create_notched_occluder,
+    occluder_gap_positioning
+)
 from generator.scene import PartitionFloor, Scene
 
 from .choosers import (
@@ -212,6 +215,7 @@ def _check_for_collisions(
         rotations or [VectorIntConfig(0, 0, 0)]
     )
     for position in all_positions:
+        position.y = position.y + definition.positionY
         for rotation in all_rotations:
             bounds = geometry.create_bounds(
                 vars(definition.dimensions),
@@ -346,8 +350,6 @@ class StructuralWallCreationService(
             source_template: StructuralWallConfig):
         """Creates a wall from the given template with
         specific values."""
-        room_height = (
-            scene.room_dimensions.y or geometry.DEFAULT_ROOM_DIMENSIONS['y'])
         if not self._material_tuple:
             self._material_tuple = choose_material_tuple_from_material(
                 reconciled.material
@@ -359,12 +361,13 @@ class StructuralWallCreationService(
             'rotation_y': reconciled.rotation_y,
             'material_tuple': self._material_tuple,
             'width': reconciled.width,
-            'height': room_height
+            'thickness': reconciled.thickness,
+            'height': reconciled.height
         }
 
         logger.trace(f'Creating interior wall:\nINPUT = {args}')
-        new_obj = structures.create_interior_wall(
-            **args)
+        new_obj = structures.create_interior_wall(**args)
+        new_obj['debug']['ignoreBounds'] = reconciled.ignore_bounds
         new_obj = _post_instance(
             scene, new_obj, reconciled, source_template, self._get_type())
         return new_obj
@@ -374,8 +377,11 @@ class StructuralWallCreationService(
             source_template
     ) -> StructuralWallConfig:
         reconciled = _handle_position_defaults(scene, reconciled)
+        configured_material = source_template.material
+        if reconciled.same_material_as_room:
+            configured_material = scene.room_materials.back
         self._material_tuple = _reconcile_material(
-            source_template.material,
+            configured_material,
             materials.ROOM_WALL_MATERIALS
         )
         reconciled.material = self._material_tuple.material
@@ -385,17 +391,32 @@ class StructuralWallCreationService(
             if reconciled.rotation_y is None else
             reconciled.rotation_y
         )
-        reconciled.position.y = 0
+        reconciled.position = choose_position(
+            reconciled.position,
+            room_x=scene.room_dimensions.x,
+            room_y=scene.room_dimensions.y,
+            room_z=scene.room_dimensions.z,
+            not_platform=True
+        )
         reconciled.width = (MinMaxFloat(
             max_room_dim * WALL_WIDTH_PERCENT_MIN,
             max_room_dim * WALL_WIDTH_PERCENT_MAX).convert_value()
             if reconciled.width is None else reconciled.width)
+        reconciled.height = reconciled.height or (
+            scene.room_dimensions.y or
+            geometry.DEFAULT_ROOM_DIMENSIONS['y']
+        )
         return reconciled
 
     def is_valid(self, scene, new_obj, bounds, try_num, retries):
         valid = (not is_wall_too_close(new_obj[0]))
         return valid and super().is_valid(
-            scene, new_obj, bounds, try_num, retries)
+            scene,
+            new_obj,
+            [] if new_obj[0].get('debug', {}).get('ignoreBounds') else bounds,
+            try_num,
+            retries
+        )
 
 
 class StructuralPlatformCreationService(
@@ -1854,79 +1875,89 @@ class StructuralPlacersCreationService(
         """Creates a placer from the given template with
         specific values."""
 
-        self._restriction_validation(
-            source_template, scene
-        )
-
         room_dim = scene.room_dimensions
-
-        idl = self.object_idl
-        geometry.move_to_location(idl.instance, {
-            'position': vars(reconciled.placed_object_position),
-            'rotation': vars(
-                VectorIntConfig(0, reconciled.placed_object_rotation, 0)
-            )
-        })
-
-        idl.instance['debug']['positionedBy'] = 'mechanism'
-        idl.instance['debug'][DEBUG_FINAL_POSITION_KEY] = True
-
         start_height = reconciled.placed_object_position.y
-        if (start_height - idl.instance['debug']['positionY']) <= 0:
-            if reconciled.pickup_object or reconciled.move_object:
-                start_height = 0
-            else:
-                start_height = room_dim.y
-
         max_height = room_dim.y
         last_step = scene.goal.last_step
-        instance = idl.instance
-        defn = idl.definition
 
-        args = {
-            'instance': instance,
+        # The object_idl is None if empty_placer is True
+        idl = self.object_idl
+        if idl:
+            geometry.move_to_location(idl.instance, {
+                'position': vars(reconciled.placed_object_position),
+                'rotation': vars(
+                    VectorIntConfig(0, reconciled.placed_object_rotation, 0)
+                )
+            })
+
+            idl.instance['debug']['positionedBy'] = 'mechanism'
+            idl.instance['debug'][DEBUG_FINAL_POSITION_KEY] = True
+
+            if (start_height - idl.instance['debug']['positionY']) <= 0:
+                if reconciled.pickup_object or reconciled.move_object:
+                    start_height = 0
+                else:
+                    start_height = room_dim.y
+
+        args_place = {
+            'instance': idl.instance if idl else None,
             'activation_step': reconciled.activation_step,
             'start_height': start_height,
-            'end_height': reconciled.end_height if not reconciled.pickup_object
-            else max_height,
+            'end_height': reconciled.end_height,
             'deactivation_step': reconciled.deactivation_step
         }
 
-        args_move_object = {
-            'instance': instance,
+        args_pickup = {
+            'instance': idl.instance if idl else None,
             'activation_step': reconciled.activation_step,
             'start_height': start_height,
-            'end_height': max_height,
-            'deactivation_step': reconciled.deactivation_step,
-            'move_object_end_position': reconciled.move_object_end_position,
+            'room_height': max_height,
+            'deactivation_step': reconciled.deactivation_step
+        }
+
+        args_move = {
+            'instance': idl.instance if idl else None,
+            'activation_step': reconciled.activation_step,
+            'room_height': max_height,
+            'move_object_end_position': reconciled.move_object_end_position.x
+            if reconciled.move_object_end_position else None,
             'move_object_y': reconciled.move_object_y,
             'move_object_z': reconciled.move_object_z,
         }
 
-        logger.trace(f'Positioning placer object:\nINPUT = {args}')
-        if reconciled.pickup_object:
-            mechanisms.pickup_object(**args)
-        elif reconciled.move_object:
+        if idl and reconciled.pickup_object:
+            logger.trace(
+                f'Positioning placer to pickup object:\nINPUT = {args_pickup}'
+            )
+            mechanisms.pickup_object(**args_pickup)
+        elif idl and reconciled.move_object:
+            logger.trace(
+                f'Positioning placer to move object:\nINPUT = {args_move}'
+            )
             # Add the movement to the object.
-            mechanisms.move_object(**args_move_object)
+            mechanisms.move_object(**args_move)
             new_x = reconciled.move_object_end_position.x
-            new_z = reconciled.move_object_end_position.z
-            instance['debug']['moveToPosition'] = {'x': new_x, 'z': new_z}
-            instance['debug']['moveToPositionBy'] = (
-                instance['moves'][-1]['stepEnd']
+            new_z = idl.instance['shows'][0]['position']['z']
+            idl.instance['debug']['moveToPosition'] = {
+                'x': new_x,
+                'y': idl.instance['shows'][0]['position']['y'],
+                'z': new_z
+            }
+            idl.instance['debug']['moveToPositionBy'] = (
+                idl.instance['moves'][-1]['stepEnd']
             )
 
             objects_to_reposition = []
 
             # If our object is a container with a separate lid, and the lid is
             # attached after our container is moved, reposition the lid/placer.
-            lid_id = instance['debug'].get('lidId')
+            lid_id = idl.instance['debug'].get('lidId')
             lid = scene.get_object_by_id(lid_id)
-            lid_placer_id = instance['debug'].get('lidPlacerId')
+            lid_placer_id = idl.instance['debug'].get('lidPlacerId')
             lid_placer = scene.get_object_by_id(lid_placer_id)
             if lid and lid_placer:
                 object_move_begin = reconciled.activation_step
-                object_move_end = instance['moves'][-1]['stepEnd']
+                object_move_end = idl.instance['moves'][-1]['stepEnd']
                 lid_placer_move_begin = lid_placer['moves'][0]['stepBegin']
                 lid_placer_move_end = lid_placer['moves'][-1]['stepEnd']
                 if (
@@ -1935,7 +1966,7 @@ class StructuralPlacersCreationService(
                 ):
                     raise ILEException(
                         f'Placer is configured to move a container with a '
-                        f'separate lid (ID={instance["id"]}) between steps '
+                        f'separate lid ({idl.instance["id"]}) between steps '
                         f'{object_move_begin} and {object_move_end}, but that '
                         f'would overlap with the placer attaching the lid '
                         f'between steps {lid_placer_move_begin} and '
@@ -1950,14 +1981,14 @@ class StructuralPlacersCreationService(
             # and are "placed" after our object was moved, reposition them.
             for possibly_held in scene.objects:
                 # Ignore our moved object!
-                if possibly_held['id'] == instance['id']:
+                if possibly_held['id'] == idl.instance['id']:
                     continue
                 # If this object was positioned by a placer...
                 if possibly_held['debug'].get('positionedBy') != 'mechanism':
                     continue
                 # If this object was positioned above our moved object...
                 above_id = possibly_held['debug'].get('positionedAboveId')
-                if above_id != instance['id']:
+                if above_id != idl.instance['id']:
                     continue
                 # Find its corresponding placer...
                 for possible_placer in scene.objects:
@@ -1977,27 +2008,34 @@ class StructuralPlacersCreationService(
             for object_to_reposition in objects_to_reposition:
                 object_to_reposition['shows'][0]['position']['x'] = new_x
                 object_to_reposition['shows'][0]['position']['z'] = new_z
-        else:
-            mechanisms.place_object(**args)
+        elif idl:
+            logger.trace(
+                f'Positioning placer to place object:\nINPUT = {args_place}'
+            )
+            mechanisms.place_object(**args_place)
 
         objs = []
-        if idl.instance not in scene.objects \
-            and not (source_template.empty_placer
-                     if source_template is not None else False):
+        if idl and idl.instance not in scene.objects:
             objs.append(idl.instance)
 
         # Create single placers when empty_placer is true
-        if source_template.empty_placer if source_template \
-                is not None else False:
-            defn.placerOffsetX = [0]
-            defn.placerOffsetZ = [0]
+        placer_offset_x = idl.definition.placerOffsetX if idl else [0]
+        placer_offset_y = idl.definition.placerOffsetY if idl else [0]
+        placer_offset_z = idl.definition.placerOffsetZ if idl else [0]
 
-        placer_offset_list = defn.placerOffsetX
+        placer_offset_list = placer_offset_x
         use_x_offset = True
         if not placer_offset_list or placer_offset_list == [0]:
             # The separate_container has a Z placer offset rather than an X.
-            placer_offset_list = defn.placerOffsetZ
+            placer_offset_list = placer_offset_z
             use_x_offset = False
+
+        idl_position = (
+            idl.instance['shows'][0]['position'] if idl else
+            vars(reconciled.placed_object_position)
+        )
+        idl_dimensions = idl.instance['debug']['dimensions'] if idl else None
+        idl_standing_y = idl.instance['debug']['positionY'] if idl else 0
 
         for index, placer_offset in enumerate(placer_offset_list or [0]):
             # Adjust the placer offset based on the object's Y rotation.
@@ -2012,39 +2050,43 @@ class StructuralPlacersCreationService(
             )
             resolved_offset_x, resolved_offset_z = list(offset_line.coords)[1]
             # Adjust the placer position based on the offsets.
-            position = copy.deepcopy(instance['shows'][0]['position'])
+            position = copy.deepcopy(idl_position)
             position['x'] += resolved_offset_x
             position['z'] += resolved_offset_z
             # Create the new placer and add it to the scene.
             args = {
                 'placed_object_position': position,
+                # If empty_placer is True, use 0 for each dimension.
                 'placed_object_dimensions': {
-                    'x': instance['debug']['dimensions']['x'],
+                    'x': idl_dimensions['x'] if idl else 0,
                     'y': _retrieve_object_height_at_step(
                         scene,
-                        instance,
+                        idl.instance,
                         reconciled.activation_step
-                    ),
-                    'z': instance['debug']['dimensions']['z']
+                    ) if idl else 0,
+                    'z': idl_dimensions['z'] if idl else 0
                 },
-                'placed_object_offset_y': instance['debug']['positionY'],
+                'placed_object_offset_y': idl_standing_y,
                 'activation_step': reconciled.activation_step,
                 'end_height': reconciled.end_height,
                 'max_height': max_height,
                 'id_modifier': None,
                 'last_step': last_step,
-                'placed_object_placer_offset_y': defn.placerOffsetY[index],
+                'placed_object_placer_offset_y': placer_offset_y[index],
                 'deactivation_step': reconciled.deactivation_step,
                 'is_pickup_obj': reconciled.pickup_object,
                 'is_move_obj': reconciled.move_object,
                 'move_object_end_position':
-                reconciled.move_object_end_position,
+                reconciled.move_object_end_position.x
+                if reconciled.move_object_end_position else None,
                 'move_object_y': reconciled.move_object_y,
                 'move_object_z': reconciled.move_object_z,
             }
             logger.trace(f'Creating placer:\nINPUT = {args}')
             placer = mechanisms.create_placer(**args)
-            placer['debug']['heldObjectId'] = instance['id']
+            placer['debug']['heldObjectId'] = (
+                idl.instance['id'] if idl else None
+            )
             _post_instance(
                 scene,
                 placer,
@@ -2059,19 +2101,21 @@ class StructuralPlacersCreationService(
             self, template, scene):
 
         if template is not None:
-            if (template.placed_object_above or
-                    template.placed_object_labels or
-                    template.placed_object_material or
-                    template.placed_object_position or
-                    template.placed_object_rotation or
-                    template.placed_object_scale or
-                    template.placed_object_shape is not None) \
-                    and template.empty_placer is True:
+            if template.empty_placer and (
+                template.placed_object_labels or
+                template.placed_object_material or
+                template.placed_object_rotation or
+                template.placed_object_scale or
+                template.placed_object_shape
+            ):
                 raise ILEConfigurationException(
                     "Error with placer "
-                    "configuration. When 'placer_empty'=True "
-                    "then placed_object_* must NOT be included in "
-                    "the configuration.")
+                    "configuration. When 'empty_placer'=True "
+                    "then the following options must NOT be included in "
+                    "the configuration: 'placed_object_labels', "
+                    "'placed_object_material', 'placed_object_rotation', "
+                    "'placed_object_scale', 'placed_object_shape'"
+                )
             if template.move_object and \
                     template.move_object_end_position is None:
                 raise ILEConfigurationException(
@@ -2104,6 +2148,10 @@ class StructuralPlacersCreationService(
             self, scene: Scene, reconciled: StructuralPlacerConfig,
             source_template
     ) -> StructuralPlacerConfig:
+        self._restriction_validation(source_template, scene)
+        # Make sure to reset the object_idl on each run.
+        self.object_idl = None
+
         obj_repo = ObjectRepository.get_instance()
         room_dim = scene.room_dimensions
         defn = None
@@ -2122,7 +2170,7 @@ class StructuralPlacersCreationService(
                 f'Using existing object for placer: '
                 f'{self.object_idl.instance["id"]}'
             )
-        if not self.object_idl:
+        if not self.object_idl and not reconciled.empty_placer:
             # Choose a shape now, so we can set the default scale accordingly.
             shape, material = choose_shape_material(
                 reconciled.placed_object_shape,
@@ -2215,14 +2263,15 @@ class StructuralPlacersCreationService(
                 z=above_position['z']
             )
             above_id = above_object['id']
-            self.object_idl.instance['debug']['positionedAboveId'] = above_id
+            if self.object_idl:
+                instance = self.object_idl.instance
+                instance['debug']['positionedAboveId'] = above_id
 
         # Retrieve the bounds for all objects in the scene, but ignore the held
         # object's current bounds, because they will change. Used below.
-        bounds_list = find_bounds(
-            scene,
-            ignore_ids=[self.object_idl.instance['id']]
-        )
+        bounds_list = find_bounds(scene, ignore_ids=(
+            [self.object_idl.instance['id']] if self.object_idl else []
+        ))
         # Add the bounds for moved objects to the bounds_list.
         for instance in scene.objects:
             if instance['debug'].get('moveToPosition'):
@@ -2236,7 +2285,7 @@ class StructuralPlacersCreationService(
                     instance['debug']['positionY']
                 ))
 
-        if reconciled.retain_position:
+        if reconciled.retain_position and not reconciled.empty_placer:
             reconciled.placed_object_position = VectorFloatConfig(
                 x=self.object_idl.instance['shows'][0]['position']['x'],
                 y=self.object_idl.instance['shows'][0]['position']['y'],
@@ -2246,8 +2295,10 @@ class StructuralPlacersCreationService(
         # If this placer picks up or moves its object, check for collisions
         # with the object's starting position (assuming it is configured),
         # since it will begin on the ground.
-        if source_template.placed_object_position and (
-            reconciled.pickup_object or reconciled.move_object
+        if (
+            source_template.placed_object_position and
+            (reconciled.pickup_object or reconciled.move_object) and
+            not reconciled.empty_placer
         ):
             # Convert the configured Y rotations into rotation vectors.
             config_rotations = source_template.placed_object_rotation or []
@@ -2284,19 +2335,33 @@ class StructuralPlacersCreationService(
             # Otherwise choose position and rotation the normal way.
             reconciled.placed_object_rotation = choose_rotation(
                 VectorIntConfig(0, reconciled.placed_object_rotation, 0)).y
+            object_idl = self.object_idl if self.object_idl else None
             reconciled.placed_object_position = choose_position(
                 reconciled.placed_object_position,
-                self.object_idl.definition.dimensions.x,
-                self.object_idl.definition.dimensions.z,
+                object_idl.definition.dimensions.x if object_idl else 0,
+                object_idl.definition.dimensions.z if object_idl else 0,
                 room_dim.x,
                 room_dim.y,
                 room_dim.z,
                 True
             )
+            # For normal empty placers, if the Y position was not configured by
+            # the user, then adjust it to be near the ceiling, rather than
+            # being at floor level (choose_position will return a Y of 0).
+            source_position = source_template.placed_object_position
+            if (
+                reconciled.empty_placer and
+                not (reconciled.move_object or reconciled.pickup_object) and
+                (source_position is None or source_position.y is None)
+            ):
+                reconciled.placed_object_position.y = room_dim.y - 0.25
 
         # If this placer moves its object, check for collisions with the
         # object's ending position.
-        if source_template.move_object_end_position:
+        if (
+            source_template.move_object_end_position and
+            not reconciled.empty_placer
+        ):
             rotation = self.object_idl.instance['shows'][0]['rotation']
             # Include the object's new starting position.
             start_bounds = geometry.create_bounds(
@@ -2306,23 +2371,33 @@ class StructuralPlacersCreationService(
                 rotation,
                 self.object_idl.instance['debug']['positionY']
             )
+            move_object_end_position = copy.deepcopy(return_list(
+                source_template.move_object_end_position
+            ))
+            for position_config in move_object_end_position:
+                position_config.y = (
+                    reconciled.placed_object_position.y -
+                    # Subtract positionY here since _check_for_collisions will
+                    # add it again.
+                    self.object_idl.definition.positionY
+                )
+                position_config.z = reconciled.placed_object_position.z
             valid_end_locations = _check_for_collisions(
                 scene,
                 self.object_idl.definition,
-                source_template.move_object_end_position,
+                move_object_end_position,
                 VectorIntConfig(rotation['x'], rotation['y'], rotation['z']),
                 bounds_list + [start_bounds]
             )
             if not valid_end_locations:
-                data = [vars(position) for position in (
-                    source_template.move_object_end_position if
-                    isinstance(source_template.move_object_end_position, list)
-                    else [source_template.move_object_end_position]
-                )]
+                data = [
+                    f'x={position.x}' for position in move_object_end_position
+                ]
                 raise ILEException(
                     f'Placer with configured move_object_end_position='
                     f'{data} moving object with '
-                    f'id={self.object_idl.instance["id"]} would collide '
+                    f'id={self.object_idl.instance["id"]} and position='
+                    f'{reconciled.placed_object_position} would collide '
                     f'with an existing object in the scene.'
                 )
             # Randomly choose from one of the valid options.
@@ -2372,14 +2447,16 @@ class StructuralPlacersCreationService(
             self, scene: Scene, reconciled_template: StructuralPlacerConfig,
             new_obj: SceneObject, key: str = 'objects'):
 
-        self.object_idl.instance['debug']['positionedBy'] = 'mechanism'
-        self.object_idl.instance['debug'][DEBUG_FINAL_POSITION_KEY] = True
+        # The object_idl is None if empty_placer is True
+        if self.object_idl:
+            self.object_idl.instance['debug']['positionedBy'] = 'mechanism'
+            self.object_idl.instance['debug'][DEBUG_FINAL_POSITION_KEY] = True
 
-        object_repo = ObjectRepository.get_instance()
-        object_repo.add_to_labeled_objects(
-            self.object_idl,
-            self._target_labels
-        )
+            object_repo = ObjectRepository.get_instance()
+            object_repo.add_to_labeled_objects(
+                self.object_idl,
+                self._target_labels
+            )
 
         return super()._on_valid_instances(
             scene, reconciled_template, new_obj, key)
@@ -2683,6 +2760,66 @@ class StructuralTubeOccluderCreationService(BaseObjectCreationService):
         return reconciled
 
 
+class StructuralNotchedOccluderCreationService(BaseObjectCreationService):
+    def __init__(self):
+        self._default_template = DEFAULT_TEMPLATE_NOTCHED_OCCLUDER
+        self._type = FeatureTypes.NOTCHED_OCCLUDERS
+        self._material_tuple = None
+
+    def create_feature_from_specific_values(
+        self,
+        scene: Scene,
+        reconciled: StructuralNotchedOccluderConfig,
+        source_template: StructuralNotchedOccluderConfig
+    ) -> StructuralNotchedOccluderConfig:
+        if not self._material_tuple:
+            self._material_tuple = choose_material_tuple_from_material(
+                reconciled.material
+            )
+
+        args = {
+            'occluder_mat': self._material_tuple,
+            'room_dimensions': scene.room_dimensions,
+            'position_z': reconciled.position_z,
+            'height': reconciled.height,
+            'platform_height': reconciled.notch_height,
+            'platform_width': reconciled.notch_width,
+            'down_step': reconciled.down_step,
+            'up_step': reconciled.up_step,
+        }
+        logger.trace(f'Creating notched occluder:\nINPUT = {args}')
+        notched_occluder = create_notched_occluder(**args)
+        notched_occluder = _post_instance(
+            scene,
+            notched_occluder,
+            reconciled,
+            source_template,
+            self._get_type()
+        )
+        return notched_occluder
+
+    def _handle_dependent_defaults(self,
+                                   scene: Scene,
+                                   reconciled: StructuralNotchedOccluderConfig,
+                                   source_template: StructuralNotchedOccluderConfig  # noqa: E501
+                                   ) -> StructuralNotchedOccluderConfig:
+        limit_z = scene.room_dimensions.z
+        # Should always be centered.
+        reconciled.position_z = (
+            reconciled.position_z if reconciled.position_z is not None
+            else random.uniform(-limit_z, limit_z)
+        )
+
+        if not self._material_tuple:
+            self._material_tuple = _reconcile_material(
+                source_template.material,
+                materials.ROOM_WALL_MATERIALS
+            )
+        reconciled.material = self._material_tuple.material
+
+        return reconciled
+
+
 @dataclass
 class PositionableStructuralObjectsConfig(BaseFeatureConfig):
     """Simple class used for user-positionable structural objects."""
@@ -2709,8 +2846,25 @@ class StructuralWallConfig(PositionableStructuralObjectsConfig):
     dict, or list of MinMaxFloat dicts): The structure's rotation in the scene
     - `width` (float, or list of floats, or [MinMaxFloat](#MinMaxFloat) dict,
     or list of MinMaxFloat dicts): The width of the wall.
+    Default: Between 5% and 50% of the room's maximum dimensions.
+    - `thickness` (float, or list of floats, or [MinMaxFloat](#MinMaxFloat)
+    dict, or list of MinMaxFloat dicts): The thickness of the wall.
+    Default: 0.1
+    - `height` (float, or list of floats, or [MinMaxFloat](#MinMaxFloat)
+    dict, or list of MinMaxFloat dicts): The height of the wall.
+    Default: The room's height.
+    - `same_material_as_room` (bool, or list of bools): Whether to use the same
+    material as the room's walls. If true, will ignore any `material`
+    configured on this wall. Default: false
+    - `ignore_bounds` (bool, or list of bools): Whether to ignore the bounds of
+    all other objects that have already been generated at the moment this wall
+    is being generated. Default: false
     """
     width: RandomizableFloat = None
+    thickness: RandomizableFloat = None
+    height: RandomizableFloat = None
+    same_material_as_room: RandomizableBool = None
+    ignore_bounds: RandomizableBool = None
 
 
 @dataclass
@@ -3308,8 +3462,11 @@ class StructuralPlacerConfig(BaseFeatureConfig):
     its held object. This number must be a step after the end of the placer's
     downward movement. Default: At the end of the placer's downward movement
     - `empty_placer` (bool, or list of bools): If True, the placer will not
-    hold/drop an object. Cannot be used in combination with any of the
-    placed_object_* config options. Default: False
+    hold, drop, or move an object. Use 'placed_object_position' to set the
+    placer's starting X/Z position if needed. Cannot be used in combination
+    with any of the following config options: 'placed_object_labels',
+    'placed_object_material', 'placed_object_rotation', 'placed_object_scale',
+    'placed_object_shape'. Default: False
     - `end_height`: (float, or list of floats, or [MinMaxFloat](#MinMaxFloat)
     dict): Height at which the placer should release its held object.
     Alternatively, one can use the `end_height_relative_object_label`.
@@ -3326,19 +3483,26 @@ class StructuralPlacerConfig(BaseFeatureConfig):
     `placed_object_labels`. Default: False
     - `labels` (string, or list of strings): A label or labels to be assigned
     to this object. Always automatically assigned "placers"
-    - `move_object` (bool): If True, a placer will be
-    generated to pickup an object. Default: False
+    - `move_object` (bool): If True, the placer will move the object on the X
+    axis from its `placed_object_position` to `move_object_end_position`.
+    Default: False
     - `move_object_end_position`: ([VectorFloatConfig](#VectorFloatConfig)
-    dict, or list of VectorFloatConfig dicts): The placed object's end
-    position after being moved by a placer
-    - `move_object_y`: The placer will raise the object by this value
-        during the move object event.
-        Default: 0
-    - `move_object_z`: The placer will move the object along the z-axis,
-        slide along the x-axis and move back.
-        Default: 1.5
-    - `pickup_object` (bool): If True, a placer will be
-    generated to pickup an object. Default: False
+    dict, or list of VectorFloatConfig dicts): If `move_object` is True,
+    the placer will move the object from its `placed_object_position` to the
+    X position in `move_object_end_position`. Note that the Y and Z positions
+    in `move_object_end_position` are ignored; the Y and Z positions set in
+    `placed_object_position` are kept the same. (This option remains a Vector
+    for backwards compatibility.)
+    - `move_object_y`: If `move_object` is True, the placer will raise the
+    object by this amount before moving it on the X/Z axes, and lower it by
+    the same amount afterward. Default: `0`
+    - `move_object_z`: If `move_object` is True, the placer will move the
+    object by this amount in the -Z direction after raising it on the Y axis
+    but before moving it on the X axis, and move it by the same amount again
+    in the +Z direction after moving it on the X axis and before lowering it
+    on the Y axis. Default: `1.5`
+    - `pickup_object` (bool): If True, the placer will pickup the object.
+    Default: False
     - `placed_object_above` (string, or list of strings): A label for an
     existing object in your configuration whose X/Z position will be used for
     this placer's (and the placed object's) starting position. Overrides
@@ -3563,6 +3727,26 @@ class StructuralTubeOccluderConfig(BaseFeatureConfig):
     up_step: RandomizableInt = None
 
 
+@dataclass
+class StructuralNotchedOccluderConfig(BaseFeatureConfig):
+    """
+    - `height` (float): The overall height of the occluder.
+    - `material`(string): The material the occluder is made of.
+    - `position_z` (float): The occulders z position within the room.
+    - `down_step` (int): The step the occluder will start to move down.
+    - `up_step` (int): The step the occluder will start to return up.
+    - `notch_height` (float): The height of the occluder notch.
+    - `notch_width` (float): The width of the occluder notch.
+    """
+    height: RandomizableFloat = None
+    material: RandomizableString = None
+    position_z: RandomizableFloat = None
+    down_step: RandomizableInt = None
+    up_step: RandomizableInt = None
+    notch_height: RandomizableFloat = None
+    notch_width: RandomizableFloat = None
+
+
 DEFAULT_TEMPLATE_DROPPER = StructuralDropperConfig(
     num=0,
     drop_step=MinMaxInt(0, 10),
@@ -3634,8 +3818,15 @@ DEFAULT_TEMPLATE_PLATFORM = StructuralPlatformConfig(
     auto_adjust_platforms=False)
 
 DEFAULT_TEMPLATE_WALL = StructuralWallConfig(
-    num=0, position=VectorFloatConfig(None, None, None),
-    rotation_y=[0, 90, 180, 270])
+    num=0,
+    position=VectorFloatConfig(None, None, None),
+    rotation_y=[0, 90, 180, 270],
+    width=None,
+    thickness=None,
+    height=None,
+    ignore_bounds=False,
+    same_material_as_room=False
+)
 
 DEFAULT_TEMPLATE_RAMP = StructuralRampConfig(
     num=0, position=VectorFloatConfig(None, None, None),
@@ -3673,7 +3864,7 @@ DEFAULT_TEMPLATE_PLACER = StructuralPlacerConfig(
     placed_object_rotation=MinMaxFloat(0, 359),
     placed_object_scale=None,
     placed_object_shape=PLACER_SHAPES,
-    activation_step=MinMaxInt(0, 10),
+    activation_step=MinMaxInt(1, 10),
     activate_after=None,
     activate_on_start_or_after=None,
     deactivation_step=None,
@@ -3681,7 +3872,12 @@ DEFAULT_TEMPLATE_PLACER = StructuralPlacerConfig(
     position_relative=None,
     empty_placer=False,
     pickup_object=False,
-    retain_position=False
+    retain_position=False,
+    move_object=False,
+    move_object_end_position=None,
+    move_object_y=None,
+    move_object_z=None,
+    existing_object_required=False
 )
 
 DOOR_MATERIAL_RESTRICTIONS = [mat[0] for mat in (materials.METAL_MATERIALS +
@@ -3725,6 +3921,16 @@ DEFAULT_TEMPLATE_TURNTABLE = StructuralTurntableConfig(
         DEFAULT_TURNTABLE_MAX_RADIUS
     ),
     turntable_movement=DEFAULT_TEMPLATE_STRUCT_OBJ_MOVEMENT
+)
+
+DEFAULT_TEMPLATE_NOTCHED_OCCLUDER = StructuralNotchedOccluderConfig(
+    height=MinMaxFloat(2.1, 3),
+    material=None,
+    position_z=MinMaxFloat(1, 3.0),
+    down_step=MinMaxInt(1, 10),
+    up_step=MinMaxInt(51, 60),
+    notch_height=MinMaxFloat(1, 2),
+    notch_width=MinMaxFloat(0.3, 2.1)
 )
 
 
@@ -4678,7 +4884,8 @@ for feature_type, creation_service in [
     (FeatureTypes.THROWERS, StructuralThrowerCreationService),
     (FeatureTypes.WALLS, StructuralWallCreationService),
     (FeatureTypes.TUBE_OCCLUDERS, StructuralTubeOccluderCreationService),
-    (FeatureTypes.TURNTABLES, StructuralTurntableCreationService)
+    (FeatureTypes.TURNTABLES, StructuralTurntableCreationService),
+    (FeatureTypes.NOTCHED_OCCLUDERS, StructuralNotchedOccluderCreationService)
 ]:
     FeatureCreationService.register_creation_service(
         feature_type, creation_service)

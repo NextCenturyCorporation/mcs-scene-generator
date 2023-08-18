@@ -843,10 +843,6 @@ TOOL_MATERIALS = [
     MaterialTuple(
         "UnityAssetStore/YughuesFreeMetalMaterials/Materials/M_YFMM_36",
         ["green"]
-    ),
-    MaterialTuple(
-        "UnityAssetStore/YughuesFreeMetalMaterials/Materials/M_YFMM_40",
-        ["blue"]
     )
 ]
 

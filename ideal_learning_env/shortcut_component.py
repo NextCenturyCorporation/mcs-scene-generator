@@ -16,6 +16,7 @@ from generator import (
     geometry,
     instances,
     materials,
+    structures,
     tags
 )
 from generator.base_objects import (
@@ -54,7 +55,8 @@ from ideal_learning_env.actions_component import StepBeginEnd
 from ideal_learning_env.agent_service import (
     AgentActionConfig,
     AgentConfig,
-    AgentMovementConfig
+    AgentMovementConfig,
+    AgentPointingConfig
 )
 
 from .components import ILEComponent
@@ -99,7 +101,12 @@ from .structural_object_service import (
     StructuralPlacerConfig,
     StructuralPlatformConfig
 )
-from .validators import ValidateNumber, ValidateOptions, ValidateOr
+from .validators import (
+    ValidateList,
+    ValidateNumber,
+    ValidateOptions,
+    ValidateOr
+)
 
 logger = logging.getLogger(__name__)
 
@@ -310,6 +317,10 @@ class TripleDoorConfig():
     or list of MinMaxInt dicts): Step number to start dropping the bisecting
     wall with doors.  If None or less than 1, the wall will start in position.
     Default: None
+    - `wall_height` (float, or list of floats, or
+    [MinMaxFloat](#MinMaxFloat) dict, or list of MinMaxFloat dicts): The
+    height for the wall. The height for the center door will be -2 to
+    account for being on top of the platform.
     - `wall_material` (string, or list of strings): The material or material
     type for the wall.
     """
@@ -323,6 +334,7 @@ class TripleDoorConfig():
     extension_length: RandomizableFloat = None
     extension_position: RandomizableFloat = None
     bigger_far_end: RandomizableBool = False
+    wall_height: RandomizableFloat = None
 
 
 @dataclass
@@ -560,6 +572,63 @@ class TurntablesAgentNonAgentConfig():
     non_agent_label: str
     turntable_labels: RandomizableString
     direction_labels: RandomizableString
+
+
+@dataclass
+class KnowledgeableAgentPairConfig():
+    """
+    Defines all of the configurable options for
+    [knowledgeable_agent_pair]
+    (#knowledgeable_agent_pair).
+    - `position_1` (Vector3): One possible location for an agent to be.
+    - `position_2` (Vector3): One possible location for an agent to be.
+    - `pointing_step` (int): Starting step of pointing action.
+    - `target_labels` (str): Label for the knowledgeable agent to use to find
+    the goal.
+    - `non_target_labels` (str): Label so the non-knowledgeable agent to use to
+    find what it should be pointing to.
+    """
+    position_1: RandomizableVectorFloat3d
+    position_2: RandomizableVectorFloat3d
+    pointing_step: RandomizableInt = 0
+    target_labels: RandomizableString = "target"
+    non_target_labels: RandomizableString = None
+
+
+@dataclass
+class PlacersWithDecoyConfig():
+    """
+    Defines the configureable options for [placers_with_decoy]
+    (#placers_with_decoy)
+    - `activation_step` List[int]: A list of steps that the placer/decoy can
+    be activated.
+    - `object_end_position_x` List[float]: A list of x positions that the
+    placer/decoy can move to.
+    - `decoy_y_modifier` float: The distance that the decoy should stop short
+    so it doesn't go all the way to the ground. Should be the height of the
+    target object.
+    - `placed_object_position` RandomizableVectorFloat3d: Starting position of
+    the placer/decoy.
+    - `labels` RandomizableString: The labels that should be applied the to
+    placer/decoy.
+    - `move_object_y` RandomizableFloat: A modifier to the release height of
+    the target object.
+    - `move_object_z` RandomizableFloat: A modifier to the release depth of
+    the target object.
+    - `placed_object_labels` RandomizableString: Labels to be applied to the
+    target object.
+    - `placed_object_rotation` RandomizableFloat: Rotation to be applied to
+    the target object during release.
+    """
+    activation_step: List[int]
+    object_end_position_x: List[float]
+    decoy_y_modifier: float
+    placed_object_position: RandomizableVectorFloat3d
+    labels: RandomizableString = 'target_placers'
+    move_object_y: RandomizableFloat = 0
+    move_object_z: RandomizableFloat = 0
+    placed_object_labels: RandomizableString = 'target'
+    placed_object_rotation: RandomizableFloat = 0.0
 
 
 class ShortcutComponent(ILEComponent):
@@ -883,12 +952,88 @@ class ShortcutComponent(ILEComponent):
     ```
     """
 
+    knowledgeable_agent_pair: Union[bool, KnowledgeableAgentPairConfig] = False
+    """
+    (bool, KnowledgeableAgentPairConfig): Config to create a pair of agents.
+    One agent will be knowledgeable (will know where the goal is), the other
+    won't know and will point into space.
+
+    Simple Example:
+    ```
+    knowledgeable_agent_pair:
+            position_1:
+                x: 1.0
+                y: 0
+                z: 0
+            position_2:
+                x: -1.0
+                y: 0
+                z: 0
+    ```
+
+    Advanced Example
+    Simple Example:
+    ```
+    knowledgeable_agent_pair:
+        position_1:
+            x: 1.0
+            y: 0
+            z: 0
+        position_2:
+            x: -1.0
+            y: 0
+            z: 0
+        pointing_step: 10,
+        target_labels: target
+    """
+
+    placers_with_decoy: Union[bool, PlacersWithDecoyConfig] = False
+    """
+    (bool): Creates one placer to move and the target object and another that
+    is a decoy that pretends to move something. The placers have the order
+    and location they will move to randomized.
+    Default: False
+
+    Simple Example:
+    ```
+    placers_with_decoy: False
+    ```
+
+    Advanced Example 1:
+    ```
+    'placers_with_decoy': {
+            'activation_step': [13, 59],
+            'object_end_position_x': [2.0, -2.0],
+            'placed_object_position': VectorFloatConfig(x=1, y=0.501, z=2),
+            'decoy_y_modifier': 0.22
+        }
+    ```
+
+    Advanced Example 2:
+    ```
+    placers_with_decoy:
+        'placers_with_decoy': {
+            'activation_step': [13, 59],
+            'object_end_position_x': [2.0, -2.0],
+            'labels': 'target_placers',
+            'move_object_y': 0,
+            'move_object_z': 0,
+            'placed_object_labels': 'target',
+            'placed_object_position': VectorFloatConfig(x=1, y=0.501, z=2),
+            'placed_object_rotation': 0.0,
+            'decoy_y_modifier': 0.22
+        }
+    ```
+    """
+
     def __init__(self, data: Dict[str, Any]):
         super().__init__(data)
         self._delayed_perf_pos = False
         self._delayed_perf_pos_reason = None
         self._delayed_turntables_with_agent_and_non_agent = False
         self._delayed_turntables_with_agent_and_non_agent_reason = None
+        self._delayed_knowledgeable_agent_pair = []
+        self._delayed_knowledgeable_agent_pair_reason = None
 
     @ile_config_setter()
     def set_shortcut_bisecting_platform(self, data: Any) -> None:
@@ -901,7 +1046,6 @@ class ShortcutComponent(ILEComponent):
         config = self.shortcut_bisecting_platform
         if self.shortcut_bisecting_platform is True:
             config = BisectingPlatformConfig()
-        config = choose_random(config)
         return config
 
     @ile_config_setter(validator=ValidateOptions(
@@ -933,6 +1077,11 @@ class ShortcutComponent(ILEComponent):
             null_ok=True
         )
     ]))
+    @ile_config_setter(validator=ValidateNumber(
+        props=['wall_height'],
+        min_value=structures.BASE_DOOR_HEIGHT,
+        null_ok=True
+    ))
     def set_shortcut_triple_door_choice(self, data: Any) -> None:
         self.shortcut_triple_door_choice = data
 
@@ -1078,6 +1227,26 @@ class ShortcutComponent(ILEComponent):
         config = choose_random(config)
         return config
 
+    @ile_config_setter(validator=ValidateList(
+        props=['object_end_position_x'],
+        min_count=2)
+    )
+    @ile_config_setter(validator=ValidateList(
+        props=['object_end_position_x'],
+        min_count=2)
+    )
+    def set_placers_with_decoy(self, data: Any) -> None:
+        self.placers_with_decoy = data
+
+    def get_placers_with_decoy(self) -> Union[bool, PlacersWithDecoyConfig]:
+        if self.placers_with_decoy is False:
+            return False
+        config = self.placers_with_decoy
+        if self.placers_with_decoy is True:
+            config = PlacersWithDecoyConfig()
+        config = choose_random(config)
+        return config
+
     @ile_config_setter(validator=ValidateOptions(
         props=['improbable_option'],
         options=(
@@ -1112,6 +1281,20 @@ class ShortcutComponent(ILEComponent):
         config = choose_random(config)
         return config
 
+    @ile_config_setter()
+    def set_knowledgeable_agent_pair(self, data: Any) -> None:
+        self.knowledgeable_agent_pair = data
+
+    def get_knowledgeable_agent_pair(
+            self) -> Union[bool, KnowledgeableAgentPairConfig]:
+        if self.knowledgeable_agent_pair is False:
+            return False
+        config = self.knowledgeable_agent_pair
+        if self.knowledgeable_agent_pair is True:
+            config = KnowledgeableAgentPairConfig()
+        config = choose_random(config)
+        return config
+
     # Override
     def update_ile_scene(self, scene: Scene) -> Scene:
         logger.info('Configuring shortcut options for the scene...')
@@ -1127,6 +1310,7 @@ class ShortcutComponent(ILEComponent):
         scene = self._add_imitation_task(scene)
         scene = self._add_lava_tool_choice_goal(scene, room_dim)
         scene = self._add_seeing_leads_to_knowing(scene)
+        scene = self._add_placers_with_decoys(scene)
 
         try:
             scene = self._update_turntables_with_agent_and_non_agent(scene)
@@ -1134,28 +1318,35 @@ class ShortcutComponent(ILEComponent):
             self._delayed_turntables_with_agent_and_non_agent = True
             self._delayed_turntables_with_agent_and_non_agent_reason = e
 
+        try:
+            scene = self._add_knowledgeable_agent_pair(scene)
+        except ILEDelayException as e:
+            self._delayed_knowledgeable_agent_pair_reason = e
+
         return scene
 
     def _add_bisecting_platform(self, scene: Scene, room_dim: Vector3d):
-        if not self.get_shortcut_bisecting_platform():
+        config = self.get_shortcut_bisecting_platform()
+        if not config:
             return scene
 
         logger.trace("Adding bisecting platform shortcut")
-        config = self.get_shortcut_bisecting_platform()
+        reconciled = choose_random(config)
         self._do_add_bisecting_platform(
             scene,
             room_dim,
-            blocking_wall=config.has_blocking_wall,
-            platform_height=(0.5 if config.is_short else 1),
-            double_blocking_wall=config.has_double_blocking_wall,
-            long_blocking_wall=config.has_long_blocking_wall,
-            is_thin=config.is_thin,
+            blocking_wall=reconciled.has_blocking_wall,
+            platform_height=(0.5 if reconciled.is_short else 1),
+            double_blocking_wall=reconciled.has_double_blocking_wall,
+            long_blocking_wall=reconciled.has_long_blocking_wall,
+            is_thin=reconciled.is_thin,
+            # Use all of the other_platforms from the source config.
             other_platforms=(
                 config.other_platforms
                 if isinstance(config.other_platforms, list)
                 else [config.other_platforms]
             ) if config.other_platforms else [],
-            position_z=choose_random(config.position_z, float)
+            position_z=choose_random(reconciled.position_z, float)
         )
 
         return scene
@@ -1207,7 +1398,7 @@ class ShortcutComponent(ILEComponent):
         scene.set_performer_start_position(
             x=0, y=platform_config.scale.y, z=performer_z)
         # Start looking down if the room is short.
-        rotation_x = (10 if scene.room_dimensions.z < 10 else 0)
+        rotation_x = (10 if scene.room_dimensions.z <= 8 else 0)
         scene.set_performer_start_rotation(rotation_x, 0)
 
         platform_instance = FeatureCreationService.create_feature(
@@ -1331,6 +1522,11 @@ class ShortcutComponent(ILEComponent):
         bounds = self._do_add_bisecting_platform(scene, room_dim, False, 2)
         plat = scene.objects[-1]
 
+        default_wall_height = 4.25
+
+        if config.wall_height:
+            default_wall_height = config.wall_height
+
         if config.bigger_far_end:
             # Create a bigger platform on top of the existing platform.
             bigger_platform = StructuralPlatformConfig(
@@ -1366,8 +1562,10 @@ class ShortcutComponent(ILEComponent):
         rot_y = 0
         door_center_template = StructuralDoorConfig(
             num=1, position=VectorFloatConfig(
-                0, 2 + add_y, 0), rotation_y=rot_y, wall_scale_x=1,
-            wall_scale_y=2.25, material=config.door_material,
+                0, 2 + add_y, 0), rotation_y=rot_y,
+            wall_scale_x=1,
+            wall_scale_y=default_wall_height - 2,
+            material=config.door_material,
             wall_material=config.wall_material)
 
         door_index = len(scene.objects)
@@ -1381,18 +1579,23 @@ class ShortcutComponent(ILEComponent):
         side_wall_scale_x = room_dim.x / 2.0 - 0.5
         side_wall_position_x = side_wall_scale_x / 2.0 + 0.5
 
-        # Note: 4.25 is from height of platform, height of door, plus what we
-        # added to the center door top so all top walls line up.
+        # Note: default_wall_height(4.25)is from height of platform, height of
+        # door, plus what we added to the center door top so all top walls
+        # line up.
         door_right_template = StructuralDoorConfig(
             num=1, position=VectorFloatConfig(
                 side_wall_position_x, add_y, 0), rotation_y=rot_y,
             wall_scale_x=side_wall_scale_x,
-            wall_scale_y=4.25, wall_material=wall_mat, material=door_mat)
+            wall_scale_y=default_wall_height,
+            wall_material=wall_mat,
+            material=door_mat)
         door_left_template = StructuralDoorConfig(
             num=1, position=VectorFloatConfig(
                 -side_wall_position_x, add_y, 0), rotation_y=rot_y,
             wall_scale_x=side_wall_scale_x,
-            wall_scale_y=4.25, wall_material=wall_mat, material=door_mat)
+            wall_scale_y=default_wall_height,
+            wall_material=wall_mat,
+            material=door_mat)
 
         door_objs = FeatureCreationService.create_feature(
             scene, FeatureTypes.DOORS, door_right_template, [])
@@ -2926,6 +3129,73 @@ class ShortcutComponent(ILEComponent):
 
         return scene
 
+    def _add_knowledgeable_agent_pair(self, scene: Scene):
+        config = self.get_knowledgeable_agent_pair()
+        if not config:
+            return scene
+        logger.trace("Adding knowledgeable agent pair")
+
+        if (random.randint(0, 1) == 0):
+            knowledgeable_agent_position = config.position_1
+            non_knowledgeable_agent_position = config.position_2
+        else:
+            knowledgeable_agent_position = config.position_2
+            non_knowledgeable_agent_position = config.position_1
+
+        knowledgeable_agent_config = AgentConfig(
+            num=1,
+            labels='knowledgeable_agent',
+            position=knowledgeable_agent_position,
+            rotation_y=180,
+            pointing=AgentPointingConfig(
+                object_label=self.knowledgeable_agent_pair.target_labels,
+                step_begin=config.pointing_step,
+                walk_distance=None
+            )
+        )
+        non_target_label = ""
+        if (self.knowledgeable_agent_pair.non_target_labels is not None):
+            non_target_label = self.knowledgeable_agent_pair.non_target_labels
+            if (len(non_target_label) > 1):
+                non_target_label = non_target_label[
+                    random.randint(0, len(non_target_label)) - 1]
+
+        non_knowledgeable_agent_config = AgentConfig(
+            num=1,
+            labels='non_knowledgeable_agent',
+            position=non_knowledgeable_agent_position,
+            rotation_y=0,
+            pointing=AgentPointingConfig(
+                object_label=non_target_label,
+                step_begin=config.pointing_step,
+                walk_distance=None
+            )
+        )
+
+        try:
+            FeatureCreationService.create_feature(
+                scene,
+                FeatureTypes.AGENT,
+                knowledgeable_agent_config,
+                scene.find_bounds()
+            )[0]
+        except ILEDelayException:
+            self._delayed_knowledgeable_agent_pair.append(
+                knowledgeable_agent_config)
+
+        try:
+            FeatureCreationService.create_feature(
+                scene,
+                FeatureTypes.AGENT,
+                non_knowledgeable_agent_config,
+                scene.find_bounds()
+            )[0]
+        except ILEDelayException:
+            self._delayed_knowledgeable_agent_pair.append(
+                non_knowledgeable_agent_config)
+
+        return scene
+
     def _create_bins_placers_seeing_leads_to_knowing(
             self, scene: Scene, target: SceneObject):
         # bin/bucket setup
@@ -3203,6 +3473,7 @@ class ShortcutComponent(ILEComponent):
         count = 0
         count += 1 if self._delayed_perf_pos else 0
         count += 1 if self._delayed_turntables_with_agent_and_non_agent else 0
+        count += 1 if self._delayed_knowledgeable_agent_pair else 0
         return count
 
     def run_delayed_actions(self, scene: Scene) -> Scene:
@@ -3216,6 +3487,21 @@ class ShortcutComponent(ILEComponent):
                 self._update_turntables_with_agent_and_non_agent(scene)
             except ILEDelayException as e:
                 self._delayed_turntables_with_agent_and_non_agent_reason = e
+        for index in range(0, len(self._delayed_knowledgeable_agent_pair)):
+            try:
+                agent = FeatureCreationService.create_feature(
+                    scene,
+                    FeatureTypes.AGENT,
+                    self._delayed_knowledgeable_agent_pair[index],
+                    scene.find_bounds()
+                )[0]
+                if agent is not None:
+                    self._delayed_knowledgeable_agent_pair.pop(index)
+                    index = 0
+            except Exception as e:
+                msg = str(e) + ": " + \
+                    str(self._delayed_knowledgeable_agent_pair[0].labels)
+                self._delayed_knowledgeable_agent_pair_reason = msg
         return scene
 
     def get_delayed_action_error_strings(self) -> List[str]:
@@ -3226,4 +3512,82 @@ class ShortcutComponent(ILEComponent):
             errors += [str(
                 self._delayed_turntables_with_agent_and_non_agent_reason
             )]
+        if self._delayed_knowledgeable_agent_pair_reason:
+            errors += [str(
+                self._delayed_knowledgeable_agent_pair_reason
+            )]
         return errors
+
+    def _add_placers_with_decoys(self, scene: Scene) -> Scene:
+        config = self.get_placers_with_decoy()
+        if not config:
+            return scene
+
+        activation_step_1 = 0
+        activation_step_2 = 0
+        if self.placers_with_decoy.activation_step is None or \
+                len(self.placers_with_decoy.activation_step) < 2:
+            raise ILEException("Must be an array with at least two values")
+        else:
+            while (activation_step_1 == activation_step_2):
+                activation_step_1 = random.randint(
+                    0, len(self.placers_with_decoy.activation_step) - 1)
+                activation_step_2 = random.randint(
+                    0, len(self.placers_with_decoy.activation_step) - 1)
+            activation_step_1 = self.placers_with_decoy.activation_step[activation_step_1]  # noqa: E501
+            activation_step_2 = self.placers_with_decoy.activation_step[activation_step_2]  # noqa: E501
+
+        x_position_1 = 0
+        x_position_2 = 0
+        if self.placers_with_decoy.object_end_position_x is None or \
+                len(self.placers_with_decoy.object_end_position_x) < 2:
+            raise ILEException("Must be an array with at least two values")
+        else:
+            while (x_position_1 == x_position_2):
+                x_position_1 = random.randint(
+                    0, len(self.placers_with_decoy.object_end_position_x) - 1)
+                x_position_2 = random.randint(
+                    0, len(self.placers_with_decoy.object_end_position_x) - 1)
+            x_position_1 = self.placers_with_decoy.object_end_position_x[x_position_1]  # noqa: E501
+            x_position_2 = self.placers_with_decoy.object_end_position_x[x_position_2]  # noqa: E501
+
+        decoy_start_position = copy.deepcopy(
+            self.placers_with_decoy.placed_object_position)
+        decoy_start_position.y = decoy_start_position.y + \
+            (self.placers_with_decoy.decoy_y_modifier or 0)
+
+        placer_1_config = StructuralPlacerConfig(
+            num=1,
+            move_object=True,
+            activation_step=activation_step_1,
+            # The Y and Z are no longer needed, so just use dummy values here.
+            move_object_end_position=VectorFloatConfig(
+                x=x_position_1, y=0, z=0),
+            labels=self.placers_with_decoy.labels,
+            move_object_y=self.placers_with_decoy.move_object_y,
+            move_object_z=self.placers_with_decoy.move_object_z,
+            # This placer will actually move the configured object.
+            placed_object_labels=self.placers_with_decoy.placed_object_labels,
+            placed_object_position=self.placers_with_decoy.placed_object_position,  # noqa: E501
+            placed_object_rotation=self.placers_with_decoy.placed_object_rotation  # noqa: E501
+        )
+        placer_2_config = StructuralPlacerConfig(
+            num=1,
+            move_object=True,
+            activation_step=activation_step_2,
+            move_object_end_position=VectorFloatConfig(
+                x=x_position_2, y=0, z=0),
+            labels=self.placers_with_decoy.labels,
+            move_object_y=self.placers_with_decoy.move_object_y,
+            move_object_z=self.placers_with_decoy.move_object_z,
+            # This placer will be the decoy.
+            placed_object_position=decoy_start_position,
+            empty_placer=True
+        )
+
+        FeatureCreationService.create_feature(
+            scene, FeatureTypes.PLACERS, placer_1_config, [])[0]
+        FeatureCreationService.create_feature(
+            scene, FeatureTypes.PLACERS, placer_2_config, [])[0]
+
+        return scene

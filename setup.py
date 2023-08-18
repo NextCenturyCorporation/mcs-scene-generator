@@ -6,7 +6,7 @@ with open('README.md', 'r') as readme_file:
 
 setuptools.setup(
     name='mcs_scene_generator',
-    version=1.9,
+    version=1.10,
     maintainer='Next Century, a wholly owned subsidiary of CACI',
     maintainer_email='mcs-ta2@machinecommonsense.com',
     url='https://github.com/NextCenturyCorporation/mcs-scene-generator/',
@@ -23,7 +23,7 @@ setuptools.setup(
     python_requires=">=3.8",
     packages=setuptools.find_packages(),
     install_requires=[
-        'machine-common-sense>=0.7.0',
+        'machine-common-sense>=0.7.1',
         'pyyaml>=5.3.1',
         'shapely>=1.7.0'
     ],

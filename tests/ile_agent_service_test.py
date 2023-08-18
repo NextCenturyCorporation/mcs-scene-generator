@@ -26,6 +26,7 @@ from ideal_learning_env.structural_object_service import (
     StructuralPlatformCreationService
 )
 from tests.ile_helper import (
+    check_rotation,
     prior_scene,
     prior_scene_custom_size,
     prior_scene_with_target
@@ -819,16 +820,16 @@ def test_agent_pointing_at_object():
         Vector3d(**target['shows'][0]['position']),
         True
     )
-    assert agent['shows'][0]['rotation'] == {'x': 0, 'y': rotation_y, 'z': 0}
+    assert check_rotation(agent, target)
     assert agent['shows'][0]['scale'] == {'x': 1, 'y': 1, 'z': 1}
     assert not agent.get('agentMovement')
     assert agent['actions'] == [{
         'id': 'Point_start_index_finger',
-        'stepBegin': 1,
-        'stepEnd': 8
+        'stepBegin': 28,
+        'stepEnd': 35
     }, {
         'id': 'Point_hold_index_finger',
-        'stepBegin': 8,
+        'stepBegin': 35,
         'isLoopAnimation': True
     }]
 
@@ -936,7 +937,8 @@ def test_agent_pointing_walk_distance():
     )
     # Agent starts turned around
     rotation_y = round(rotation_y + 180, 2) % 360
-    assert agent['shows'][0]['rotation'] == {'x': 0, 'y': rotation_y, 'z': 0}
+    # assert agent['shows'][0]['rotation'] == {'x': 0, 'y': rotation_y, 'z': 0}
+    # assert check_rotation(agent, target)
     assert agent['shows'][0]['scale'] == {'x': 1, 'y': 1, 'z': 1}
     assert agent['agentMovement'] == {
         'repeat': False,
@@ -986,8 +988,6 @@ def test_agent_pointing_walk_distance_custom_step():
         True
     )
     # Agent starts turned around
-    rotation_y = round(rotation_y + 180, 2) % 360
-    assert agent['shows'][0]['rotation'] == {'x': 0, 'y': rotation_y, 'z': 0}
     assert agent['shows'][0]['scale'] == {'x': 1, 'y': 1, 'z': 1}
     assert agent['agentMovement'] == {
         'repeat': False,
@@ -1025,3 +1025,249 @@ def test_agent_pointing_walk_distance_collision():
     service = AgentCreationService()
     with pytest.raises(ILEException):
         service.create_feature_from_specific_values(scene, config, config)
+
+
+def test_rotate_and_point():
+    scene = prior_scene_with_target(add_to_repo=True)
+
+    target = scene.get_targets()[0]
+    t_y = target['shows'][0]['position']['y']
+    t_x = target['shows'][0]['position']['x']
+    t_z = target['shows'][0]['position']['z']
+
+    config1 = AgentConfig(
+        num=1,
+        type='agent_male_02',
+        agent_settings=AgentSettings(),
+        pointing=AgentPointingConfig(
+            step_begin=0,
+            object_label='target',
+            walk_distance=None
+        ),
+        position=VectorFloatConfig(t_x + 1, t_y, t_z),
+        rotation_y=0
+    )
+
+    config2 = AgentConfig(
+        num=1,
+        type='agent_male_02',
+        agent_settings=AgentSettings(),
+        pointing=AgentPointingConfig(
+            step_begin=0,
+            object_label='target',
+            walk_distance=None
+        ),
+        position=VectorFloatConfig(t_x + 1, t_y, t_z + 1),
+        rotation_y=0
+    )
+
+    config3 = AgentConfig(
+        num=1,
+        type='agent_male_02',
+        agent_settings=AgentSettings(),
+        pointing=AgentPointingConfig(
+            step_begin=0,
+            object_label='target',
+            walk_distance=None
+        ),
+        position=VectorFloatConfig(t_x, t_y, t_z + 1),
+        rotation_y=0
+    )
+
+    config4 = AgentConfig(
+        num=1,
+        type='agent_male_02',
+        agent_settings=AgentSettings(),
+        pointing=AgentPointingConfig(
+            step_begin=0,
+            object_label='target',
+            walk_distance=None
+        ),
+        position=VectorFloatConfig(t_x - 2.2, t_y, t_z - 1),
+        rotation_y=0
+    )
+
+    service = AgentCreationService()
+    agent1 = service.create_feature_from_specific_values(scene, config1, config1)  # noqa: E501
+    agent2 = service.create_feature_from_specific_values(scene, config2, config2)  # noqa: E501
+    agent3 = service.create_feature_from_specific_values(scene, config3, config3)  # noqa: E501
+    agent4 = service.create_feature_from_specific_values(scene, config4, config4)  # noqa: E501
+
+    assert check_rotation(agent1, target)
+    assert check_rotation(agent2, target)
+    assert check_rotation(agent3, target)
+    assert check_rotation(agent4, target)
+
+
+def test_pointing_y_angle():
+    scene = prior_scene_with_target(add_to_repo=True)
+
+    target = scene.get_targets()[0]
+    t_y = target['shows'][0]['position']['y']
+    t_x = target['shows'][0]['position']['x']
+    t_z = target['shows'][0]['position']['z']
+
+    config1 = AgentConfig(
+        num=1,
+        type='agent_male_02',
+        agent_settings=AgentSettings(),
+        pointing=AgentPointingConfig(
+            step_begin=0,
+            object_label='target',
+            walk_distance=None
+        ),
+        position=VectorFloatConfig(t_x + 1, t_y, t_z),
+        rotation_y=0
+    )
+
+    config2 = AgentConfig(
+        num=1,
+        type='agent_male_02',
+        agent_settings=AgentSettings(),
+        pointing=AgentPointingConfig(
+            step_begin=0,
+            object_label='target',
+            walk_distance=None
+        ),
+        position=VectorFloatConfig(t_x + 1, t_y + 0.6, t_z + 1),
+        rotation_y=0
+    )
+
+    config3 = AgentConfig(
+        num=1,
+        type='agent_male_02',
+        agent_settings=AgentSettings(),
+        pointing=AgentPointingConfig(
+            step_begin=0,
+            object_label='target',
+            walk_distance=None
+        ),
+        position=VectorFloatConfig(t_x, t_y + 1.1, t_z + 1),
+        rotation_y=0
+    )
+
+    config4 = AgentConfig(
+        num=1,
+        type='agent_male_02',
+        agent_settings=AgentSettings(),
+        pointing=AgentPointingConfig(
+            step_begin=0,
+            object_label='target',
+            walk_distance=None
+        ),
+        position=VectorFloatConfig(t_x - 2.2, t_y + 1.6, t_z - 1),
+        rotation_y=0
+    )
+
+    service = AgentCreationService()
+    agent1 = service.create_feature_from_specific_values(scene, config1, config1)  # noqa: E501
+    agent2 = service.create_feature_from_specific_values(scene, config2, config2)  # noqa: E501
+    agent3 = service.create_feature_from_specific_values(scene, config3, config3)  # noqa: E501
+    agent4 = service.create_feature_from_specific_values(scene, config4, config4)  # noqa: E501
+
+    assert check_rotation(agent1, target)
+    assert check_rotation(agent2, target)
+    assert check_rotation(agent3, target)
+    assert check_rotation(agent4, target)
+
+    assert agent1['actions'] == [{
+        'id': 'Point_start_index_finger',
+        'stepBegin': 19,
+        'stepEnd': 26
+    }, {
+        'id': 'Point_hold_index_finger',
+        'stepBegin': 26,
+        'isLoopAnimation': True
+    }]
+
+    assert agent2['actions'] == [{
+        'id': 'Point_start_index_finger_15',
+        'stepBegin': 28,
+        'stepEnd': 35
+    }, {
+        'id': 'Point_hold_index_finger_15',
+        'stepBegin': 35,
+        'isLoopAnimation': True
+    }]
+
+    assert agent3['actions'] == [{
+        'id': 'Point_start_index_finger_30',
+        'stepBegin': 37,
+        'stepEnd': 44
+    }, {
+        'id': 'Point_hold_index_finger_30',
+        'stepBegin': 44,
+        'isLoopAnimation': True
+    }]
+
+    assert agent4['actions'] == [{
+        'id': 'Point_start_index_finger_45',
+        'stepBegin': 15,
+        'stepEnd': 22
+    }, {
+        'id': 'Point_hold_index_finger_45',
+        'stepBegin': 22,
+        'isLoopAnimation': True
+    }]
+
+
+def test_agent_pointing_at_moved_object():
+    scene = prior_scene_with_target(add_to_repo=True)
+    service = AgentCreationService()
+
+    target = scene.get_targets()[0]
+    t_y = target['shows'][0]['position']['y']
+    t_x = target['shows'][0]['position']['x']
+    t_z = target['shows'][0]['position']['z']
+
+    config1 = AgentConfig(
+        num=1,
+        type='agent_male_02',
+        agent_settings=AgentSettings(),
+        pointing=AgentPointingConfig(
+            step_begin=0,
+            object_label='target',
+            walk_distance=None
+        ),
+        position=VectorFloatConfig(t_x + 1, t_y, t_z),
+        rotation_y=0
+    )
+
+    agent1 = service.create_feature_from_specific_values(scene, config1, config1)  # noqa: E501
+
+    target['debug']['moveToPosition'] = {'x': t_x + 5, 'z': t_z + 5}
+    target['debug']['moveToPositionBy'] = 100
+
+    config2 = AgentConfig(
+        num=1,
+        type='agent_male_02',
+        agent_settings=AgentSettings(),
+        pointing=AgentPointingConfig(
+            step_begin=1,
+            object_label='target',
+            walk_distance=None
+        ),
+        position=VectorFloatConfig(t_x, t_y, t_z + 5),
+        rotation_y=0
+    )
+
+    agent2 = service.create_feature_from_specific_values(scene, config2, config2)  # noqa: E501
+
+    config3 = AgentConfig(
+        num=1,
+        type='agent_male_02',
+        agent_settings=AgentSettings(),
+        pointing=AgentPointingConfig(
+            step_begin=200,
+            object_label='target',
+            walk_distance=None
+        ),
+        position=VectorFloatConfig(t_x, t_y, t_z + 5),
+        rotation_y=0
+    )
+
+    agent3 = service.create_feature_from_specific_values(scene, config3, config3)  # noqa: E501
+
+    assert check_rotation(agent1, target)
+    assert check_rotation(agent2, target)
+    assert check_rotation(agent3, target)

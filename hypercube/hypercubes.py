@@ -1,4 +1,5 @@
 import copy
+import math
 import random
 import uuid
 from abc import ABC, abstractmethod
@@ -240,6 +241,43 @@ class Hypercube(ABC):
         # Create all the scenes using the starter scene and the goal template.
         goal_template = self._create_goal_template(self._task_type)
         self._scenes = self._create_scenes(self._starter_scene, goal_template)
+
+        for scene in self._scenes:
+
+            targets = scene.get_targets()
+
+            if len(targets) == 1:
+                scene.goal.scene_info[tags.SCENE.DISTANCE] = math.dist(
+                    [scene.performer_start.position.x,
+                        scene.performer_start.position.z,
+                        scene.performer_start.position.y],
+                    [targets[0]["shows"][0]["position"]["x"],
+                        targets[0]["shows"][0]["position"]["z"],
+                        targets[0]["shows"][0]["position"]["y"]
+                     ]
+                )
+            elif len(targets) > 1:
+                scene.goal.scene_info[tags.SCENE.DISTANCE] = math.dist(
+                    [scene.performer_start.position.x,
+                        scene.performer_start.position.z,
+                        scene.performer_start.position.y],
+                    [targets[0]["shows"][0]["position"]["x"],
+                        targets[0]["shows"][0]["position"]["z"],
+                        targets[0]["shows"][0]["position"]["y"]
+                     ]
+                )
+                for target in targets:
+                    dist = math.dist(
+                        [scene.performer_start.position.x,
+                            scene.performer_start.position.z,
+                            scene.performer_start.position.y],
+                        [target["shows"][0]["position"]["x"],
+                            target["shows"][0]["position"]["z"],
+                            targets[0]["shows"][0]["position"]["y"]
+                         ]
+                    )
+                    if dist < scene.goal.scene_info[tags.SCENE.DISTANCE]:
+                        scene.goal.scene_info[tags.SCENE.DISTANCE] = dist
 
         # Finalize the slice tags for each scene in this hypercube.
         for scene in self._scenes:

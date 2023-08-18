@@ -34,6 +34,8 @@ tools:
               max: 3.0
       rotation_y: [0, 45, 90, 135, 180, 225, 270, 315]
       surrounded_by_lava: true
+      # Ensure performer can move around the tool's surrounding lava perimeter
+      surrounding_safe_zone: true
       labels: hooked_tool
     - num: 1
       shape:

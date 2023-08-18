@@ -1,6 +1,9 @@
 import copy
+import math
 import uuid
-from typing import Dict, List, Tuple
+from typing import Any, Dict, List, Tuple
+
+from machine_common_sense.config_manager import Vector3d
 
 from .geometry import (
     MAX_TRIES,
@@ -323,6 +326,153 @@ _OCCLUDER_INSTANCE_SIDEWAYS = [{
     }]
 }]
 
+NOTCHED_OCCLUDER_TEMPLATE = [{
+    "id": "notched_occluder_left_",
+    "type": "cube",
+    "debug": {},
+    "mass": 1000,
+    "materials": None,
+    "kinematic": 'true',
+    "structure": 'true',
+    "shows": [
+        {
+          "stepBegin": 0,
+          "position": {
+              "x": None,
+              "y": None,
+              "z": None
+          },
+            "rotation": {
+              "x": 0,
+              "y": 0,
+              "z": 0
+          },
+            "scale": {
+              "x": None,
+              "y": None,
+              "z": 0.1
+          }
+        }
+    ],
+    "moves": [
+        {
+            "stepBegin": None,
+            "stepEnd": None,
+            "vector": {
+                "x": 0,
+                "y": -0.25,
+                "z": 0
+            }
+        },
+        {
+            "stepBegin": None,
+            "stepEnd": None,
+            "vector": {
+                "x": 0,
+                "y": 0.25,
+                "z": 0
+            }
+        }
+    ]
+},
+    {
+    "id": "notched_occluder_right_",
+    "type": "cube",
+    "debug": {},
+    "mass": 1000,
+    "materials": None,
+    "kinematic": 'true',
+    "structure": 'true',
+    "shows": [
+        {
+          "stepBegin": 0,
+          "position": {
+              "x": None,
+              "y": None,
+              "z": None
+          },
+            "rotation": {
+              "x": 0,
+              "y": 0,
+              "z": 0
+          },
+            "scale": {
+              "x": None,
+              "y": None,
+              "z": 0.1
+          }
+        }
+    ],
+    "moves": [
+        {
+            "stepBegin": None,
+            "stepEnd": None,
+            "vector": {
+                "x": 0,
+                "y": -0.25,
+                "z": 0
+            }
+        },
+        {
+            "stepBegin": None,
+            "stepEnd": None,
+            "vector": {
+                "x": 0,
+                "y": 0.25,
+                "z": 0
+            }
+        }
+    ]
+},
+    {
+    "id": "notched_occluder_middle_",
+    "type": "cube",
+    "debug": {},
+    "mass": 1000,
+    "materials": None,
+    "kinematic": 'true',
+    "structure": 'true',
+    "shows": [
+        {
+          "stepBegin": 0,
+          "position": {
+              "x": 0,
+              "y": None,
+              "z": None
+          },
+            "rotation": {
+              "x": 0,
+              "y": 0,
+              "z": 0
+          },
+            "scale": {
+              "x": None,
+              "y": None,
+              "z": 0.1
+          }
+        }
+    ],
+    "moves": [
+        {
+            "stepBegin": None,
+            "stepEnd": None,
+            "vector": {
+                "x": 0,
+                "y": -0.25,
+                "z": 0
+            }
+        },
+        {
+            "stepBegin": None,
+            "stepEnd": None,
+            "vector": {
+                "x": 0,
+                "y": 0.25,
+                "z": 0
+            }
+        }
+    ]
+}]
 
 WALL = 0
 POLE = 1
@@ -631,6 +781,136 @@ def create_occluder(
     _assign_occluder_bounds(occluder[WALL], is_sideways)
     _assign_occluder_bounds(occluder[POLE], is_sideways, is_pole=True)
     return occluder
+
+
+def create_notched_occluder(
+    occluder_mat: MaterialTuple,
+    room_dimensions: Vector3d,
+    position_z: float,
+    height: float,
+    platform_height: float,
+    platform_width: float,
+    down_step: int,
+    up_step: int
+) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+    """
+    Create and return a moving occluder
+    that is notched so that a rectangular platform can sit under it.
+    Arguments:
+    - occluder_mat: Has the material and color for the occluder
+    - room_dimensions: Room dimensions
+    - position_z: Z position of the center of the occluder
+    - height: The overall height of the occluder
+    - platform_height: The height of the platform, and, thus, the height of the
+        notch
+    - platform_width: The width of the platform, and, thus, the width of
+        the notch
+    - down_step: The step at which the occluder begins to move down
+    - up_step: The step at which the occluder begins to move up
+    """
+
+    l_oclr = copy.deepcopy(NOTCHED_OCCLUDER_TEMPLATE[0])
+    r_oclr = copy.deepcopy(NOTCHED_OCCLUDER_TEMPLATE[1])
+    m_oclr = copy.deepcopy(NOTCHED_OCCLUDER_TEMPLATE[2])
+
+    temp_uuid = str(uuid.uuid4())
+
+    l_oclr['id'] += temp_uuid
+    r_oclr['id'] += temp_uuid
+    m_oclr['id'] += temp_uuid
+
+    # Sets the starting height of the occluder
+    rounded_height = math.ceil(height / 0.25) * 0.25
+    vertical_shift = room_dimensions.y - rounded_height
+
+    # Setting scale and positional info
+    l_oclr['shows'][0]['scale']['x'] = (room_dimensions.x - platform_width) / 2
+    l_oclr['shows'][0]['scale']['y'] = height
+
+    r_oclr['shows'][0]['scale']['x'] = (room_dimensions.x - platform_width) / 2
+    r_oclr['shows'][0]['scale']['y'] = height
+
+    m_oclr['shows'][0]['scale']['x'] = platform_width
+    m_oclr['shows'][0]['scale']['y'] = height - platform_height
+
+    l_oclr['shows'][0]['position']['x'] = \
+        -(platform_width / 2 + l_oclr['shows'][0]['scale']['x'] / 2)
+    l_oclr['shows'][0]['position']['y'] = (height / 2) + vertical_shift
+    l_oclr['shows'][0]['position']['z'] = position_z
+
+    r_oclr['shows'][0]['position']['x'] = \
+        platform_width / 2 + r_oclr['shows'][0]['scale']['x'] / 2
+    r_oclr['shows'][0]['position']['y'] = (height / 2) + vertical_shift
+    r_oclr['shows'][0]['position']['z'] = position_z
+
+    m_oclr['shows'][0]['position']['x'] = 0
+    m_oclr['shows'][0]['position']['y'] = \
+        (platform_height + m_oclr['shows'][0]
+         ['scale']['y'] / 2) + vertical_shift
+    m_oclr['shows'][0]['position']['z'] = position_z
+
+    # Materials and debug
+    l_oclr['materials'] = [occluder_mat.material]
+    r_oclr['materials'] = [occluder_mat.material]
+    m_oclr['materials'] = [occluder_mat.material]
+
+    l_oclr['debug']['color'] = occluder_mat.color
+    l_oclr['debug']['info'] = occluder_mat.color
+    r_oclr['debug']['color'] = occluder_mat.color
+    r_oclr['debug']['info'] = occluder_mat.color
+    m_oclr['debug']['color'] = occluder_mat.color
+    m_oclr['debug']['info'] = occluder_mat.color
+
+    l_oclr['debug']['dimension'] = copy.deepcopy(l_oclr['shows'][0]['scale'])
+    r_oclr['debug']['dimension'] = copy.deepcopy(r_oclr['shows'][0]['scale'])
+    m_oclr['debug']['dimension'] = copy.deepcopy(m_oclr['shows'][0]['scale'])
+
+    # Stepping stats
+    movement_steps = (room_dimensions.y - rounded_height) / 0.25
+
+    l_oclr['moves'][0]['stepBegin'] = down_step
+    l_oclr['moves'][0]['stepEnd'] = down_step + movement_steps - 1
+
+    r_oclr['moves'][0]['stepBegin'] = down_step
+    r_oclr['moves'][0]['stepEnd'] = down_step + movement_steps - 1
+
+    m_oclr['moves'][0]['stepBegin'] = down_step
+    m_oclr['moves'][0]['stepEnd'] = down_step + movement_steps - 1
+
+    l_oclr['moves'][1]['stepBegin'] = up_step
+    l_oclr['moves'][1]['stepEnd'] = up_step + movement_steps - 1
+
+    r_oclr['moves'][1]['stepBegin'] = up_step
+    r_oclr['moves'][1]['stepEnd'] = up_step + movement_steps - 1
+
+    m_oclr['moves'][1]['stepBegin'] = up_step
+    m_oclr['moves'][1]['stepEnd'] = up_step + movement_steps - 1
+
+    l_oclr['shows'][0]['boundingBox'] = create_bounds(
+        dimensions=l_oclr['shows'][0]['scale'],
+        offset={'x': 0, 'y': 0, 'z': 0},
+        position=l_oclr['shows'][0]['position'],
+        rotation=l_oclr['shows'][0]['rotation'],
+        standing_y=(l_oclr['shows'][0]['scale']['y'] / 2.0)
+    )
+
+    r_oclr['shows'][0]['boundingBox'] = create_bounds(
+        dimensions=r_oclr['shows'][0]['scale'],
+        offset={'x': 0, 'y': 0, 'z': 0},
+        position=r_oclr['shows'][0]['position'],
+        rotation=r_oclr['shows'][0]['rotation'],
+        standing_y=(r_oclr['shows'][0]['scale']['y'] / 2.0)
+    )
+
+    m_oclr['shows'][0]['boundingBox'] = create_bounds(
+        dimensions=m_oclr['shows'][0]['scale'],
+        offset={'x': 0, 'y': 0, 'z': 0},
+        position=m_oclr['shows'][0]['position'],
+        rotation=m_oclr['shows'][0]['rotation'],
+        standing_y=(m_oclr['shows'][0]['scale']['y'] / 2.0)
+    )
+
+    return [l_oclr, r_oclr, m_oclr]
 
 
 def _assign_occluder_bounds(

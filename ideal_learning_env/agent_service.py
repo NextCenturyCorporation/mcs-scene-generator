@@ -15,6 +15,7 @@ from generator.agents import (
     add_agent_action,
     add_agent_movement,
     add_agent_pointing,
+    add_agent_rotate_then_point,
     create_agent,
     estimate_move_step_length,
     get_random_agent_settings
@@ -352,7 +353,8 @@ class AgentCreationService(BaseObjectCreationService):
             position_z=reconciled.position.z,
             rotation_y=reconciled.rotation_y,
             settings=full_settings,
-            position_y_modifier=reconciled.position.y
+            position_y_modifier=reconciled.position.y,
+            labels=reconciled.labels
         )
 
         if reconciled.keyword_location:
@@ -425,13 +427,12 @@ class AgentCreationService(BaseObjectCreationService):
         reconciled.actions = None
         reconciled.movement = None
 
-        add_agent_pointing(
-            agent=agent,
-            step_begin=(reconciled.pointing.step_begin or 1)
-        )
-
         # If the agent is not pointing at a specific object, return here.
         if not reconciled.pointing.object_label:
+            add_agent_pointing(
+                agent=agent,
+                step_begin=(reconciled.pointing.step_begin or 1)
+            )
             return
 
         # Retrieve the object using the label, or delay if necessary.
@@ -452,10 +453,16 @@ class AgentCreationService(BaseObjectCreationService):
             Vector3d(**object_position),
             no_rounding_to_tens=True
         )
-        agent['shows'][0]['rotation']['y'] = rotation_y
 
         # If the agent is not walking toward a specific object, return here.
         if not reconciled.pointing.walk_distance:
+            step_begin = (reconciled.pointing.step_begin or 1)
+
+            add_agent_rotate_then_point(
+                agent,
+                step_begin,
+                object_idl.instance
+            )
             return
 
         # Calculate the agent's new starting position, as well as its ending

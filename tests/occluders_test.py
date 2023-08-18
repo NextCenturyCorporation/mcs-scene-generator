@@ -1,4 +1,5 @@
 import pytest
+from machine_common_sense.config_manager import Vector3d
 
 from generator.geometry import ObjectBounds
 from generator.materials import MaterialTuple
@@ -7,6 +8,7 @@ from generator.occluders import (
     DEFAULT_INTUITIVE_PHYSICS_ROOM_DIMENSIONS,
     OCCLUDER_HEIGHT,
     calculate_separation_distance,
+    create_notched_occluder,
     create_occluder,
     find_rotate_step_length,
     generate_occluder_position,
@@ -1533,3 +1535,36 @@ def test_occluder_gap_viewport_positioning():
     assert new_scene.objects[1]['shows'][0]['position']['x'] == 2.2
     assert new_object[0]['shows'][0]['position']['x'] == -2.2
     assert new_object[1]['shows'][0]['position']['x'] == -2.2
+
+
+def test_create_notched_occluder():
+    room_dim = Vector3d(x=3, y=3, z=3)
+    notched_occluder = create_notched_occluder(
+        occluder_mat=TEST_MATERIAL_WALL,
+        room_dimensions=room_dim,
+        position_z=1,
+        height=1,
+        platform_height=1,
+        platform_width=1,
+        down_step=0,
+        up_step=10
+    )
+
+    assert notched_occluder
+    left = notched_occluder[0]
+    right = notched_occluder[1]
+    middle = notched_occluder[2]
+
+    assert left['shows'][0]['position']['y'] == \
+        right['shows'][0]['position']['y'] and \
+        left['shows'][0]['position']['y'] < \
+        middle['shows'][0]['position']['y']
+
+    assert left['shows'][0]['position']['z'] == \
+        right['shows'][0]['position']['z'] and \
+        left['shows'][0]['position']['z'] == \
+        middle['shows'][0]['position']['z']
+
+    assert left['shows'][0]['position']['x'] == \
+        (right['shows'][0]['position']['x'] * -1) and \
+        middle['shows'][0]['position']['x'] == 0

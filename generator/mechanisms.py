@@ -158,10 +158,10 @@ def _set_placer_or_placed_object_movement(
 
     # Calculate the Y distance in steps. If it doesn't divide evenly, round
     # DOWN to nearest int (the placed object will fall the rest of the way).
-    total_steps = math.floor(move_distance / PLACER_MOVE_AMOUNT)
+    # Subtract 1 because the step range is inclusive.
+    total_steps = math.floor(move_distance / PLACER_MOVE_AMOUNT) - 1
 
-    # The stepEnd is inclusive, so subtract 1 from the total steps.
-    stop_step = activation_step + total_steps - 1
+    stop_step = activation_step + total_steps
 
     if deactivation_step is None or deactivation_step < stop_step:
         deactivation_step = stop_step + 1 + PLACER_WAIT_STEP
@@ -171,7 +171,8 @@ def _set_placer_or_placed_object_movement(
         instance['moves'][0]['stepBegin'] = deactivation_step + \
             PLACER_WAIT_STEP
         instance['moves'][0]['stepEnd'] = (
-            instance['moves'][0]['stepBegin'] + total_steps) - 2
+            instance['moves'][0]['stepBegin'] + total_steps
+        )
     else:
         instance['moves'][0]['stepBegin'] = activation_step
         instance['moves'][0]['stepEnd'] = stop_step
@@ -184,19 +185,16 @@ def _set_placer_or_placed_object_movement(
         instance['moves'][1]['stepBegin'] = (
             deactivation_step + PLACER_WAIT_STEP
         )
-        # Keep placer extruded from ceiling
         instance['moves'][1]['stepEnd'] = (
-            instance['moves'][1]['stepBegin'] + total_steps - 2
+            instance['moves'][1]['stepBegin'] + total_steps
         )
     return deactivation_step
 
 
 def _set_placer_or_placed_object_shellgame_movement(
     instance: SceneObject,
-    move_object_end_position: Dict[str, float],
-    placed_object_dimensions: Dict[str, float],
+    move_object_end_position: float,
     activation_step: int,
-    deactivation_step: int = None,
     is_placer: bool = False,
     move_distance: int = None,
     move_object_y: float = None,
@@ -221,21 +219,26 @@ def _set_placer_or_placed_object_shellgame_movement(
         else MOVE_OBJ_OFFSET
 
     move_distance_x = abs(
-        instance['shows'][0]['position']['x'] - move_object_end_position.x)
+        instance['shows'][0]['position']['x'] - move_object_end_position)
 
     move_distance_y = move_object_raise_height
 
     direction_x = 1 if instance['shows'][0]['position']['x'] < \
-        move_object_end_position.x else -1
+        move_object_end_position else -1
 
     # Calculate the distances in steps. If it doesn't divide evenly, round
     # DOWN to nearest int.
     total_steps_y = math.floor(move_distance_y / PLACER_MOVE_AMOUNT)
     total_steps_x = math.floor(move_distance_x / PLACER_MOVE_AMOUNT)
     total_steps_z = math.floor(offset_step_z / PLACER_MOVE_AMOUNT)
-
-    # Steps - Placer at ceiling height minus PLACER_EXT_AMT to top of object
-    init_placer_steps_y = math.floor(move_distance / PLACER_MOVE_AMOUNT)
+    # Steps for the placer to move down at the start.
+    # Subtract 1 because the step range is inclusive.
+    total_steps_placer_y = math.floor(move_distance / PLACER_MOVE_AMOUNT) - 1
+    # The first movement after the placer activates must add the wait step.
+    must_wait = True
+    # Backwards compatibility: use only half the wait step to activate or
+    # deactivate the placer.
+    half_wait_step = math.floor(PLACER_WAIT_STEP / 2)
 
     # Placer Comes Down
     if is_placer:
@@ -244,8 +247,7 @@ def _set_placer_or_placed_object_shellgame_movement(
         instance['materials'] = ['Custom/Materials/Cyan']
         instance['moves'][moves_idx]['stepBegin'] = activation_step
         instance['moves'][moves_idx]['stepEnd'] = \
-            instance['moves'][moves_idx]['stepBegin'] + \
-            init_placer_steps_y - 1
+            instance['moves'][moves_idx]['stepBegin'] + total_steps_placer_y
         instance['moves'][moves_idx]['vector']['y'] = -PLACER_MOVE_AMOUNT
 
         # Placer is now active - magenta
@@ -254,7 +256,7 @@ def _set_placer_or_placed_object_shellgame_movement(
             'Custom/Materials/Magenta']
         instance['changeMaterials'][chg_mat_idx]['stepBegin'] = \
             instance['moves'][moves_idx]['stepEnd'] + \
-            math.floor(PLACER_WAIT_STEP / 2)
+            half_wait_step
         instance['states'] = [PLACER_INACTIVE_STATUS] * \
             instance['changeMaterials'][chg_mat_idx]['stepBegin']
 
@@ -264,7 +266,7 @@ def _set_placer_or_placed_object_shellgame_movement(
             instance['moves'] = [copy.deepcopy(OBJECT_MOVEMENT_TEMPLATE)]
             moves_idx = len(instance['moves']) - 1
             instance['moves'][moves_idx]['stepBegin'] = \
-                activation_step + init_placer_steps_y + PLACER_WAIT_STEP + 1
+                activation_step + total_steps_placer_y + PLACER_WAIT_STEP
             instance['moves'][moves_idx]['stepEnd'] = \
                 instance['moves'][moves_idx]['stepBegin'] + \
                 total_steps_y - 1
@@ -275,11 +277,12 @@ def _set_placer_or_placed_object_shellgame_movement(
             moves_idx = len(instance['moves']) - 1
             instance['moves'][moves_idx]['stepBegin'] = \
                 instance['moves'][moves_idx - 1]['stepEnd'] + \
-                PLACER_WAIT_STEP + 1
+                PLACER_WAIT_STEP
             instance['moves'][moves_idx]['stepEnd'] = \
                 instance['moves'][moves_idx]['stepBegin'] + \
                 total_steps_y - 1
             instance['moves'][moves_idx]['vector']['y'] = PLACER_MOVE_AMOUNT
+        must_wait = False
 
     # Move the object forward
     if total_steps_z != 0:
@@ -287,9 +290,9 @@ def _set_placer_or_placed_object_shellgame_movement(
             # Object
             instance['moves'] = [copy.deepcopy(OBJECT_MOVEMENT_TEMPLATE)]
             moves_idx = len(instance['moves']) - 1
-            instance['moves'][moves_idx]['stepBegin'] = activation_step + \
-                init_placer_steps_y + 1 + \
-                (0 if move_object_raise_height > 0 else PLACER_WAIT_STEP)
+            instance['moves'][moves_idx]['stepBegin'] = \
+                activation_step + total_steps_placer_y + \
+                (PLACER_WAIT_STEP if must_wait else 1)
             instance['moves'][moves_idx]['stepEnd'] = \
                 instance['moves'][moves_idx]['stepBegin'] + \
                 abs(total_steps_z) - 1
@@ -299,19 +302,20 @@ def _set_placer_or_placed_object_shellgame_movement(
             moves_idx = len(instance['moves']) - 1
             instance['moves'][moves_idx]['stepBegin'] = \
                 instance['moves'][moves_idx - 1]['stepEnd'] + \
-                1 + (0 if move_object_raise_height > 0 else PLACER_WAIT_STEP)
+                (PLACER_WAIT_STEP if must_wait else 1)
             instance['moves'][moves_idx]['stepEnd'] = \
                 instance['moves'][moves_idx]['stepBegin'] + \
                 abs(total_steps_z) - 1
             instance['moves'][moves_idx]['vector']['z'] = -PLACER_MOVE_AMOUNT
+        must_wait = False
 
     # X-Axis Movement
     if instance.get('moves') is None:
         instance['moves'] = [copy.deepcopy(OBJECT_MOVEMENT_TEMPLATE)]
         moves_idx = len(instance['moves']) - 1
-        instance['moves'][moves_idx]['stepBegin'] = activation_step + \
-            init_placer_steps_y + 1 + \
-            (PLACER_WAIT_STEP if total_steps_z == 0 else 0)
+        instance['moves'][moves_idx]['stepBegin'] = \
+            activation_step + total_steps_placer_y + \
+            (PLACER_WAIT_STEP if must_wait else 1)
         instance['moves'][moves_idx]['stepEnd'] = \
             instance['moves'][moves_idx]['stepBegin'] + \
             total_steps_x - 1
@@ -321,13 +325,15 @@ def _set_placer_or_placed_object_shellgame_movement(
         instance['moves'].append(copy.deepcopy(OBJECT_MOVEMENT_TEMPLATE))
         moves_idx = len(instance['moves']) - 1
         instance['moves'][moves_idx]['stepBegin'] = \
-            instance['moves'][moves_idx - 1]['stepEnd'] + 1 + \
-            (PLACER_WAIT_STEP if total_steps_z == 0 else 0)
+            instance['moves'][moves_idx - 1]['stepEnd'] + \
+            (PLACER_WAIT_STEP if must_wait else 1)
         instance['moves'][moves_idx]['stepEnd'] = \
             instance['moves'][moves_idx]['stepBegin'] + \
             total_steps_x - 1
         instance['moves'][moves_idx]['vector']['x'] = direction_x * \
             PLACER_MOVE_AMOUNT
+
+    must_wait = False
 
     # Move the object backward
     if total_steps_z != 0:
@@ -350,21 +356,19 @@ def _set_placer_or_placed_object_shellgame_movement(
         instance['moves'][moves_idx]['vector']['y'] = -PLACER_MOVE_AMOUNT
 
     deactivation_step = instance['moves'][moves_idx]['stepEnd'] + \
-        PLACER_WAIT_STEP + 1
+        half_wait_step
 
     # Placer is now inactive - cyan / move the placer back up
     if is_placer:
-        instance['changeMaterials'].append(
-            {'stepBegin': instance['moves']
-                [moves_idx]['stepEnd'] + math.floor
-                (PLACER_WAIT_STEP / 2),
-                'materials':
-                ['Custom/Materials/Cyan']
-             })
+        instance['changeMaterials'].append({
+            'stepBegin': (
+                instance['moves'][moves_idx]['stepEnd'] + half_wait_step
+            ),
+            'materials': ['Custom/Materials/Cyan']
+        })
 
         instance['states'] += [PLACER_ACTIVE_STATUS] * \
-            (instance['moves'][moves_idx]['stepEnd'] +
-             math.floor(PLACER_WAIT_STEP / 2) -
+            (instance['moves'][moves_idx]['stepEnd'] + half_wait_step -
              instance['changeMaterials'][chg_mat_idx]['stepBegin'])
 
         instance['moves'].append(copy.deepcopy(OBJECT_MOVEMENT_TEMPLATE))
@@ -372,8 +376,7 @@ def _set_placer_or_placed_object_shellgame_movement(
         instance['moves'][moves_idx]['stepBegin'] = \
             instance['moves'][moves_idx - 1]['stepEnd'] + PLACER_WAIT_STEP
         instance['moves'][moves_idx]['stepEnd'] =  \
-            instance['moves'][moves_idx]['stepBegin'] + \
-            (init_placer_steps_y) - 1
+            instance['moves'][moves_idx]['stepBegin'] + total_steps_placer_y
         instance['moves'][moves_idx]['vector']['y'] = PLACER_MOVE_AMOUNT
 
         instance['states'] += [PLACER_INACTIVE_STATUS] * \
@@ -444,7 +447,7 @@ def create_placer(
     deactivation_step: int = None,
     is_pickup_obj: bool = False,
     is_move_obj: bool = False,
-    move_object_end_position: Dict[str, float] = None,
+    move_object_end_position: float = None,
     move_object_y: float = None,
     move_object_z: float = None,
 ) -> List[ObjectDefinition]:
@@ -460,6 +463,7 @@ def create_placer(
                               Y position is its bottom or center.
     - activation_step: Step on which placer should begin downward movement.
     - end_height: Height at which placed object's bottom should stop.
+                  Not used if is_pickup_obj or is_move_obj.
     - max_height: Height of room's ceiling.
     - id_modifier: String to append to placer's ID. Default: none
     - last_step: Scene's last step, used to record inactive state.
@@ -497,27 +501,28 @@ def create_placer(
     placer['shows'][0]['scale']['x'] = placer_scale
     placer['shows'][0]['scale']['z'] = placer_scale
 
-    # Set placer Y scale to go from max height to end height.
-    placer['shows'][0]['scale']['y'] = ((max_height - end_height) / 2.0)
-
-    # Set placer position after setting scale.
-    placer['shows'][0]['position']['x'] = placed_object_position['x']
-    placer['shows'][0]['position']['z'] = placed_object_position['z']
+    # Calculate the Y distance between the object and the end height.
     if is_pickup_obj or is_move_obj:
-        # Keep placer extruded from ceiling
-        placer['shows'][0]['position']['y'] = max_height + object_top + \
-            placer['shows'][0]['scale']['y'] - PLACER_EXT_AMT
+        move_distance = math.ceil(
+            (max_height - object_top - PLACER_EXT_AMT) / PLACER_MOVE_AMOUNT
+        ) * PLACER_MOVE_AMOUNT
+        placer['shows'][0]['scale']['y'] = max_height / 2.0
+        # Ensure the placer always starts slightly extruded from the ceiling.
+        placer['shows'][0]['position']['y'] = (
+            object_top + move_distance + placer['shows'][0]['scale']['y']
+        )
     else:
-        # Keep placer extruded from ceiling
+        move_distance = object_bottom - end_height
+        # Set placer Y scale to go from max height to end height.
+        placer['shows'][0]['scale']['y'] = ((max_height - end_height) / 2.0)
+        # Ensure the placer always starts slightly extruded from the ceiling.
         placer['shows'][0]['position']['y'] = (
             object_top + placer['shows'][0]['scale']['y']
         )
 
-    # Calculate the Y distance between the object and the end height.
-    if is_pickup_obj or is_move_obj:
-        move_distance = max_height - PLACER_EXT_AMT
-    else:
-        move_distance = object_bottom - end_height
+    # Set placer position after setting scale.
+    placer['shows'][0]['position']['x'] = placed_object_position['x']
+    placer['shows'][0]['position']['z'] = placed_object_position['z']
 
     # Set the scripted downward and upward movement on the placer.
     if is_move_obj:
@@ -525,10 +530,8 @@ def create_placer(
             placer,
             move_object_end_position=move_object_end_position,
             activation_step=activation_step,
-            deactivation_step=deactivation_step,
             is_placer=True,
             move_distance=move_distance,
-            placed_object_dimensions=placed_object_dimensions,
             move_object_y=move_object_y,
             move_object_z=move_object_z,
         )
@@ -751,54 +754,45 @@ def place_object(
 
 def move_object(
     instance: SceneObject,
-    move_object_end_position: Dict[str, float],
+    move_object_end_position: float,
     activation_step: int,
-    start_height: float = None,
-    end_height: float = 0,
-    deactivation_step: int = None,
+    room_height: float,
     move_object_y: float = None,
     move_object_z: float = None,
 ) -> SceneObject:
-    """Modify and return the given object instance so its top is positioned at
-    the given height, will move downward with a placer (instantiated later) at
-    the given step like they're attached together, and is then placed when its
-    bottom is at the given height.
+    """Modify and return the given object instance so it's moved from its
+    current position to the given position via "shell game" movement.
+    Assumes there will always be movement on the X axis.
 
     NOTE: Call create_placer AFTER this function!
 
     - instance: Instantiated object to place.
-    - activation_step: Step on which object should begin downward movement.
-    - start_height: Y coordinate at which top of object should be positioned.
-                    If none, just use given instance's Y position.
-    - end_height: Y coordinate at which bottom of object should be placed.
-                  Default: 0
-    - deactivation_step: Step on which held object should be released.
-                         Default: At end of object's downward movement
+    - move_object_end_position: End X position of object instance.
+    - activation_step: Step on which placer will begin downward movement.
+    - room_height: Height of the room.
     - move_object_y: The placer will raise the object by this value
         during the move object event.
         Default: 0
     - move_object_z: The object will be moved this distance along the z-axis,
         slide along the x-axis and move back.
         Default: 1.5
-
     """
-    # Change the object's Y position so its top is at the given start height.
-    if start_height is not None:
-        instance['shows'][0]['position']['y'] = start_height + \
-            instance['debug']['positionY']
+    object_top = (
+        instance['shows'][0]['position']['y'] +
+        instance['debug']['dimensions']['y'] -
+        instance['debug'].get('positionY', 0)
+    )
+    move_distance = math.ceil(
+        (room_height - object_top - PLACER_EXT_AMT) / PLACER_MOVE_AMOUNT
+    ) * PLACER_MOVE_AMOUNT
 
-    placer_move_distance_y = end_height - start_height - \
-        instance['debug']['dimensions']['y']
-
-    # Set the scripted downward movement on the object.
+    # Set the scripted sideways movement on the object.
     deactivation_step = _set_placer_or_placed_object_shellgame_movement(
         instance,
         move_object_end_position=move_object_end_position,
         activation_step=activation_step,
-        deactivation_step=deactivation_step,
         is_placer=False,
-        move_distance=placer_move_distance_y,
-        placed_object_dimensions=instance['debug']['dimensions'],
+        move_distance=move_distance,
         move_object_y=move_object_y,
         move_object_z=move_object_z
     )
@@ -825,8 +819,8 @@ def move_object(
 def pickup_object(
     instance: SceneObject,
     activation_step: int,
+    room_height: float,
     start_height: float = 0,
-    end_height: float = 0,
     deactivation_step: int = None
 ) -> SceneObject:
     """Modify and return the given object instance so its bottom is positioned
@@ -851,9 +845,14 @@ def pickup_object(
         start_height + instance['debug']['positionY']
     )
 
-    # Calculate the Y distance between the object's mid section and the end
-    # height.
-    move_distance = end_height - start_height - PLACER_EXT_AMT
+    object_top = (
+        instance['shows'][0]['position']['y'] +
+        instance['debug']['dimensions']['y'] -
+        instance['debug'].get('positionY', 0)
+    )
+    move_distance = math.ceil(
+        (room_height - object_top - PLACER_EXT_AMT) / PLACER_MOVE_AMOUNT
+    ) * PLACER_MOVE_AMOUNT
 
     # Set the scripted upward movement on the object.
     deactivation_step = _set_placer_or_placed_object_movement(

@@ -1,5 +1,5 @@
 import pytest
-from machine_common_sense.config_manager import Vector3d
+from machine_common_sense.config_manager import RoomMaterials, Vector3d
 
 from generator import materials
 from generator.base_objects import (
@@ -8,6 +8,7 @@ from generator.base_objects import (
 )
 from generator.geometry import MAX_TRIES, ORIGIN_LOCATION
 from generator.instances import instantiate_object
+from generator.structures import DOOR_TYPES
 from ideal_learning_env.defs import ILEDelayException
 from ideal_learning_env.numerics import (
     MinMaxFloat,
@@ -865,10 +866,9 @@ def test_placer_creation_reconcile():
 
     # Test empty_placer config
     tmp4 = StructuralPlacerConfig(
-        num=[2, 3], placed_object_rotation=MinMaxInt(230, 260),
-        placed_object_position=VectorFloatConfig(3, 0, [2, 3]),
-        placed_object_scale=4, placed_object_shape='soccer_ball',
-        activation_step=MinMaxInt(90, 100), end_height=[5, 6],
+        num=[2, 3],
+        activation_step=MinMaxInt(90, 100),
+        end_height=[5, 6],
         empty_placer=True
     )
     srv = StructuralPlacersCreationService()
@@ -910,6 +910,305 @@ def test_placer_creation_reconcile():
     assert r6.placed_object_position == Vector3d(x=3.0, y=0.0, z=3.0)
     assert r6.move_object_end_position == Vector3d(x=-3.0, y=0.0, z=3.0)
     assert r6.move_object_y == 2
+
+
+def test_placer_add_to_scene_empty_placer():
+    service = StructuralPlacersCreationService()
+    material_active = ['Custom/Materials/Magenta']
+    material_inactive = ['Custom/Materials/Cyan']
+
+    # Test with default options.
+    config = StructuralPlacerConfig(empty_placer=True)
+    # Create a new scene.
+    scene = prior_scene()
+    # Add two placers to the scene.
+    service.add_to_scene(scene, config, scene.find_bounds())
+    service.add_to_scene(scene, config, scene.find_bounds())
+    assert len(scene.objects) == 2
+    for instance in scene.objects:
+        assert instance['id'].startswith('placer_')
+        assert instance['type'] == 'cylinder'
+        assert instance['kinematic']
+        assert instance['structure']
+        assert instance['materials'] == material_active
+        assert len(instance['shows']) == 1
+        assert instance['shows'][0]['stepBegin'] == 0
+        assert -5 < instance['shows'][0]['position']['x'] < 5
+        assert instance['shows'][0]['position']['y'] == 4.25
+        assert -5 < instance['shows'][0]['position']['z'] < 5
+        assert instance['shows'][0]['rotation'] == {'x': 0, 'y': 0, 'z': 0}
+        assert instance['shows'][0]['scale'] == {
+            'x': 0.05, 'y': 1.5, 'z': 0.05
+        }
+        assert len(instance['moves']) == 2
+        move_starts = instance['moves'][0]['stepBegin']
+        assert 1 <= move_starts <= 10
+        assert instance['moves'][0]['stepEnd'] == move_starts + 10
+        assert instance['moves'][0]['vector']['y'] == -0.25
+        assert instance['moves'][1]['stepBegin'] == move_starts + 21
+        assert instance['moves'][1]['stepEnd'] == move_starts + 31
+        assert instance['moves'][1]['vector']['y'] == 0.25
+        assert len(instance['changeMaterials']) == 1
+        assert instance['changeMaterials'][0]['stepBegin'] == move_starts + 16
+        assert instance['changeMaterials'][0]['materials'] == material_inactive
+
+    # Test with custom options.
+    config = StructuralPlacerConfig(
+        activation_step=20,
+        placed_object_position=VectorFloatConfig(1, 2, 3),
+        empty_placer=True
+    )
+    # Create a new scene.
+    scene = prior_scene()
+    # Add two placers to the scene.
+    service.add_to_scene(scene, config, scene.find_bounds())
+    service.add_to_scene(scene, config, scene.find_bounds())
+    assert len(scene.objects) == 2
+    for instance in scene.objects:
+        assert instance['id'].startswith('placer_')
+        assert instance['type'] == 'cylinder'
+        assert instance['kinematic']
+        assert instance['structure']
+        assert instance['materials'] == material_active
+        assert len(instance['shows']) == 1
+        assert instance['shows'][0]['stepBegin'] == 0
+        assert instance['shows'][0]['position'] == {'x': 1, 'y': 3.5, 'z': 3}
+        assert instance['shows'][0]['scale']['y'] == 1.5
+        assert len(instance['moves']) == 2
+        assert instance['moves'][0]['stepBegin'] == 20
+        assert instance['moves'][0]['stepEnd'] == 27
+        assert instance['moves'][0]['vector']['y'] == -0.25
+        assert instance['moves'][1]['stepBegin'] == 38
+        assert instance['moves'][1]['stepEnd'] == 45
+        assert instance['moves'][1]['vector']['y'] == 0.25
+        assert len(instance['changeMaterials']) == 1
+        assert instance['changeMaterials'][0]['stepBegin'] == 33
+        assert instance['changeMaterials'][0]['materials'] == material_inactive
+
+    # Test picking-up placer with Y position 0.
+    config = StructuralPlacerConfig(
+        activation_step=20,
+        placed_object_position=VectorFloatConfig(1, 0, 3),
+        pickup_object=True,
+        empty_placer=True
+    )
+    # Create a new scene.
+    scene = prior_scene()
+    # Add two placers to the scene.
+    service.add_to_scene(scene, config, scene.find_bounds())
+    service.add_to_scene(scene, config, scene.find_bounds())
+    assert len(scene.objects) == 2
+    for instance in scene.objects:
+        assert instance['id'].startswith('placer_')
+        assert instance['type'] == 'cylinder'
+        assert instance['kinematic']
+        assert instance['structure']
+        assert instance['materials'] == material_inactive
+        assert len(instance['shows']) == 1
+        assert instance['shows'][0]['stepBegin'] == 0
+        assert instance['shows'][0]['position'] == {'x': 1, 'y': 4.25, 'z': 3}
+        assert instance['shows'][0]['scale']['y'] == 1.5
+        assert len(instance['moves']) == 2
+        assert instance['moves'][0]['stepBegin'] == 20
+        assert instance['moves'][0]['stepEnd'] == 30
+        assert instance['moves'][0]['vector']['y'] == -0.25
+        assert instance['moves'][1]['stepBegin'] == 41
+        assert instance['moves'][1]['stepEnd'] == 51
+        assert instance['moves'][1]['vector']['y'] == 0.25
+        assert len(instance['changeMaterials']) == 1
+        assert instance['changeMaterials'][0]['stepBegin'] == 36
+        assert instance['changeMaterials'][0]['materials'] == material_active
+
+    # Test picking-up placer with non-zero Y position.
+    config = StructuralPlacerConfig(
+        activation_step=20,
+        placed_object_position=VectorFloatConfig(1, 2, 3),
+        pickup_object=True,
+        empty_placer=True
+    )
+    # Create a new scene.
+    scene = prior_scene()
+    # Add two placers to the scene.
+    service.add_to_scene(scene, config, scene.find_bounds())
+    service.add_to_scene(scene, config, scene.find_bounds())
+    assert len(scene.objects) == 2
+    for instance in scene.objects:
+        assert instance['id'].startswith('placer_')
+        assert instance['type'] == 'cylinder'
+        assert instance['kinematic']
+        assert instance['structure']
+        assert instance['materials'] == material_inactive
+        assert len(instance['shows']) == 1
+        assert instance['shows'][0]['stepBegin'] == 0
+        assert instance['shows'][0]['position'] == {'x': 1, 'y': 4.25, 'z': 3}
+        assert instance['shows'][0]['scale']['y'] == 1.5
+        assert len(instance['moves']) == 2
+        assert instance['moves'][0]['stepBegin'] == 20
+        assert instance['moves'][0]['stepEnd'] == 22
+        assert instance['moves'][0]['vector']['y'] == -0.25
+        assert instance['moves'][1]['stepBegin'] == 33
+        assert instance['moves'][1]['stepEnd'] == 35
+        assert instance['moves'][1]['vector']['y'] == 0.25
+        assert len(instance['changeMaterials']) == 1
+        assert instance['changeMaterials'][0]['stepBegin'] == 28
+        assert instance['changeMaterials'][0]['materials'] == material_active
+
+    # Test moving-sideways placer with Y position 0.
+    config = StructuralPlacerConfig(
+        activation_step=20,
+        placed_object_position=VectorFloatConfig(1, 0, 3),
+        move_object=True,
+        move_object_end_position=VectorFloatConfig(-1, 0, 3),
+        move_object_y=0,
+        move_object_z=0,
+        empty_placer=True
+    )
+    # Create a new scene.
+    scene = prior_scene()
+    # Add two placers to the scene.
+    service.add_to_scene(scene, config, scene.find_bounds())
+    service.add_to_scene(scene, config, scene.find_bounds())
+    assert len(scene.objects) == 2
+    for instance in scene.objects:
+        assert instance['id'].startswith('placer_')
+        assert instance['type'] == 'cylinder'
+        assert instance['kinematic']
+        assert instance['structure']
+        assert instance['materials'] == material_inactive
+        assert len(instance['shows']) == 1
+        assert instance['shows'][0]['stepBegin'] == 0
+        assert instance['shows'][0]['position'] == {'x': 1, 'y': 4.25, 'z': 3}
+        assert instance['shows'][0]['scale']['y'] == 1.5
+        assert len(instance['moves']) == 3
+        assert instance['moves'][0]['stepBegin'] == 20
+        assert instance['moves'][0]['stepEnd'] == 30
+        assert instance['moves'][0]['vector']['y'] == -0.25
+        assert instance['moves'][1]['stepBegin'] == 35
+        assert instance['moves'][1]['stepEnd'] == 42
+        assert instance['moves'][1]['vector']['x'] == -0.25
+        assert instance['moves'][2]['stepBegin'] == 47
+        assert instance['moves'][2]['stepEnd'] == 57
+        assert instance['moves'][2]['vector']['y'] == 0.25
+        assert len(instance['changeMaterials']) == 2
+        assert instance['changeMaterials'][0]['stepBegin'] == 32
+        assert instance['changeMaterials'][0]['materials'] == material_active
+        assert instance['changeMaterials'][1]['stepBegin'] == 44
+        assert instance['changeMaterials'][1]['materials'] == material_inactive
+
+    # Test moving-sideways placer with non-zero Y position.
+    config = StructuralPlacerConfig(
+        activation_step=20,
+        placed_object_position=VectorFloatConfig(1, 2, 3),
+        move_object=True,
+        move_object_end_position=VectorFloatConfig(-1, 2, 3),
+        move_object_y=0,
+        move_object_z=0,
+        empty_placer=True
+    )
+    # Create a new scene.
+    scene = prior_scene()
+    # Add two placers to the scene.
+    service.add_to_scene(scene, config, scene.find_bounds())
+    service.add_to_scene(scene, config, scene.find_bounds())
+    assert len(scene.objects) == 2
+    for instance in scene.objects:
+        assert instance['id'].startswith('placer_')
+        assert instance['type'] == 'cylinder'
+        assert instance['kinematic']
+        assert instance['structure']
+        assert instance['materials'] == material_inactive
+        assert len(instance['shows']) == 1
+        assert instance['shows'][0]['stepBegin'] == 0
+        assert instance['shows'][0]['position'] == {'x': 1, 'y': 4.25, 'z': 3}
+        assert instance['shows'][0]['scale']['y'] == 1.5
+        assert len(instance['moves']) == 3
+        assert instance['moves'][0]['stepBegin'] == 20
+        assert instance['moves'][0]['stepEnd'] == 22
+        assert instance['moves'][0]['vector']['y'] == -0.25
+        assert instance['moves'][1]['stepBegin'] == 27
+        assert instance['moves'][1]['stepEnd'] == 34
+        assert instance['moves'][1]['vector']['x'] == -0.25
+        assert instance['moves'][2]['stepBegin'] == 39
+        assert instance['moves'][2]['stepEnd'] == 41
+        assert instance['moves'][2]['vector']['y'] == 0.25
+        assert len(instance['changeMaterials']) == 2
+        assert instance['changeMaterials'][0]['stepBegin'] == 24
+        assert instance['changeMaterials'][0]['materials'] == material_active
+        assert instance['changeMaterials'][1]['stepBegin'] == 36
+        assert instance['changeMaterials'][1]['materials'] == material_inactive
+
+
+def test_placer_add_to_scene_two_placers_same_position_one_decoy():
+    service = StructuralPlacersCreationService()
+
+    config_1 = StructuralPlacerConfig(
+        activation_step=1,
+        placed_object_position=VectorFloatConfig(0, 0, 3),
+        placed_object_rotation=0,
+        placed_object_scale=1,
+        placed_object_shape='soccer_ball',
+        move_object=True,
+        move_object_end_position=VectorFloatConfig(-2, 0, 0),
+        move_object_y=0,
+        move_object_z=0
+    )
+    config_2 = StructuralPlacerConfig(
+        activation_step=61,
+        placed_object_position=VectorFloatConfig(0, 0.22, 3),
+        move_object=True,
+        move_object_end_position=VectorFloatConfig(2, 0, 0),
+        move_object_y=0,
+        move_object_z=0,
+        empty_placer=True
+    )
+    # Create a new scene.
+    scene = prior_scene()
+    # Add two placers to the scene.
+    service.add_to_scene(scene, config_1, scene.find_bounds())
+    service.add_to_scene(scene, config_2, scene.find_bounds())
+    assert len(scene.objects) == 3
+
+    ball = scene.objects[0]
+    assert ball['type'] == 'soccer_ball'
+    assert ball['kinematic']
+    assert len(ball['shows']) == 1
+    assert ball['shows'][0]['stepBegin'] == 0
+    assert ball['shows'][0]['position'] == {'x': 0, 'y': 0.11, 'z': 3}
+    assert ball['shows'][0]['rotation'] == {'x': 0, 'y': 0, 'z': 0}
+    assert ball['shows'][0]['scale'] == {'x': 1, 'y': 1, 'z': 1}
+    assert len(ball['moves']) == 1
+    assert ball['moves'][0]['stepBegin'] == 16
+    assert ball['moves'][0]['stepEnd'] == 23
+    assert ball['moves'][0]['vector']['x'] == -0.25
+    assert len(ball['togglePhysics']) == 1
+    assert ball['togglePhysics'][0]['stepBegin'] == 25
+
+    for index, instance in enumerate(scene.objects[1:]):
+        assert instance['id'].startswith('placer_')
+        assert instance['type'] == 'cylinder'
+        assert instance['kinematic']
+        assert instance['structure']
+        assert len(instance['shows']) == 1
+        assert instance['shows'][0]['stepBegin'] == 0
+        assert instance['shows'][0]['position']['x'] == 0
+        assert instance['shows'][0]['position']['z'] == 3
+        if index == 0:
+            assert instance['shows'][0]['position']['y'] == pytest.approx(4.47)
+        else:
+            assert instance['shows'][0]['position']['y'] == pytest.approx(4.47)
+        assert instance['shows'][0]['scale']['y'] == 1.5
+        step_modifier = 0 if index == 0 else 60
+        placer_direction = -0.25 if index == 0 else 0.25
+        assert len(instance['moves']) == 3
+        assert instance['moves'][0]['stepBegin'] == 1 + step_modifier
+        assert instance['moves'][0]['stepEnd'] == 11 + step_modifier
+        assert instance['moves'][0]['vector']['y'] == -0.25
+        assert instance['moves'][1]['stepBegin'] == 16 + step_modifier
+        assert instance['moves'][1]['stepEnd'] == 23 + step_modifier
+        assert instance['moves'][1]['vector']['x'] == placer_direction
+        assert instance['moves'][2]['stepBegin'] == 28 + step_modifier
+        assert instance['moves'][2]['stepEnd'] == 38 + step_modifier
+        assert instance['moves'][2]['vector']['y'] == 0.25
 
 
 def test_placer_creation_reconcile_activate_after():
@@ -1261,6 +1560,9 @@ def test_wall_creation_reconcile():
     assert -rd.z / 2.0 < r1.position.z < rd.z / 2.0
     assert r1.rotation_y in [0, 90, 180, 270]
     assert 0 < r1.width <= 5
+    assert r1.thickness is None
+    assert r1.height == 3
+    assert r1.same_material_as_room is False
 
     tmp2 = StructuralWallConfig(
         num=[2, 3],
@@ -1280,6 +1582,9 @@ def test_wall_creation_reconcile():
     assert r2.material in ["AI2-THOR/Materials/Walls/DrywallOrange",
                            "AI2-THOR/Materials/Plastics/BlackPlastic"]
     assert r2.width in [3, 4]
+    assert r2.thickness is None
+    assert r2.height == 3
+    assert r2.same_material_as_room is False
 
 
 def test_door_create():
@@ -1296,7 +1601,7 @@ def test_door_create():
     twall = doors[1]
     lwall = doors[2]
     rwall = doors[3]
-    assert door['type'] == 'door_4'
+    assert door['type'] in DOOR_TYPES
     assert door['id'].startswith('door')
     pos = door['shows'][0]['position']
     rot = door['shows'][0]['rotation']
@@ -1574,7 +1879,7 @@ def test_placer_create():
     assert move1['vector'] == {'x': 0, 'y': -0.25, 'z': 0}
 
     assert move2['stepBegin'] == 15
-    assert move2['stepEnd'] == 15
+    assert move2['stepEnd'] == 16
     assert move2['vector'] == {'x': 0, 'y': 0.25, 'z': 0}
 
     target = scene.objects[0]
@@ -1625,7 +1930,7 @@ def test_placer_create_with_non_zero_position_y():
     assert move1['vector'] == {'x': 0, 'y': -0.25, 'z': 0}
 
     assert move2['stepBegin'] == 15
-    assert move2['stepEnd'] == 15
+    assert move2['stepEnd'] == 16
     assert move2['vector'] == {'x': 0, 'y': 0.25, 'z': 0}
 
     target = scene.objects[0]
@@ -1699,7 +2004,7 @@ def test_placer_create_container_asymmetric():
     assert placer['moves'][0]['stepEnd'] == 4
     assert placer['moves'][0]['vector'] == {'x': 0, 'y': -0.25, 'z': 0}
     assert placer['moves'][1]['stepBegin'] == 15
-    assert placer['moves'][1]['stepEnd'] == 15
+    assert placer['moves'][1]['stepEnd'] == 16
     assert placer['moves'][1]['vector'] == {'x': 0, 'y': 0.25, 'z': 0}
 
     assert len(placer['changeMaterials']) == 1
@@ -1723,7 +2028,7 @@ def test_placer_create_container_asymmetric():
     assert placer['moves'][0]['stepEnd'] == 4
     assert placer['moves'][0]['vector'] == {'x': 0, 'y': -0.25, 'z': 0}
     assert placer['moves'][1]['stepBegin'] == 15
-    assert placer['moves'][1]['stepEnd'] == 15
+    assert placer['moves'][1]['stepEnd'] == 16
     assert placer['moves'][1]['vector'] == {'x': 0, 'y': 0.25, 'z': 0}
 
     assert len(placer['changeMaterials']) == 1
@@ -1789,7 +2094,7 @@ def test_placer_create_container_asymmetric_with_rotation():
     assert placer['moves'][0]['stepEnd'] == 4
     assert placer['moves'][0]['vector'] == {'x': 0, 'y': -0.25, 'z': 0}
     assert placer['moves'][1]['stepBegin'] == 15
-    assert placer['moves'][1]['stepEnd'] == 15
+    assert placer['moves'][1]['stepEnd'] == 16
     assert placer['moves'][1]['vector'] == {'x': 0, 'y': 0.25, 'z': 0}
 
     assert len(placer['changeMaterials']) == 1
@@ -1815,7 +2120,7 @@ def test_placer_create_container_asymmetric_with_rotation():
     assert placer['moves'][0]['stepEnd'] == 4
     assert placer['moves'][0]['vector'] == {'x': 0, 'y': -0.25, 'z': 0}
     assert placer['moves'][1]['stepBegin'] == 15
-    assert placer['moves'][1]['stepEnd'] == 15
+    assert placer['moves'][1]['stepEnd'] == 16
     assert placer['moves'][1]['vector'] == {'x': 0, 'y': 0.25, 'z': 0}
 
     assert len(placer['changeMaterials']) == 1
@@ -2168,30 +2473,80 @@ def test_thrower_create_with_projectile_dimensions():
     )
 
 
-def test_wall_create():
-    temp = StructuralWallConfig(
-        position=VectorFloatConfig(1.1, 0, 1.3), rotation_y=34,
-        width=2.2,
-        material="AI2-THOR/Materials/Plastics/WhitePlastic")
-    wall = StructuralWallCreationService().create_feature_from_specific_values(
-        prior_scene(), temp, None)
+def test_wall_create_random():
+    config = StructuralWallConfig()
+    service = StructuralWallCreationService()
+    walls, _ = service.add_to_scene(prior_scene(), config, [])
 
-    wall = wall[0]
+    wall = walls[0]
     assert wall
     assert wall['id'].startswith('wall_')
     assert wall['type'] == 'cube'
     assert wall['kinematic']
     assert wall['structure']
-    assert wall['materials'] == [
-        "AI2-THOR/Materials/Plastics/WhitePlastic"]
+    assert wall['materials'][0] in material_tuple_group_to_string_list(
+        materials.ROOM_WALL_MATERIALS
+    )
 
-    show = wall['shows'][0]
-    pos = show['position']
-    rot = show['rotation']
-    scale = show['scale']
-    assert pos == {'x': 1.1, 'y': 1.5, 'z': 1.3}
-    assert rot == {'x': 0, 'y': 34, 'z': 0}
-    assert scale == {'x': 2.2, 'y': 3, 'z': 0.1}
+    assert -5 <= wall['shows'][0]['position']['x'] <= 5
+    assert wall['shows'][0]['position']['y'] == 1.5
+    assert -5 <= wall['shows'][0]['position']['z'] <= 5
+    assert wall['shows'][0]['rotation']['x'] == 0
+    assert 0 <= wall['shows'][0]['rotation']['y'] <= 360
+    assert wall['shows'][0]['rotation']['z'] == 0
+    assert 0.5 <= wall['shows'][0]['scale']['x'] <= 5
+    assert wall['shows'][0]['scale']['y'] == 3
+    assert wall['shows'][0]['scale']['z'] == 0.1
+
+
+def test_wall_create_customized():
+    config = StructuralWallConfig(
+        position=VectorFloatConfig(1.1, 0, 1.3),
+        rotation_y=34,
+        width=2.2,
+        height=1.5,
+        thickness=0.5,
+        material="AI2-THOR/Materials/Plastics/WhitePlastic"
+    )
+    service = StructuralWallCreationService()
+    walls, _ = service.add_to_scene(prior_scene(), config, [])
+
+    wall = walls[0]
+    assert wall
+    assert wall['id'].startswith('wall_')
+    assert wall['type'] == 'cube'
+    assert wall['kinematic']
+    assert wall['structure']
+    assert wall['materials'] == ["AI2-THOR/Materials/Plastics/WhitePlastic"]
+
+    assert wall['shows'][0]['position'] == {'x': 1.1, 'y': 0.75, 'z': 1.3}
+    assert wall['shows'][0]['rotation'] == {'x': 0, 'y': 34, 'z': 0}
+    assert wall['shows'][0]['scale'] == {'x': 2.2, 'y': 1.5, 'z': 0.5}
+
+
+def test_wall_create_same_material_as_room():
+    config = StructuralWallConfig(
+        same_material_as_room=True,
+        # This should be overridden
+        material="AI2-THOR/Materials/Plastics/WhitePlastic"
+    )
+    scene = prior_scene()
+    scene.room_materials = RoomMaterials(
+        front=materials.WORN_WOOD[0],
+        left=materials.WORN_WOOD[0],
+        right=materials.WORN_WOOD[0],
+        back=materials.WORN_WOOD[0]
+    )
+    service = StructuralWallCreationService()
+    walls, _ = service.add_to_scene(scene, config, [])
+
+    wall = walls[0]
+    assert wall
+    assert wall['id'].startswith('wall_')
+    assert wall['type'] == 'cube'
+    assert wall['kinematic']
+    assert wall['structure']
+    assert wall['materials'] == [materials.WORN_WOOD[0]]
 
 
 def test_turntable_creation_reconcile():

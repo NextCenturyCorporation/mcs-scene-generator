@@ -2,7 +2,7 @@ import logging
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Union
 
-from generator import materials
+from generator import geometry, materials
 from generator.scene import Scene
 
 from .choosers import choose_counts, choose_random
@@ -35,6 +35,7 @@ from .structural_object_service import (
     StructuralDropperConfig,
     StructuralLOccluderConfig,
     StructuralMovingOccluderConfig,
+    StructuralNotchedOccluderConfig,
     StructuralOccludingWallConfig,
     StructuralPlacerConfig,
     StructuralPlatformConfig,
@@ -693,6 +694,35 @@ class SpecificStructuralObjectsComponent(ILEComponent):
     ```
     """
 
+    structural_notched_occluders: Union[StructuralNotchedOccluderConfig, List[StructuralNotchedOccluderConfig]] = None  # noqa: E501
+    """
+    ([StructuralNotchedOccluderConfig](#StructuralNotchedOccluderConfig), or
+    list of [StructuralNotchedOccluderConfig](#StructuralNotchedOccluderConfig)
+    dict) --
+    Occluders made of 3 cube. Formed with a notch in the middle to leave space
+    for a platform to pass under.
+
+    Simple Example:
+    ```
+    structural_notched_occluders:
+        num: 1
+    ```
+
+    Advanced Example
+    ```
+    structural_notched_occluders:
+        num: 1
+        labels: [test_label]
+        material: AI2-THOR/Materials/Metals/BrushedAluminum_Blue
+        height: 2
+        position_z: 2
+        down_step: 6
+        up_step: 61
+        notch_width: 2
+        notch_height: 2
+    ```
+    """
+
     @ile_config_setter(validator=ValidateNumber(props=['num'], min_value=0))
     @ile_config_setter(validator=ValidateOptions(
         props=['material'],
@@ -904,6 +934,19 @@ class SpecificStructuralObjectsComponent(ILEComponent):
     def set_doors(self, data: Any) -> None:
         self.doors = data
 
+    @ile_config_setter(validator=ValidateNumber(
+        props=['down_step'], min_value=1, null_ok=True
+    ))
+    @ile_config_setter(validator=ValidateOptions(
+        props=['material'],
+        options=(materials.ALL_UNRESTRICTED_MATERIAL_LISTS_AND_STRINGS)
+    ))
+    @ile_config_setter(validator=ValidateNumber(
+        props=['up_step'], min_value=0, null_ok=True
+    ))
+    def set_structural_notched_occluders(self, data: Any) -> None:
+        self.structural_notched_occluders = data
+
     # Override
 
     def update_ile_scene(self, scene: Scene) -> Scene:
@@ -929,6 +972,7 @@ class SpecificStructuralObjectsComponent(ILEComponent):
             (FeatureTypes.DOORS, self.doors),
             (FeatureTypes.TUBE_OCCLUDERS, self.structural_tube_occluders),
             (FeatureTypes.TURNTABLES, self.structural_turntables),
+            (FeatureTypes.NOTCHED_OCCLUDERS, self.structural_notched_occluders)
         ]
 
         for s_type, templates in structural_type_templates:
@@ -1089,23 +1133,34 @@ class RandomStructuralObjectsComponent(ILEComponent):
 
         for template, num in choose_counts(templates):
             for i in range(num):
-                type = choose_random(template.type or all_types)
-                structural_type = FeatureTypes[type.upper()]
-                if using_default:
-                    logger.info(
-                        f'Using default setting to generate random '
-                        f'structural object number {i + 1} / {num + 1}: '
-                        f'{structural_type.name.lower().replace("_", " ")}'
-                    )
-                else:
-                    logger.debug(
-                        f'Using configured setting to generate random '
-                        f'structural object number {i + 1} / {num + 1}: '
-                        f'{structural_type.name.lower().replace("_", " ")}'
-                    )
-                random_template = self._create_random_template(type, template)
-                FeatureCreationService.create_feature(
-                    scene, structural_type, random_template, bounds)
+                # Try generating the object many times, which may mean randomly
+                # choosing a new structural object type each time.
+                tries = 0
+                while True:
+                    tries += 1
+                    try:
+                        type = choose_random(template.type or all_types)
+                        structural_type = FeatureTypes[type.upper()]
+                        log_tag = 'default' if using_default else 'configured'
+                        logger.info(
+                            f'Using {log_tag} setting to generate random '
+                            f'structural object number {i + 1} / {num}: '
+                            f'{structural_type.name.lower().replace("_", " ")}'
+                        )
+                        random_template = self._create_random_template(
+                            type,
+                            template
+                        )
+                        FeatureCreationService.create_feature(
+                            scene,
+                            structural_type,
+                            random_template,
+                            bounds
+                        )
+                        break
+                    except Exception as e:
+                        if tries >= geometry.MAX_TRIES:
+                            raise e from e
 
         return scene
 
@@ -1154,6 +1209,8 @@ class RandomStructuralObjectsComponent(ILEComponent):
             return StructuralTurntableConfig(labels=template.labels)
         if structural_type == FeatureTypes.WALLS:
             return StructuralWallConfig(labels=template.labels)
+        if structural_type == FeatureTypes.NOTCHED_OCCLUDERS:
+            return StructuralNotchedOccluderConfig(labels=template.labels)
         # Otherwise return None; defaults will be used automatically.
         return None
 

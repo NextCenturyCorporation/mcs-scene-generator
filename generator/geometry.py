@@ -1381,6 +1381,34 @@ def calculate_rotations(
     return round(rotation_x, 4), round(rotation_y, 4) % 360
 
 
+def calculate_rotation_amount(
+    starting_rotation: float,
+    starting_position: Vector3d,
+    object_position: Vector3d,
+) -> float:
+    """Calculates and returns the rotation needed to turn from the given
+    starting rotation to a rotation facing the given object as a value between
+    -180 and 180."""
+    starting_angle = starting_rotation % 360
+
+    _, target_angle = calculate_rotations(
+        starting_position,
+        object_position,
+        no_rounding_to_tens=True
+    )
+
+    if round(starting_angle, 0) == round(target_angle, 0):
+        return 0
+
+    angles = [starting_angle, target_angle]
+    amount = max(angles) - min(angles)
+    if amount > 180:
+        amount = -1 * (360 - amount)
+    if max(angles) == starting_angle:
+        amount = -1 * amount
+    return amount
+
+
 def get_magnitudes_of_x_z_dirs_for_rotation_and_move_vector(
     object_rotation, x_move_magnitude, z_move_magnitude
 ):

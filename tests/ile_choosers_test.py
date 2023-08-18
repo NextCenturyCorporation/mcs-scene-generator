@@ -209,7 +209,7 @@ def test_choose_position_within_bounds_placer_obj():
         room_x=room_dimensions.x,
         room_y=room_dimensions.y,
         room_z=room_dimensions.z,
-        is_placer_obj=True
+        not_platform=True
     )
 
     assert isinstance(result, Vector3d)
@@ -229,7 +229,7 @@ def test_choose_position_within_bounds_placer_obj():
         room_x=room_dimensions.x,
         room_y=room_dimensions.y,
         room_z=room_dimensions.z,
-        is_placer_obj=True
+        not_platform=True
     )
 
     assert isinstance(result, Vector3d)

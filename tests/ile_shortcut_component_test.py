@@ -33,11 +33,13 @@ from generator.imitation import (
     IMITATION_TASK_TARGET_SEPARATION
 )
 from generator.scene import PartitionFloor, Scene
+from generator.structures import DOOR_TYPES
 from ideal_learning_env import (
     InstanceDefinitionLocationTuple,
     ObjectRepository,
     ShortcutComponent,
-    SpecificStructuralObjectsComponent
+    SpecificStructuralObjectsComponent,
+    VectorFloatConfig
 )
 from ideal_learning_env.defs import ILEException
 from ideal_learning_env.shortcut_component import (
@@ -47,6 +49,7 @@ from ideal_learning_env.shortcut_component import (
 )
 
 from .ile_helper import (
+    check_rotation,
     prior_scene,
     prior_scene_custom_size,
     prior_scene_with_target
@@ -433,7 +436,7 @@ def test_shortcut_triple_door_on():
 
     obj = objs[1]
     assert obj['id'].startswith('door')
-    assert obj['type'] == 'door_4'
+    assert obj['type'] in DOOR_TYPES
     assert obj['kinematic']
     assert obj.get('structure') is None
     show = obj['shows'][0]
@@ -479,7 +482,7 @@ def test_shortcut_triple_door_on():
 
     obj = objs[5]
     assert obj['id'].startswith('door')
-    assert obj['type'] == 'door_4'
+    assert obj['type'] in DOOR_TYPES
     assert obj['kinematic']
     assert obj.get('structure') is None
     show = obj['shows'][0]
@@ -525,7 +528,7 @@ def test_shortcut_triple_door_on():
 
     obj = objs[9]
     assert obj['id'].startswith('door')
-    assert obj['type'] == 'door_4'
+    assert obj['type'] in DOOR_TYPES
     assert obj['kinematic']
     assert obj.get('structure') is None
     show = obj['shows'][0]
@@ -928,6 +931,167 @@ def test_shortcut_triple_door_with_bigger_far_end():
     assert show['scale'] == {'x': 1, 'y': 2, 'z': scene.room_dimensions.z}
 
 
+def test_shortcut_triple_door_with_wall_height_5():
+    component = ShortcutComponent({
+        'shortcut_triple_door_choice': {
+            'start_drop_step': 30,
+            'wall_height': 5
+        }
+    })
+    assert component.shortcut_triple_door_choice
+    config = component.get_shortcut_triple_door_choice()
+    assert isinstance(config, TripleDoorConfig)
+    assert config.start_drop_step == 30
+
+    scene = component.update_ile_scene(prior_scene())
+    assert scene != prior_scene()
+
+    assert len(scene.objects) == 13
+
+    door_height = structures.BASE_DOOR_HEIGHT
+    platform_height = 2
+
+    center_top_door_wall = scene.objects[2]
+    center_left_door_wall = scene.objects[3]
+    center_right_door_wall = scene.objects[4]
+
+    left_top_door_wall = scene.objects[6]
+    left_left_door_wall = scene.objects[7]
+    left_right_door_wall = scene.objects[8]
+
+    right_top_door_wall = scene.objects[10]
+    right_left_door_wall = scene.objects[11]
+    right_right_door_wall = scene.objects[12]
+
+    assert center_top_door_wall.data['shows'][0]['scale']['y'] == \
+        config.wall_height - door_height - platform_height
+    assert center_left_door_wall.data['shows'][0]['scale']['y'] == \
+        door_height
+    assert center_right_door_wall.data['shows'][0]['scale']['y'] == \
+        door_height
+
+    assert left_top_door_wall.data['shows'][0]['scale']['y'] == \
+        config.wall_height - door_height
+    assert left_left_door_wall.data['shows'][0]['scale']['y'] == \
+        door_height
+    assert left_right_door_wall.data['shows'][0]['scale']['y'] == \
+        door_height
+
+    assert right_top_door_wall.data['shows'][0]['scale']['y'] == \
+        config.wall_height - door_height
+    assert right_left_door_wall.data['shows'][0]['scale']['y'] == \
+        door_height
+    assert right_right_door_wall.data['shows'][0]['scale']['y'] == \
+        door_height
+
+
+def test_shortcut_triple_door_with_wall_height_2_75():
+    component = ShortcutComponent({
+        'shortcut_triple_door_choice': {
+            'start_drop_step': 30,
+            'wall_height': 2.75
+        }
+    })
+    assert component.shortcut_triple_door_choice
+    config = component.get_shortcut_triple_door_choice()
+    assert isinstance(config, TripleDoorConfig)
+    assert config.start_drop_step == 30
+
+    scene = component.update_ile_scene(prior_scene())
+    assert scene != prior_scene()
+
+    assert len(scene.objects) == 12
+
+    door_height = structures.BASE_DOOR_HEIGHT
+
+    center_left_door_wall = scene.objects[2]
+    center_right_door_wall = scene.objects[3]
+
+    left_top_door_wall = scene.objects[5]
+    left_left_door_wall = scene.objects[6]
+    left_right_door_wall = scene.objects[7]
+
+    right_top_door_wall = scene.objects[9]
+    right_left_door_wall = scene.objects[10]
+    right_right_door_wall = scene.objects[11]
+
+    assert center_left_door_wall.data['shows'][0]['scale']['y'] == \
+        door_height
+    assert center_right_door_wall.data['shows'][0]['scale']['y'] == \
+        door_height
+
+    assert left_top_door_wall.data['shows'][0]['scale']['y'] == \
+        config.wall_height - door_height
+    assert left_left_door_wall.data['shows'][0]['scale']['y'] == \
+        door_height
+    assert left_right_door_wall.data['shows'][0]['scale']['y'] == \
+        door_height
+
+    assert right_top_door_wall.data['shows'][0]['scale']['y'] == \
+        config.wall_height - door_height
+    assert right_left_door_wall.data['shows'][0]['scale']['y'] == \
+        door_height
+    assert right_right_door_wall.data['shows'][0]['scale']['y'] == \
+        door_height
+
+
+def test_shortcut_triple_door_with_wall_height_2():
+    component = ShortcutComponent({
+        'shortcut_triple_door_choice': {
+            'start_drop_step': 30,
+            'wall_height': 2
+        }
+    })
+    assert component.shortcut_triple_door_choice
+    config = component.get_shortcut_triple_door_choice()
+    assert isinstance(config, TripleDoorConfig)
+    assert config.start_drop_step == 30
+
+    scene = component.update_ile_scene(prior_scene())
+    assert scene != prior_scene()
+
+    assert len(scene.objects) == 10
+
+    door_height = structures.BASE_DOOR_HEIGHT
+
+    center_left_door_wall = scene.objects[2]
+    center_right_door_wall = scene.objects[3]
+
+    left_left_door_wall = scene.objects[5]
+    left_right_door_wall = scene.objects[6]
+
+    right_left_door_wall = scene.objects[8]
+    right_right_door_wall = scene.objects[9]
+
+    assert center_left_door_wall.data['shows'][0]['scale']['y'] == \
+        door_height
+    assert center_right_door_wall.data['shows'][0]['scale']['y'] == \
+        door_height
+
+    assert left_left_door_wall.data['shows'][0]['scale']['y'] == \
+        door_height
+    assert left_right_door_wall.data['shows'][0]['scale']['y'] == \
+        door_height
+
+    assert right_left_door_wall.data['shows'][0]['scale']['y'] == \
+        door_height
+    assert right_right_door_wall.data['shows'][0]['scale']['y'] == \
+        door_height
+
+
+def test_shortcut_triple_door_with_wall_height_min_value():
+    try:
+        ShortcutComponent({
+            'shortcut_triple_door_choice': {
+                'start_drop_step': 30,
+                'wall_height': 1
+            }
+        })
+    except ILEException as e:
+        assert str(e) == \
+            'The property "shortcut_triple_door_choice.wall_height" must be greater than or equal to 2.0 but is 1'  # noqa
+
+
 def test_shortcut_triple_door_colors():
     configurations = [
         (None, None, "None"),
@@ -1025,7 +1189,7 @@ def test_shortcut_double_door():
     obj = objs[counter]
     counter += 1
     assert obj['id'].startswith('door')
-    assert obj['type'] == 'door_4'
+    assert obj['type'] in DOOR_TYPES
     assert obj['kinematic']
     assert obj.get('structure') is None
     show = obj['shows'][0]
@@ -1075,7 +1239,7 @@ def test_shortcut_double_door():
     obj = objs[counter]
     counter += 1
     assert obj['id'].startswith('door')
-    assert obj['type'] == 'door_4'
+    assert obj['type'] in DOOR_TYPES
     assert obj['kinematic']
     assert obj.get('structure') is None
     show = obj['shows'][0]
@@ -1168,7 +1332,7 @@ def test_shortcut_double_door_lava_off():
     obj = objs[counter]
     counter += 1
     assert obj['id'].startswith('door')
-    assert obj['type'] == 'door_4'
+    assert obj['type'] in DOOR_TYPES
     assert obj['kinematic']
     assert obj.get('structure') is None
     show = obj['shows'][0]
@@ -1218,7 +1382,7 @@ def test_shortcut_double_door_lava_off():
     obj = objs[counter]
     counter += 1
     assert obj['id'].startswith('door')
-    assert obj['type'] == 'door_4'
+    assert obj['type'] in DOOR_TYPES
     assert obj['kinematic']
     assert obj.get('structure') is None
     show = obj['shows'][0]
@@ -1303,7 +1467,7 @@ def test_shortcut_double_door_platform_off():
     obj = objs[counter]
     counter += 1
     assert obj['id'].startswith('door')
-    assert obj['type'] == 'door_4'
+    assert obj['type'] in DOOR_TYPES
     assert obj['kinematic']
     assert obj.get('structure') is None
     show = obj['shows'][0]
@@ -1353,7 +1517,7 @@ def test_shortcut_double_door_platform_off():
     obj = objs[counter]
     counter += 1
     assert obj['id'].startswith('door')
-    assert obj['type'] == 'door_4'
+    assert obj['type'] in DOOR_TYPES
     assert obj['kinematic']
     assert obj.get('structure') is None
     show = obj['shows'][0]
@@ -1472,7 +1636,7 @@ def test_shortcut_double_door_other_configs():
     obj = objs[counter]
     counter += 1
     assert obj['id'].startswith('door')
-    assert obj['type'] == 'door_4'
+    assert obj['type'] in DOOR_TYPES
     assert obj['kinematic']
     assert obj.get('structure') is None
     show = obj['shows'][0]
@@ -1522,7 +1686,7 @@ def test_shortcut_double_door_other_configs():
     obj = objs[counter]
     counter += 1
     assert obj['id'].startswith('door')
-    assert obj['type'] == 'door_4'
+    assert obj['type'] in DOOR_TYPES
     assert obj['kinematic']
     assert obj.get('structure') is None
     show = obj['shows'][0]
@@ -1641,7 +1805,7 @@ def test_shortcut_double_door_occluder_wall_position_z():
     obj = objs[counter]
     counter += 1
     assert obj['id'].startswith('door')
-    assert obj['type'] == 'door_4'
+    assert obj['type'] in DOOR_TYPES
     assert obj['kinematic']
     assert obj.get('structure') is None
     show = obj['shows'][0]
@@ -1691,7 +1855,7 @@ def test_shortcut_double_door_occluder_wall_position_z():
     obj = objs[counter]
     counter += 1
     assert obj['id'].startswith('door')
-    assert obj['type'] == 'door_4'
+    assert obj['type'] in DOOR_TYPES
     assert obj['kinematic']
     assert obj.get('structure') is None
     show = obj['shows'][0]
@@ -1810,7 +1974,7 @@ def test_shortcut_double_door_occluder_distance_from_performer():
     obj = objs[counter]
     counter += 1
     assert obj['id'].startswith('door')
-    assert obj['type'] == 'door_4'
+    assert obj['type'] in DOOR_TYPES
     assert obj['kinematic']
     assert obj.get('structure') is None
     show = obj['shows'][0]
@@ -1860,7 +2024,7 @@ def test_shortcut_double_door_occluder_distance_from_performer():
     obj = objs[counter]
     counter += 1
     assert obj['id'].startswith('door')
-    assert obj['type'] == 'door_4'
+    assert obj['type'] in DOOR_TYPES
     assert obj['kinematic']
     assert obj.get('structure') is None
     show = obj['shows'][0]
@@ -3478,7 +3642,132 @@ def setup_turntables_with_agent_and_non_agent(agent_point_step=46):
         rotation_y=180,
         position_y_modifier=0.51
     )
-    agents.add_agent_pointing(agent, agent_point_step)
+    scene.objects.append(agent)
+    object_repository.add_to_labeled_objects(InstanceDefinitionLocationTuple(
+        agent,
+        None,
+        None
+    ), 'agent')
+
+    # Create non-agent (duck).
+    non_agent_definition = base_objects.create_specific_definition_from_base(
+        type='duck_on_wheels',
+        color=['yellow'],
+        materials=['Custom/Materials/YellowWoodMCS'],
+        salient_materials=['wood'],
+        scale=2
+    )
+    non_agent = instances.instantiate_object(non_agent_definition, {
+        'position': {'x': -2, 'y': 0.51, 'z': 2},
+        'rotation': {'x': 0, 'y': 0, 'z': 0}
+    })
+    scene.objects.append(non_agent)
+    object_repository.add_to_labeled_objects(InstanceDefinitionLocationTuple(
+        non_agent,
+        None,
+        None
+    ), 'non_agent')
+
+    # Create directional object (ball).
+    ball_definition = base_objects.create_specific_definition_from_base(
+        type='ball',
+        color=['blue'],
+        materials=['Custom/Materials/BlueWoodMCS'],
+        salient_materials=['wood'],
+        scale=1
+    )
+    ball = instances.instantiate_object(ball_definition, {
+        'position': {'x': -2, 'y': 0, 'z': -2},
+        'rotation': {'x': 0, 'y': 0, 'z': 0}
+    })
+    agents.add_agent_rotate_then_point(agent, agent_point_step, ball)
+    scene.objects.append(ball)
+    object_repository.add_to_labeled_objects(InstanceDefinitionLocationTuple(
+        ball,
+        None,
+        None
+    ), ['ball', 'directions'])
+
+    # Create directional object (cube).
+    cube_definition = base_objects.create_specific_definition_from_base(
+        type='block_blank_wood_cube',
+        color=['red'],
+        materials=['Custom/Materials/RedWoodMCS'],
+        salient_materials=['wood'],
+        scale=2
+    )
+    cube = instances.instantiate_object(cube_definition, {
+        'position': {'x': 2, 'y': 0, 'z': -2},
+        'rotation': {'x': 0, 'y': 0, 'z': 0}
+    })
+    scene.objects.append(cube)
+    object_repository.add_to_labeled_objects(InstanceDefinitionLocationTuple(
+        cube,
+        None,
+        None
+    ), ['cube', 'directions'])
+
+    # Create turntables.
+    turntable_left = structures.create_turntable(
+        position_x=-2,
+        position_y_modifier=0,
+        position_z=2,
+        rotation_y=0,
+        radius=1,
+        height=0.5,
+        step_begin=0,
+        step_end=0,
+        movement_rotation=0,
+        material_tuple=materials.GREY
+    )
+    scene.objects.append(turntable_left)
+    object_repository.add_to_labeled_objects(InstanceDefinitionLocationTuple(
+        turntable_left,
+        None,
+        None
+    ), ['turntables', 'turntable_left'])
+
+    turntable_right = structures.create_turntable(
+        position_x=2,
+        position_y_modifier=0,
+        position_z=2,
+        rotation_y=0,
+        radius=1,
+        height=0.5,
+        step_begin=0,
+        step_end=0,
+        movement_rotation=0,
+        material_tuple=materials.GREY
+    )
+    scene.objects.append(turntable_right)
+    object_repository.add_to_labeled_objects(InstanceDefinitionLocationTuple(
+        turntable_right,
+        None,
+        None
+    ), ['turntables', 'turntable_right'])
+
+    return scene, [
+        copy.deepcopy(agent),
+        copy.deepcopy(non_agent),
+        copy.deepcopy(ball),
+        copy.deepcopy(cube),
+        copy.deepcopy(turntable_left),
+        copy.deepcopy(turntable_right)
+    ]
+
+
+def setup_turntables_with_agent_rotate_and_point_and_non_agent(agent_point_step=1):  # noqa E501
+    object_repository = ObjectRepository.get_instance()
+    scene = Scene()
+
+    # Create agent.
+    agent = agents.create_agent(
+        type='agent_male_02',
+        position_x=2,
+        position_z=2,
+        rotation_y=90,
+        position_y_modifier=0.51
+    )
     scene.objects.append(agent)
     object_repository.add_to_labeled_objects(InstanceDefinitionLocationTuple(
         agent,
@@ -3523,6 +3812,9 @@ def setup_turntables_with_agent_and_non_agent(agent_point_step=46):
         None,
         None
     ), ['ball', 'directions'])
+
+    # add rotation and point
+    agents.add_agent_rotate_then_point(agent, agent_point_step, ball)
 
     # Create directional object (cube).
     cube_definition = base_objects.create_specific_definition_from_base(
@@ -3828,6 +4120,7 @@ def test_turntables_with_agent_and_non_agent_with_point_step_begin_before_46():
             'direction_labels': 'directions'
         }
     })
+
     assert component.turntables_with_agent_and_non_agent
     # Start agent point before step 46.
     scene, original_objects = setup_turntables_with_agent_and_non_agent(43)
@@ -3852,16 +4145,82 @@ def test_turntables_with_agent_and_non_agent_with_point_step_begin_before_46():
     assert turntable_left != original_turntable_left
     assert turntable_right == original_turntable_right
     assert turntable_left['rotates'] == [{
-        'stepBegin': 51,
-        'stepEnd': 86,
+        'stepBegin': 1,
+        'stepEnd': 36,
         'vector': {'x': 0, 'y': 5, 'z': 0}
     }] or turntable_left['rotates'] == [{
-        'stepBegin': 51,
-        'stepEnd': 86,
+        'stepBegin': 1,
+        'stepEnd': 36,
         'vector': {'x': 0, 'y': -5, 'z': 0}
     }] or turntable_left['rotates'] == [{
-        'stepBegin': 51,
-        'stepEnd': 78,
+        'stepBegin': 1,
+        'stepEnd': 28,
+        'vector': {'x': 0, 'y': 5, 'z': 0}
+    }]
+    assert 'rotates' not in turntable_right
+
+
+def test_setup_turntables_with_agent_rotate_and_point_and_non_agent():
+    component = ShortcutComponent({
+        'turntables_with_agent_and_non_agent': {
+            'agent_label': 'agent',
+            'non_agent_label': 'non_agent',
+            'turntable_labels': 'turntables',
+            'direction_labels': 'directions'
+        }
+    })
+
+    assert component.turntables_with_agent_and_non_agent
+    # Start agent point before step 46.
+    scene, original_objects = \
+        setup_turntables_with_agent_rotate_and_point_and_non_agent(1)
+    original_agent = original_objects[0]
+    original_non_agent = original_objects[1]
+    original_ball = original_objects[2]
+    original_cube = original_objects[3]
+    original_turntable_left = original_objects[4]
+    original_turntable_right = original_objects[5]
+    scene = component.update_ile_scene(scene)
+    assert len(scene.objects) == 6
+    agent = scene.objects[0]
+    non_agent = scene.objects[1]
+    ball = scene.objects[2]
+    cube = scene.objects[3]
+    turntable_left = scene.objects[4]
+    turntable_right = scene.objects[5]
+    assert agent == original_agent
+    assert agent['rotates'][0] == {
+        'stepBegin': 1, 'stepEnd': 27, 'vector': {'x': 0, 'y': 5.0, 'z': 0}}
+    assert agent['actions'] == [
+        {
+            'id': 'Point_start_index_finger_15',
+            'stepBegin': 28,
+            'stepEnd': 35
+        },
+        {
+            'id': 'Point_hold_index_finger_15',
+            'stepBegin': 35,
+            'isLoopAnimation': True
+        }
+    ]
+    assert agent['rotates'][0] == {
+        'stepBegin': 1, 'stepEnd': 27, 'vector': {'x': 0, 'y': 5.0, 'z': 0}}
+    assert non_agent == original_non_agent
+    assert ball == original_ball
+    assert cube == original_cube
+    assert turntable_left != original_turntable_left
+    assert turntable_right == original_turntable_right
+    assert turntable_left['rotates'] == [{
+        'stepBegin': 36,
+        'stepEnd': 71,
+        'vector': {'x': 0, 'y': 5, 'z': 0}
+    }] or turntable_left['rotates'] == [{
+        'stepBegin': 36,
+        'stepEnd': 71,
+        'vector': {'x': 0, 'y': -5, 'z': 0}
+    }] or turntable_left['rotates'] == [{
+        'stepBegin': 36,
+        'stepEnd': 63,
         'vector': {'x': 0, 'y': 5, 'z': 0}
     }]
     assert 'rotates' not in turntable_right
@@ -4225,7 +4584,7 @@ def test_shortcut_imitation_left_side_teleport_containers_rotation_left_right():
     assert placer['moves'][0]['stepEnd'] == 8
     assert placer['moves'][0]['vector']['y'] == -0.25
     assert placer['moves'][1]['stepBegin'] == 19
-    assert placer['moves'][1]['stepEnd'] == 26
+    assert placer['moves'][1]['stepEnd'] == 27
     assert placer['moves'][1]['vector']['y'] == 0.25
     assert len(placer['changeMaterials']) == 1
     assert placer['changeMaterials'][0]['stepBegin'] == 14
@@ -4438,7 +4797,7 @@ def test_shortcut_imitation_right_side_teleport_containers_rotation_left_right()
     assert placer['moves'][0]['stepEnd'] == 8
     assert placer['moves'][0]['vector']['y'] == -0.25
     assert placer['moves'][1]['stepBegin'] == 19
-    assert placer['moves'][1]['stepEnd'] == 26
+    assert placer['moves'][1]['stepEnd'] == 27
     assert placer['moves'][1]['vector']['y'] == 0.25
     assert len(placer['changeMaterials']) == 1
     assert placer['changeMaterials'][0]['stepBegin'] == 14
@@ -4647,7 +5006,7 @@ def test_shortcut_imitation_left_side_teleport_containers_right_middle():
     assert placer['moves'][0]['stepEnd'] == 8
     assert placer['moves'][0]['vector']['y'] == -0.25
     assert placer['moves'][1]['stepBegin'] == 19
-    assert placer['moves'][1]['stepEnd'] == 26
+    assert placer['moves'][1]['stepEnd'] == 27
     assert placer['moves'][1]['vector']['y'] == 0.25
     assert len(placer['changeMaterials']) == 1
     assert placer['changeMaterials'][0]['stepBegin'] == 14
@@ -4859,7 +5218,7 @@ def test_shortcut_imitation_right_side_teleport_containers_right_middle():
     assert placer['moves'][0]['stepEnd'] == 8
     assert placer['moves'][0]['vector']['y'] == -0.25
     assert placer['moves'][1]['stepBegin'] == 19
-    assert placer['moves'][1]['stepEnd'] == 26
+    assert placer['moves'][1]['stepEnd'] == 27
     assert placer['moves'][1]['vector']['y'] == 0.25
     assert len(placer['changeMaterials']) == 1
     assert placer['changeMaterials'][0]['stepBegin'] == 14
@@ -5054,7 +5413,7 @@ def test_shortcut_imitation_left_side_teleport_performer_left():
     assert placer['moves'][0]['stepEnd'] == 8
     assert placer['moves'][0]['vector']['y'] == -0.25
     assert placer['moves'][1]['stepBegin'] == 19
-    assert placer['moves'][1]['stepEnd'] == 26
+    assert placer['moves'][1]['stepEnd'] == 27
     assert placer['moves'][1]['vector']['y'] == 0.25
     assert len(placer['changeMaterials']) == 1
     assert placer['changeMaterials'][0]['stepBegin'] == 14
@@ -5233,7 +5592,7 @@ def test_shortcut_imitation_right_side_teleport_performer_right():
     assert placer['moves'][0]['stepEnd'] == 8
     assert placer['moves'][0]['vector']['y'] == -0.25
     assert placer['moves'][1]['stepBegin'] == 19
-    assert placer['moves'][1]['stepEnd'] == 26
+    assert placer['moves'][1]['stepEnd'] == 27
     assert placer['moves'][1]['vector']['y'] == 0.25
     assert len(placer['changeMaterials']) == 1
     assert placer['changeMaterials'][0]['stepBegin'] == 14
@@ -5376,7 +5735,7 @@ def test_shortcut_imitation_left_side_middle():
     assert placer['moves'][0]['stepEnd'] == 8
     assert placer['moves'][0]['vector']['y'] == -0.25
     assert placer['moves'][1]['stepBegin'] == 19
-    assert placer['moves'][1]['stepEnd'] == 26
+    assert placer['moves'][1]['stepEnd'] == 27
     assert placer['moves'][1]['vector']['y'] == 0.25
     assert len(placer['changeMaterials']) == 1
     assert placer['changeMaterials'][0]['stepBegin'] == 14
@@ -5533,7 +5892,7 @@ def test_shortcut_imitation_right_side_middle_left():
     assert placer['moves'][0]['stepEnd'] == 8
     assert placer['moves'][0]['vector']['y'] == -0.25
     assert placer['moves'][1]['stepBegin'] == 19
-    assert placer['moves'][1]['stepEnd'] == 26
+    assert placer['moves'][1]['stepEnd'] == 27
     assert placer['moves'][1]['vector']['y'] == 0.25
     assert len(placer['changeMaterials']) == 1
     assert placer['changeMaterials'][0]['stepBegin'] == 14
@@ -6423,12 +6782,11 @@ def test_shortcut_lava_target_tool_inaccessible_no_config():
     )
 
     left_side_wall = wall_pos['x'] <= -0.5
-    assert (
-        scene.performer_start.position.x > wall_pos['x'] +
-        PERFORMER_HALF_WIDTH if left_side_wall else
-        scene.performer_start.position.x < wall_pos['x'] -
-        PERFORMER_HALF_WIDTH
-    )
+    x_position = scene.performer_start.position.x
+    if left_side_wall:
+        assert x_position > (wall_pos['x'] + PERFORMER_HALF_WIDTH)
+    else:
+        assert x_position < (wall_pos['x'] - PERFORMER_HALF_WIDTH)
 
     # X long direction
     scene = prior_scene_custom_size(20, 15)
@@ -6462,13 +6820,12 @@ def test_shortcut_lava_target_tool_inaccessible_no_config():
         minimum_bound == pytest.approx(wall_pos['z'] + wall_scale['x'])
     )
 
-    left_side_wall = wall_pos['z'] >= -0.5
-    assert (
-        scene.performer_start.position.z < wall_pos['z'] -
-        PERFORMER_HALF_WIDTH if left_side_wall else
-        scene.performer_start.position.z > wall_pos['z'] +
-        PERFORMER_HALF_WIDTH
-    )
+    back_side_wall = wall_pos['z'] <= -0.5
+    z_position = scene.performer_start.position.z
+    if back_side_wall:
+        assert z_position > (wall_pos['z'] + PERFORMER_HALF_WIDTH)
+    else:
+        assert z_position < (wall_pos['z'] - PERFORMER_HALF_WIDTH)
 
 
 def test_shortcut_lava_target_tool_inaccessible_no_config_not_random_start():
@@ -6989,10 +7346,84 @@ def check_shortcut_seeing_leads_to_knowing_bins_placers(objs):
             'stepBegin': 50, 'stepEnd': 60, 'vector': {
                 'x': 0, 'y': -0.25, 'z': 0}}
         assert placer['moves'][1] == {
-            'stepBegin': 70, 'stepEnd': 79, 'vector': {
+            'stepBegin': 70, 'stepEnd': 80, 'vector': {
                 'x': 0, 'y': 0.25, 'z': 0}}
         assert len(placer['changeMaterials']) == 1
         assert placer['changeMaterials'][0]['stepBegin'] == 65
         assert placer['changeMaterials'][0]['materials'] == [
             'Custom/Materials/Cyan']
         assert placer['states'] == ([['active']] * 64) + ([['inactive']] * 40)
+
+
+def test_knowledgeable_agent_pair():
+    data = {
+        'knowledgeable_agent_pair': {
+            'position_1': {'x': 1.0, 'y': 0.0, 'z': 0.0},
+            'position_2': {'x': -1.0, 'y': 0.0, 'z': 0.0},
+            'pointing_step': 10,
+            'target_labels': "target"
+        }
+    }
+    component = ShortcutComponent(data)
+    scene = prior_scene_with_target(10, 10, add_to_repo=True)
+
+    scene = component.update_ile_scene(scene)
+
+    objs = scene.objects
+
+    assert component.knowledgeable_agent_pair
+    assert component.get_knowledgeable_agent_pair()
+
+    assert len(objs) == 3
+    target = objs[0]
+    assert target['type'] == 'soccer_ball'
+
+    agent_1 = objs[1]
+    assert agent_1['type'].startswith('agent')
+    assert agent_1['labels'] == ('knowledgeable_agent')
+
+    agent_2 = objs[2]
+    assert agent_2['type'].startswith('agent')
+    assert agent_2['labels'] == ('non_knowledgeable_agent')
+
+    assert check_rotation(agent_1, target)
+    assert not check_rotation(agent_2, target)
+
+
+def test_shortcut_placers_with_decoys():
+    data = {
+        'placers_with_decoy': {
+            'activation_step': [13, 59],
+            'object_end_position_x': [2.0, -2.0],
+            'placed_object_position': VectorFloatConfig(x=1, y=0.501, z=2),
+            'decoy_y_modifier': 0.22
+        }
+    }
+
+    component = ShortcutComponent(data)
+
+    scene = prior_scene_with_target(10, 10, add_to_repo=True)
+
+    scene = component.update_ile_scene(scene)
+
+    objs = scene.objects
+
+    assert component.placers_with_decoy
+    assert component.get_placers_with_decoy()
+
+    assert len(objs) == 3
+    ball = objs[0]
+    placer = objs[1]
+    decoy = objs[2]
+
+    assert 'ball' in ball['debug']['info']
+    assert 'placer' in placer['debug']['info']
+    assert 'placer' in decoy['debug']['info']
+
+    assert decoy['moves'][0]['stepBegin'] != placer['moves'][0]['stepBegin']
+    assert decoy['states'] is not placer['states']
+
+    # Confirm they aren't active at the same time.
+    for i in range(0, len(decoy['states'])):
+        assert not (decoy['states'][i] is ['active'] and
+                    placer['states'][i] is ['active'])

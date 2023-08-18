@@ -152,7 +152,7 @@ def test_shortcut_imitation_left_side_teleport_containers_left_right():  # noqa
     assert placer['moves'][0]['stepEnd'] == 8
     assert placer['moves'][0]['vector']['y'] == -0.25
     assert placer['moves'][1]['stepBegin'] == 19
-    assert placer['moves'][1]['stepEnd'] == 26
+    assert placer['moves'][1]['stepEnd'] == 27
     assert placer['moves'][1]['vector']['y'] == 0.25
     assert len(placer['changeMaterials']) == 1
     assert placer['changeMaterials'][0]['stepBegin'] == 14
@@ -349,7 +349,7 @@ def test_shortcut_imitation_right_side_teleport_containers_left_right():  # noqa
     assert placer['moves'][0]['stepEnd'] == 8
     assert placer['moves'][0]['vector']['y'] == -0.25
     assert placer['moves'][1]['stepBegin'] == 19
-    assert placer['moves'][1]['stepEnd'] == 26
+    assert placer['moves'][1]['stepEnd'] == 27
     assert placer['moves'][1]['vector']['y'] == 0.25
     assert len(placer['changeMaterials']) == 1
     assert placer['changeMaterials'][0]['stepBegin'] == 14
@@ -542,7 +542,7 @@ def test_shortcut_imitation_left_side_teleport_containers_right_middle():
     assert placer['moves'][0]['stepEnd'] == 8
     assert placer['moves'][0]['vector']['y'] == -0.25
     assert placer['moves'][1]['stepBegin'] == 19
-    assert placer['moves'][1]['stepEnd'] == 26
+    assert placer['moves'][1]['stepEnd'] == 27
     assert placer['moves'][1]['vector']['y'] == 0.25
     assert len(placer['changeMaterials']) == 1
     assert placer['changeMaterials'][0]['stepBegin'] == 14
@@ -739,7 +739,7 @@ def test_shortcut_imitation_right_side_teleport_containers_right_middle():
     assert placer['moves'][0]['stepEnd'] == 8
     assert placer['moves'][0]['vector']['y'] == -0.25
     assert placer['moves'][1]['stepBegin'] == 19
-    assert placer['moves'][1]['stepEnd'] == 26
+    assert placer['moves'][1]['stepEnd'] == 27
     assert placer['moves'][1]['vector']['y'] == 0.25
     assert len(placer['changeMaterials']) == 1
     assert placer['changeMaterials'][0]['stepBegin'] == 14
@@ -920,7 +920,7 @@ def test_shortcut_imitation_left_side_teleport_performer_left():
     assert placer['moves'][0]['stepEnd'] == 8
     assert placer['moves'][0]['vector']['y'] == -0.25
     assert placer['moves'][1]['stepBegin'] == 19
-    assert placer['moves'][1]['stepEnd'] == 26
+    assert placer['moves'][1]['stepEnd'] == 27
     assert placer['moves'][1]['vector']['y'] == 0.25
     assert len(placer['changeMaterials']) == 1
     assert placer['changeMaterials'][0]['stepBegin'] == 14
@@ -1085,7 +1085,7 @@ def test_shortcut_imitation_right_side_teleport_performer_right():
     assert placer['moves'][0]['stepEnd'] == 8
     assert placer['moves'][0]['vector']['y'] == -0.25
     assert placer['moves'][1]['stepBegin'] == 19
-    assert placer['moves'][1]['stepEnd'] == 26
+    assert placer['moves'][1]['stepEnd'] == 27
     assert placer['moves'][1]['vector']['y'] == 0.25
     assert len(placer['changeMaterials']) == 1
     assert placer['changeMaterials'][0]['stepBegin'] == 14
@@ -1214,7 +1214,7 @@ def test_shortcut_imitation_left_side_middle_agent_only():
     assert placer['moves'][0]['stepEnd'] == 8
     assert placer['moves'][0]['vector']['y'] == -0.25
     assert placer['moves'][1]['stepBegin'] == 19
-    assert placer['moves'][1]['stepEnd'] == 26
+    assert placer['moves'][1]['stepEnd'] == 27
     assert placer['moves'][1]['vector']['y'] == 0.25
     assert len(placer['changeMaterials']) == 1
     assert placer['changeMaterials'][0]['stepBegin'] == 14
@@ -1357,7 +1357,7 @@ def test_shortcut_imitation_right_side_teleport_containers_middle_left_agent_onl
     assert placer['moves'][0]['stepEnd'] == 8
     assert placer['moves'][0]['vector']['y'] == -0.25
     assert placer['moves'][1]['stepBegin'] == 19
-    assert placer['moves'][1]['stepEnd'] == 26
+    assert placer['moves'][1]['stepEnd'] == 27
     assert placer['moves'][1]['vector']['y'] == 0.25
     assert len(placer['changeMaterials']) == 1
     assert placer['changeMaterials'][0]['stepBegin'] == 14

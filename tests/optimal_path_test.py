@@ -59,6 +59,24 @@ def test_dilate_and_unify_object_bounds():
     ]]))
 
 
+def compare_arrays_as_numpy(one, two_a, two_b):
+    # Sometimes the arrays are reordered (we think depending on your versions
+    # of python and numpy), so check if either the given arrays are valid.
+
+    if len(one) != len(two_a):
+        assert_array_almost_equal_nulp(numpy.array(one), numpy.array(two_b))
+        return
+
+    if len(one) != len(two_b):
+        assert_array_almost_equal_nulp(numpy.array(one), numpy.array(two_a))
+        return
+
+    try:
+        assert_array_almost_equal_nulp(numpy.array(one), numpy.array(two_a))
+    except AssertionError:
+        assert_array_almost_equal_nulp(numpy.array(one), numpy.array(two_b))
+
+
 def test_dilate_and_unify_object_bounds_multiple_poly():
     bounds_1 = [
         {'x': -1.0, 'z': -1.0},
@@ -86,18 +104,30 @@ def test_dilate_and_unify_object_bounds_multiple_poly():
         Point(0, 4)
     )
     assert len(output) == 3
-    assert_array_almost_equal_nulp(numpy.array(output[0]), numpy.array([
-        (-4, -1.5), (-4.5, -1.0), (-4.5, 1.0), (-4.0, 1.5), (-3.0, 1.5),
-        (-2.5, 1.0), (-2.5, -1.0), (-3.0, -1.5)
-    ]))
-    assert_array_almost_equal_nulp(numpy.array(output[1]), numpy.array([
+    compare_arrays_as_numpy(output[0], [
+        (-4.0, -1.5), (-4.5, -1.0), (-4.5, 1.0), (-4.0, 1.5),
+        (-3.0, 1.5), (-2.5, 1.0), (-2.5, -1.0), (-3.0, -1.5)
+    ], [
+        # Sometimes the first element is the last element.
+        (-4.5, -1.0), (-4.5, 1.0), (-4.0, 1.5), (-3.0, 1.5),
+        (-2.5, 1.0), (-2.5, -1.0), (-3.0, -1.5), (-4.0, -1.5)
+    ])
+    compare_arrays_as_numpy(output[1], [
+        (-1.5, 1.0), (-1.0, 1.5), (1.0, 1.5), (1.5, 1.0),
+        (1.5, -1.0), (1.0, -1.5), (-1.0, -1.5), (-1.5, -1.0),
+    ], [
+        # Sometimes output[1] and output[2] are switched.
         (3.0, -1.5), (2.5, -1.0), (2.5, 1.0), (3.0, 1.5), (4.0, 1.5),
         (4.5, 1.0), (4.5, -1.0), (4.0, -1.5)
-    ]))
-    assert_array_almost_equal_nulp(numpy.array(output[2]), numpy.array([
-        (-1.0, -1.5), (-1.5, -1.0), (-1.5, 1.0), (-1.0, 1.5), (1.0, 1.5),
-        (1.5, 1.0), (1.5, -1.0), (1.0, -1.5)
-    ]))
+    ])
+    compare_arrays_as_numpy(output[2], [
+        (-1.0, -1.5), (-1.5, -1.0), (-1.5, 1.0), (-1.0, 1.5),
+        (1.0, 1.5), (1.5, 1.0), (1.5, -1.0), (1.0, -1.5)
+    ], [
+        # Sometimes output[1] and output[2] are switched.
+        (2.5, 1.0), (3.0, 1.5), (4.0, 1.5), (4.5, 1.0),
+        (4.5, -1.0), (4.0, -1.5), (3.0, -1.5), (2.5, -1.0)
+    ])
 
     bounds_4 = [
         {'x': 1.0, 'z': -1.0},
@@ -113,15 +143,24 @@ def test_dilate_and_unify_object_bounds_multiple_poly():
         Point(0, 4)
     )
     assert len(output) == 2
-    assert_array_almost_equal_nulp(numpy.array(output[0]), numpy.array([
+    compare_arrays_as_numpy(output[0], [
         (-1.0, -1.5), (-1.5, -1.0), (-1.5, 1.0), (-1.0, 1.5), (1.0, 1.5),
         (3.0, 1.5), (4.0, 1.5), (4.5, 1.0), (4.5, -1.0), (4.0, -1.5),
         (3.0, -1.5), (1.0, -1.5)
-    ]))
-    assert_array_almost_equal_nulp(numpy.array(output[1]), numpy.array([
+    ], [
+        # Sometimes output[0] and output[1] are switched.
+        (-4.5, 1.0), (-4.0, 1.5), (-3.0, 1.5), (-2.5, 1.0),
+        (-2.5, -1.0), (-3.0, -1.5), (-4.0, -1.5), (-4.5, -1.0)
+    ])
+    compare_arrays_as_numpy(output[1], [
         (-4.0, -1.5), (-4.5, -1.0), (-4.5, 1.0), (-4.0, 1.5), (-3.0, 1.5),
         (-2.5, 1.0), (-2.5, -1.0), (-3.0, -1.5)
-    ]))
+    ], [
+        # Sometimes output[0] and output[1] are switched.
+        (-1.5, 1.0), (-1.0, 1.5), (1.0, 1.5), (3.0, 1.5),
+        (4.0, 1.5), (4.5, 1.0), (4.5, -1.0), (4.0, -1.5),
+        (3.0, -1.5), (1.0, -1.5), (-1.0, -1.5), (-1.5, -1.0)
+    ])
 
 
 def test_dilate_target_bounds():

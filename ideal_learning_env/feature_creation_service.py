@@ -54,6 +54,7 @@ class FeatureTypes(Enum):
     TURNTABLES = auto()
     # Should be the same as the TARGET_LABEL
     TARGET = auto()
+    NOTCHED_OCCLUDERS = auto()
 
 
 @dataclass

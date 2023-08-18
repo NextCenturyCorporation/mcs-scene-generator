@@ -13,7 +13,8 @@ from generator.agents import (
     add_agent_pointing,
     create_agent,
     create_blob,
-    get_random_agent_settings
+    get_random_agent_settings,
+    set_pointing_angle
 )
 from generator.exceptions import SceneException
 from generator.materials import ROOM_WALL_MATERIALS, MaterialTuple
@@ -437,3 +438,10 @@ def test_wall_materials():
             wall_material in WALL_MATERIALS_LIGHT_SKIN or
             wall_material in WALL_MATERIALS_NO_AGENTS
         )
+
+
+def test_set_pointing_angle():
+    assert set_pointing_angle(0, 0) == 0
+    assert set_pointing_angle(0.6, 0) == 15
+    assert set_pointing_angle(1.1, 0) == 30
+    assert set_pointing_angle(1.6, 0) == 45

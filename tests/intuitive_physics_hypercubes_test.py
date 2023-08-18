@@ -588,12 +588,11 @@ def test_ShapeConstancyHypercube_scenes_fall_down():
         target_dict[scene_id] = get_object_list(scene, 'target')
         scene_name = scene.goal.scene_info['name']
         assert scene_name.startswith('SHAP_')
-        assert scene.goal.scene_info[tags.SCENE.TIPSY] is False
-        for obj in scene.objects:
-            if obj['type'] in intuitive_physics_hypercubes.TIPSY_OBJECT_TYPES:
-                assert scene.goal.scene_info[tags.SCENE.TIPSY] is True
-            else:
-                assert scene.goal.scene_info[tags.SCENE.TIPSY] is False
+        has_tipsy_shape = any([
+            obj['type'] in intuitive_physics_hypercubes.TIPSY_OBJECT_TYPES
+            for obj in scene.objects
+        ])
+        assert scene.goal.scene_info[tags.SCENE.TIPSY] == has_tipsy_shape
 
     cell_list = ['a1', 'a2', 'e1', 'e2', 'e3',
                  'b1', 'd2', 'j1', 'l2', 'l4']
@@ -1021,7 +1020,7 @@ def test_GravitySupportHypercube_scenes_fall_down():
                 show_step + move_step_count + 11
             )
             assert pole['moves'][1]['stepEnd'] == (
-                pole['moves'][1]['stepBegin'] + move_step_count - 1
+                pole['moves'][1]['stepBegin'] + move_step_count
             )
             assert 'changeMaterials' in pole
             assert len(pole['changeMaterials']) == 1

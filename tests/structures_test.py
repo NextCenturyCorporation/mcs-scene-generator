@@ -2,6 +2,7 @@ import pytest
 from machine_common_sense.config_manager import Vector3d
 
 from generator import MaterialTuple, ObjectBounds, structures
+from generator.structures import DOOR_TYPES
 
 
 def test_create_interior_wall():
@@ -1038,7 +1039,7 @@ def test_create_door():
     assert isinstance(door['id'], str)
     assert door['kinematic']
     assert not door.get('structure')
-    assert door['type'] == 'door_4'
+    assert door['type'] in DOOR_TYPES
     assert door['materials'] == ['test_material']
     assert door['debug']['color'] == ['brown', 'blue']
     assert door['debug']['info'] == [

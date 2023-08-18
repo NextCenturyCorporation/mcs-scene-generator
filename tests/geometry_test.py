@@ -6,7 +6,11 @@ from machine_common_sense.config_manager import Vector3d
 
 from generator import ObjectBounds, geometry, specific_objects
 from generator.base_objects import create_soccer_ball
-from generator.geometry import calculate_rotations, rotate_point_around_origin
+from generator.geometry import (
+    calculate_rotation_amount,
+    calculate_rotations,
+    rotate_point_around_origin
+)
 from generator.instances import instantiate_object
 from generator.separating_axis_theorem import sat_entry
 
@@ -4018,3 +4022,61 @@ def test_calculate_aligned_position():
     assert (x, z) == (0, 5)
     x, z = geometry.calculate_aligned_position(0, 0, 270, 5, 3, 2, offset_z=1)
     assert (x, z) == (5, 0)
+
+
+def test_calculate_rotation_amount():
+    center = Vector3d(x=0, y=0, z=0)
+    right = Vector3d(x=2, y=0, z=0)
+    front_right = Vector3d(x=2, y=0, z=2)
+    front = Vector3d(x=0, y=0, z=2)
+    front_left = Vector3d(x=-2, y=0, z=2)
+    left = Vector3d(x=-2, y=0, z=0)
+    back_left = Vector3d(x=-2, y=0, z=-2)
+    back = Vector3d(x=0, y=0, z=-2)
+    back_right = Vector3d(x=2, y=0, z=-2)
+
+    assert calculate_rotation_amount(0, back, center) == 0
+    assert abs(calculate_rotation_amount(180, back, center)) == 180
+    assert calculate_rotation_amount(1, back, center) == -1
+    assert calculate_rotation_amount(359, back, center) == 1
+    assert calculate_rotation_amount(45, back, center) == -45
+    assert calculate_rotation_amount(315, back, center) == 45
+    assert calculate_rotation_amount(90, back, center) == -90
+    assert calculate_rotation_amount(270, back, center) == 90
+    assert calculate_rotation_amount(179, back, center) == -179
+    assert calculate_rotation_amount(181, back, center) == 179
+
+    assert calculate_rotation_amount(180, front, center) == 0
+    assert abs(calculate_rotation_amount(0, front, center)) == 180
+    assert calculate_rotation_amount(1, front, center) == 179
+    assert calculate_rotation_amount(359, front, center) == -179
+    assert calculate_rotation_amount(45, front, center) == 135
+    assert calculate_rotation_amount(315, front, center) == -135
+    assert calculate_rotation_amount(90, front, center) == 90
+    assert calculate_rotation_amount(270, front, center) == -90
+    assert calculate_rotation_amount(179, front, center) == 1
+    assert calculate_rotation_amount(181, front, center) == -1
+
+    assert calculate_rotation_amount(90, left, right) == 0
+    assert abs(calculate_rotation_amount(270, left, right)) == 180
+    assert calculate_rotation_amount(89, left, right) == 1
+    assert calculate_rotation_amount(91, left, right) == -1
+    assert calculate_rotation_amount(0, left, right) == 90
+    assert calculate_rotation_amount(180, left, right) == -90
+
+    assert calculate_rotation_amount(45, back_left, front_right) == 0
+    assert abs(calculate_rotation_amount(225, back_left, front_right)) == 180
+    assert calculate_rotation_amount(44, back_left, front_right) == 1
+    assert calculate_rotation_amount(46, back_left, front_right) == -1
+    assert calculate_rotation_amount(0, back_left, front_right) == 45
+    assert calculate_rotation_amount(90, back_left, front_right) == -45
+
+    assert calculate_rotation_amount(315, back_right, front_left) == 0
+    assert abs(calculate_rotation_amount(135, back_right, front_left)) == 180
+    assert calculate_rotation_amount(314, back_right, front_left) == 1
+    assert calculate_rotation_amount(316, back_right, front_left) == -1
+    assert calculate_rotation_amount(270, back_right, front_left) == 45
+    assert calculate_rotation_amount(0, back_right, front_left) == -45
+
+    assert calculate_rotation_amount(-1, back, center) == 1
+    assert calculate_rotation_amount(361, back, center) == -1

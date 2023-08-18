@@ -31,6 +31,9 @@ shortcut_triple_door_choice:
     restrict_open_doors: true
     # The door occluder starts to descend at a specific action/step.
     start_drop_step: 26
+    # The height of the occluder wall.  Can't be less the height of the 
+    # door (2).
+    # wall_height: 2.75
 
 # Generate a placer that begins holding the target object (soccer ball),
 # descends into the room, waits, and then releases it.

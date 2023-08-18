@@ -1,7 +1,7 @@
 import math
 
 import pytest
-from machine_common_sense.config_manager import Vector3d
+from machine_common_sense.config_manager import Vector2dInt, Vector3d
 
 from generator import base_objects, instances, materials, tools
 from ideal_learning_env import (
@@ -1071,6 +1071,141 @@ def test_interactable_object_service_surrounded_by_lava():
         assert not (square.x == -3 and square.z == -3)
 
 
+def test_interactable_object_service_surrounded_by_lava_with_safe_zone():
+    srv = InteractableObjectCreationService()
+    scene = prior_scene()
+
+    # Preexisting lava, just outside safe zone
+    lava_square = Vector2dInt(x=0, z=-2)
+    scene.lava = [lava_square]
+
+    klc = KeywordLocationConfig(
+        KeywordLocation.ADJACENT_TO_CORNER,
+        adjacent_distance=VectorFloatConfig(2, 0, 2),
+        relative_object_label="back_left"
+    )
+    config = InteractableObjectConfig(
+        keyword_location=klc,
+        material='AI2-THOR/Materials/Plastics/OrangePlastic',
+        rotation=VectorFloatConfig(0, 0, 0),
+        scale=0.5,
+        shape='ball',
+        surrounded_by_lava=True,
+        surrounding_lava_size=1,
+        surrounding_safe_zone=True
+    )
+    reconciled = srv.reconcile(scene, config)
+    instance = srv.create_feature_from_specific_values(
+        scene=scene, reconciled=reconciled, source_template=config)
+    assert instance['type'] == 'ball'
+    assert instance['debug'][DEBUG_FINAL_POSITION_KEY]
+    assert instance['materials'] == [
+        'AI2-THOR/Materials/Plastics/OrangePlastic']
+    assert instance['shows'][0]['position']['y'] == 0.25
+    x_pos = instance['shows'][0]['position']['x']
+    z_pos = instance['shows'][0]['position']['z']
+    assert (
+        x_pos == pytest.approx(-3.0, 0.1) and
+        z_pos == pytest.approx(-3.0, 0.1)
+    )
+
+    assert instance['shows'][0]['scale'] == {'x': 0.5, 'y': 0.5, 'z': 0.5}
+
+    # Make sure lava isn't officially added until add_to_scene is called
+    # only the initial lava square previously added should exist
+    assert len(scene.lava) == 1
+    assert instance['debug']['surroundingLava']
+    print(instance['debug']['surroundingLava'])
+    assert len(instance['debug']['surroundingLava']) == 8
+    for square in instance['debug']['surroundingLava']:
+        assert square['x'] in [-4, -3, -2]
+        assert square['z'] in [-4, -3, -2]
+        assert not (square['x'] == -3 and square['z'] == -3)
+
+    instances, _ = srv.add_to_scene(
+        scene=scene, source_template=config, bounds=[])
+
+    instance = instances[0]
+    assert scene.lava
+    assert len(scene.lava) == 9
+    # check that 'surroundingLava' array was deleted
+    # after lava was placed
+    assert 'surroundingLava' not in instance['debug']
+
+    for square in scene.lava:
+        assert square.x in [-4, -3, -2] or square.x == 0
+        assert square.z in [-4, -3, -2] or square.z == -2
+        assert not (square.x == -3 and square.z == -3)
+
+
+def test_interactable_object_service_surrounded_by_lava_safe_zone_by_wall():
+    srv = InteractableObjectCreationService()
+    scene = prior_scene()
+
+    # Should position lava + object in corner with 0.5 of surrounding area
+    # free.
+    klc = KeywordLocationConfig(
+        KeywordLocation.ADJACENT_TO_CORNER,
+        adjacent_distance=VectorFloatConfig(1.5, 0, 1.5),
+        relative_object_label="back_left"
+    )
+    config = InteractableObjectConfig(
+        keyword_location=klc,
+        material='AI2-THOR/Materials/Plastics/OrangePlastic',
+        rotation=VectorFloatConfig(0, 0, 0),
+        scale=0.5,
+        shape='ball',
+        surrounded_by_lava=True,
+        surrounding_lava_size=1,
+        surrounding_safe_zone=True
+    )
+    reconciled = srv.reconcile(scene, config)
+    instance = srv.create_feature_from_specific_values(
+        scene=scene, reconciled=reconciled, source_template=config)
+    assert instance['type'] == 'ball'
+    assert instance['debug'][DEBUG_FINAL_POSITION_KEY]
+    assert instance['materials'] == [
+        'AI2-THOR/Materials/Plastics/OrangePlastic']
+    assert instance['shows'][0]['position']['y'] == 0.25
+    x_pos = instance['shows'][0]['position']['x']
+    z_pos = instance['shows'][0]['position']['z']
+    assert (
+        x_pos == pytest.approx(-3.0, 0.1) and
+        z_pos == pytest.approx(-3.0, 0.1)
+    )
+
+    assert instance['shows'][0]['scale'] == {'x': 0.5, 'y': 0.5, 'z': 0.5}
+
+    # Make sure lava isn't officially added until add_to_scene is called
+    assert not scene.lava
+    assert instance['debug']['surroundingLava']
+    print(instance['debug']['surroundingLava'])
+    assert len(instance['debug']['surroundingLava']) == 8
+    for square in instance['debug']['surroundingLava']:
+        assert square['x'] in [-4, -3, -2]
+        assert square['z'] in [-4, -3, -2]
+        assert not (square['x'] == -3 and square['z'] == -3)
+        # explicitly check that there is a gap in the corner
+        assert not (square['x'] == -5 and square['z'] == -5)
+
+    instances, _ = srv.add_to_scene(
+        scene=scene, source_template=config, bounds=[])
+
+    instance = instances[0]
+    assert scene.lava
+    assert len(scene.lava) == 8
+    # check that 'surroundingLava' array was deleted
+    # after lava was placed
+    assert 'surroundingLava' not in instance['debug']
+
+    for square in scene.lava:
+        assert square.x in [-4, -3, -2]
+        assert square.z in [-4, -3, -2]
+        assert not (square.x == -3 and square.z == -3)
+        # explicitly check that there is a gap in the corner
+        assert not (square.x == -5 and square.z == -5)
+
+
 def test_interactable_object_service_larger_object_surrounded_by_lava():
     srv = InteractableObjectCreationService()
     scene = prior_scene()
@@ -1147,6 +1282,72 @@ def test_interactable_object_service_larger_object_surrounded_by_lava():
         assert not (square.x == 0 and square.z == -2)
         assert not (square.x == 0 and square.z == -1)
         assert not (square.x == 0 and square.z == 0)
+
+
+def test_interactable_object_service_surrounded_by_lava_fail_safe_zone():
+    srv = InteractableObjectCreationService()
+    scene = prior_scene()
+
+    # this lava would be in the safe zone
+    lava_square = Vector2dInt(x=-1, z=-2)
+    scene.lava = [lava_square]
+
+    klc = KeywordLocationConfig(
+        KeywordLocation.ADJACENT_TO_CORNER,
+        adjacent_distance=VectorFloatConfig(2, 0, 2),
+        relative_object_label="back_left"
+    )
+    config = InteractableObjectConfig(
+        keyword_location=klc,
+        material='AI2-THOR/Materials/Plastics/OrangePlastic',
+        rotation=VectorFloatConfig(0, 0, 0),
+        scale=0.5,
+        shape='ball',
+        surrounded_by_lava=True,
+        surrounding_lava_size=1,
+        surrounding_safe_zone=True
+    )
+    reconciled = srv.reconcile(scene, config)
+
+    # Should fail because of initial lava_square
+    with pytest.raises(ILEException):
+        srv.create_feature_from_specific_values(
+            scene=scene,
+            reconciled=reconciled,
+            source_template=config
+        )
+
+
+def test_interactable_object_service_surrounded_by_lava_fail_safe_zone_by_wall():  # noqa: E501
+    srv = InteractableObjectCreationService()
+    scene = prior_scene_custom_size(x=11, z=11)
+
+    # Should position lava + object in corner
+    klc = KeywordLocationConfig(
+        KeywordLocation.ADJACENT_TO_CORNER,
+        adjacent_distance=VectorFloatConfig(1.5, 0, 1.5),
+        relative_object_label="back_left"
+    )
+    config = InteractableObjectConfig(
+        keyword_location=klc,
+        material='AI2-THOR/Materials/Plastics/OrangePlastic',
+        rotation=VectorFloatConfig(0, 0, 0),
+        scale=0.5,
+        shape='ball',
+        surrounded_by_lava=True,
+        surrounding_lava_size=1,
+        surrounding_safe_zone=True
+    )
+    reconciled = srv.reconcile(scene, config)
+
+    # Should fail, since the room has odd dimensions, there will be
+    # no buffer zone by the wall
+    with pytest.raises(ILEException):
+        srv.create_feature_from_specific_values(
+            scene=scene,
+            reconciled=reconciled,
+            source_template=config
+        )
 
 
 def test_interactable_object_service_surrounded_by_lava_fail_perf_start():
@@ -2435,8 +2636,10 @@ def test_tool_create_with_lava_surrounding():
     # move performer out of the way of tool and lava so there are no errors
     scene.performer_start.position.x = -4
     scene.performer_start.position.z = -4
+    # default lava size is 1
     temp = ToolConfig(
         surrounded_by_lava=True,
+        surrounding_lava_size=1,
         shape='tool_hooked_0_50_x_5_00',
         rotation_y=0,
         position=VectorFloatConfig(1, 0, 1)
@@ -2482,11 +2685,189 @@ def test_tool_create_with_lava_surrounding():
         assert not (square.x in [0, 1, 2] and square.z in [-1, 0, 1, 2, 3])
 
 
+def test_tool_create_with_lava_surrounding_and_safe_zone():
+    scene = prior_scene()
+    # move performer out of the way of tool and lava so there are no errors
+    scene.performer_start.position.x = -4
+    scene.performer_start.position.z = -4
+
+    # add preexisting lava just outside safe zone
+    lava_square = Vector2dInt(x=-3, z=-2)
+    scene.lava = [lava_square]
+
+    # default lava size is 1
+    temp = ToolConfig(
+        surrounded_by_lava=True,
+        surrounding_lava_size=1,
+        surrounding_safe_zone=True,
+        shape='tool_hooked_0_50_x_5_00',
+        rotation_y=0,
+        position=VectorFloatConfig(1, 0, 1)
+    )
+    temp.material = materials.TOOL_MATERIALS[1]
+    tool = ToolCreationService().create_feature_from_specific_values(
+        scene, temp, None)
+
+    assert tool
+    assert tool['id'].startswith('tool_')
+    assert tool['type'] == 'tool_hooked_0_50_x_5_00'
+    show = tool['shows'][0]
+    pos = show['position']
+    rot = show['rotation']
+    scale = show['scale']
+    assert pos == {'x': 1, 'y': 0.15, 'z': 1}
+    assert rot == {'x': 0, 'y': 0, 'z': 0}
+    assert scale == {'x': 1, 'y': 1, 'z': 1}
+
+    # Make sure new surrounding lava isn't officially added until
+    # add_to_scene is called
+    assert len(scene.lava) == 1
+    assert tool['debug']['surroundingLava']
+    assert len(tool['debug']['surroundingLava']) == 20
+    for square in tool['debug']['surroundingLava']:
+        assert square['x'] in [-1, 0, 1, 2, 3]
+        assert square['z'] in [-2, -1, 0, 1, 2, 3, 4]
+        assert not (square['x'] in [0, 1, 2] and
+                    square['z'] in [-1, 0, 1, 2, 3])
+
+    instances, _ = ToolCreationService().add_to_scene(
+        scene=scene, source_template=temp, bounds=[])
+
+    tool = instances[0]
+    assert scene.lava
+    assert len(scene.lava) == 21
+    # check that 'surroundingLava' array was deleted
+    # after lava was placed
+    assert 'surroundingLava' not in tool['debug']
+
+    for square in scene.lava:
+        assert square.x in [-1, 0, 1, 2, 3] or square.x == -3
+        assert square.z in [-2, -1, 0, 1, 2, 3, 4]
+        assert not (square.x in [0, 1, 2] and square.z in [-1, 0, 1, 2, 3])
+
+
+def test_tool_create_with_lava_surrounding_and_safe_zone_by_wall():
+    scene = prior_scene()
+    # move performer out of the way of tool and lava so there are no errors
+    scene.performer_start.position.x = -4
+    scene.performer_start.position.z = -4
+
+    # should still have 0.5 of buffer by the wall
+    temp = ToolConfig(
+        surrounded_by_lava=True,
+        surrounding_lava_size=1,
+        surrounding_safe_zone=True,
+        shape='tool_hooked_0_50_x_5_00',
+        rotation_y=0,
+        position=VectorFloatConfig(1, 0, 1)
+    )
+    temp.material = materials.TOOL_MATERIALS[1]
+    tool = ToolCreationService().create_feature_from_specific_values(
+        scene, temp, None)
+
+    assert tool
+    assert tool['id'].startswith('tool_')
+    assert tool['type'] == 'tool_hooked_0_50_x_5_00'
+    show = tool['shows'][0]
+    pos = show['position']
+    rot = show['rotation']
+    scale = show['scale']
+    assert pos == {'x': 1, 'y': 0.15, 'z': 1}
+    assert rot == {'x': 0, 'y': 0, 'z': 0}
+    assert scale == {'x': 1, 'y': 1, 'z': 1}
+
+    # Make sure new surrounding lava isn't officially added until
+    # add_to_scene is called
+    assert not scene.lava
+    assert tool['debug']['surroundingLava']
+    assert len(tool['debug']['surroundingLava']) == 20
+    for square in tool['debug']['surroundingLava']:
+        assert square['x'] in [-1, 0, 1, 2, 3]
+        assert square['z'] in [-2, -1, 0, 1, 2, 3, 4]
+        assert not (square['x'] in [0, 1, 2] and
+                    square['z'] in [-1, 0, 1, 2, 3])
+        # more explicit check to make sure wall buffer exists
+        assert not square['z'] == 5
+
+    instances, _ = ToolCreationService().add_to_scene(
+        scene=scene, source_template=temp, bounds=[])
+
+    tool = instances[0]
+    assert scene.lava
+    assert len(scene.lava) == 20
+    # check that 'surroundingLava' array was deleted
+    # after lava was placed
+    assert 'surroundingLava' not in tool['debug']
+
+    for square in scene.lava:
+        assert square.x in [-1, 0, 1, 2, 3]
+        assert square.z in [-2, -1, 0, 1, 2, 3, 4]
+        assert not (square.x in [0, 1, 2] and square.z in [-1, 0, 1, 2, 3])
+        # more explicit check to make sure wall buffer exists
+        assert not square.z == 5
+
+
+def test_tool_create_with_lava_surrounding_and_lava_size_set():
+    scene = prior_scene()
+    # move performer out of the way of tool and lava so there are no errors
+    scene.performer_start.position.x = -4
+    scene.performer_start.position.z = -4
+    temp = ToolConfig(
+        surrounded_by_lava=True,
+        surrounding_lava_size=2,
+        shape='tool_hooked_0_50_x_5_00',
+        rotation_y=0,
+        position=VectorFloatConfig(1, 0, 1)
+    )
+    temp.material = materials.TOOL_MATERIALS[1]
+    tool = ToolCreationService().create_feature_from_specific_values(
+        scene, temp, None)
+
+    assert tool
+    assert tool['id'].startswith('tool_')
+    assert tool['type'] == 'tool_hooked_0_50_x_5_00'
+    show = tool['shows'][0]
+    pos = show['position']
+    rot = show['rotation']
+    scale = show['scale']
+    assert pos == {'x': 1, 'y': 0.15, 'z': 1}
+    assert rot == {'x': 0, 'y': 0, 'z': 0}
+    assert scale == {'x': 1, 'y': 1, 'z': 1}
+
+    # Make sure lava isn't officially added until add_to_scene is called
+    assert not scene.lava
+    assert tool['debug']['surroundingLava']
+    assert len(tool['debug']['surroundingLava']) == 48
+
+    for square in tool['debug']['surroundingLava']:
+        print(square)
+        assert square['x'] in [-2, -1, 0, 1, 2, 3, 4]
+        assert square['z'] in [-3, -2, -1, 0, 1, 2, 3, 4, 5]
+        assert not (square['x'] in [0, 1, 2] and
+                    square['z'] in [-1, 0, 1, 2, 3])
+
+    instances, _ = ToolCreationService().add_to_scene(
+        scene=scene, source_template=temp, bounds=[])
+
+    tool = instances[0]
+    assert scene.lava
+    assert len(scene.lava) == 48
+    # check that 'surroundingLava' array was deleted
+    # after lava was placed
+    assert 'surroundingLava' not in tool['debug']
+
+    for square in scene.lava:
+        assert square.x in [-2, -1, 0, 1, 2, 3, 4]
+        assert square.z in [-3, -2, -1, 0, 1, 2, 3, 4, 5]
+        assert not (square.x in [0, 1, 2] and square.z in [-1, 0, 1, 2, 3])
+
+
 def test_tool_create_with_lava_surrounding_fail_perf_start():
     scene = prior_scene()
 
     temp = ToolConfig(
         surrounded_by_lava=True,
+        surrounding_lava_size=1,
         shape='tool_hooked_0_50_x_5_00',
         rotation_y=0,
         position=VectorFloatConfig(1, 0, 1)
@@ -2508,9 +2889,66 @@ def test_tool_create_with_lava_surrounding_fail_object_overlap():
 
     temp = ToolConfig(
         surrounded_by_lava=True,
+        surrounding_lava_size=1,
         shape='tool_hooked_0_50_x_5_00',
         rotation_y=0,
         position=VectorFloatConfig(1, 0, 1)
+    )
+    temp.material = materials.TOOL_MATERIALS[1]
+
+    with pytest.raises(ILEException):
+        ToolCreationService().create_feature_from_specific_values(
+            scene=scene, reconciled=temp, source_template=None
+        )
+        ToolCreationService().add_to_scene(
+            scene=scene, source_template=temp, bounds=[])
+
+
+def test_tool_create_with_lava_surrounding_fail_safe_zone():
+    scene = prior_scene()
+
+    # add preexisting lava within safe zone
+    lava_square = Vector2dInt(x=-2, z=-2)
+    scene.lava = [lava_square]
+
+    # move performer out of the way of tool and lava so there are no errors
+    scene.performer_start.position.x = -4
+    scene.performer_start.position.z = -4
+
+    temp = ToolConfig(
+        surrounded_by_lava=True,
+        surrounding_lava_size=1,
+        surrounding_safe_zone=True,
+        shape='tool_hooked_0_50_x_5_00',
+        rotation_y=0,
+        position=VectorFloatConfig(1, 0, 1)
+    )
+    temp.material = materials.TOOL_MATERIALS[1]
+
+    with pytest.raises(ILEException):
+        ToolCreationService().create_feature_from_specific_values(
+            scene=scene, reconciled=temp, source_template=None
+        )
+        ToolCreationService().add_to_scene(
+            scene=scene, source_template=temp, bounds=[])
+
+
+def test_tool_create_with_lava_surrounding_fail_safe_zone_next_to_wall():
+    scene = prior_scene()
+
+    # move performer out of the way of tool and lava so there are no errors
+    scene.performer_start.position.x = -4
+    scene.performer_start.position.z = -4
+
+    # Will be positioned too close to the wall to pass validation,
+    # since surrounding_safe_zone is True
+    temp = ToolConfig(
+        surrounded_by_lava=True,
+        surrounding_lava_size=1,
+        surrounding_safe_zone=True,
+        shape='tool_hooked_0_50_x_5_00',
+        rotation_y=0,
+        position=VectorFloatConfig(1, 0, 2)
     )
     temp.material = materials.TOOL_MATERIALS[1]
 

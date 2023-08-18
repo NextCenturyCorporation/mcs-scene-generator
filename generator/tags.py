@@ -122,6 +122,7 @@ SCENE = SimpleNamespace(
     TERTIARY='tertiaryType',
     QUATERNARY='quaternaryType',
     DOMAIN_TYPE='domainType',
+    DISTANCE='distance',
 
     ID='id',
     NAME='name',

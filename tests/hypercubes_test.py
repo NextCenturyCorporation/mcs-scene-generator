@@ -1,6 +1,6 @@
 import copy
 
-from generator import Scene
+from generator import Scene, tags
 from hypercube import Hypercube
 from hypercube.hypercubes import update_floor_and_walls, update_scene_objects
 
@@ -143,6 +143,9 @@ def test_Hypercube_tags():
 
     assert scene.goal.scene_info['count']['all'] == 1
     assert scene.goal.scene_info['count']['target'] == 1
+    targets = scene.get_targets()
+    if (len(targets) >= 1):
+        assert scene.goal.scene_info[tags.SCENE.DISTANCE] is not None
 
 
 def test_Hypercube_tags_multiple_target():
@@ -187,6 +190,10 @@ def test_Hypercube_tags_multiple_target():
 
     assert scene.goal.scene_info['count']['all'] == 2
     assert scene.goal.scene_info['count']['target'] == 2
+
+    targets = scene.get_targets()
+    if (len(targets) >= 1):
+        assert scene.goal.scene_info[tags.SCENE.DISTANCE] is not None
 
 
 def test_Hypercube_tags_with_obstacle():
