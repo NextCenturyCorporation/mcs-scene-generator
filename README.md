@@ -79,6 +79,11 @@ python ile.py -c ile_config.yaml -n 10 -p scene
 
 ### Latest Release Notes
 
+#### Release 1.11
+
+Changelog:
+- Updated `ile_configs/interactive_knowledgeable_agents.yaml` to depict both of the simulation-controlled agents rotating 180 degrees at the start of each scene
+
 #### Release 1.10
 
 Changelog:

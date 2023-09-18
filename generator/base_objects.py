@@ -3114,7 +3114,6 @@ def _create_bed_5(args: _FunctionArgs) -> ObjectDefinition:
     return ObjectDefinition(
         type='bed_5',
         attributes=['receptacle'],
-        obstacle=True,
         shape=['bed'],
         stackTarget=True,
         chooseMaterialList=[item.copy() for item in args.chosen_material_list],
@@ -4469,7 +4468,6 @@ def _create_crib(args: _FunctionArgs) -> ObjectDefinition:
     return ObjectDefinition(
         type='crib',
         attributes=[],
-        obstacle=True,
         shape=['crib'],
         chooseMaterialList=[item.copy() for item in args.chosen_material_list],
         chooseSizeList=[
@@ -5575,7 +5573,6 @@ def _create_table_22(args: _FunctionArgs) -> ObjectDefinition:
         type='table_22',
         untrainedShape=True,
         attributes=['moveable', 'receptacle'],
-        obstacle=True,
         shape=['table'],
         stackTarget=True,
         chooseMaterialList=[item.copy() for item in args.chosen_material_list],

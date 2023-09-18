@@ -3129,6 +3129,31 @@ class ShortcutComponent(ILEComponent):
 
         return scene
 
+    def _modify_knowledgeable_agent_rotation(self, agent: SceneObject) -> None:
+        position_x = agent['shows'][0]['position']['x']
+        rotation_y = agent['shows'][0]['rotation']['y']
+        if rotation_y not in [0, 180]:
+            raise ILEException(
+                f'Knowledgeable agent pair Y rotation should be 0 or 180, but '
+                f'was {rotation_y}'
+            )
+        # Modify the starting Y rotation by 180 degrees.
+        rotation_y = (rotation_y + 180) % 360
+        agent['shows'][0]['rotation']['y'] = rotation_y
+        # The agent rotates 180 degrees during the first 12 steps.
+        y = (1 if rotation_y == 0 else -1) * (15 if position_x < 0 else -15)
+        if 'rotates' not in agent:
+            agent['rotates'] = []
+        agent['rotates'].insert(0, {
+            'stepBegin': 1,
+            'stepEnd': 12,
+            'vector': {
+                'x': 0,
+                'y': y,
+                'z': 0
+            }
+        })
+
     def _add_knowledgeable_agent_pair(self, scene: Scene):
         config = self.get_knowledgeable_agent_pair()
         if not config:
@@ -3146,6 +3171,8 @@ class ShortcutComponent(ILEComponent):
             num=1,
             labels='knowledgeable_agent',
             position=knowledgeable_agent_position,
+            # We will modify this rotation later (see the comment below).
+            # Keep it as this value to ensure the pointing rotation is correct.
             rotation_y=180,
             pointing=AgentPointingConfig(
                 object_label=self.knowledgeable_agent_pair.target_labels,
@@ -3164,6 +3191,8 @@ class ShortcutComponent(ILEComponent):
             num=1,
             labels='non_knowledgeable_agent',
             position=non_knowledgeable_agent_position,
+            # We will modify this rotation later (see the comment below).
+            # Keep it as this value to ensure the pointing rotation is correct.
             rotation_y=0,
             pointing=AgentPointingConfig(
                 object_label=non_target_label,
@@ -3173,23 +3202,25 @@ class ShortcutComponent(ILEComponent):
         )
 
         try:
-            FeatureCreationService.create_feature(
+            agent = FeatureCreationService.create_feature(
                 scene,
                 FeatureTypes.AGENT,
                 knowledgeable_agent_config,
                 scene.find_bounds()
             )[0]
+            self._modify_knowledgeable_agent_rotation(agent)
         except ILEDelayException:
             self._delayed_knowledgeable_agent_pair.append(
                 knowledgeable_agent_config)
 
         try:
-            FeatureCreationService.create_feature(
+            agent = FeatureCreationService.create_feature(
                 scene,
                 FeatureTypes.AGENT,
                 non_knowledgeable_agent_config,
                 scene.find_bounds()
             )[0]
+            self._modify_knowledgeable_agent_rotation(agent)
         except ILEDelayException:
             self._delayed_knowledgeable_agent_pair.append(
                 non_knowledgeable_agent_config)
@@ -3498,6 +3529,7 @@ class ShortcutComponent(ILEComponent):
                 if agent is not None:
                     self._delayed_knowledgeable_agent_pair.pop(index)
                     index = 0
+                    self._modify_knowledgeable_agent_rotation(agent)
             except Exception as e:
                 msg = str(e) + ": " + \
                     str(self._delayed_knowledgeable_agent_pair[0].labels)

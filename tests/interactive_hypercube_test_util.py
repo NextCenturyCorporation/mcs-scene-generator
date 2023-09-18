@@ -82,7 +82,9 @@ def verify_scene(
     assert (scene.goal.scene_info['secondaryType'] == category or
             scene.goal.scene_info['secondaryType'] == 'retrieval' or
             scene.goal.scene_info['secondaryType'] == 'passive' and passive)
-    assert scene.goal.scene_info['tertiaryType'] == task_type
+    # Tool Use have different tertiaryTypes than task_type -- ignore that case
+    if task_type != 'tool use':
+        assert scene.goal.scene_info['tertiaryType'] == task_type
     assert scene.goal.scene_info['quaternaryType'] == (
         'action none' if (
             passive and scene.goal.scene_info['primaryType'] == 'passive')

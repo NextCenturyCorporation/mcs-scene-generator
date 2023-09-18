@@ -7386,8 +7386,18 @@ def test_knowledgeable_agent_pair():
     assert agent_2['type'].startswith('agent')
     assert agent_2['labels'] == ('non_knowledgeable_agent')
 
-    assert check_rotation(agent_1, target)
-    assert not check_rotation(agent_2, target)
+    assert agent_1['rotates'][0]['stepBegin'] == 1
+    assert agent_1['rotates'][0]['stepEnd'] == 12
+    assert agent_1['rotates'][0]['vector']['x'] == 0
+    assert agent_1['rotates'][0]['vector']['y'] in [15, -15]
+    assert agent_1['rotates'][0]['vector']['z'] == 0
+    assert check_rotation(agent_1, target, index=1, starting_rotation=180)
+    assert agent_2['rotates'][0]['stepBegin'] == 1
+    assert agent_2['rotates'][0]['stepEnd'] == 12
+    assert agent_2['rotates'][0]['vector']['x'] == 0
+    assert agent_2['rotates'][0]['vector']['y'] in [15, -15]
+    assert agent_2['rotates'][0]['vector']['z'] == 0
+    assert not check_rotation(agent_2, target, index=1, starting_rotation=0)
 
 
 def test_shortcut_placers_with_decoys():

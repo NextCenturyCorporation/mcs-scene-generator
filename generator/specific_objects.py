@@ -413,7 +413,7 @@ _BED_4_OCCLUDER = create_variable_definition_from_base(
 )
 
 
-_BED_5_OBSTACLE = create_variable_definition_from_base(
+_BED_5 = create_variable_definition_from_base(
     type='bed_5',
     size_multiplier_list=[1],
     chosen_material_list=[ChosenMaterial.WOOD]
@@ -2116,8 +2116,6 @@ _NOT_PICKUPABLES = [
         _BED_9_OCCLUDER,
         _BED_10_OCCLUDER
     ],
-    # Arbitrary division: bed obstacles
-    [_BED_5_OBSTACLE, _BED_5_OBSTACLE],
     # Arbitrary division: shelf occluders
     [_BOOKCASE, _BOOKCASE_SIDELESS],
     # Arbitrary division: shelf obstacles
@@ -2193,6 +2191,7 @@ _NOT_PICKUPABLES = [
     [_TABLE_5_RECT_ACCESSIBLE, _TABLE_11_T_LEGS, _TABLE_12_X_LEGS],
     # Arbitrary division: random objects
     [
+        _BED_5,
         _BLOCK_BLANK_CUBE_NOT_PICKUPABLE,
         _BLOCK_BLANK_CYLINDER_NOT_PICKUPABLE,
         _CART_1,

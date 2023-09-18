@@ -54,7 +54,7 @@ SCENE_OPTIONAL_TAGS_DICT = {
     'DIRECTION': 'direction',
     'FALL_DOWN': 'fallDown',
     'MOVE_ACROSS': 'moveAcross',
-    'NUM_FLOOR_FEATURES': 'numFloorFeatures',
+    'FEATURES': 'numFloorFeatures',
     'PATH_RATIO': 'pathRatio',
     'ROTATION': 'rotation',
     'SETUP': 'sceneSetup',
@@ -517,6 +517,13 @@ ABBREV = SimpleNamespace(
     SUPPORT_RELATIONS='suprel',
     TRAJECTORY='traj',
     TOOL_USE='tool',
+)
+
+
+TOOL_TASK_TYPES = SimpleNamespace(
+    ASYMMETRIC='asymmetric tool use',
+    SYMMETRIC='symmetric tool use',
+    TOOL_CHOICE='tool choice'
 )
 
 

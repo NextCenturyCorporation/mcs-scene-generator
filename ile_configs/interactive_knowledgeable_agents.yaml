@@ -85,8 +85,8 @@ structural_notched_occluders:
     - num: 1
       height: 0.9
       position_z: -0.5
-      down_step: 1
-      up_step: 151
+      down_step: 13
+      up_step: 173
       notch_height: 0.5
       notch_width: 0.5
 
@@ -97,7 +97,7 @@ structural_notched_occluders:
 placers_with_decoy:
     # Each placer (decoy and non-decoy) will be randomly assigned an activation
     # step and ending X position from the corresponding lists here.
-    activation_step: [13, 63]
+    activation_step: [29, 79]
     labels: target_placers
     # The target (soccer ball) will be released above one of the containers.
     object_end_position_x: [2.0, -2.0]
@@ -136,7 +136,7 @@ knowledgeable_agent_pair:
         - x: 1.5
           y: 0.01
           z: 1
-    pointing_step: 163
+    pointing_step: 189
     target_labels: target
     non_target_labels: [left_container, right_container]
 

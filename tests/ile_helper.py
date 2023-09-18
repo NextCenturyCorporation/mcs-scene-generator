@@ -59,18 +59,18 @@ def prior_passive_scene(last_step: int = None):
     return scene
 
 
-def check_rotation(agent, object):
+def check_rotation(agent, object, index=0, starting_rotation=None):
     a_steps, a_step_size, a_shift = 0, 0, 0
     object_position = object['shows'][0]['position']
-    if ('rotates' in agent):
-        a_steps = agent['rotates'][0]['stepEnd'] - \
-            agent['rotates'][0]['stepBegin'] + 1
-        a_step_size = agent['rotates'][0]['vector']['y']
+    if ('rotates' in agent) and len(agent['rotates']) > index:
+        a_steps = agent['rotates'][index]['stepEnd'] - \
+            agent['rotates'][index]['stepBegin'] + 1
+        a_step_size = agent['rotates'][index]['vector']['y']
         a_shift = a_step_size * a_steps
 
         if ('moveToPosition' in object['debug']):
             if (int(object['debug']['moveToPositionBy']) <=
-                    agent['rotates'][0]['stepBegin']):
+                    agent['rotates'][index]['stepBegin']):
                 object_position = object['debug']['moveToPosition']
 
     else:
@@ -84,7 +84,10 @@ def check_rotation(agent, object):
         True
     )
 
-    curr_rotation = round(agent['shows'][0]['rotation']['y'], 0)
+    if starting_rotation is None:
+        curr_rotation = round(agent['shows'][0]['rotation']['y'], 0)
+    else:
+        curr_rotation = starting_rotation
     target_rotation = round(target_rotation, 0)
     a_shift = round(a_shift, 0)
 

@@ -238,6 +238,18 @@ def get_tool_choice_tool_object(scene, is_valid):
             return obj
 
 
+def change_obj_material(obj, material):
+    obj['materials'] = [material[0]]
+    obj['debug']['color'] = material[1]
+
+    obj['debug']['info'] = list(map(lambda x: str.replace(
+        x,
+        "grey",
+        material[1][0]),
+        obj['debug']['info']))
+    return obj
+
+
 def create_broken_tool(
     object_type: str,
     direction: str,
