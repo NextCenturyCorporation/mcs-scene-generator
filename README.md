@@ -79,6 +79,21 @@ python ile.py -c ile_config.yaml -n 10 -p scene
 
 ### Latest Release Notes
 
+#### Release 1.12
+
+Changelog:
+- Addressed various issues with "hooked" and "isosceles" tools:
+  - Added information to the ILE_API about the "isosceles" tools (hooked tools with two equal sides).
+  - Fixed bugs with generating hooked and isosceles tools using the `shortcut_target_lava_tool` config option, causing them to start positioned colliding with the target object (soccer ball).
+  - Fixed `tool_offset_backward_from_lava` so that it works correctly with hooked and isosceles tools.
+  - Updated `ile_configs/tools.yaml` with more comments.
+- Added the `size` property to the `holes` and `lava` config options for generating contiguous holes and/or pools of lava composed of multiple 1x1 areas.
+  - Updated `ile_configs/navigation_2d.yaml` to use the new `size` property.
+  - Added `ile_configs/tool_with_more_lava.yaml` to demonstrate adding extra pools of lava in a scene that has the `shortcut_lava_target_tool` config option enabled.
+- Changed `tool_rotation` (in the `shortcut_lava_target_tool` config option) to default to a random rotation (`[0, 45, 90, 135, 180, 225, 270, 315]`) rather than `0`.
+- Updated the `check_valid_path` config option to alternatively accept a string object label to use rather than the "target" object label (which continues to be the default). Furthermore, `check_valid_path` can now validate paths to multiple objects in the scene if necessary.
+- Updated the `performer_starts_near` global config option and the `distance_between_performer_and_tool` property (in the `shortcut_target_lava_tool` config option) to support varying min/max ranges that will adjust based on the room's dimensions. See the ILE_API for details.
+
 #### Release 1.11
 
 Changelog:
@@ -396,7 +411,7 @@ Eval 5 Tasks:
 | Solidity (Interactive) | O3 | [interactive_solidity.yaml](./ile_configs/interactive_solidity.yaml) |
 | Spatial Elimination (Interactive) | P4 | [interactive_spatial_elimination.yaml](./ile_configs/interactive_spatial_elimination.yaml) |
 | Support Relations (Interactive) | O6 | [interactive_support_relations.yaml](./ile_configs/interactive_support_relations.yaml) |
-| Tool Use (Interactive) | O5 | [tools.yaml](./ile_configs/tools.yaml) |
+| Tool Use (Interactive) | O5 | [tools.yaml](./ile_configs/tools.yaml), [tool_with_more_lava.yaml](./ile_configs/tool_with_more_lava.yaml) |
 
 List of example ILE configuration files for generating scenes similar to specific evaluation tasks:
 
@@ -418,6 +433,7 @@ List of example ILE configuration files for generating scenes similar to specifi
 - [ramps.yaml](./ile_configs/ramps.yaml) Generates scenes with ramps leading up to platforms and a soccer ball retrieval target either on top of the platform or on the floor adjacent to the platform.
 - [ramps_with_agent.yaml](./ile_configs/ramps_with_agent.yaml) Generates scenes with ramps leading up to platforms and an agent with a soccer ball retrieval target.
 - [tools.yaml](./ile_configs/tools.yaml) Generates scenes with a large moveable block tool and a soccer ball retrieval target completely surrounded by lava.
+- [tool_with_more_lava.yaml](./ile_configs/tool_with_more_lava.yaml) Generates scenes with a large moveable block tool and a soccer ball retrieval target completely surrounded by lava, along with extra pools of lava that may obstruct your path to the tool.
 
 Eval 6 Tasks:
 

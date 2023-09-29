@@ -273,6 +273,10 @@ MinMaxInt dicts): Number of areas to be used with these parameters
 list of MinMaxInt dicts): X position of the area.
 - `position_z` (int, or list of ints, or [MinMaxInt](#MinMaxInt) dict, or
 list of MinMaxInt dicts): Z position of the area.
+- `size` (int, or list of ints, or [MinMaxInt](#MinMaxInt) dict, or
+list of MinMaxInt dicts): Size of a single contiguous area. If `position_x`
+and/or `position_z` are set, the area will include a space matching those
+coordinate(s). Default: 1
 
 #### FloorMaterialConfig
 
@@ -724,7 +728,8 @@ creates a room with a target object on an island surrounded by lava. There
 will also be a block tool to facilitate acquiring the goal object.
 - `front_lava_width` (int, or list of ints, or [MinMaxInt](#MinMaxInt):
 The number of tiles of lava in front of the island.  Must produce value
-between 2 and 6 for rectangular tools, 1 to 3 for hooked tools.
+between 2 and 6 for rectangular tools, 1 to 3 for hooked and isosceles
+tools.
 Default: Random based on room size and island size
 - `guide_rails` (bool, or list of bools): If True, guide rails will be
 generated to guide the tool in the direction it is oriented.  If a target
@@ -733,12 +738,12 @@ used with `tool_rotation`. Default: False
 - `island_size` (int, or list of ints, or [MinMaxInt](#MinMaxInt) dict,
 or list of MinMaxInt dicts): The width and length of the island inside the
 lava.  Must produce value from 1 to 5 for rectangular tools, 1 to 3
-for hooked tools.
+for hooked and isosceles tools.
 Default: Random based on room size
 - `left_lava_width` (int, or list of ints, or [MinMaxInt](#MinMaxInt):
 The number of tiles of lava left of the island.  Must produce value
-between 2 and 6 for rectangular tools, but will be ignored for hooked
-tools, since the lava should extend to the wall in that case.
+between 2 and 6 for rectangular tools, but will be ignored for hooked and
+isosceles tools, since the lava should extend to the wall in that case.
 Default: Random based on room size and island size
 - `random_performer_position` (bool, or list of bools): If True, the
 performer will be randomly placed in the room. They will not be placed in
@@ -748,12 +753,13 @@ target object will be positioned randomly in the room, rather than being
 positioned on the island surrounded by lava. Default: False
 - `rear_lava_width` (int, or list of ints, or [MinMaxInt](#MinMaxInt):
 The number of tiles of lava behind of the island.  Must produce value
-between 2 and 6 for rectangular tools, 1 to 3 for hooked tools.
+between 2 and 6 for rectangular tools, 1 to 3 for hooked and isosceles
+tools.
 Default: Random based on room size, island size, and other lava widths.
 - `right_lava_width` (int, or list of ints, or [MinMaxInt](#MinMaxInt):
 The number of tiles right of the island.  Must produce value
-between 2 and 6 for rectangular tools, but will be ignored for hooked
-tools, since the lava should extend to the wall in that case.
+between 2 and 6 for rectangular tools, but will be ignored for hooked and
+isosceles tools, since the lava should extend to the wall in that case.
 Default: Random based on room size and island size
 - `random_performer_position` (bool, or list of bools): If True, the
 performer will be randomly placed in the room. They will not be placed in
@@ -763,15 +769,24 @@ they cannot access the tool. Default: False
 - `tool_rotation` (float, or list of floats, or
 [MinMaxFloat](#MinMaxFloat) dict, or list of MinMaxFloat dicts):
 Angle that tool should be rotated out of alignment with target.
-This option cannot be used with `guide_rails`.  Default: 0
-- `distance_between_performer_and_tool` (float, or list of floats,
-or [MinMaxFloat](#MinMaxFloat): The distance away the performer is from the
-tool at start. The performer will be at random point around a rectangular
-perimeter surrounding the tool. This option cannot be used with
-`random_performer_position`.  Default: None
+This option cannot be used with `guide_rails`, or the `broken` and
+`inaccessible` `tool_type` choices. For `hooked` and `isosceles` tools,
+we advice against setting a rotation higher than 315.
+Defaults to one of the following: 0, 45, 90, 135, 180, 225, 270, 315
+- `distance_between_performer_and_tool` (float, or
+[MinMaxFloat](#MinMaxFloat) dict, or list of floats and/or MinMaxFloat
+dicts): Distance between the performer agent and the tool. If set to `0`,
+will try all distances between `0.5` and the bounds of the room. If set to
+a MinMaxFloat with a `max` of `0` or greater than the room bounds, will
+try all distances between the configured `min` and the bounds of the room.
+If set to a MinMaxFloat with a `min` of `0`, will try all distances
+between the configured `max` and `0.5`. This cannot be used in combination
+with `random_performer_position`. Default: None
 - `tool_offset_backward_from_lava` (float, or [MinMaxFloat](#MinMaxFloat)
 dict, or list of floats and/or MinMaxFloat dicts): The vertical offset of
-tool either away from the lava pool. Must be greater than or equal to 0
+the tool: either further into the lava, for `hooked` and `isosceles` tools,
+or further from the lava, for other tools. Must be 0 or greater. Cannot be
+used with `hooked` and `isosceles` tools when `tool_rotation` is non-zero.
 Default: 0
 - `tool_horizontal_offset` (float, or [MinMaxFloat](#MinMaxFloat) dict, or
 list of floats and/or MinMaxFloat dicts): The horizontal offset of tool
@@ -796,11 +811,13 @@ closest edge to the wall will be a distance of 3 to the left of the wall
 since the wall has a negative offset to the left.
 Default: None
 - `tool_type` (str, or list of strs): The type of tool to generate, either
-`rectangular`, `hooked`, `small`, `broken`, or `inaccessible`.
-If `hooked` tools are chosen and lava widths are not specified,
-the room will default to having an island size of 1, with lava extending
-all the way to the walls in both the left and right directions.
-The front and rear lava in the default hooked tool case will each
+`rectangular`, `hooked`, `isosceles`, `small`, `broken`, or `inaccessible`.
+Both `hooked` and isosceles` tools are L-shaped; `hooked` tools always have
+width 3, and `isosceles` tools always have width equal to their length.
+If `hooked` and `isosceles` tools are chosen and lava widths are not
+specified, the room will default to having an island size of 1, with lava
+extending all the way to the walls in both the left and right directions.
+The front and rear lava in the default hooked/isosceles tool case will each
 have a size of 1.
 If `small` is chosen the tool will always be a length of 1.
 If `broken` is chosen the tool will be the correct length but have
@@ -840,13 +857,19 @@ Defines details of performer_starts_near which places the performer near an
 object of a given label at a specified distance away.
 - `label` (string or list of strings):
 Label of the object the performer will be placed near. Required.
-- `distance` (float or list of floats):
-Distance the performer will be from the object.  Default: 0.1
+- `distance` (float, or [MinMaxFloat](#MinMaxFloat) dict, or list of
+floats and/or MinMaxFloat dicts): Distance between the performer agent and
+the object. If set to `0`, will try all distances between `0.5` and the
+bounds of the room. If set to a MinMaxFloat with a `max` of `0` or greater
+than the room bounds, will try all distances between the configured `min`
+and the bounds of the room. If set to a MinMaxFloat with a `min` of `0`,
+will try all distances between the configured `max` and `0.5`.
+Default: 0.5
 
 Example:
 ```
 label: container
-distance: 0.1
+distance: 0.5
 ```
 
 #### PlacersWithDecoyConfig
@@ -1747,7 +1770,10 @@ object in each scene. For a list, a new shape will be randomly chosen for
 each scene. Must be a valid [tool shape](#Lists). If set, ignores `length`,
 `width`, and `tool_type`.  Default: Use `tool_type`
 - `tool_type` (str, or list of strs): The type of tool to generate, either
-`rectangular`, `hooked`, or `small`. Default: `rectangular` or `hooked`
+`rectangular`, `hooked`, `isosceles`, or `small`.
+Both `hooked` and isosceles` tools are L-shaped; `hooked` tools always have
+width 3, and `isosceles` tools always have width equal to their length.
+Default: `rectangular` or `hooked`
 - `width` (float, or list of floats, or [MinMaxFloat](#MinMaxFloat) dict,
 or list of MinMaxFloat dicts):  The width of the tool.  Tools only have
 specific sizes and the values much match exactly.  Valid widths are
@@ -1920,7 +1946,8 @@ ceiling_material: "Custom/Materials/GreyDrywallMCS"
 
 #### check_valid_path
 
-(bool): If true, checks for a valid path between the performer agent's
+(bool or str):
+If true, checks for a valid path between the performer agent's
 starting position and the target's position and retries generating the
 current scene if one cannot be found. Considers all objects and structures
 that would block the performer when their position is y = 0 or are light
@@ -1928,8 +1955,11 @@ enough to be pushed. The check considers all holes and areas of lava in the
 scene. It also considers moving up and/or down ramps that are attached to
 platforms (via the `attached_ramps` option in `structural_platforms`), as
 well as across those platforms. Pathfinding is otherwise only done in two
-dimensions. This check is skipped if false. Please note that this feature
-is not currently supported for scenes containing multiple targets.
+dimensions. This check is skipped if false.
+
+Can also be set as a string corresponding to the label of one or more
+objects that already exist in the scene.
+
 Default: False
 
 Simple Example:
@@ -2622,7 +2652,7 @@ Advanced Example:
 ```
 performer_starts_near:
     label: container
-    distance: 0.1
+    distance: 0.5
 ```
 
 #### placers
@@ -2991,7 +3021,7 @@ but the same restrictions of width min: 5 and max: 9 apply for left +
 island_size + right as well. By default, the target is a soccer ball
 with scale between 1 and 3.
 
-For hooked tools, different min/max rules apply. See
+For hooked and isosceles tools, different min/max rules apply. See
 LavaTargetToolConfig for details.
 
 The tool is a pushable/pullable tool object with a length equal

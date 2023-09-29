@@ -36,6 +36,7 @@ from generator.scene import PartitionFloor, Scene
 from generator.structures import DOOR_TYPES
 from ideal_learning_env import (
     InstanceDefinitionLocationTuple,
+    MinMaxFloat,
     ObjectRepository,
     ShortcutComponent,
     SpecificStructuralObjectsComponent,
@@ -2409,9 +2410,11 @@ def test_shortcut_lava_island_default_tool_type():
 
 def test_shortcut_lava_island_min_size():
     component = ShortcutComponent({
-        'shortcut_lava_target_tool': True
+        'shortcut_lava_target_tool': {
+            'tool_rotation': 0
+        }
     })
-    assert component.shortcut_lava_target_tool
+    assert component.shortcut_lava_target_tool.tool_rotation == 0
     assert component.get_shortcut_lava_target_tool()
     scene = prior_scene_custom_size(7, 13)
     scene_switched = prior_scene_custom_size(13, 7)
@@ -2452,9 +2455,11 @@ def test_shortcut_lava_island_min_size():
 
 def test_shortcut_lava_island_min_size_plus_one():
     component = ShortcutComponent({
-        'shortcut_lava_target_tool': True
+        'shortcut_lava_target_tool': {
+            'tool_rotation': 0
+        }
     })
-    assert component.shortcut_lava_target_tool
+    assert component.shortcut_lava_target_tool.tool_rotation == 0
     assert component.get_shortcut_lava_target_tool()
     scene = prior_scene_custom_size(8, 14)
     scene_switched = prior_scene_custom_size(14, 8)
@@ -2495,9 +2500,11 @@ def test_shortcut_lava_island_min_size_plus_one():
 
 def test_shortcut_lava_island_big_room():
     component = ShortcutComponent({
-        'shortcut_lava_target_tool': True
+        'shortcut_lava_target_tool': {
+            'tool_rotation': 0
+        }
     })
-    assert component.shortcut_lava_target_tool
+    assert component.shortcut_lava_target_tool.tool_rotation == 0
     assert component.get_shortcut_lava_target_tool()
     scene = prior_scene_custom_size(25, 25)
     scene = component.update_ile_scene(scene)
@@ -2529,7 +2536,8 @@ def test_shortcut_lava_island_big_room():
 def test_shortcut_lava_island_guide_rail():
     component = ShortcutComponent({
         'shortcut_lava_target_tool': {
-            'guide_rails': True
+            'guide_rails': True,
+            'tool_rotation': 0
         }
     })
     assert component.shortcut_lava_target_tool
@@ -2742,7 +2750,8 @@ def test_shortcut_lava_island_rails_with_existing_target():
 def test_shortcut_lava_island_random_target_position():
     component = ShortcutComponent({
         'shortcut_lava_target_tool': {
-            'random_target_position': True
+            'random_target_position': True,
+            'tool_rotation': 0
         }
     })
     assert component.shortcut_lava_target_tool
@@ -2838,6 +2847,26 @@ def test_shortcut_lava_island_left_right_ignored_hooked():
     assert len(lavas) == 44
 
 
+def test_shortcut_lava_island_left_right_ignored_isosceles():
+    component = ShortcutComponent({
+        'shortcut_lava_target_tool': {
+            'left_lava_width': 2,
+            'right_lava_width': 3,
+            'tool_type': 'isosceles'
+        }
+    })
+    assert component.shortcut_lava_target_tool
+    assert component.shortcut_lava_target_tool.left_lava_width
+    assert component.shortcut_lava_target_tool.right_lava_width
+    scene = prior_scene_custom_size(15, 15)
+
+    scene = component.update_ile_scene(scene)
+    lavas = scene.lava
+    # lava array size in this case should be the
+    # long side room_dimension * 3 - island size
+    assert len(lavas) == 44
+
+
 def test_shortcut_lava_island_left_right_too_big():
     component = ShortcutComponent({
         'shortcut_lava_target_tool': {
@@ -2894,6 +2923,17 @@ def test_shortcut_lava_island_front_rear_too_big():
             'front_lava_width': 2,
             'rear_lava_width': 6,
             'tool_type': 'hooked'
+        }
+    })
+    scene = prior_scene_custom_size(30, 30)
+    with pytest.raises(ILEException):
+        scene = component.update_ile_scene(scene)
+
+    component = ShortcutComponent({
+        'shortcut_lava_target_tool': {
+            'front_lava_width': 2,
+            'rear_lava_width': 6,
+            'tool_type': 'isosceles'
         }
     })
     scene = prior_scene_custom_size(30, 30)
@@ -3054,6 +3094,7 @@ def test_shortcut_lava_island_front_rear_left_right_long_x_dimension():
 @pytest.mark.slow
 def test_shortcut_lava_island_distance_between_performer_and_tool():
     for distance_away in arange(0.1, 1.1, 0.1):
+        # Try a bunch of times to account for random variance.
         for _ in range(5):
             distance_away = round(distance_away, 1)
             ObjectRepository.get_instance().clear()
@@ -3086,6 +3127,7 @@ def test_shortcut_lava_island_distance_between_performer_and_tool():
 @pytest.mark.slow
 def test_shortcut_lava_island_distance_between_performer_and_hooked_tool():
     for distance_away in arange(0.1, 1.1, 0.1):
+        # Try a bunch of times to account for random variance.
         for _ in range(5):
             distance_away = round(distance_away, 1)
             ObjectRepository.get_instance().clear()
@@ -3137,21 +3179,146 @@ def test_shortcut_lava_island_distance_between_performer_and_hooked_tool():
                 actual_distance, 0.1)
 
 
+@pytest.mark.slow
+def test_shortcut_lava_island_distance_between_performer_and_isosceles_tool():
+    for distance_away in arange(0.1, 1.1, 0.1):
+        # Try a bunch of times to account for random variance.
+        for _ in range(5):
+            distance_away = round(distance_away, 1)
+            ObjectRepository.get_instance().clear()
+            component = ShortcutComponent({
+                'shortcut_lava_target_tool': {
+                    'distance_between_performer_and_tool': distance_away,
+                    'tool_rotation': [0, 15, 30, 45, 60, 75, 90],
+                    'tool_type': 'isosceles'
+                }
+            })
+            assert component.shortcut_lava_target_tool
+            assert component.shortcut_lava_target_tool.distance_between_performer_and_tool  # noqa
+            scene = prior_scene_custom_size(25, 25)
+            scene = component.update_ile_scene(scene)
+            performer_start = Point(
+                scene.performer_start.position.x,
+                scene.performer_start.position.z)
+            tool = scene.objects[1]
+
+            bb_boxes = tool['shows'][0]['boundingBox'].box_xz
+            top_right = Point(bb_boxes[0].x, bb_boxes[0].z)
+            bottom_right = Point(bb_boxes[1].x, bb_boxes[1].z)
+            top_left = Point(bb_boxes[3].x, bb_boxes[3].z)
+
+            normalized_vertical_vector = \
+                get_normalized_vector_from_two_points(
+                    top_right, bottom_right)
+            normalized_horizontal_vector = \
+                get_normalized_vector_from_two_points(
+                    top_right, top_left)
+            actual_distance = distance_away + PERFORMER_HALF_WIDTH
+
+            thickness = tool['debug']['tool_thickness']
+            bottom_left = Point(
+                bottom_right.x - (normalized_horizontal_vector.x * thickness),
+                bottom_right.y - (normalized_horizontal_vector.y * thickness))
+            far_left = Point(
+                top_left.x - normalized_vertical_vector.x * thickness,
+                top_left.y - normalized_vertical_vector.y * thickness)
+            middle_left = Point(
+                far_left.x + normalized_horizontal_vector.x * (thickness * 2),
+                far_left.y + normalized_horizontal_vector.y * (thickness * 2))
+
+            tool_polygon = Polygon(
+                [top_right, bottom_right, bottom_left,
+                 middle_left, far_left, top_left])
+            distance = performer_start.distance(tool_polygon)
+            assert distance == pytest.approx(
+                actual_distance, 0.1)
+
+
+@pytest.mark.slow
+def test_shortcut_lava_island_distance_between_performer_and_tool_variable_max():  # noqa E501
+    # Try a bunch of times to account for random variance.
+    for _ in range(5):
+        ObjectRepository.get_instance().clear()
+        config = MinMaxFloat(min=5, max=99)
+        component = ShortcutComponent({
+            'shortcut_lava_target_tool': {
+                'distance_between_performer_and_tool': config,
+                'tool_rotation': 0
+            }
+        })
+        scene = component.update_ile_scene(prior_scene_custom_size(25, 25))
+        performer_start = Point(
+            scene.performer_start.position.x,
+            scene.performer_start.position.z
+        )
+        poly = scene.objects[1]['shows'][0]['boundingBox'].polygon_xz
+        distance = round(performer_start.distance(poly), 2)
+        assert 5 <= distance <= 35
+
+
+@pytest.mark.slow
+def test_shortcut_lava_island_distance_between_performer_and_tool_variable_min():  # noqa E501
+    # Try a bunch of times to account for random variance.
+    for _ in range(5):
+        ObjectRepository.get_instance().clear()
+        config = MinMaxFloat(min=0, max=5)
+        component = ShortcutComponent({
+            'shortcut_lava_target_tool': {
+                'distance_between_performer_and_tool': config,
+                'tool_rotation': 0
+            }
+        })
+        scene = component.update_ile_scene(prior_scene_custom_size(25, 25))
+        performer_start = Point(
+            scene.performer_start.position.x,
+            scene.performer_start.position.z
+        )
+        poly = scene.objects[1]['shows'][0]['boundingBox'].polygon_xz
+        distance = round(performer_start.distance(poly), 2)
+        assert 0.5 <= distance <= (5 + PERFORMER_HALF_WIDTH)
+
+
+@pytest.mark.slow
+def test_shortcut_lava_island_distance_between_performer_and_tool_variable_min_and_max():  # noqa E501
+    # Try a bunch of times to account for random variance.
+    for _ in range(5):
+        ObjectRepository.get_instance().clear()
+        config = MinMaxFloat(min=0, max=99)
+        component = ShortcutComponent({
+            'shortcut_lava_target_tool': {
+                'distance_between_performer_and_tool': config,
+                'tool_rotation': 0
+            }
+        })
+        scene = component.update_ile_scene(prior_scene_custom_size(25, 25))
+        performer_start = Point(
+            scene.performer_start.position.x,
+            scene.performer_start.position.z
+        )
+        poly = scene.objects[1]['shows'][0]['boundingBox'].polygon_xz
+        distance = round(performer_start.distance(poly), 2)
+        assert 0.5 <= distance <= 35
+
+
 def test_shortcut_lava_island_hooked_tool():
     component = ShortcutComponent({
         'shortcut_lava_target_tool': {
-            'tool_type': 'hooked'
+            'tool_type': 'hooked',
+            'tool_rotation': 0
         }
     })
     assert component.shortcut_lava_target_tool
     assert component.shortcut_lava_target_tool.tool_type == 'hooked'
-    scene = prior_scene_custom_size(19, 19)
+    assert component.shortcut_lava_target_tool.tool_rotation == 0
+
+    # Test 1: lava along front wall
+    scene = prior_scene_custom_size(17, 19)
     scene = component.update_ile_scene(scene)
 
     lavas = scene.lava
-    assert len(lavas) == 56
+    assert len(lavas) == 50
 
-    for x in range(-9, 10):
+    for x in range(-8, 9):
         for z in range(7, 10):
             if x != 0 and z != 8:
                 assert Vector2dInt(x=x, z=z) in lavas
@@ -3179,22 +3346,61 @@ def test_shortcut_lava_island_hooked_tool():
     assert pos == {'x': x_pos, 'y': 0.15, 'z': z_pos}
     assert rot_y == 0
 
+    # Test 2: lava along right wall
+    scene_switched = prior_scene_custom_size(19, 17)
+    scene_switched = component.update_ile_scene(scene_switched)
+
+    lavas = scene_switched.lava
+    assert len(lavas) == 50
+
+    for z in range(-8, 9):
+        for x in range(7, 10):
+            if x != 8 and z != 0:
+                assert Vector2dInt(x=x, z=z) in lavas
+
+    objs = scene_switched.objects
+    assert len(objs) == 2
+    target = objs[0]
+    tool = objs[1]
+    tool_type = tool['type']
+    pos = target['shows'][0]['position']
+    assert pos['x'] == 8.0
+    assert pos['z'] == 0
+
+    pos = tool['shows'][0]['position']
+    rot_y = tool['shows'][0]['rotation']['y']
+
+    assert 'hooked' in tool_type
+    tool_width = LARGE_BLOCK_TOOLS_TO_DIMENSIONS[tool_type][0]
+    tool_length = LARGE_BLOCK_TOOLS_TO_DIMENSIONS[tool_type][1]
+
+    tool_buffer = (1.0 - (tool_width / 3.0))
+    max_dimension = 9.5
+    z_pos = -(tool_buffer / 2.0)
+    x_pos = max_dimension - (tool_length / 2.0) - tool_buffer
+    assert pos == {'x': x_pos, 'y': 0.15, 'z': z_pos}
+    assert rot_y == 90
+
 
 def test_shortcut_lava_island_hooked_tool_even_room_dim():
     component = ShortcutComponent({
         'shortcut_lava_target_tool': {
-            'tool_type': 'hooked'
+            'tool_type': 'hooked',
+            'tool_rotation': 0
         }
     })
     assert component.shortcut_lava_target_tool
     assert component.shortcut_lava_target_tool.tool_type == 'hooked'
-    scene = prior_scene_custom_size(20, 20)
+    assert component.shortcut_lava_target_tool.tool_rotation == 0
+
+    # Test 1: lava along front wall
+    scene = prior_scene_custom_size(18, 20)
     scene = component.update_ile_scene(scene)
 
     lavas = scene.lava
-    assert len(lavas) == 83
+    assert len(lavas) == 75
 
-    for x in range(-10, 11):
+    for x in range(-9, 10):
         for z in range(7, 11):
             if x != 0 and z != 8:
                 assert Vector2dInt(x=x, z=z) in lavas
@@ -3221,6 +3427,197 @@ def test_shortcut_lava_island_hooked_tool_even_room_dim():
     z_pos = max_dimension - (tool_length / 2.0) - tool_buffer
     assert pos == {'x': x_pos, 'y': 0.15, 'z': z_pos}
     assert rot_y == 0
+
+    # Test 2: lava along right wall
+    scene_switched = prior_scene_custom_size(20, 18)
+    scene_switched = component.update_ile_scene(scene_switched)
+
+    lavas = scene_switched.lava
+    assert len(lavas) == 75
+
+    for z in range(-9, 10):
+        for x in range(7, 11):
+            if x != 8 and z != 0:
+                assert Vector2dInt(x=x, z=z) in lavas
+
+    objs = scene_switched.objects
+    assert len(objs) == 2
+    target = objs[0]
+    tool = objs[1]
+    tool_type = tool['type']
+    pos = target['shows'][0]['position']
+    assert pos['x'] == 8.0
+    assert pos['z'] == 0
+
+    pos = tool['shows'][0]['position']
+    rot_y = tool['shows'][0]['rotation']['y']
+
+    assert 'hooked' in tool_type
+    tool_width = LARGE_BLOCK_TOOLS_TO_DIMENSIONS[tool_type][0]
+    tool_length = LARGE_BLOCK_TOOLS_TO_DIMENSIONS[tool_type][1]
+
+    tool_buffer = (1.0 - (tool_width / 3.0))
+    max_dimension = 9.5
+    z_pos = -(tool_buffer / 2.0)
+    x_pos = max_dimension - (tool_length / 2.0) - tool_buffer
+    assert pos == {'x': x_pos, 'y': 0.15, 'z': z_pos}
+    assert rot_y == 90
+
+
+def test_shortcut_lava_island_isosceles_tool():
+    component = ShortcutComponent({
+        'shortcut_lava_target_tool': {
+            'tool_type': 'isosceles',
+            'tool_rotation': 0
+        }
+    })
+    assert component.shortcut_lava_target_tool
+    assert component.shortcut_lava_target_tool.tool_type == 'isosceles'
+    assert component.shortcut_lava_target_tool.tool_rotation == 0
+
+    # Test 1: lava along front wall
+    scene = prior_scene_custom_size(17, 19)
+    scene = component.update_ile_scene(scene)
+
+    lavas = scene.lava
+    assert len(lavas) == 50
+
+    for x in range(-8, 9):
+        for z in range(7, 10):
+            if x != 0 and z != 8:
+                assert Vector2dInt(x=x, z=z) in lavas
+
+    objs = scene.objects
+    assert len(objs) == 2
+    target = objs[0]
+    tool = objs[1]
+    tool_type = tool['type']
+    pos = target['shows'][0]['position']
+    assert pos['x'] == 0
+    assert pos['z'] == 8.0
+
+    pos = tool['shows'][0]['position']
+    rot_y = tool['shows'][0]['rotation']['y']
+
+    assert 'isosceles' in tool_type
+    tool_length = LARGE_BLOCK_TOOLS_TO_DIMENSIONS[tool_type][1]
+
+    max_dimension = 9.5
+    x_pos = 0
+    z_pos = max_dimension - (tool_length / 2.0)
+    assert pos == {'x': x_pos, 'y': 0.15, 'z': z_pos}
+    assert rot_y == 0
+
+    # Test 2: lava along right wall
+    scene_switched = prior_scene_custom_size(19, 17)
+    scene_switched = component.update_ile_scene(scene_switched)
+
+    lavas = scene_switched.lava
+    assert len(lavas) == 50
+
+    for z in range(-8, 9):
+        for x in range(7, 10):
+            if x != 8 and z != 0:
+                assert Vector2dInt(x=x, z=z) in lavas
+
+    objs = scene_switched.objects
+    assert len(objs) == 2
+    target = objs[0]
+    tool = objs[1]
+    tool_type = tool['type']
+    pos = target['shows'][0]['position']
+    assert pos['x'] == 8.0
+    assert pos['z'] == 0
+
+    pos = tool['shows'][0]['position']
+    rot_y = tool['shows'][0]['rotation']['y']
+
+    assert 'isosceles' in tool_type
+    tool_length = LARGE_BLOCK_TOOLS_TO_DIMENSIONS[tool_type][1]
+
+    max_dimension = 9.5
+    z_pos = 0
+    x_pos = max_dimension - (tool_length / 2.0)
+    assert pos == {'x': x_pos, 'y': 0.15, 'z': z_pos}
+    assert rot_y == 90
+
+
+def test_shortcut_lava_island_isosceles_tool_even_room_dim():
+    component = ShortcutComponent({
+        'shortcut_lava_target_tool': {
+            'tool_type': 'isosceles',
+            'tool_rotation': 0
+        }
+    })
+    assert component.shortcut_lava_target_tool
+    assert component.shortcut_lava_target_tool.tool_type == 'isosceles'
+    assert component.shortcut_lava_target_tool.tool_rotation == 0
+
+    # Test 1: lava along front wall
+    scene = prior_scene_custom_size(18, 20)
+    scene = component.update_ile_scene(scene)
+
+    lavas = scene.lava
+    assert len(lavas) == 75
+
+    for x in range(-9, 10):
+        for z in range(7, 11):
+            if x != 0 and z != 8:
+                assert Vector2dInt(x=x, z=z) in lavas
+
+    objs = scene.objects
+    assert len(objs) == 2
+    target = objs[0]
+    tool = objs[1]
+    tool_type = tool['type']
+    pos = target['shows'][0]['position']
+    assert pos['x'] == 0
+    assert pos['z'] == 8.0
+
+    pos = tool['shows'][0]['position']
+    rot_y = tool['shows'][0]['rotation']['y']
+
+    assert 'isosceles' in tool_type
+    tool_length = LARGE_BLOCK_TOOLS_TO_DIMENSIONS[tool_type][1]
+
+    max_dimension = 9.5
+    x_pos = 0
+    z_pos = max_dimension - (tool_length / 2.0)
+    assert pos == {'x': x_pos, 'y': 0.15, 'z': z_pos}
+    assert rot_y == 0
+
+    # Test 2: lava along right wall
+    scene_switched = prior_scene_custom_size(20, 18)
+    scene_switched = component.update_ile_scene(scene_switched)
+
+    lavas = scene_switched.lava
+    assert len(lavas) == 75
+
+    for z in range(-9, 10):
+        for x in range(7, 11):
+            if x != 8 and z != 0:
+                assert Vector2dInt(x=x, z=z) in lavas
+
+    objs = scene_switched.objects
+    assert len(objs) == 2
+    target = objs[0]
+    tool = objs[1]
+    tool_type = tool['type']
+    pos = target['shows'][0]['position']
+    assert pos['x'] == 8.0
+    assert pos['z'] == 0
+
+    pos = tool['shows'][0]['position']
+    rot_y = tool['shows'][0]['rotation']['y']
+
+    assert 'isosceles' in tool_type
+    tool_length = LARGE_BLOCK_TOOLS_TO_DIMENSIONS[tool_type][1]
+
+    max_dimension = 9.5
+    z_pos = 0
+    x_pos = max_dimension - (tool_length / 2.0)
+    assert pos == {'x': x_pos, 'y': 0.15, 'z': z_pos}
+    assert rot_y == 90
 
 
 def test_shortcut_agent_with_target_off():
@@ -6295,6 +6692,7 @@ def test_shortcut_lava_target_tool_offset_hooked():
             'tool_horizontal_offset': horizontal,
             'tool_offset_backward_from_lava': backward,
             'tool_type': 'hooked',
+            'tool_rotation': 0
         }
     })
     assert component.shortcut_lava_target_tool
@@ -6302,6 +6700,7 @@ def test_shortcut_lava_target_tool_offset_hooked():
     assert \
         component.shortcut_lava_target_tool.tool_offset_backward_from_lava == 1
     assert component.shortcut_lava_target_tool.tool_type == 'hooked'
+    assert component.shortcut_lava_target_tool.tool_rotation == 0
     assert component.get_shortcut_lava_target_tool()
     scene = prior_scene_custom_size(15, 20)
     scene = component.update_ile_scene(scene)
@@ -6309,7 +6708,7 @@ def test_shortcut_lava_target_tool_offset_hooked():
     tool = objs[1]
     tool_pos = tool['shows'][0]['position']
     tool_width = tool['debug']['tool_thickness'] * 3
-    tool_buffer = 1.0 - (tool_width / 3.0)
+    tool_buffer = max(1.0 - (tool_width / 3.0), 0)
     rear_buffer = 1.0
     lava_front_to_behind_island = rear_buffer + 3
     tool_pos_increment = lava_front_to_behind_island - tool_buffer
@@ -6319,8 +6718,9 @@ def test_shortcut_lava_target_tool_offset_hooked():
         island_coord - front_lava_width - tool['debug']['length'] / 2.0 - 0.5)
     long_tool_pos = long_tool_pos + tool_pos_increment
     short_coord = tool_buffer / 2.0
+    assert tool['shows'][0]['rotation']['y'] == 0
     assert tool_pos['x'] == short_coord + horizontal
-    assert tool_pos['z'] == long_tool_pos - backward
+    assert tool_pos['z'] == long_tool_pos + backward
 
     scene = prior_scene_custom_size(20, 15)
     scene = component.update_ile_scene(scene)
@@ -6328,7 +6728,7 @@ def test_shortcut_lava_target_tool_offset_hooked():
     tool = objs[1]
     tool_pos = tool['shows'][0]['position']
     tool_width = tool['debug']['tool_thickness'] * 3
-    tool_buffer = 1.0 - (tool_width / 3.0)
+    tool_buffer = max(1.0 - (tool_width / 3.0), 0)
     rear_buffer = 1.0
     lava_front_to_behind_island = rear_buffer + 3
     tool_pos_increment = lava_front_to_behind_island - tool_buffer
@@ -6337,9 +6737,70 @@ def test_shortcut_lava_target_tool_offset_hooked():
     long_tool_pos = (
         island_coord - front_lava_width - tool['debug']['length'] / 2.0 - 0.5)
     long_tool_pos = long_tool_pos + tool_pos_increment
-    short_coord = tool_buffer / 2.0
+    short_coord = -(tool_buffer / 2.0)
+    assert tool['shows'][0]['rotation']['y'] == 90
     assert tool_pos['z'] == short_coord - horizontal
-    assert tool_pos['x'] == long_tool_pos - backward
+    assert tool_pos['x'] == long_tool_pos + backward
+
+
+def test_shortcut_lava_target_tool_offset_isosceles():
+    horizontal = 2
+    backward = 1
+    component = ShortcutComponent({
+        'shortcut_lava_target_tool': {
+            'front_lava_width': 2,
+            'rear_lava_width': 2,
+            'left_lava_width': 2,
+            'right_lava_width': 2,
+            'island_size': 1,
+            'tool_horizontal_offset': horizontal,
+            'tool_offset_backward_from_lava': backward,
+            'tool_type': 'isosceles',
+            'tool_rotation': 0
+        }
+    })
+    assert component.shortcut_lava_target_tool
+    assert component.shortcut_lava_target_tool.tool_horizontal_offset == 2
+    assert \
+        component.shortcut_lava_target_tool.tool_offset_backward_from_lava == 1
+    assert component.shortcut_lava_target_tool.tool_type == 'isosceles'
+    assert component.shortcut_lava_target_tool.tool_rotation == 0
+    assert component.get_shortcut_lava_target_tool()
+    scene = prior_scene_custom_size(15, 20)
+    scene = component.update_ile_scene(scene)
+    objs = scene.objects
+    tool = objs[1]
+    tool_pos = tool['shows'][0]['position']
+    rear_buffer = 1.0
+    lava_front_to_behind_island = rear_buffer + 3
+    tool_pos_increment = lava_front_to_behind_island
+    island_coord = 7
+    front_lava_width = 2
+    long_tool_pos = (
+        island_coord - front_lava_width - tool['debug']['length'] / 2.0 - 0.5)
+    long_tool_pos = long_tool_pos + tool_pos_increment
+    short_coord = 0
+    assert tool['shows'][0]['rotation']['y'] == 0
+    assert tool_pos['x'] == short_coord + horizontal
+    assert tool_pos['z'] == long_tool_pos + backward
+
+    scene = prior_scene_custom_size(20, 15)
+    scene = component.update_ile_scene(scene)
+    objs = scene.objects
+    tool = objs[1]
+    tool_pos = tool['shows'][0]['position']
+    rear_buffer = 1.0
+    lava_front_to_behind_island = rear_buffer + 3
+    tool_pos_increment = lava_front_to_behind_island
+    island_coord = 7
+    front_lava_width = 2
+    long_tool_pos = (
+        island_coord - front_lava_width - tool['debug']['length'] / 2.0 - 0.5)
+    long_tool_pos = long_tool_pos + tool_pos_increment
+    short_coord = 0
+    assert tool['shows'][0]['rotation']['y'] == 90
+    assert tool_pos['z'] == short_coord - horizontal
+    assert tool_pos['x'] == long_tool_pos + backward
 
 
 def test_shortcut_lava_target_tool_small():
@@ -6925,7 +7386,7 @@ def test_shortcut_lava_target_tool_inaccessible_errors_negative():
 
 def test_shortcut_lava_target_tool_no_inaccessible_blocking_wall():
     separation = 1
-    tool_types = ['rectangular', 'hooked', 'broken', 'small']
+    tool_types = ['rectangular', 'hooked', 'isosceles', 'broken', 'small']
 
     for tool_type in tool_types:
         component = ShortcutComponent({
@@ -6956,8 +7417,7 @@ def test_shortcut_lava_target_tool_offset_broken():
             'island_size': 1,
             'tool_horizontal_offset': horizontal,
             'tool_offset_backward_from_lava': backward,
-            'tool_type': 'broken',
-            'tool_rotation': 0
+            'tool_type': 'broken'
         }
     })
     minimum_positive = \

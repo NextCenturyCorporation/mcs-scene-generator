@@ -1445,73 +1445,155 @@ def get_magnitudes_of_x_z_dirs_for_rotation_and_move_vector(
     final_x_shift = x_length_x_shift + x_length_z_shift
     final_z_shift = z_length_x_shift + z_length_z_shift
 
-    return final_x_shift, final_z_shift\
-
+    return final_x_shift, final_z_shift
 
 
 def get_position_distance_away_from_obj(
-        room_dimensions: Vector3d, obj,
-        distance, bounds) -> Tuple[float, float]:
-    """ Calculates and returns a position around an object at a
-    specified distance away from an edge of the objects bounding box
+    room_dimensions: Vector3d,
+    obj: SceneObject,
+    min_distance: float,
+    max_distance: float,
+    bounds: List[ObjectBounds],
+    factor: float = 0.5
+) -> Tuple[float, float]:
+    """ Calculates and returns a position near an object at a variable distance
+    away from an edge of the object's bounds.
+
+    - If the given min_distance and max_distance are equal: try just the one
+    distance.
+    - If the given max_distance is 0, or greater than the room's diagonal:
+    choose a random distance between the min_distance and the room's diagonal,
+    try all distances from the chosen distance to the room's diagonal in
+    increasing order, then try all distances from the chosen distance to the
+    min_distance in decreasing order.
+    - If the given min_distance is 0: choose a random distance between 0.5 and
+    the max_distance, try all distances from the chosen distance to 0.5 in
+    decreasing order, then try all distances from the chosen distance to the
+    max_distance in increasing order.
+    - And otherwise: try all distances between the min_distance and the
+    max_distance in a random order.
     """
-    distance_away = distance + PERFORMER_HALF_WIDTH
     (top_right, bottom_right, bottom_left, top_left,
      normalized_vertical_vector, normalized_horizontal_vector) = \
         get_basic_bounding_box_point_and_directional_vectors(obj)
-    (resultant_vector_up_right, resultant_vector_down_right,
-     resultant_vector_down_left, resultant_vector_up_left, directions) = \
-        get_resultant_vectors(normalized_horizontal_vector,
-                              normalized_vertical_vector, distance_away)
-    """
-    p4----------p1
-    |  tl   tr  |
-    |    [o]    |
-    |    [b]    |
-    |    [j]    |
-    |  bl   br  |
-    p3---------p2
-    """
-    p1 = geometry.Point(
-        top_right.x + resultant_vector_up_right.x,
-        top_right.y + resultant_vector_up_right.z)
-    p2 = geometry.Point(
-        bottom_right.x + resultant_vector_down_right.x,
-        bottom_right.y + resultant_vector_down_right.z)
-    p3 = geometry.Point(
-        bottom_left.x + resultant_vector_down_left.x,
-        bottom_left.y + resultant_vector_down_left.z)
-    p4 = geometry.Point(
-        top_left.x + resultant_vector_up_left.x,
-        top_left.y + resultant_vector_up_left.z)
 
-    # The perimeter line
-    line = geometry.LineString((
-        [p1.x, p1.y],
-        [p2.x, p2.y],
-        [p3.x, p3.y],
-        [p4.x, p4.y],
-        [p1.x, p1.y]))
-    poly = geometry.Polygon(
-        [top_right, bottom_right, bottom_left, top_left])
-    valid, pos = get_valid_starts_near_position_on_perimeter(
-        line, poly, room_dimensions, bounds, directions, distance_away)
-    if valid:
-        return (pos.x, pos.z)
+    # Generate the list of possible distances.
+    ignore_min = min_distance is not None and min_distance == 0
+    object_show = obj['shows'][0]['position']
+    room_diagonal = math.hypot(
+        (room_dimensions.x / 2.0) + abs(object_show['x']) - PERFORMER_WIDTH,
+        (room_dimensions.z / 2.0) + abs(object_show['z']) - PERFORMER_WIDTH
+    )
+    ignore_max = max_distance is not None and (
+        max_distance == 0 or max_distance > room_diagonal
+    )
+    if ignore_min and ignore_max:
+        distances = [factor + (i * factor) for i in range(
+            int((room_diagonal - factor) / factor + 1)
+        )]
+        index = random.choice(range(len(distances)))
+        distances = distances[index:] + list(reversed(distances[:index]))
+    elif ignore_min:
+        distances = list(reversed([factor + (i * factor) for i in range(
+            int((max_distance - factor) / factor + 1)
+        )]))
+        index = random.choice(range(len(distances)))
+        distances = distances[index:] + list(reversed(distances[:index]))
+    elif ignore_max:
+        distances = [min_distance + (i * factor) for i in range(
+            int((room_diagonal - min_distance) / factor + 1)
+        )]
+        index = random.choice(range(len(distances)))
+        distances = distances[index:] + list(reversed(distances[:index]))
+    elif min_distance == max_distance:
+        distances = [min_distance]
+    else:
+        distances = [min_distance + (i * factor) for i in range(
+            int((max_distance - min_distance) / factor + 1)
+        )]
+        random.shuffle(distances)
 
+    for possible_distance in distances:
+        distance_away = possible_distance + PERFORMER_HALF_WIDTH
+        (resultant_vector_up_right, resultant_vector_down_right,
+         resultant_vector_down_left, resultant_vector_up_left, directions) = \
+            get_resultant_vectors(normalized_horizontal_vector,
+                                  normalized_vertical_vector, distance_away)
+        """
+        p4----------p1
+        |  tl   tr  |
+        |    [o]    |
+        |    [b]    |
+        |    [j]    |
+        |  bl   br  |
+        p3---------p2
+        """
+        p1 = geometry.Point(
+            top_right.x + resultant_vector_up_right.x,
+            top_right.y + resultant_vector_up_right.z)
+        p2 = geometry.Point(
+            bottom_right.x + resultant_vector_down_right.x,
+            bottom_right.y + resultant_vector_down_right.z)
+        p3 = geometry.Point(
+            bottom_left.x + resultant_vector_down_left.x,
+            bottom_left.y + resultant_vector_down_left.z)
+        p4 = geometry.Point(
+            top_left.x + resultant_vector_up_left.x,
+            top_left.y + resultant_vector_up_left.z)
+
+        # The perimeter line
+        line = geometry.LineString((
+            [p1.x, p1.y],
+            [p2.x, p2.y],
+            [p3.x, p3.y],
+            [p4.x, p4.y],
+            [p1.x, p1.y]))
+        poly = geometry.Polygon(
+            [top_right, bottom_right, bottom_left, top_left])
+        valid, pos = get_valid_starts_near_position_on_perimeter(
+            line, poly, room_dimensions, bounds, directions, distance_away)
+        if valid:
+            return (pos.x, pos.z)
+
+    if len(distances) == 1:
+        message_snippet = f'distance={distances[0]}'
+    else:
+        message_snippet = (
+            f'distance between min={min(distances)} and max={max(distances)}'
+        )
     raise Exception(
-        f"Failed to find valid performer location "
-        f"with distance away: ({distance}) from object: ({obj['id']})"
-        f"because location is obstructed or outside of room bounds")
+        f"Failed to find a valid location {message_snippet} away from "
+        f"object={obj['id']} (position={obj['shows'][0]['position']}) "
+        f"because all possible locations are obstructed or outside the room "
+        f"(dimensions=({room_dimensions}))"
+    )
 
 
 def get_position_distance_away_from_hooked_tool(
-        room_dimensions: Vector3d, tool,
-        distance, bounds) -> Tuple[float, float]:
-    """ Calculates and returns a position around an object at a
-    specified distance away from an edge of the unique hooked tool bounding box
+    room_dimensions: Vector3d,
+    tool: SceneObject,
+    min_distance: float,
+    max_distance: float,
+    bounds: List[ObjectBounds],
+    factor: float = 0.5
+) -> Tuple[float, float]:
+    """ Calculates and returns a position near an object at a variable distance
+    away from an edge of the L-shaped tool's bounds.
+
+    - If the given min_distance and max_distance are equal: try just the one
+    distance.
+    - If the given max_distance is 0, or greater than the room's diagonal:
+    choose a random distance between the min_distance and the room's diagonal,
+    try all distances from the chosen distance to the room's diagonal in
+    increasing order, then try all distances from the chosen distance to the
+    min_distance in decreasing order.
+    - If the given min_distance is 0: choose a random distance between 0.5 and
+    the max_distance, try all distances from the chosen distance to 0.5 in
+    decreasing order, then try all distances from the chosen distance to the
+    max_distance in increasing order.
+    - And otherwise: try all distances between the min_distance and the
+    max_distance in a random order.
     """
-    distance_away = distance + PERFORMER_HALF_WIDTH
     (top_right, bottom_right, bottom_left, top_left,
      normalized_vertical_vector, normalized_horizontal_vector) = \
         get_basic_bounding_box_point_and_directional_vectors(tool)
@@ -1538,51 +1620,98 @@ def get_position_distance_away_from_hooked_tool(
           | bl br |
           |-------|
     """
-    (resultant_vector_up_right, resultant_vector_down_right,
-     resultant_vector_down_left, resultant_vector_up_left, directions) = \
-        get_resultant_vectors(normalized_horizontal_vector,
-                              normalized_vertical_vector, distance_away)
 
-    p1 = geometry.Point(
-        top_right.x + resultant_vector_up_right.x,
-        top_right.y + resultant_vector_up_right.z)
-    p2 = geometry.Point(
-        bottom_right.x + resultant_vector_down_right.x,
-        bottom_right.y + resultant_vector_down_right.z)
-    p3 = geometry.Point(
-        bottom_left.x + resultant_vector_down_left.x,
-        bottom_left.y + resultant_vector_down_left.z)
-    p4 = geometry.Point(
-        middle_left.x + resultant_vector_down_left.x,
-        middle_left.y + resultant_vector_down_left.z)
-    p5 = geometry.Point(
-        far_left.x + resultant_vector_down_left.x,
-        far_left.y + resultant_vector_down_left.z)
-    p6 = geometry.Point(
-        top_left.x + resultant_vector_up_left.x,
-        top_left.y + resultant_vector_up_left.z)
+    # Generate the list of possible distances.
+    ignore_min = min_distance is not None and min_distance == 0
+    object_show = tool['shows'][0]['position']
+    room_diagonal = math.hypot(
+        (room_dimensions.x / 2.0) + abs(object_show['x']) - PERFORMER_WIDTH,
+        (room_dimensions.z / 2.0) + abs(object_show['z']) - PERFORMER_WIDTH
+    )
+    ignore_max = max_distance is not None and (
+        max_distance == 0 or max_distance > room_diagonal
+    )
+    if ignore_min and ignore_max:
+        distances = [factor + (i * factor) for i in range(
+            int((room_diagonal - factor) / factor + 1)
+        )]
+        index = random.choice(range(len(distances)))
+        distances = distances[index:] + list(reversed(distances[:index]))
+    elif ignore_min:
+        distances = list(reversed([factor + (i * factor) for i in range(
+            int((max_distance - factor) / factor + 1)
+        )]))
+        index = random.choice(range(len(distances)))
+        distances = distances[index:] + list(reversed(distances[:index]))
+    elif ignore_max:
+        distances = [min_distance + (i * factor) for i in range(
+            int((room_diagonal - min_distance) / factor + 1)
+        )]
+        index = random.choice(range(len(distances)))
+        distances = distances[index:] + list(reversed(distances[:index]))
+    elif min_distance == max_distance:
+        distances = [min_distance]
+    else:
+        distances = [min_distance + (i * factor) for i in range(
+            int((max_distance - min_distance) / factor + 1)
+        )]
+        random.shuffle(distances)
 
-    # The perimeter line
-    line = geometry.LineString((
-        [p1.x, p1.y],
-        [p2.x, p2.y],
-        [p3.x, p3.y],
-        [p4.x, p4.y],
-        [p5.x, p5.y],
-        [p6.x, p6.y],
-        [p1.x, p1.y]))
-    poly = geometry.Polygon(
-        [top_right, bottom_right, bottom_left,
-            middle_left, far_left, top_left])
-    valid, pos = get_valid_starts_near_position_on_perimeter(
-        line, poly, room_dimensions, bounds, directions, distance_away)
-    if valid:
-        return (pos.x, pos.z)
+    for possible_distance in distances:
+        distance_away = possible_distance + PERFORMER_HALF_WIDTH
+        (resultant_vector_up_right, resultant_vector_down_right,
+         resultant_vector_down_left, resultant_vector_up_left, directions) = \
+            get_resultant_vectors(normalized_horizontal_vector,
+                                  normalized_vertical_vector, distance_away)
 
+        p1 = geometry.Point(
+            top_right.x + resultant_vector_up_right.x,
+            top_right.y + resultant_vector_up_right.z)
+        p2 = geometry.Point(
+            bottom_right.x + resultant_vector_down_right.x,
+            bottom_right.y + resultant_vector_down_right.z)
+        p3 = geometry.Point(
+            bottom_left.x + resultant_vector_down_left.x,
+            bottom_left.y + resultant_vector_down_left.z)
+        p4 = geometry.Point(
+            middle_left.x + resultant_vector_down_left.x,
+            middle_left.y + resultant_vector_down_left.z)
+        p5 = geometry.Point(
+            far_left.x + resultant_vector_down_left.x,
+            far_left.y + resultant_vector_down_left.z)
+        p6 = geometry.Point(
+            top_left.x + resultant_vector_up_left.x,
+            top_left.y + resultant_vector_up_left.z)
+
+        # The perimeter line
+        line = geometry.LineString((
+            [p1.x, p1.y],
+            [p2.x, p2.y],
+            [p3.x, p3.y],
+            [p4.x, p4.y],
+            [p5.x, p5.y],
+            [p6.x, p6.y],
+            [p1.x, p1.y]))
+        poly = geometry.Polygon(
+            [top_right, bottom_right, bottom_left,
+                middle_left, far_left, top_left])
+        valid, pos = get_valid_starts_near_position_on_perimeter(
+            line, poly, room_dimensions, bounds, directions, distance_away)
+        if valid:
+            return (pos.x, pos.z)
+
+    if len(distances) == 1:
+        message_snippet = f'distance={distances[0]}'
+    else:
+        message_snippet = (
+            f'distance between min={min(distances)} and max={max(distances)}'
+        )
     raise Exception(
-        f"Failed to find valid performer location "
-        f"with distance away: ({distance}) from object: ({tool['id']}) "
-        f"because location is obstructed or outside of room bounds")
+        f"Failed to find a valid location {message_snippet} away from L-"
+        f"shaped tool={tool['id']} (position={tool['shows'][0]['position']}) "
+        f"because all possible locations are obstructed or outside the room "
+        f"(dimensions=({room_dimensions}))"
+    )
 
 
 def get_basic_bounding_box_point_and_directional_vectors(obj):

@@ -3,8 +3,11 @@
 # (and pullable) "tool" object. See the ILE_API for all config options.
 shortcut_lava_target_tool:
 
-    # Start next to the tool (50%) or in a random location (50%).
-    random_performer_position: [true, false]
+    # Always start away from the tool. Larger distances increases the chance
+    # that extra pools of lava are randomly generated between you and the tool.
+    distance_between_performer_and_tool:
+        min: 3.0
+        max: 99.0
 
     # Target positioned on the island (50%) or in a random location (50%).
     random_target_position: [true, false]
@@ -17,22 +20,6 @@ shortcut_lava_target_tool:
     # By default, a tool may or may not be rotated.
     # tool_rotation: 0
 
-    # Uncomment and edit this option to set a starting distance to the tool.
-    # Cannot be used if random_performer_position is also set.
-    # distance_between_performer_and_tool: 1.0
-
-    # Whether to generate guide rails for the tool.
-    guide_rails: False
-
-# Sometimes (25%) make an extra tool that is "too small" to use effectively.
-# Remove this whole block if you do not wish to generate this extra tool.
-tools:
-    - num: [0, 0, 0, 1]
-      shape:
-        - tool_rect_0_50_x_1_00
-        - tool_rect_0_75_x_1_00
-        - tool_rect_1_00_x_1_00
-
 # Only generate medium or large rooms.
 room_dimensions:
     x:
@@ -43,6 +30,19 @@ room_dimensions:
         min: 15
         max: 25
 room_shape: square
+
+# Add extra random pools of lava, which may or may not obstruct navigation to
+# the tool (it is completely random).
+lava:
+    num:
+        min: 4
+        max: 6
+    # Each pool of lava contains this many contiguous 1x1 areas.
+    size:
+        min: 2
+        max: 10
+
+check_valid_path: tools
 
 # Only the target can be a soccer ball.
 excluded_shapes: soccer_ball

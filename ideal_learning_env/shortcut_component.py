@@ -4,7 +4,7 @@ import math
 import random
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Dict, List, Union
+from typing import Any, Dict, List, Optional, Union
 
 from machine_common_sense.config_manager import Goal, Vector3d
 
@@ -41,6 +41,7 @@ from generator.structures import (
 from generator.tools import (
     HOOKED_TOOL_BUFFER,
     INACCESSIBLE_TOOL_BLOCKING_WALL_MINIMUM_SEPARATION,
+    L_SHAPED_TOOLS,
     MAX_TOOL_LENGTH,
     MIN_LAVA_ISLAND_LONG_ROOM_DIMENSION_LENGTH,
     MIN_LAVA_ISLAND_SHORT_ROOM_DIMENSION_LENGTH,
@@ -162,7 +163,8 @@ class LavaTargetToolConfig():
     will also be a block tool to facilitate acquiring the goal object.
     - `front_lava_width` (int, or list of ints, or [MinMaxInt](#MinMaxInt):
     The number of tiles of lava in front of the island.  Must produce value
-    between 2 and 6 for rectangular tools, 1 to 3 for hooked tools.
+    between 2 and 6 for rectangular tools, 1 to 3 for hooked and isosceles
+    tools.
     Default: Random based on room size and island size
     - `guide_rails` (bool, or list of bools): If True, guide rails will be
     generated to guide the tool in the direction it is oriented.  If a target
@@ -171,12 +173,12 @@ class LavaTargetToolConfig():
     - `island_size` (int, or list of ints, or [MinMaxInt](#MinMaxInt) dict,
     or list of MinMaxInt dicts): The width and length of the island inside the
     lava.  Must produce value from 1 to 5 for rectangular tools, 1 to 3
-    for hooked tools.
+    for hooked and isosceles tools.
     Default: Random based on room size
     - `left_lava_width` (int, or list of ints, or [MinMaxInt](#MinMaxInt):
     The number of tiles of lava left of the island.  Must produce value
-    between 2 and 6 for rectangular tools, but will be ignored for hooked
-    tools, since the lava should extend to the wall in that case.
+    between 2 and 6 for rectangular tools, but will be ignored for hooked and
+    isosceles tools, since the lava should extend to the wall in that case.
     Default: Random based on room size and island size
     - `random_performer_position` (bool, or list of bools): If True, the
     performer will be randomly placed in the room. They will not be placed in
@@ -186,12 +188,13 @@ class LavaTargetToolConfig():
     positioned on the island surrounded by lava. Default: False
     - `rear_lava_width` (int, or list of ints, or [MinMaxInt](#MinMaxInt):
     The number of tiles of lava behind of the island.  Must produce value
-    between 2 and 6 for rectangular tools, 1 to 3 for hooked tools.
+    between 2 and 6 for rectangular tools, 1 to 3 for hooked and isosceles
+    tools.
     Default: Random based on room size, island size, and other lava widths.
     - `right_lava_width` (int, or list of ints, or [MinMaxInt](#MinMaxInt):
     The number of tiles right of the island.  Must produce value
-    between 2 and 6 for rectangular tools, but will be ignored for hooked
-    tools, since the lava should extend to the wall in that case.
+    between 2 and 6 for rectangular tools, but will be ignored for hooked and
+    isosceles tools, since the lava should extend to the wall in that case.
     Default: Random based on room size and island size
     - `random_performer_position` (bool, or list of bools): If True, the
     performer will be randomly placed in the room. They will not be placed in
@@ -201,15 +204,24 @@ class LavaTargetToolConfig():
     - `tool_rotation` (float, or list of floats, or
     [MinMaxFloat](#MinMaxFloat) dict, or list of MinMaxFloat dicts):
     Angle that tool should be rotated out of alignment with target.
-    This option cannot be used with `guide_rails`.  Default: 0
-    - `distance_between_performer_and_tool` (float, or list of floats,
-    or [MinMaxFloat](#MinMaxFloat): The distance away the performer is from the
-    tool at start. The performer will be at random point around a rectangular
-    perimeter surrounding the tool. This option cannot be used with
-    `random_performer_position`.  Default: None
+    This option cannot be used with `guide_rails`, or the `broken` and
+    `inaccessible` `tool_type` choices. For `hooked` and `isosceles` tools,
+    we advice against setting a rotation higher than 315.
+    Defaults to one of the following: 0, 45, 90, 135, 180, 225, 270, 315
+    - `distance_between_performer_and_tool` (float, or
+    [MinMaxFloat](#MinMaxFloat) dict, or list of floats and/or MinMaxFloat
+    dicts): Distance between the performer agent and the tool. If set to `0`,
+    will try all distances between `0.5` and the bounds of the room. If set to
+    a MinMaxFloat with a `max` of `0` or greater than the room bounds, will
+    try all distances between the configured `min` and the bounds of the room.
+    If set to a MinMaxFloat with a `min` of `0`, will try all distances
+    between the configured `max` and `0.5`. This cannot be used in combination
+    with `random_performer_position`. Default: None
     - `tool_offset_backward_from_lava` (float, or [MinMaxFloat](#MinMaxFloat)
     dict, or list of floats and/or MinMaxFloat dicts): The vertical offset of
-    tool either away from the lava pool. Must be greater than or equal to 0
+    the tool: either further into the lava, for `hooked` and `isosceles` tools,
+    or further from the lava, for other tools. Must be 0 or greater. Cannot be
+    used with `hooked` and `isosceles` tools when `tool_rotation` is non-zero.
     Default: 0
     - `tool_horizontal_offset` (float, or [MinMaxFloat](#MinMaxFloat) dict, or
     list of floats and/or MinMaxFloat dicts): The horizontal offset of tool
@@ -234,11 +246,13 @@ class LavaTargetToolConfig():
     since the wall has a negative offset to the left.
     Default: None
     - `tool_type` (str, or list of strs): The type of tool to generate, either
-    `rectangular`, `hooked`, `small`, `broken`, or `inaccessible`.
-    If `hooked` tools are chosen and lava widths are not specified,
-    the room will default to having an island size of 1, with lava extending
-    all the way to the walls in both the left and right directions.
-    The front and rear lava in the default hooked tool case will each
+    `rectangular`, `hooked`, `isosceles`, `small`, `broken`, or `inaccessible`.
+    Both `hooked` and isosceles` tools are L-shaped; `hooked` tools always have
+    width 3, and `isosceles` tools always have width equal to their length.
+    If `hooked` and `isosceles` tools are chosen and lava widths are not
+    specified, the room will default to having an island size of 1, with lava
+    extending all the way to the walls in both the left and right directions.
+    The front and rear lava in the default hooked/isosceles tool case will each
     have a size of 1.
     If `small` is chosen the tool will always be a length of 1.
     If `broken` is chosen the tool will be the correct length but have
@@ -255,7 +269,7 @@ class LavaTargetToolConfig():
     left_lava_width: RandomizableInt = None
     right_lava_width: RandomizableInt = None
     guide_rails: RandomizableBool = False
-    tool_rotation: RandomizableFloat = 0
+    tool_rotation: RandomizableFloat = None
     random_performer_position: RandomizableBool = False
     random_target_position: RandomizableBool = False
     distance_between_performer_and_tool: RandomizableFloat = None
@@ -771,7 +785,7 @@ class ShortcutComponent(ILEComponent):
     island_size + right as well. By default, the target is a soccer ball
     with scale between 1 and 3.
 
-    For hooked tools, different min/max rules apply. See
+    For hooked and isosceles tools, different min/max rules apply. See
     LavaTargetToolConfig for details.
 
     The tool is a pushable/pullable tool object with a length equal
@@ -1162,15 +1176,12 @@ class ShortcutComponent(ILEComponent):
     def set_shortcut_lava_target_tool(self, data: Any) -> None:
         self.shortcut_lava_target_tool = data
 
-    def get_shortcut_lava_target_tool(
-            self) -> Union[bool, LavaTargetToolConfig]:
+    def get_shortcut_lava_target_tool(self) -> Optional[LavaTargetToolConfig]:
         if self.shortcut_lava_target_tool is False:
-            return False
-        config = self.shortcut_lava_target_tool
+            return None
         if self.shortcut_lava_target_tool is True:
-            config = LavaTargetToolConfig()
-        config = choose_random(config)
-        return config
+            return LavaTargetToolConfig()
+        return self.shortcut_lava_target_tool
 
     @ile_config_setter()
     def set_shortcut_agent_with_target(self, data: Any) -> None:
@@ -1877,12 +1888,24 @@ class ShortcutComponent(ILEComponent):
 
     def _add_tool_lava_goal(self, scene: Scene, room_dim: Vector3d):
         last_exception = None
-        config = self.get_shortcut_lava_target_tool()
-        if not config:
+        source_config = self.get_shortcut_lava_target_tool()
+        if not source_config:
             return scene
+        config = choose_random(source_config)
         logger.trace("Adding tool to goal shortcut")
         num_prev_objs = len(scene.objects)
         num_prev_lava = len(scene.lava)
+
+        # Do not use choose_random for the distance_between_performer_and_tool.
+        # Keep the source config for now.
+        distance_between_performer_and_tool = (
+            source_config.distance_between_performer_and_tool
+        )
+        if isinstance(distance_between_performer_and_tool, list):
+            # For lists, choose a random configuration from it.
+            distance_between_performer_and_tool = random.choice(
+                distance_between_performer_and_tool
+            )
 
         if config.guide_rails and (
             config.tool_rotation or
@@ -1892,13 +1915,13 @@ class ShortcutComponent(ILEComponent):
                 "Unable to use 'guide_rails' and 'tool_rotation' or "
                 "tool_types: 'inaccessible' or 'broken' from "
                 "shortcut_lava_target_tool at the same time")
-        if (config.distance_between_performer_and_tool is not None and
+        if (distance_between_performer_and_tool is not None and
                 config.random_performer_position):
             raise ILEException(
                 "Cannot have distance_between_performer_and_tool "
                 "and random_performer_position"
             )
-        if (config.distance_between_performer_and_tool is not None and
+        if (distance_between_performer_and_tool is not None and
                 config.tool_type == TOOL_TYPES.INACCESSIBLE):
             raise ILEException(
                 "Cannot have distance_between_performer_and_tool "
@@ -1927,6 +1950,20 @@ class ShortcutComponent(ILEComponent):
                 f"Scene room dimensions must not be below "
                 f"{MIN_LAVA_ISLAND_SHORT_ROOM_DIMENSION_LENGTH} "
                 f"to place lava and tool")
+        if (
+            config.tool_rotation is not None and config.tool_rotation != 0 and
+            config.tool_offset_backward_from_lava and
+            config.tool_type in L_SHAPED_TOOLS
+        ):
+            # This can cause the tool to collide with the target.
+            raise ILEException(
+                f"Cannot set 'tool_offset_backward_from_lava' on 'hooked' and "
+                f"'isosceles' tools with a non-zero 'tool_rotation': "
+                f"tool_offset_backward_from_lava="
+                f"{config.tool_offset_backward_from_lava} "
+                f"tool_rotation={config.tool_rotation} "
+                f"tool_type={config.tool_type}"
+            )
 
         for _ in range(MAX_TRIES):
             try:
@@ -1959,7 +1996,7 @@ class ShortcutComponent(ILEComponent):
                     sizes.front +
                     sizes.island_size)
 
-                if config.tool_type == TOOL_TYPES.HOOKED:
+                if config.tool_type in L_SHAPED_TOOLS:
                     tool_length = random.randint(
                         tool_length + HOOKED_TOOL_BUFFER, MAX_TOOL_LENGTH)
                 if config.tool_type == TOOL_TYPES.SMALL:
@@ -1970,13 +2007,14 @@ class ShortcutComponent(ILEComponent):
 
                 # buffer here not used for hooked tools
                 far_island_buffer = (
-                    1 if config.tool_type != TOOL_TYPES.HOOKED else 0)
+                    1 if config.tool_type not in L_SHAPED_TOOLS else 0
+                )
                 # additional buffer of lava needed for hooked tool scenes
                 # with even sized long dimension
                 rear_lava_buffer = (
-                    1 if config.tool_type ==
-                    TOOL_TYPES.HOOKED and long_length %
-                    2 == 0 else 0)
+                    1 if config.tool_type in L_SHAPED_TOOLS and
+                    long_length % 2 == 0 else 0
+                )
 
                 long_buffer_coord = math.floor(long_length / 2.0 - 0.5)
                 long_far_island_coord = (
@@ -2080,26 +2118,41 @@ class ShortcutComponent(ILEComponent):
                             scene,
                             long_key, short_key, long_near_island_coord,
                             long_far_island_coord, sizes)
-                elif config.distance_between_performer_and_tool is not None:
+
+                elif distance_between_performer_and_tool is not None:
+                    if isinstance(distance_between_performer_and_tool, float):
+                        distance_between_performer_and_tool = MinMaxFloat(
+                            min=distance_between_performer_and_tool,
+                            max=distance_between_performer_and_tool
+                        )
+                    referenced_tool = tool
+                    func = geometry.get_position_distance_away_from_obj
+                    bounds_list = bounds + [island_bounds]
                     if config.tool_type == TOOL_TYPES.BROKEN:
-                        broken_tool = random.choice(tool)
-                        (x, z) = geometry.get_position_distance_away_from_obj(
-                            scene.room_dimensions, broken_tool,
-                            config.distance_between_performer_and_tool,
-                            bounds + [island_bounds])
-                        scene.set_performer_start_position(x=x, y=None, z=z)
-                    elif config.tool_type == TOOL_TYPES.HOOKED:
-                        (x, z) = geometry.get_position_distance_away_from_hooked_tool(  # noqa
-                            scene.room_dimensions, tool,
-                            config.distance_between_performer_and_tool,
-                            find_bounds(scene) + [island_bounds])
-                    else:
-                        (x, z) = geometry.get_position_distance_away_from_obj(
-                            scene.room_dimensions, tool,
-                            config.distance_between_performer_and_tool,
-                            bounds + [island_bounds])
-                    scene.set_performer_start_position(x=x, y=None, z=z)
+                        referenced_tool = random.choice(tool)
+                    elif config.tool_type in L_SHAPED_TOOLS:
+                        func = geometry.get_position_distance_away_from_hooked_tool  # noqa
+                        # QUESTION: Why is this different?
+                        bounds_list = find_bounds(scene) + [island_bounds]
+                    try:
+                        (x, z) = func(
+                            scene.room_dimensions,
+                            referenced_tool,
+                            distance_between_performer_and_tool.min,
+                            distance_between_performer_and_tool.max,
+                            bounds_list
+                        )
+                        scene.set_performer_start_position(x=x, y=0, z=z)
+                    except Exception as e:
+                        raise ILEException(
+                            f'Cannot find any valid locations for '
+                            f'"distance_between_performer_and_tool" (in the '
+                            f'"shortcut_lava_target_tool" config option) of '
+                            f'{distance_between_performer_and_tool}'
+                        ) from e
+
                 return scene
+
             except Exception as e:
                 last_exception = e
                 logger.debug(
@@ -2114,7 +2167,7 @@ class ShortcutComponent(ILEComponent):
                     meta = (scene.goal or Goal()).metadata or {}
                     if 'target' in meta:
                         meta.pop('target')
-                config = self.get_shortcut_lava_target_tool()
+                config = choose_random(source_config)
 
         raise ILEException(
             "Failed to create lava island with tool") from last_exception
@@ -2387,7 +2440,8 @@ class ShortcutComponent(ILEComponent):
             long_near_island_coord,
             TOOL_TYPES.RECT,
             tool_shape,
-            False)
+            tool_rotation=0
+        )
 
     def _find_island_bounds(self, long_key, long_far_island_coord,
                             long_near_island_coord, short_left_island_coord,
@@ -2421,7 +2475,7 @@ class ShortcutComponent(ILEComponent):
         rot = tool['shows'][0]['rotation']['y']
         end_guide_rail = copy.deepcopy(target['shows'][0]['position'])
         center = VectorIntConfig(y=tool_pos['y'])
-        if TOOL_TYPES.HOOKED in tool['type']:
+        if any([tool_type in tool['type'] for tool_type in L_SHAPED_TOOLS]):
             max_long_dim = (scene.room_dimensions.z if short_key ==
                             'x' else scene.room_dimensions.x) / 2.0
             end_guide_rail[short_key] = tool_pos[short_key]
@@ -2588,14 +2642,22 @@ class ShortcutComponent(ILEComponent):
     def _add_tool(self, scene, bounds, island_size, long_key, short_key,
                   short_coord, front_lava_width, tool_length,
                   long_near_island_coord, tool_type, tool_shape,
-                  tool_rotation=False,
+                  tool_rotation=None,
                   tool_horizontal_offset=0,
                   tool_offset_backward_from_lava=0,
                   blocking_wall_horizontal_offset=None):
         bounds_to_check = bounds
         tool_rot = 0 if long_key == 'z' else 90
-        if tool_rotation:
-            tool_rot += tool_rotation
+        if tool_rotation is None:
+            # If tool_offset_backward_from_lava is set, a non-zero rotation can
+            # cause a hooked or isosceles tool to collide with the target.
+            if tool_type in L_SHAPED_TOOLS and tool_offset_backward_from_lava:
+                tool_rotation = 0
+            elif tool_type in [TOOL_TYPES.INACCESSIBLE, TOOL_TYPES.BROKEN]:
+                tool_rotation = 0
+            else:
+                tool_rotation = random.choice(geometry.VALID_ROTATIONS)
+        tool_rot += tool_rotation
         tool_pos = VectorFloatConfig(y=0)
         long_tool_pos = (long_near_island_coord -
                          front_lava_width - tool_length / 2.0 - 0.5)
@@ -2707,10 +2769,10 @@ class ShortcutComponent(ILEComponent):
                 tool['debug']['length'] = 1
             return tools
 
-        if (tool_type == TOOL_TYPES.HOOKED):
+        if (tool_type in L_SHAPED_TOOLS):
             bounds_to_check = []
             tool_width = LARGE_BLOCK_TOOLS_TO_DIMENSIONS[tool_shape][0]
-            tool_buffer = 1.0 - (tool_width / 3.0)
+            tool_buffer = max(1.0 - (tool_width / 3.0), 0)
 
             # make sure tool is placed directly behind island
             rear_buffer = 1.0
@@ -2719,12 +2781,13 @@ class ShortcutComponent(ILEComponent):
                 island_size + rear_buffer)
             tool_pos_increment = lava_front_to_behind_island - tool_buffer
             long_tool_pos = long_tool_pos + tool_pos_increment
-            short_coord = short_coord + (tool_buffer / 2.0)
+            short_coord = short_coord + (tool_buffer / 2.0 * direction_left)
+            tool_offset_backward_from_lava *= -1
 
         setattr(tool_pos, short_key,
                 short_coord + tool_horizontal_offset * direction_left)
         setattr(tool_pos, long_key,
-                long_tool_pos - tool_offset_backward_from_lava)
+                long_tool_pos - round(tool_offset_backward_from_lava, 4))
         tool_template = ToolConfig(
             num=1,
             position=tool_pos,
@@ -2737,9 +2800,9 @@ class ShortcutComponent(ILEComponent):
         tool = scene.objects[-1]
         if tool_type == TOOL_TYPES.HOOKED:
             tool['debug']['tool_thickness'] = tool_width / 3.0
-            tool['debug']['length'] = tool_length
-        else:
-            tool['debug']['length'] = tool_length
+        if tool_type == TOOL_TYPES.ISOSCELES:
+            tool['debug']['tool_thickness'] = tool_length
+        tool['debug']['length'] = tool_length
         return tool
 
     def _add_asymmetric_lava_around_island(
@@ -2792,7 +2855,8 @@ class ShortcutComponent(ILEComponent):
 
         min_lava_width = (
             MIN_LAVA_WIDTH_HOOKED_TOOL
-            if tool_type == TOOL_TYPES.HOOKED else MIN_LAVA_WIDTH)
+            if tool_type in L_SHAPED_TOOLS else MIN_LAVA_WIDTH
+        )
         buffer = 1.5 if long_side else \
             (3 if dimension_length % 2 == 0 else 1.5)
         total_max_width_in_dimension = math.floor(
@@ -2801,7 +2865,7 @@ class ShortcutComponent(ILEComponent):
             MAX_LAVA_WITH_ISLAND_WIDTH,
             total_max_width_in_dimension)
 
-        if long_side and tool_type == TOOL_TYPES.HOOKED:
+        if long_side and tool_type in L_SHAPED_TOOLS:
             if (not side_one and not side_two):
                 total_max_width_in_dimension = (
                     MIN_LAVA_WITH_ISLAND_WIDTH_HOOKED_TOOL if (
@@ -2820,15 +2884,16 @@ class ShortcutComponent(ILEComponent):
                     f"Island size ({island_size}) is larger than "
                     f"max island size ({max_island_size})")
         else:
-            island_size = (1 if tool_type == TOOL_TYPES.HOOKED
-                           else random.randint(
-                               MIN_LAVA_ISLAND_SIZE, max_island_size))
+            island_size = (
+                1 if tool_type in L_SHAPED_TOOLS else
+                random.randint(MIN_LAVA_ISLAND_SIZE, max_island_size)
+            )
 
         total_accumulated_size += island_size
 
         # for the left and right lava sides in hooked tool scenes,
         # make sure lava extends to the wall
-        if (not long_side and tool_type == TOOL_TYPES.HOOKED):
+        if (not long_side and tool_type in L_SHAPED_TOOLS):
             side_size = math.ceil((dimension_length - island_size) / 2.0)
             return island_size, side_size, side_size
         # Side 1
@@ -2836,7 +2901,7 @@ class ShortcutComponent(ILEComponent):
         max_side_one_width = (
             total_max_width_in_dimension - total_accumulated_size - side_two)
 
-        if (tool_type == TOOL_TYPES.HOOKED and (side_two or side_one)):
+        if (tool_type in L_SHAPED_TOOLS and (side_two or side_one)):
             max_side_one_width = min(
                 max_side_one_width,
                 MAX_LAVA_WIDTH_HOOKED_TOOL)
@@ -2862,7 +2927,7 @@ class ShortcutComponent(ILEComponent):
         max_side_two_width = total_max_width_in_dimension - \
             total_accumulated_size
 
-        if (tool_type == TOOL_TYPES.HOOKED and (side_two or side_one)):
+        if (tool_type in L_SHAPED_TOOLS and (side_two or side_one)):
             max_side_two_width = min(
                 max_side_two_width,
                 MAX_LAVA_WIDTH_HOOKED_TOOL)

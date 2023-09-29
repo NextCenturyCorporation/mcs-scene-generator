@@ -120,17 +120,23 @@ class PerformerStartsNearConfig():
     object of a given label at a specified distance away.
     - `label` (string or list of strings):
     Label of the object the performer will be placed near. Required.
-    - `distance` (float or list of floats):
-    Distance the performer will be from the object.  Default: 0.1
+    - `distance` (float, or [MinMaxFloat](#MinMaxFloat) dict, or list of
+    floats and/or MinMaxFloat dicts): Distance between the performer agent and
+    the object. If set to `0`, will try all distances between `0.5` and the
+    bounds of the room. If set to a MinMaxFloat with a `max` of `0` or greater
+    than the room bounds, will try all distances between the configured `min`
+    and the bounds of the room. If set to a MinMaxFloat with a `min` of `0`,
+    will try all distances between the configured `max` and `0.5`.
+    Default: 0.5
 
     Example:
     ```
     label: container
-    distance: 0.1
+    distance: 0.5
     ```
     """
     label: RandomizableString = None
-    distance: RandomizableFloat = 0.1
+    distance: RandomizableFloat = 0.5
 
 
 class GlobalSettingsComponent(ILEComponent):
@@ -436,7 +442,7 @@ class GlobalSettingsComponent(ILEComponent):
     ```
     performer_starts_near:
         label: container
-        distance: 0.1
+        distance: 0.5
     ```
     """
 
@@ -773,9 +779,7 @@ class GlobalSettingsComponent(ILEComponent):
         if self.performer_starts_near:
             random_perf_starts_near = self.get_performer_distance()
             self._delayed_position_label = random_perf_starts_near.label
-            self._delayed_position_distance = choose_random(
-                random_perf_starts_near.distance
-            )
+            self._delayed_position_distance = random_perf_starts_near.distance
             self._set_position_by_distance(scene)
             # Temporarily set the performer start location outside of the room
             # to avoid issues with collision checking in other ILE components.
@@ -885,11 +889,28 @@ class GlobalSettingsComponent(ILEComponent):
                 self._delayed_position_label)):
             self._delayed_position_reason = None
             target = idl.instance
-            (x, z) = geometry.get_position_distance_away_from_obj(
-                scene.room_dimensions, target,
-                self._delayed_position_distance,
-                find_bounds(scene))
-            scene.set_performer_start_position(x=x, y=None, z=z)
+            if isinstance(self._delayed_position_distance, (int, float)):
+                self._delayed_position_distance = MinMaxFloat(
+                    min=self._delayed_position_distance,
+                    max=self._delayed_position_distance
+                )
+            try:
+                # Identify a valid position using the current distance.
+                (x, z) = geometry.get_position_distance_away_from_obj(
+                    scene.room_dimensions,
+                    target,
+                    self._delayed_position_distance.min,
+                    self._delayed_position_distance.max,
+                    find_bounds(scene)
+                )
+            except Exception as e:
+                raise ILEException(
+                    f'Cannot find any valid locations for '
+                    f'"performer_starts_near" with configured '
+                    f'label={self._delayed_position_label} and '
+                    f'distance={self._delayed_position_distance}'
+                ) from e
+            scene.set_performer_start_position(x=x, y=0, z=z)
             self._delayed_position_label = None
         else:
             self._delayed_position_reason = ILEDelayException(
@@ -995,7 +1016,11 @@ class GlobalSettingsComponent(ILEComponent):
         self.performer_starts_near = data
 
     def get_performer_distance(self) -> str:
-        return choose_random(self.performer_starts_near)
+        # Do not use choose_random for the distance. Return the source config.
+        if isinstance(self.performer_starts_near, list):
+            # For lists, choose a random configuration from it.
+            return random.choice(self.performer_starts_near)
+        return self.performer_starts_near
 
     def get_performer_start_position(
         self,

@@ -5647,6 +5647,15 @@ def _create_table_28(args: _FunctionArgs) -> ObjectDefinition:
 
 # Maps each tool type to its base X/Z dimensions.
 LARGE_BLOCK_TOOLS_TO_DIMENSIONS = {
+    'tool_big_0_50_x_33_00': (.50, 33),
+    'tool_big_0_50_x_36_00': (.50, 36),
+    'tool_big_0_50_x_39_00': (.50, 39),
+    'tool_big_0_75_x_33_00': (.75, 33),
+    'tool_big_0_75_x_36_00': (.75, 36),
+    'tool_big_0_75_x_39_00': (.75, 39),
+    'tool_big_1_00_x_33_00': (1.00, 33),
+    'tool_big_1_00_x_36_00': (1.00, 36),
+    'tool_big_1_00_x_39_00': (1.00, 39),
     'tool_hooked_0_50_x_4_00': (1.5, 4),
     'tool_hooked_0_50_x_5_00': (1.5, 5),
     'tool_hooked_0_50_x_6_00': (1.5, 6),

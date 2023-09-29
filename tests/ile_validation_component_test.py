@@ -3,7 +3,10 @@ from machine_common_sense.config_manager import Vector2dInt, Vector3d
 
 from generator import ObjectBounds
 from ideal_learning_env.defs import ILEException
-from ideal_learning_env.object_services import ObjectRepository
+from ideal_learning_env.object_services import (
+    InstanceDefinitionLocationTuple,
+    ObjectRepository
+)
 from ideal_learning_env.validation_component import ValidPathComponent
 
 from .ile_helper import prior_scene, prior_scene_with_target
@@ -44,6 +47,45 @@ def test_valid_path_no_obstacles():
     # Just don't raise.
 
 
+def test_valid_path_custom_label():
+    label = 'custom'
+    component = ValidPathComponent({'check_valid_path': label})
+    assert component.check_valid_path
+    assert component.get_check_valid_path()
+
+    scene = prior_scene()
+    custom_object = {
+        'id': 'object_id',
+        'type': 'whatever',
+        'debug': {},
+        'shows': [{
+            'rotation': {'x': 0, 'y': 0, 'z': 0},
+            'position': {'x': 2, 'y': 0, 'z': 3},
+            'boundingBox': ObjectBounds(box_xz=[
+                Vector3d(**{'x': 1, 'y': 0, 'z': 4}),
+                Vector3d(**{'x': 3, 'y': 0, 'z': 4}),
+                Vector3d(**{'x': 3, 'y': 0, 'z': 3}),
+                Vector3d(**{'x': 1, 'y': 0, 'z': 3})
+            ], max_y=0.5, min_y=0),
+            'stepBegin': 0,
+            'scale': {'x': 1, 'y': 1, 'z': 1}
+        }]
+    }
+
+    scene.objects = [custom_object]
+    ObjectRepository.get_instance().clear()
+    idl = InstanceDefinitionLocationTuple(
+        custom_object,
+        None,
+        custom_object['shows'][0]
+    )
+    ObjectRepository.get_instance().add_to_labeled_objects(idl, label)
+
+    component.update_ile_scene(scene)
+    assert round(component.last_distance, 1) == 3.6
+    assert component.last_path == [(0, 0), (2, 3)]
+
+
 def test_valid_path_no_target():
     component = ValidPathComponent({'check_valid_path': True})
     assert component.check_valid_path
@@ -55,7 +97,7 @@ def test_valid_path_no_target():
 
 def test_valid_path_no_valid_performer_start():
     component = ValidPathComponent({'check_valid_path': True})
-    scene = prior_scene_with_target()
+    scene = prior_scene_with_target(add_to_repo=True)
     scene.set_performer_start_position(x=10, y=0.5, z=10)
     assert component.check_valid_path
 
@@ -67,7 +109,7 @@ def test_valid_path_no_valid_performer_start():
 
 def test_valid_path_blocked_by_holes():
     component = ValidPathComponent({'check_valid_path': True})
-    scene = prior_scene_with_target()
+    scene = prior_scene_with_target(add_to_repo=True)
     # create blocked by holes
     holes = scene.holes
     for i in range(11):
@@ -79,7 +121,7 @@ def test_valid_path_blocked_by_holes():
 
 def test_valid_path_blocked_by_lava():
     component = ValidPathComponent({'check_valid_path': True})
-    scene = prior_scene_with_target()
+    scene = prior_scene_with_target(add_to_repo=True)
 
     # create blocked by lava
     scene.lava = [Vector2dInt(x=(i - 5), z=2) for i in range(11)]
@@ -90,7 +132,7 @@ def test_valid_path_blocked_by_lava():
 
 def test_valid_path_blocked_by_platforms():
     component = ValidPathComponent({'check_valid_path': True})
-    scene = prior_scene_with_target()
+    scene = prior_scene_with_target(add_to_repo=True)
     # create blocked by platform
     objs = scene.objects
     bb = ObjectBounds([Vector3d(x=4.9, y=0, z=2.4386),
@@ -156,7 +198,7 @@ def test_valid_path_blocked_by_platforms():
 
 def test_valid_path_blocked_by_ramp():
     component = ValidPathComponent({'check_valid_path': True})
-    scene = prior_scene_with_target()
+    scene = prior_scene_with_target(add_to_repo=True)
     # create blocked by ramp
     objs = scene.objects
     bb = ObjectBounds([Vector3d(x=4.9, y=0, z=2.4386),
@@ -233,7 +275,7 @@ def test_valid_path_with_platform_and_ramp():
                             Vector3d(x=2.5, y=0, z=-2.4928)],
                            max_y=0.5, min_y=0.0)
     component = ValidPathComponent({'check_valid_path': True})
-    scene = prior_scene_with_target()
+    scene = prior_scene_with_target(add_to_repo=True)
     scene.set_performer_start_position(x=1.9, y=0.5, z=-2.009)
     scene.set_performer_start_rotation(x=0, y=225)
 
@@ -374,7 +416,7 @@ def test_valid_path_with_platform_and_ramp_delayed():
                             Vector3d(x=2.5, y=0, z=-2.4928)],
                            max_y=0.5, min_y=0.0)
     component = ValidPathComponent({'check_valid_path': True})
-    scene = prior_scene_with_target()
+    scene = prior_scene_with_target(add_to_repo=True)
     # start with invalid performer position
     scene.set_performer_start_position(x=10, y=0.5, z=10)
     scene.set_performer_start_rotation(x=0, y=225)
@@ -511,7 +553,7 @@ def test_valid_path_with_platform_and_ramp_delayed():
 
 def test_valid_path_with_lava_and_holes():
     component = ValidPathComponent({'check_valid_path': True})
-    scene = prior_scene_with_target(start_x=-3, start_z=-3)
+    scene = prior_scene_with_target(start_x=-3, start_z=-3, add_to_repo=True)
     # create blocked by holes
     holes = scene.holes
     for i in range(8):

@@ -110,7 +110,10 @@ class ToolConfig(BaseFeatureConfig):
     each scene. Must be a valid [tool shape](#Lists). If set, ignores `length`,
     `width`, and `tool_type`.  Default: Use `tool_type`
     - `tool_type` (str, or list of strs): The type of tool to generate, either
-    `rectangular`, `hooked`, or `small`. Default: `rectangular` or `hooked`
+    `rectangular`, `hooked`, `isosceles`, or `small`.
+    Both `hooked` and isosceles` tools are L-shaped; `hooked` tools always have
+    width 3, and `isosceles` tools always have width equal to their length.
+    Default: `rectangular` or `hooked`
     - `width` (float, or list of floats, or [MinMaxFloat](#MinMaxFloat) dict,
     or list of MinMaxFloat dicts):  The width of the tool.  Tools only have
     specific sizes and the values much match exactly.  Valid widths are
@@ -491,6 +494,7 @@ class SurroundingLavaConfig(BaseFeatureConfig):
     # for circular dependency issue when trying to import FloorAreaConfig
     position_x: RandomizableInt = None
     position_z: RandomizableInt = None
+    size: RandomizableInt = None
 
 
 DEFAULT_TEMPLATE_INTERACTABLE = InteractableObjectConfig(
@@ -1166,7 +1170,8 @@ def finalize_surrounding_lava(scene, reconciled_template, obj):
             lava = SurroundingLavaConfig(
                 num=1,
                 position_x=lava['x'],
-                position_z=lava['z']
+                position_z=lava['z'],
+                size=1
             )
             FeatureCreationService.create_feature(
                 scene, FeatureTypes.LAVA, lava,

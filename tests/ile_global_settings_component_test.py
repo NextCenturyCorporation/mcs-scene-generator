@@ -1057,7 +1057,8 @@ def test_global_settings_wall_right_material_fail_restricted_material():
 @pytest.mark.slow
 def test_global_settings_performer_starts_near():
     for distance_away in arange(0.1, 2.1, 0.1):
-        for _ in range(10):
+        # Try a bunch of times to account for random variance.
+        for _ in range(5):
             distance_away = round(distance_away, 1)
             ObjectRepository.get_instance().clear()
             data = {
@@ -1077,6 +1078,7 @@ def test_global_settings_performer_starts_near():
             assert component.performer_starts_near.label
             assert component.performer_starts_near.distance >= 0
             assert component.performer_starts_near.distance == distance_away
+
             scene = component.update_ile_scene(
                 prior_scene_custom_start(10, 10))
             assert component.get_num_delayed_actions() == 1
@@ -1089,7 +1091,7 @@ def test_global_settings_performer_starts_near():
             assert len(scene.objects) == 1
 
             scene = component.run_delayed_actions(scene)
-            component.get_num_delayed_actions() == 0
+            assert component.get_num_delayed_actions() == 0
 
             performer_start = Point(
                 scene.performer_start.position.x,
@@ -1105,6 +1107,106 @@ def test_global_settings_performer_starts_near():
             distance = round(performer_start.distance(object_polygon), 2)
             expected_distance = round(distance_away + PERFORMER_HALF_WIDTH, 2)
             assert distance == expected_distance
+
+
+@pytest.mark.slow
+def test_global_settings_performer_starts_near_variable_max():
+    # Try a bunch of times to account for random variance.
+    for _ in range(5):
+        ObjectRepository.get_instance().clear()
+        data = {
+            "specific_interactable_objects": [{
+                'num': 1,
+                'shape': 'chest_1',
+                'labels': 'container'
+            }],
+            'performer_starts_near': {
+                'label': 'container',
+                'distance': MinMaxFloat(min=3, max=99)
+            }
+        }
+
+        component = GlobalSettingsComponent(data)
+        scene = component.update_ile_scene(prior_scene_custom_start(10, 10))
+        objects_component = SpecificInteractableObjectsComponent(data)
+        scene = objects_component.update_ile_scene(scene)
+        scene = component.run_delayed_actions(scene)
+
+        performer_start = Point(
+            scene.performer_start.position.x,
+            scene.performer_start.position.z
+        )
+        poly = scene.objects[0]['shows'][0]['boundingBox'].polygon_xz
+        distance = round(performer_start.distance(poly), 2)
+        room_dimensions = scene.room_dimensions
+        diagonal = math.hypot(room_dimensions.x, room_dimensions.z)
+        assert 3 <= distance <= diagonal
+
+
+@pytest.mark.slow
+def test_global_settings_performer_starts_near_variable_min():
+    # Try a bunch of times to account for random variance.
+    for _ in range(5):
+        ObjectRepository.get_instance().clear()
+        data = {
+            "specific_interactable_objects": [{
+                'num': 1,
+                'shape': 'chest_1',
+                'labels': 'container'
+            }],
+            'performer_starts_near': {
+                'label': 'container',
+                'distance': MinMaxFloat(min=0, max=5)
+            }
+        }
+
+        component = GlobalSettingsComponent(data)
+        scene = component.update_ile_scene(prior_scene_custom_start(10, 10))
+        objects_component = SpecificInteractableObjectsComponent(data)
+        scene = objects_component.update_ile_scene(scene)
+        scene = component.run_delayed_actions(scene)
+
+        performer_start = Point(
+            scene.performer_start.position.x,
+            scene.performer_start.position.z
+        )
+        poly = scene.objects[0]['shows'][0]['boundingBox'].polygon_xz
+        distance = round(performer_start.distance(poly), 2)
+        assert 0.5 <= distance <= (5 + PERFORMER_HALF_WIDTH)
+
+
+@pytest.mark.slow
+def test_global_settings_performer_starts_near_variable_min_and_max():
+    # Try a bunch of times to account for random variance.
+    for _ in range(5):
+        ObjectRepository.get_instance().clear()
+        data = {
+            "specific_interactable_objects": [{
+                'num': 1,
+                'shape': 'chest_1',
+                'labels': 'container'
+            }],
+            'performer_starts_near': {
+                'label': 'container',
+                'distance': MinMaxFloat(min=0, max=99)
+            }
+        }
+
+        component = GlobalSettingsComponent(data)
+        scene = component.update_ile_scene(prior_scene_custom_start(10, 10))
+        objects_component = SpecificInteractableObjectsComponent(data)
+        scene = objects_component.update_ile_scene(scene)
+        scene = component.run_delayed_actions(scene)
+
+        performer_start = Point(
+            scene.performer_start.position.x,
+            scene.performer_start.position.z
+        )
+        poly = scene.objects[0]['shows'][0]['boundingBox'].polygon_xz
+        distance = round(performer_start.distance(poly), 2)
+        room_dimensions = scene.room_dimensions
+        diagonal = math.hypot(room_dimensions.x, room_dimensions.z)
+        assert 0.5 <= distance <= diagonal
 
 
 def test_global_settings_adjacent_targets_without_error():

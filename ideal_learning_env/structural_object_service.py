@@ -1578,7 +1578,14 @@ class StructuralLavaCreationService(
             source_template: FloorAreaConfig):
         """Creates lava from the given template with
         specific values."""
-        return Vector2dInt(x=reconciled.position_x, z=reconciled.position_z)
+        return _create_contiguous_floor_features(
+            scene,
+            reconciled.position_x,
+            reconciled.position_z,
+            reconciled.size,
+            self.bounds,
+            'lava'
+        )
 
     def _handle_dependent_defaults(
             self, scene: Scene, reconciled: FloorAreaConfig, source_template
@@ -1586,15 +1593,24 @@ class StructuralLavaCreationService(
         _add_floor_dependent_defaults(scene, reconciled)
         return reconciled
 
-    def is_valid(self, scene: Scene, lava_pos: List, bounds, try_num, retries):
+    def is_valid(
+        self,
+        scene: Scene,
+        position_list: List[Vector2dInt],
+        bounds_list: List[ObjectBounds],
+        try_num: int,
+        retries: int
+    ) -> bool:
         return _is_valid_floor(
             scene,
-            lava_pos[0],
+            position_list,
             'lava',
             True,
-            bounds,
+            bounds_list,
             try_num,
-            retries, self._get_type())
+            retries,
+            self._get_type()
+        )
 
     def _on_valid_instances(self, scene, reconciled_template, new_obj):
         scene.lava += new_obj
@@ -1614,7 +1630,14 @@ class StructuralHolesCreationService(
             source_template: FloorAreaConfig):
         """Creates a hole from the given template with
         specific values."""
-        return Vector2dInt(x=reconciled.position_x, z=reconciled.position_z)
+        return _create_contiguous_floor_features(
+            scene,
+            reconciled.position_x,
+            reconciled.position_z,
+            reconciled.size,
+            self.bounds,
+            'holes'
+        )
 
     def _handle_dependent_defaults(
             self, scene: Scene, reconciled: FloorAreaConfig, source_template
@@ -1622,15 +1645,24 @@ class StructuralHolesCreationService(
         _add_floor_dependent_defaults(scene, reconciled)
         return reconciled
 
-    def is_valid(self, scene: Scene, lava_pos: List, bounds, try_num, retries):
+    def is_valid(
+        self,
+        scene: Scene,
+        position_list: List[Vector2dInt],
+        bounds_list: List[ObjectBounds],
+        try_num: int,
+        retries: int
+    ) -> bool:
         return _is_valid_floor(
             scene,
-            lava_pos[0],
+            position_list,
             'holes',
             True,
-            bounds,
+            bounds_list,
             try_num,
-            retries, self._get_type())
+            retries,
+            self._get_type()
+        )
 
     def _on_valid_instances(
         self,
@@ -3365,9 +3397,14 @@ class FloorAreaConfig(BaseFeatureConfig):
     list of MinMaxInt dicts): X position of the area.
     - `position_z` (int, or list of ints, or [MinMaxInt](#MinMaxInt) dict, or
     list of MinMaxInt dicts): Z position of the area.
+    - `size` (int, or list of ints, or [MinMaxInt](#MinMaxInt) dict, or
+    list of MinMaxInt dicts): Size of a single contiguous area. If `position_x`
+    and/or `position_z` are set, the area will include a space matching those
+    coordinate(s). Default: 1
     """
     position_x: RandomizableInt = None
     position_z: RandomizableInt = None
+    size: RandomizableInt = None
 
 
 @dataclass
@@ -4016,27 +4053,112 @@ def _handle_position_defaults(
     return reconciled
 
 
+def _create_contiguous_floor_features(
+    scene: Scene,
+    starting_x: float,
+    starting_z: float,
+    size: int,
+    bounds_list: List[ObjectBounds],
+    scene_attribute: str
+) -> List[Vector2dInt]:
+    """Create and return a list of contiguous floor features."""
+    area_list = [Vector2dInt(x=starting_x, z=starting_z)]
+    valid, _ = validate_floor_position(
+        scene,
+        area_list[0],
+        scene_attribute,
+        True,
+        bounds_list
+    )
+    if not valid:
+        raise ILEException(
+            f'Starting {scene_attribute} floor feature has been assigned an '
+            f'invalid position: x={starting_x}, z={starting_z}'
+        )
+
+    for _ in range((size or 1) - 1):
+        area = None
+        adjacent_options = area_list.copy()
+        random.shuffle(adjacent_options)
+        for adjacent_option in adjacent_options:
+            area_options = [
+                Vector2dInt(x=(adjacent_option.x - 1), z=adjacent_option.z),
+                Vector2dInt(x=(adjacent_option.x + 1), z=adjacent_option.z),
+                Vector2dInt(x=adjacent_option.x, z=(adjacent_option.z - 1)),
+                Vector2dInt(x=adjacent_option.x, z=(adjacent_option.z + 1))
+            ]
+            random.shuffle(area_options)
+            for area_option in area_options:
+                if area_option in area_list:
+                    continue
+                valid, _ = validate_floor_position(
+                    scene,
+                    area_option,
+                    scene_attribute,
+                    True,
+                    bounds_list
+                )
+                if valid:
+                    area = area_option
+                    break
+            if area:
+                break
+        if not area:
+            raise ILEException(
+                f'Cannot find any valid {scene_attribute} position adjacent '
+                f'to : {[(vector.x, vector.z) for vector in area_list]}'
+            )
+        area_list.append(area)
+
+    return area_list
+
+
 def _is_valid_floor(
-        scene: Scene, floor_pos: Vector2dInt, key, restrict_under_user,
-        bounds, try_num, retries, type_str):
-    valid, bb = validate_floor_position(
-        scene, floor_pos, key, restrict_under_user, bounds)
-    if valid:
-        bounds.append(bb)
-        return valid
-    else:
+    scene: Scene,
+    position_list: List[Vector2dInt],
+    scene_attribute: str,
+    restrict_under_user: bool,
+    bounds_list: List[ObjectBounds],
+    try_num: int,
+    retries: int,
+    feature_type_string: str
+) -> bool:
+    """Return whether the given floor features are valid (they do not collide
+    with other objects in the scene, or the performer agent). If all are valid,
+    then this function will add their bounds to the given bounds_list."""
+    invalid = False
+    new_bounds_list = []
+    for position in position_list:
+        valid, bounds = validate_floor_position(
+            scene,
+            position,
+            scene_attribute,
+            restrict_under_user,
+            bounds_list
+        )
+        if not valid:
+            invalid = True
+            break
+        new_bounds_list.append(bounds)
+
+    if invalid:
         # Checks if enabled for TRACE logging.
         if logger.isEnabledFor(logging.TRACE):
             logger.trace(
-                f'Failed validating location of {type_str} on'
+                f'Failed validating location of {feature_type_string} on'
                 f' try {try_num + 1} of {retries}.'
-                f'\nFAILED FLOOR POSITION = {floor_pos}'
+                f'\nFAILED FLOOR POSITION = {position}'
             )
         else:
             logger.debug(
-                f'Failed validating location of {type_str} on'
+                f'Failed validating location of {feature_type_string} on'
                 f' try {try_num + 1} of {retries}.'
             )
+        return False
+
+    for bounds in new_bounds_list:
+        bounds_list.append(bounds)
+    return True
 
 
 def _add_floor_dependent_defaults(scene, reconciled):
@@ -4051,6 +4173,7 @@ def _add_floor_dependent_defaults(scene, reconciled):
         reconciled.position_z if reconciled.position_z is not None
         else random.randint(-zmax, zmax)
     )
+    reconciled.size = max(reconciled.size or 1, 1)
 
 
 def _add_platform_attached_objects(

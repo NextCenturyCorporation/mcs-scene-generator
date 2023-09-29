@@ -4908,6 +4908,23 @@ def test_floor_features_holes_specific():
     assert len(holes) == 2
 
 
+def test_floor_features_holes_size():
+    component = SpecificStructuralObjectsComponent({
+        'holes': [{
+            'num': 1,
+            'size': 10
+        }]
+    })
+    assert component.holes[0].num == 1
+    assert component.holes[0].size == 10
+
+    scene = component.update_ile_scene(prior_scene())
+    assert len(scene.holes) == 10
+    for index, area_1 in enumerate(scene.holes):
+        for area_2 in scene.holes[(index + 1):]:
+            assert area_1 != area_2
+
+
 def test_floor_features_holes_variables():
     component = SpecificStructuralObjectsComponent({
         'holes': {
@@ -5192,6 +5209,23 @@ def test_floor_features_lava_specific():
 
     scene = component.update_ile_scene(prior_scene())
     assert scene.lava == [Vector2dInt(x=2, z=3), Vector2dInt(x=-2, z=-3)]
+
+
+def test_floor_features_lava_size():
+    component = SpecificStructuralObjectsComponent({
+        'lava': [{
+            'num': 1,
+            'size': 10
+        }]
+    })
+    assert component.lava[0].num == 1
+    assert component.lava[0].size == 10
+
+    scene = component.update_ile_scene(prior_scene())
+    assert len(scene.lava) == 10
+    for index, area_1 in enumerate(scene.lava):
+        for area_2 in scene.lava[(index + 1):]:
+            assert area_1 != area_2
 
 
 def test_floor_features_lava_variable():

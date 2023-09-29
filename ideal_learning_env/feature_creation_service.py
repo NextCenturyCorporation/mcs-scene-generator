@@ -114,6 +114,7 @@ class BaseObjectCreationService(ABC):
     _default_template: BaseFeatureConfig = None
     _type = None
     _last_exception = None
+    bounds = []
 
     def _get_type(self) -> str:
         return (self._type.name if self._type is not None and hasattr(

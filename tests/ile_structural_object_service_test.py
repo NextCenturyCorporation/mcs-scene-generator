@@ -682,16 +682,21 @@ def test_holes_creation_reconcile():
     assert r1.num == 1
     assert -rd.x / 2.0 <= r1.position_x <= rd.x / 2.0
     assert -rd.z / 2.0 <= r1.position_z <= rd.z / 2.0
+    assert r1.size == 1
 
     tmp2 = FloorAreaConfig(
-        [2, 3], position_x=[-2, 2],
-        position_z=MinMaxFloat(1, 2))
+        [2, 3],
+        position_x=[-2, 2],
+        position_z=MinMaxFloat(1, 2),
+        size=5
+    )
     srv = StructuralHolesCreationService()
     r2: FloorAreaConfig = srv.reconcile(scene, tmp2)
 
     assert r2.num in [2, 3]
     assert r2.position_x in [-2, 2]
     assert 1 <= r2.position_z <= 2
+    assert r2.size == 5
 
 
 def test_lava_creation_reconcile():
@@ -703,16 +708,21 @@ def test_lava_creation_reconcile():
     assert r1.num == 1
     assert -rd.x / 2.0 <= r1.position_x <= rd.x / 2.0
     assert -rd.z / 2.0 <= r1.position_z <= rd.z / 2.0
+    assert r1.size == 1
 
     tmp2 = FloorAreaConfig(
-        [2, 3], position_x=[-2, 2],
-        position_z=MinMaxFloat(1, 2))
+        [2, 3],
+        position_x=[-2, 2],
+        position_z=MinMaxFloat(1, 2),
+        size=5
+    )
     srv = StructuralLavaCreationService()
     r2: FloorAreaConfig = srv.reconcile(scene, tmp2)
 
     assert r2.num in [2, 3]
     assert r2.position_x in [-2, 2]
     assert 1 <= r2.position_z <= 2
+    assert r2.size == 5
 
 
 def test_l_occluder_creation_reconcile():
@@ -1734,7 +1744,44 @@ def test_holes_create():
     temp = FloorAreaConfig(position_x=3, position_z=-4)
     holes = StructuralHolesCreationService(
     ).create_feature_from_specific_values(prior_scene(), temp, None)
-    assert holes == {'x': 3, 'z': -4}
+    assert holes == [{'x': 3, 'z': -4}]
+
+
+def test_holes_create_bigger_size():
+    for _ in range(10):
+        temp = FloorAreaConfig(position_x=3, position_z=-4, size=3)
+        holes = StructuralHolesCreationService(
+        ).create_feature_from_specific_values(prior_scene(), temp, None)
+        assert len(holes) == 3
+        assert holes[0] == {'x': 3, 'z': -4}
+        adjacent_option_1 = {'x': 3, 'z': -3}
+        adjacent_option_2 = {'x': 2, 'z': -4}
+        adjacent_option_3 = {'x': 3, 'z': -5}
+        adjacent_option_4 = {'x': 4, 'z': -4}
+        assert holes[1] in [
+            adjacent_option_1, adjacent_option_2,
+            adjacent_option_3, adjacent_option_4
+        ]
+        if holes[1] == adjacent_option_1:
+            assert holes[2] in [
+                adjacent_option_2, adjacent_option_3, adjacent_option_4,
+                {'x': 2, 'z': -3}, {'x': 3, 'z': -2}, {'x': 4, 'z': -3}
+            ]
+        if holes[1] == adjacent_option_2:
+            assert holes[2] in [
+                adjacent_option_1, adjacent_option_3, adjacent_option_4,
+                {'x': 2, 'z': -3}, {'x': 1, 'z': -4}, {'x': 2, 'z': -5}
+            ]
+        if holes[1] == adjacent_option_3:
+            assert holes[2] in [
+                adjacent_option_1, adjacent_option_2, adjacent_option_4,
+                {'x': 2, 'z': -5}, {'x': -2, 'z': -6}, {'x': 4, 'z': -5}
+            ]
+        if holes[1] == adjacent_option_4:
+            assert holes[2] in [
+                adjacent_option_1, adjacent_option_2, adjacent_option_3,
+                {'x': 4, 'z': -3}, {'x': 5, 'z': -4}, {'x': 4, 'z': -5}
+            ]
 
 
 def test_l_occluder_create():
@@ -1779,7 +1826,44 @@ def test_lava_create():
     temp = FloorAreaConfig(position_x=-1, position_z=4)
     lava = StructuralLavaCreationService().create_feature_from_specific_values(
         prior_scene(), temp, None)
-    assert lava == {'x': -1, 'z': 4}
+    assert lava == [{'x': -1, 'z': 4}]
+
+
+def test_lava_create_bigger_size():
+    for _ in range(10):
+        temp = FloorAreaConfig(position_x=-1, position_z=4, size=3)
+        lava = StructuralLavaCreationService(
+        ).create_feature_from_specific_values(prior_scene(), temp, None)
+        assert len(lava) == 3
+        assert lava[0] == {'x': -1, 'z': 4}
+        adjacent_option_1 = {'x': -1, 'z': 5}
+        adjacent_option_2 = {'x': -2, 'z': 4}
+        adjacent_option_3 = {'x': -1, 'z': 3}
+        adjacent_option_4 = {'x': 0, 'z': 4}
+        assert lava[1] in [
+            adjacent_option_1, adjacent_option_2,
+            adjacent_option_3, adjacent_option_4
+        ]
+        if lava[1] == adjacent_option_1:
+            assert lava[2] in [
+                adjacent_option_2, adjacent_option_3, adjacent_option_4,
+                {'x': -1, 'z': 6}, {'x': -2, 'z': 5}, {'x': 0, 'z': 5}
+            ]
+        if lava[1] == adjacent_option_2:
+            assert lava[2] in [
+                adjacent_option_1, adjacent_option_3, adjacent_option_4,
+                {'x': -2, 'z': 5}, {'x': -3, 'z': 4}, {'x': -2, 'z': 3}
+            ]
+        if lava[1] == adjacent_option_3:
+            assert lava[2] in [
+                adjacent_option_1, adjacent_option_2, adjacent_option_4,
+                {'x': -1, 'z': 2}, {'x': -2, 'z': 3}, {'x': 0, 'z': 3}
+            ]
+        if lava[1] == adjacent_option_4:
+            assert lava[2] in [
+                adjacent_option_1, adjacent_option_2, adjacent_option_3,
+                {'x': 0, 'z': 5}, {'x': 1, 'z': 4}, {'x': 0, 'z': 3}
+            ]
 
 
 def test_moving_occluder_create():

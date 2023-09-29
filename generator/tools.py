@@ -1,4 +1,5 @@
 import copy
+import math
 import random
 import uuid
 from enum import Enum
@@ -74,27 +75,31 @@ INACCESSIBLE_TOOL_BLOCKING_WALL_MINIMUM_SEPARATION = 0.5
 
 
 class ImprobableToolOption(str, Enum):
-    NO_TOOL = 'no_tool'
-    TOO_SHORT_TOOL = 'too_short'
     BROKEN_TOOL = 'broken'
-    INACCESSIBLE_TOOL = 'inaccessible'
     INACCESSIBLE_DIAGONAL = 'inaccessible_diagonal'
-    INACCESSIBLE_ROTATED = 'inaccessible_rotated'
     INACCESSIBLE_MISALIGNED = 'inaccessible_misaligned'
+    INACCESSIBLE_ROTATED = 'inaccessible_rotated'
+    INACCESSIBLE_TOOL = 'inaccessible'
+    NO_TOOL = 'no_tool'
+    TOO_BIG_TOOL = 'too_big'
+    TOO_SHORT_TOOL = 'too_short'
 
 
 TOOL_TYPES = SimpleNamespace(
-    RECT="rectangular",
-    HOOKED="hooked",
     BROKEN="broken",
-    SMALL="small",
+    HOOKED="hooked",
     INACCESSIBLE="inaccessible",
     INACCESSIBLE_DIAGONAL="inaccessible_diagonal",
     INACCESSIBLE_ROTATED="inaccessible_rotated",
     INACCESSIBLE_MISALIGNED="inaccessible_misaligned",
     ISOSCELES="isosceles",
-    NO_TOOL="no_tool"
+    NO_TOOL="no_tool",
+    SMALL="small",
+    RECT="rectangular",
+    TOO_BIG="too_big"
 )
+
+L_SHAPED_TOOLS = [TOOL_TYPES.HOOKED, TOOL_TYPES.ISOSCELES]
 
 
 def get_tool_shape(
@@ -121,6 +126,9 @@ def get_tool_shape(
                 continue
         elif tool_category in [TOOL_TYPES.SMALL, TOOL_TYPES.BROKEN]:
             if 'rect' not in tool or length != 1:
+                continue
+        elif tool_category in [TOOL_TYPES.TOO_BIG]:
+            if 'tool_big' not in tool:
                 continue
         else:
             # Default to RECT tools (including for INACCESSIBLE type).
@@ -219,13 +227,36 @@ def get_scene_tool_length(scene):
             return float(obj['type'][-4:].replace("_", "."))
 
 
-def get_too_small_tool():
+def get_too_small_tool(good_tool_width):
     tools = [
         tool
-        for tool, (_, length) in LARGE_BLOCK_TOOLS_TO_DIMENSIONS.items()
-        if tool.startswith('tool_rect') and length < USEFUL_LENGTH_MIN
+        for tool, (width, length) in LARGE_BLOCK_TOOLS_TO_DIMENSIONS.items()
+        if tool.startswith('tool_rect') and
+        length < USEFUL_LENGTH_MIN and
+        width == good_tool_width
     ]
     return random.choice(tools)
+
+
+def get_too_big_tool(scene, good_tool_width):
+    # Diagonal length tolerance to check against big tool length,
+    # 3 was a little too much, caused some errors in smaller rooms
+    big_tool_len_tolerance = 2
+    room_diagonal = math.sqrt(((scene.room_dimensions.x / 2) ** 2) +
+                              (scene.room_dimensions.z ** 2)) - \
+        big_tool_len_tolerance
+
+    selected_tool = ""
+
+    for tool, (width, length) in LARGE_BLOCK_TOOLS_TO_DIMENSIONS.items():
+        if tool.startswith('tool_big'):
+            if length < room_diagonal and width == good_tool_width:
+                selected_tool = tool
+
+    if selected_tool == "":
+        raise Exception('Too Big Tool was not selected')
+
+    return selected_tool
 
 
 def get_tool_choice_tool_object(scene, is_valid):

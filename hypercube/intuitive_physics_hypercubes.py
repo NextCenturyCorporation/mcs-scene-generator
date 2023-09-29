@@ -1419,20 +1419,17 @@ class IntuitivePhysicsHypercube(Hypercube, ABC):
             raise latest_exception from latest_exception
         return object_list, occluder_list
 
-    def _generate_move_across_object_list(
+    def _generate_move_across_object_list_helper(
         self,
-        last_action_step: int
-    ) -> List[SceneObject]:
-        """Generate and return move-across objects."""
-        object_count = self._get_move_across_object_count()
-        object_list = []
+        left_side: bool
+    ) -> Tuple[List, List, float]:
+        """Helper function for _generate_move_across_object_list. Returns an
+        object_list, a variations_list, and a max_movement, in that order."""
         max_movement = 0
-        self._variations_list = []
+        object_list = []
+        variations_list = []
 
-        # Each move-across object enters from the same side in Eval 3.
-        left_side = random.choice([True, False])
-
-        for i in range(object_count):
+        for i in range(self._get_move_across_object_count()):
             move_dict = None
             for _ in range(MAX_TRIES):
                 # Choose the object's position and define its location.
@@ -1448,8 +1445,8 @@ class IntuitivePhysicsHypercube(Hypercube, ABC):
                     'position': object_position
                 }
 
-                # Choose the object's movement to set its default variation's
-                # forces and starting Y position.
+                # Choose the object's movement to set its default
+                # variation's forces and starting Y position.
                 move_dict = self._choose_all_movements(
                     object_position,
                     left_side
@@ -1458,7 +1455,12 @@ class IntuitivePhysicsHypercube(Hypercube, ABC):
                     break
             if not move_dict:
                 raise SceneException(
-                    'Cannot find a valid movement option after max try count!'
+                    f'Cannot find a valid movement option for object '
+                    f'number {i + 1} after max try count: '
+                    f'{object_position=} {left_side=} '
+                    f'deep_move={self._does_have_deep_move()} '
+                    f'stop_move={self._does_have_stop_move()} '
+                    f'toss_move={self._does_have_toss_move()} '
                 )
 
             max_movement = max(
@@ -1473,7 +1475,36 @@ class IntuitivePhysicsHypercube(Hypercube, ABC):
                 instance['debug']['movement'] = move_dict
 
             object_list.append(variations.get(VARIATIONS.TRAINED))
-            self._variations_list.append(variations)
+            variations_list.append(variations)
+
+        return object_list, variations_list, max_movement
+
+    def _generate_move_across_object_list(
+        self,
+        last_action_step: int
+    ) -> List[SceneObject]:
+        """Generate and return move-across objects."""
+        object_count = self._get_move_across_object_count()
+
+        # Each move-across object enters from the same side in Eval 3.
+        left_side = random.choice([True, False])
+
+        max_movement = 0
+        object_list = []
+        self._variations_list = []
+        last_exception = None
+
+        for _ in range(MAX_TRIES):
+            try:
+                data = self._generate_move_across_object_list_helper(left_side)
+                object_list, variations_list, max_movement = data
+                self._variations_list = variations_list
+                break
+            except SceneException as e:
+                last_exception = e
+
+        if not object_list:
+            raise last_exception
 
         # Adjust the latest action step by the slowest chosen movement.
         latest_action_step = max(

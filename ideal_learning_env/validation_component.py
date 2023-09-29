@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Union
 
 from extremitypathfinder import PolygonEnvironment
 from extremitypathfinder.plotting import PlottingEnvironment
@@ -10,7 +10,8 @@ from generator import ObjectBounds, Scene, geometry
 
 from .components import ILEComponent
 from .decorators import ile_config_setter
-from .defs import ILEException
+from .defs import TARGET_LABEL, ILEDelayException, ILEException
+from .object_services import ObjectRepository
 from .structural_object_service import (
     LABEL_BIDIRECTIONAL_RAMP,
     LABEL_CONNECTED_TO_RAMP,
@@ -26,9 +27,10 @@ class ValidPathComponent(ILEComponent):
     unmovable objects.  This path does not take Ramps, performers starting
     elevation or any other methods of elevation change into account."""
 
-    check_valid_path: bool = False
+    check_valid_path: Union[bool, str] = False
     """
-    (bool): If true, checks for a valid path between the performer agent's
+    (bool or str):
+    If true, checks for a valid path between the performer agent's
     starting position and the target's position and retries generating the
     current scene if one cannot be found. Considers all objects and structures
     that would block the performer when their position is y = 0 or are light
@@ -36,8 +38,11 @@ class ValidPathComponent(ILEComponent):
     scene. It also considers moving up and/or down ramps that are attached to
     platforms (via the `attached_ramps` option in `structural_platforms`), as
     well as across those platforms. Pathfinding is otherwise only done in two
-    dimensions. This check is skipped if false. Please note that this feature
-    is not currently supported for scenes containing multiple targets.
+    dimensions. This check is skipped if false.
+
+    Can also be set as a string corresponding to the label of one or more
+    objects that already exist in the scene.
+
     Default: False
 
     Simple Example:
@@ -67,7 +72,7 @@ class ValidPathComponent(ILEComponent):
         self.last_distance = None
 
         if self.check_valid_path:
-            self._delayed_target = self._no_target_found(scene)
+            self._delayed_target = self._no_objects_found(scene)
             self._delayed_performer_start = self._performer_not_within_room(
                 scene)
 
@@ -75,9 +80,12 @@ class ValidPathComponent(ILEComponent):
                 self._find_valid_path(scene)
         return scene
 
-    def _no_target_found(self, scene) -> bool:
-        # Target placement may be delayed
-        return len(scene.get_targets()) == 0
+    def _no_objects_found(self, scene) -> bool:
+        object_repository = ObjectRepository.get_instance()
+        return not object_repository.has_label(
+            TARGET_LABEL if self.check_valid_path is True else
+            self.check_valid_path
+        )
 
     def _performer_not_within_room(self, scene) -> bool:
         # shortcut_start_on_platform triggers a delayed action, placing
@@ -112,52 +120,58 @@ class ValidPathComponent(ILEComponent):
         })
 
     def _find_valid_path(self, scene: Scene):
-        if self.check_valid_path:
-            logger.info('Running path validation check...')
+        if not self.check_valid_path:
+            return
 
-            environ = PlottingEnvironment(
-                "./plots/") if self._debug_plot else PolygonEnvironment()
+        label = (
+            TARGET_LABEL if self.check_valid_path is True else
+            self.check_valid_path
+        )
 
-            blocked_area = []
-            if self._delayed_target:
-                raise ILEException(
-                    "Path check requires a goal target. "
-                    "No goal target found.")
+        logger.info(f'Running path validation check on {label}...')
 
-            if self._delayed_performer_start:
-                raise ILEException(
-                    "Performer start position is not within bounds.")
+        environ = PlottingEnvironment(
+            "./plots/") if self._debug_plot else PolygonEnvironment()
 
-            # TODO This won't work in scenes with multiple targets.
-            targets = scene.get_targets()
-            if len(targets) > 1:
-                raise ILEException(
-                    f'The check_valid_path config option does not currently '
-                    f'support scenes containing multiple targets (found '
-                    f'{len(targets)} total targets)'
-                )
-            tgt = targets[0] if targets else None
-            start, end = self._compute_start_end(scene, tgt)
-            boundary = self._compute_boundary(scene)
+        blocked_area = []
+        if self._delayed_target:
+            raise ILEDelayException(f"No {label} objects found.")
 
-            # Add each different type
-            # coordinates must be clockwise ordering
-            self._add_objects_to_blocked(scene, tgt, blocked_area)
-            self._add_blocked_areas(scene.lava, blocked_area)
-            # Buffer should be 0.5 to be exactly hole, but then path library
-            # thinks it can go between holes.
-            self._add_blocked_areas(scene.holes, blocked_area, 0.6)
-            # validate
+        if self._delayed_performer_start:
+            raise ILEDelayException(
+                "Performer start position is not within room bounds."
+            )
 
-            logger.trace("Setting pathfinding environment")
-            environ.store(
-                boundary,
-                list_of_hole_coordinates=blocked_area,
-                validate=True)
-            logger.trace("pre-computing possible paths")
-            environ.prepare()
-            logger.trace(
-                "finding shortest path from performer start to target")
+        object_repository = ObjectRepository.get_instance()
+        targets = object_repository.get_all_from_labeled_objects(
+            TARGET_LABEL if self.check_valid_path is True else
+            self.check_valid_path
+        )
+        targets = [idl.instance for idl in targets]
+
+        boundary = self._compute_boundary(scene)
+
+        # Add each different type
+        # coordinates must be clockwise ordering
+        self._add_objects_to_blocked(scene, targets, blocked_area)
+        self._add_blocked_areas(scene.lava, blocked_area)
+        # Buffer should be 0.5 to be exactly hole, but then path library
+        # thinks it can go between holes.
+        self._add_blocked_areas(scene.holes, blocked_area, 0.6)
+        # validate
+
+        logger.trace("Setting pathfinding environment")
+        environ.store(
+            boundary,
+            list_of_hole_coordinates=blocked_area,
+            validate=True)
+        logger.trace("pre-computing possible paths")
+        environ.prepare()
+        logger.trace(
+            "finding shortest path from performer start to target")
+
+        for target in targets:
+            start, end = self._compute_start_end(scene, target)
             try:
                 # if plotting is off, path will be blank and distance will be 0
                 self.last_path, self.last_distance = (
@@ -324,7 +338,7 @@ class ValidPathComponent(ILEComponent):
 
         return bounds_list
 
-    def _add_objects_to_blocked(self, scene, tgt, blocked_area):
+    def _add_objects_to_blocked(self, scene, targets, blocked_area):
         objs = scene.objects or []
         default_buffer = geometry.PERFORMER_HALF_WIDTH
         plat_ramp_buffer = 0.1
@@ -349,13 +363,16 @@ class ValidPathComponent(ILEComponent):
                         side, plat_ramp_buffer, blocked_area)
 
             else:
-                bb = obj['shows'][0]['boundingBox']
-
-                valid_blocking_object = self.is_object_path_blocking(obj, tgt)
-                # TODO MCS-895 We do not support multiple targets yet.
+                valid_blocking_object = self.is_object_path_blocking(
+                    obj,
+                    targets
+                )
                 if valid_blocking_object:
-                    self._add_polygon_to_blocked(bb, default_buffer,
-                                                 blocked_area)
+                    self._add_polygon_to_blocked(
+                        obj['shows'][0]['boundingBox'],
+                        default_buffer,
+                        blocked_area
+                    )
 
     def _add_polygon_to_blocked(self, bounding_box, buffer, blocked_area):
         # This creates a new polygon that is bigger by 'buffer'
@@ -392,14 +409,17 @@ class ValidPathComponent(ILEComponent):
                 (area.x + area_buffer, area.z - area_buffer)
             ])
 
-    def is_object_path_blocking(self, obj, tgt):
-        if tgt.get('associatedWithAgent') == obj['id']:
-            return False
+    def is_object_path_blocking(self, obj, targets):
+        for target in targets:
+            if target.get('associatedWithAgent') == obj['id']:
+                return False
 
         show = obj['shows'][0]
         bb = show['boundingBox']
-        # Don't add the target
-        valid_blocking_object = obj['id'] != tgt['id']
+        # Don't add the targets
+        valid_blocking_object = (
+            obj['id'] not in [target['id'] for target in targets]
+        )
         # Don't add objects that are above
 
         valid_blocking_object &= (bb.min_y < geometry.PERFORMER_HEIGHT or
@@ -423,7 +443,7 @@ class ValidPathComponent(ILEComponent):
                          self.last_distance is None)
         if delay or no_valid_path:
             try:
-                self._delayed_target = self._no_target_found(scene)
+                self._delayed_target = self._no_objects_found(scene)
                 self._delayed_performer_start = self._performer_not_within_room(scene)  # noqa: E501
                 self._find_valid_path(scene)
             except Exception as e:
@@ -436,8 +456,7 @@ class ValidPathComponent(ILEComponent):
         return [str(self._delayed_error_reason)
                 ] if self._delayed_error_reason else []
 
-    def get_check_valid_path(
-            self) -> bool:
+    def get_check_valid_path(self) -> Union[bool, str]:
         return self.check_valid_path or False
 
     @ile_config_setter()

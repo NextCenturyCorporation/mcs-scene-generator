@@ -16,3 +16,5 @@ goal:
           identical_to: target_1
 # Only the target can be a soccer ball.
 excluded_shapes: soccer_ball
+# Ensure any random objects don't completely obstruct the path to the targets.
+check_valid_path: True

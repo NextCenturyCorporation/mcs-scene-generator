@@ -20,19 +20,35 @@ room_dimensions:
         min: 10
         max: 25
 
+performer_starts_near:
+    label: target
+    distance:
+        min: 5.0
+        # A big number is automatically adjusted to the room dimensions.
+        max: 99.0
+
 # Generate many holes, walls, and pools of lava, but no other structures.
-random_structural_objects:
-    - type:
-        - holes
-        - lava
-      num:
-        min: 50
-        max: 250
-    - type:
-        - walls
-      num:
+holes:
+    num:
         min: 5
-        max: 15
+        max: 20
+    # Each hole contains this many contiguous 1x1 areas.
+    size:
+        min: 1
+        max: 10
+lava:
+    num:
+        min: 5
+        max: 20
+    # Each pool of lava contains this many contiguous 1x1 areas.
+    size:
+        min: 1
+        max: 10
+random_structural_objects:
+    type: walls
+    num:
+        min: 2
+        max: 10
 
 # Override the defaults to avoid randomly generating any other interactable 
 # objects besides the target. Remove these lines if you want additional
