@@ -826,7 +826,6 @@ SOFA_THORKEA_MATERIALS = [
     )
 ]
 
-# For use with Rect and Hooked Tools
 TOOL_MATERIALS = [
     MaterialTuple(
         "UnityAssetStore/YughuesFreeMetalMaterials/Materials/M_YFMM_13",
@@ -844,6 +843,21 @@ TOOL_MATERIALS = [
         "UnityAssetStore/YughuesFreeMetalMaterials/Materials/M_YFMM_36",
         ["green"]
     )
+]
+
+NOVEL_TOOL_MATERIALS = [
+    MaterialTuple(
+        "UnityAssetStore/YughuesFreeMetalMaterials/Materials/M_YFMM_11",
+        ["black"]),
+    MaterialTuple(
+        "UnityAssetStore/YughuesFreeMetalMaterials/Materials/M_YFMM_23",
+        ["grey"]),
+    MaterialTuple(
+        "UnityAssetStore/YughuesFreeMetalMaterials/Materials/M_YFMM_40",
+        ["blue"]),
+    MaterialTuple(
+        "UnityAssetStore/YughuesFreeMetalMaterials/Materials/M_YFMM_42",
+        ["brown"]),
 ]
 
 

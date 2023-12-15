@@ -77,7 +77,9 @@ BACKGROUND_MAX_Z = 4.95
 
 TIPSY_OBJECT_TYPES = [
     'rollable_4',
-    'rollable_6'
+    'rollable_6',
+    'rollable_10',
+    'rollable_11'
 ]
 
 PERFORMER_START = PerformerStart(
@@ -1849,7 +1851,7 @@ class CollisionsHypercube(IntuitivePhysicsHypercube):
         super().__init__(
             tags.ABBREV.COLLISIONS.upper(),
             starter_scene,
-            tags.SCENE.COLLISIONS,
+            tags.TASKS.COLLISIONS,
             role_to_type,
             # Collision scenes are always move-across.
             is_fall_down=False,
@@ -2166,7 +2168,7 @@ class GravitySupportHypercube(IntuitivePhysicsHypercube):
         super().__init__(
             tags.ABBREV.GRAVITY_SUPPORT.upper(),
             starter_scene,
-            tags.SCENE.GRAVITY_SUPPORT,
+            tags.TASKS.GRAVITY_SUPPORT,
             role_to_type,
             # All gravity support scenes are fall-down in Eval 4.
             is_fall_down=True,
@@ -2286,8 +2288,8 @@ class GravitySupportHypercube(IntuitivePhysicsHypercube):
         target_location = {
             'position': {
                 'x': random.randrange(
-                    -GRAVITY_SUPPORT_MAX_ONSCREEN_X * 100,
-                    GRAVITY_SUPPORT_MAX_ONSCREEN_X * 100,
+                    round(-GRAVITY_SUPPORT_MAX_ONSCREEN_X * 100),
+                    round(GRAVITY_SUPPORT_MAX_ONSCREEN_X * 100),
                     5
                 ) / 100.0,
                 # The target's Y position will be adjusted later.
@@ -2462,7 +2464,7 @@ class GravitySupportHypercube(IntuitivePhysicsHypercube):
         # full-support scenes (evenly divisible by PLACER_MOVE_AMOUNT).
         implausible_support_y = random.randint(
             1,
-            (1 / mechanisms.PLACER_MOVE_AMOUNT)
+            round(1 / mechanisms.PLACER_MOVE_AMOUNT)
         )
 
         # Initialize scenes.
@@ -2815,7 +2817,7 @@ class ObjectPermanenceHypercube(IntuitivePhysicsHypercube):
         super().__init__(
             tags.ABBREV.OBJECT_PERMANENCE.upper(),
             starter_scene,
-            tags.SCENE.OBJECT_PERMANENCE,
+            tags.TASKS.OBJECT_PERMANENCE,
             role_to_type,
             is_fall_down=is_fall_down,
             is_move_across=is_move_across,
@@ -3107,7 +3109,7 @@ class ShapeConstancyHypercube(IntuitivePhysicsHypercube):
         super().__init__(
             tags.ABBREV.SHAPE_CONSTANCY.upper(),
             starter_scene,
-            tags.SCENE.SHAPE_CONSTANCY,
+            tags.TASKS.SHAPE_CONSTANCY,
             role_to_type,
             is_fall_down=is_fall_down,
             is_move_across=is_move_across,
@@ -3356,7 +3358,7 @@ class SpatioTemporalContinuityHypercube(IntuitivePhysicsHypercube):
         super().__init__(
             tags.ABBREV.SPATIO_TEMPORAL_CONTINUITY.upper(),
             starter_scene,
-            tags.SCENE.SPATIO_TEMPORAL_CONTINUITY,
+            tags.TASKS.SPATIO_TEMPORAL_CONTINUITY,
             role_to_type,
             is_fall_down=is_fall_down,
             is_move_across=is_move_across,

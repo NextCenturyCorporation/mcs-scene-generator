@@ -469,6 +469,34 @@ _BED_12_OCCLUDER = create_variable_definition_from_base(
 )
 
 
+_BED_13_OCCLUDER = create_variable_definition_from_base(
+    type='bed_13',
+    size_multiplier_list=[1],
+    chosen_material_list=[ChosenMaterial.WOOD]
+)
+
+
+_BED_14_OCCLUDER = create_variable_definition_from_base(
+    type='bed_14',
+    size_multiplier_list=[1],
+    chosen_material_list=[ChosenMaterial.WOOD]
+)
+
+
+_BED_15_OCCLUDER = create_variable_definition_from_base(
+    type='bed_15',
+    size_multiplier_list=[1],
+    chosen_material_list=[ChosenMaterial.WOOD]
+)
+
+
+_BED_16_OCCLUDER = create_variable_definition_from_base(
+    type='bed_16',
+    size_multiplier_list=[1],
+    chosen_material_list=[ChosenMaterial.WOOD]
+)
+
+
 _BOOKCASE = ObjectDefinition(
     chooseTypeList=[
         create_variable_definition_from_base(
@@ -561,6 +589,25 @@ _BOOKCASE_DOUBLE = ObjectDefinition(
         create_variable_definition_from_base(
             type='double_bookcase_4_shelf',
             size_multiplier_list=[Vector3d(x=0.5, y=1, z=1)]
+        )
+    ],
+    chooseMaterialList=[
+        ChosenMaterial.METAL.copy(),
+        ChosenMaterial.PLASTIC.copy(),
+        ChosenMaterial.WOOD.copy()
+    ]
+)
+
+
+_BOOKCASE_DUPLEX = ObjectDefinition(
+    chooseTypeList=[
+        create_variable_definition_from_base(
+            type='bookcase_duplex_2_4',
+            size_multiplier_list=[1],
+        ),
+        create_variable_definition_from_base(
+            type='bookcase_duplex_4_2',
+            size_multiplier_list=[1]
         )
     ],
     chooseMaterialList=[
@@ -833,6 +880,34 @@ _CHAIR_16 = create_variable_definition_from_base(
 )
 
 
+_CHAIR_17 = create_variable_definition_from_base(
+    type='chair_17',
+    size_multiplier_list=[1],
+    chosen_material_list=[ChosenMaterial.PLASTIC, ChosenMaterial.WOOD]
+)
+
+
+_CHAIR_18 = create_variable_definition_from_base(
+    type='chair_17',
+    size_multiplier_list=[1],
+    chosen_material_list=[ChosenMaterial.PLASTIC, ChosenMaterial.WOOD]
+)
+
+
+_FOLDING_CHAIR = create_variable_definition_from_base(
+    type='folding_chair',
+    size_multiplier_list=[1],
+    chosen_material_list=[ChosenMaterial.METAL, ChosenMaterial.PLASTIC]
+)
+
+
+_HIGH_CHAIR = create_variable_definition_from_base(
+    type='high_chair',
+    size_multiplier_list=[1],
+    chosen_material_list=[ChosenMaterial.PLASTIC, ChosenMaterial.WOOD]
+)
+
+
 _BLOCK_BLANK_CUBE_NOT_PICKUPABLE = create_variable_definition_from_base(
     type='block_blank_wood_cube',
     attributes_overrides=['moveable'],
@@ -878,6 +953,53 @@ _DESK_3 = create_variable_definition_from_base(
 _DESK_4 = create_variable_definition_from_base(
     type='desk_4',
     size_multiplier_list=[1, Vector3d(x=1.5, y=1, z=1)],
+    chosen_material_list=[ChosenMaterial.WOOD]
+)
+
+
+_DESK_5 = create_variable_definition_from_base(
+    type='desk_5',
+    size_multiplier_list=[1, Vector3d(x=1, y=1, z=2)],
+    chosen_material_list=[ChosenMaterial.WOOD]
+)
+
+
+_DESK_6 = create_variable_definition_from_base(
+    type='desk_6',
+    size_multiplier_list=[1, Vector3d(x=1, y=1, z=2)],
+    chosen_material_list=[ChosenMaterial.WOOD]
+)
+
+
+_DESK_7_OBSTACLE = create_variable_definition_from_base(
+    type='desk_7',
+    size_multiplier_list=[1, Vector3d(x=0.5, y=1, z=1)],
+    chosen_material_list=[ChosenMaterial.WOOD]
+)
+
+
+_DESK_8_OBSTACLE = create_variable_definition_from_base(
+    type='desk_8',
+    size_multiplier_list=[1, Vector3d(x=0.5, y=1, z=1)],
+    chosen_material_list=[ChosenMaterial.WOOD]
+)
+
+
+_DESK_9_OBSTACLE = create_variable_definition_from_base(
+    type='desk_9',
+    size_multiplier_list=[
+        1,
+        Vector3d(x=1, y=1, z=1.5),
+        Vector3d(x=1.5, y=1, z=1.5),
+        Vector3d(x=2, y=1, z=1.5),
+    ],
+    chosen_material_list=[ChosenMaterial.WOOD]
+)
+
+
+_DESK_10_OBSTACLE = create_variable_definition_from_base(
+    type='desk_10',
+    size_multiplier_list=[1, Vector3d(x=0.5, y=1, z=1)],
     chosen_material_list=[ChosenMaterial.WOOD]
 )
 
@@ -1245,6 +1367,54 @@ _TABLE_22_OVAL = create_variable_definition_from_base(
 )
 
 
+_TABLE_23_RECT = create_variable_definition_from_base(
+    type='table_23',
+    size_multiplier_list=[
+        1,
+        1.5,
+        Vector3d(x=1, y=1.5, z=1),
+        Vector3d(x=1, y=2, z=1),
+        Vector3d(x=1.5, y=1, z=1.5),
+        Vector3d(x=1.5, y=2, z=1.5),
+        Vector3d(x=0.5, y=1, z=1),
+        Vector3d(x=1, y=1, z=2),
+        Vector3d(x=0.5, y=1.5, z=1),
+        Vector3d(x=1, y=1.5, z=2),
+        Vector3d(x=0.5, y=2, z=1),
+        Vector3d(x=1, y=2, z=2),
+    ],
+    chosen_material_list=[
+        ChosenMaterial.METAL,
+        ChosenMaterial.PLASTIC,
+        ChosenMaterial.WOOD
+    ]
+)
+
+
+_TABLE_24_RECT = create_variable_definition_from_base(
+    type='table_24',
+    size_multiplier_list=[
+        1,
+        1.5,
+        Vector3d(x=1, y=1.5, z=1),
+        Vector3d(x=1, y=2, z=1),
+        Vector3d(x=1.5, y=1, z=1.5),
+        Vector3d(x=1.5, y=2, z=1.5),
+        Vector3d(x=0.5, y=1, z=1),
+        Vector3d(x=1, y=1, z=2),
+        Vector3d(x=0.5, y=1.5, z=1),
+        Vector3d(x=1, y=1.5, z=2),
+        Vector3d(x=0.5, y=2, z=1),
+        Vector3d(x=1, y=2, z=2),
+    ],
+    chosen_material_list=[
+        ChosenMaterial.METAL,
+        ChosenMaterial.PLASTIC,
+        ChosenMaterial.WOOD
+    ]
+)
+
+
 _TABLE_25_CIRCLE = create_variable_definition_from_base(
     type='table_25',
     size_multiplier_list=[
@@ -1445,6 +1615,12 @@ _SOFA_9 = create_variable_definition_from_base(
 )
 
 
+_SOFA_10 = create_variable_definition_from_base(
+    type='sofa_10',
+    size_multiplier_list=[1]
+)
+
+
 _SOFA_11 = create_variable_definition_from_base(
     type='sofa_11',
     size_multiplier_list=[1]
@@ -1543,6 +1719,12 @@ _SOFA_CHAIR_8 = create_variable_definition_from_base(
 
 _SOFA_CHAIR_9 = create_variable_definition_from_base(
     type='sofa_chair_9',
+    size_multiplier_list=[1]
+)
+
+
+_SOFA_CHAIR_10 = create_variable_definition_from_base(
+    type='sofa_chair_10',
     size_multiplier_list=[1]
 )
 
@@ -1647,6 +1829,22 @@ _CASE_7 = create_variable_definition_from_base(
 )
 
 
+_CASE_8 = create_variable_definition_from_base(
+    type='case_8',
+    # Big enough to fit a soccer ball inside
+    size_multiplier_list=[1, 1.25, 1.5],
+    chosen_material_list=[ChosenMaterial.METAL, ChosenMaterial.PLASTIC]
+)
+
+
+_CASE_9 = create_variable_definition_from_base(
+    type='case_9',
+    # Big enough to fit a soccer ball inside
+    size_multiplier_list=[2.5, 3, 3.5],
+    chosen_material_list=[ChosenMaterial.METAL, ChosenMaterial.PLASTIC]
+)
+
+
 _CRATE_1 = create_variable_definition_from_base(
     type='crate_1',
     # Big enough to fit a soccer ball inside
@@ -1675,6 +1873,22 @@ _CRATE_4 = create_variable_definition_from_base(
     type='crate_4',
     # Big enough to fit a soccer ball inside
     size_multiplier_list=[0.6],
+    chosen_material_list=[ChosenMaterial.WOOD]
+)
+
+
+_CRATE_5 = create_variable_definition_from_base(
+    type='crate_5',
+    # Big enough to fit a soccer ball inside
+    size_multiplier_list=[0.5, 0.6],
+    chosen_material_list=[ChosenMaterial.WOOD]
+)
+
+
+_CRATE_6 = create_variable_definition_from_base(
+    type='crate_6',
+    # Big enough to fit a soccer ball inside
+    size_multiplier_list=[0.4, 0.5],
     chosen_material_list=[ChosenMaterial.WOOD]
 )
 
@@ -1823,6 +2037,54 @@ _CHEST_9_TRAPEZOID_LID = create_variable_definition_from_base(
 )
 
 
+_CHEST_10 = create_variable_definition_from_base(
+    type='chest_10',
+    size_multiplier_list=[
+        # Too little to fit a soccer ball inside
+        0.5, 0.75,
+        # Big enough to fit a soccer ball inside
+        1.25, 1.5, 1.75
+    ],
+    chosen_material_list=[
+        ChosenMaterial.METAL,
+        ChosenMaterial.PLASTIC,
+        ChosenMaterial.WOOD
+    ]
+)
+
+
+_CHEST_11 = create_variable_definition_from_base(
+    type='chest_11',
+    size_multiplier_list=[
+        # Too little to fit a soccer ball inside
+        1, 1.5,
+        # Big enough to fit a soccer ball inside
+        2.5, 3, 3.5
+    ],
+    chosen_material_list=[
+        ChosenMaterial.METAL,
+        ChosenMaterial.PLASTIC,
+        ChosenMaterial.WOOD
+    ]
+)
+
+
+_CIRCULAR_CONTAINER = create_variable_definition_from_base(
+    type='circular_container',
+    # Big enough to fit a soccer ball inside
+    size_multiplier_list=[1.5, 1.75, 2],
+    chosen_material_list=[ChosenMaterial.METAL, ChosenMaterial.PLASTIC]
+)
+
+
+_HAMPER = create_variable_definition_from_base(
+    type='hamper',
+    # Big enough to fit a soccer ball inside
+    size_multiplier_list=[1, 1.25, 1.5],
+    chosen_material_list=[]
+)
+
+
 _MILITARY_CASE_1 = create_variable_definition_from_base(
     type='military_case_1',
     # Big enough to fit a soccer ball inside
@@ -1851,6 +2113,22 @@ _MILITARY_CASE_4 = create_variable_definition_from_base(
     type='military_case_4',
     # Big enough to fit a soccer ball inside
     size_multiplier_list=[1],
+    chosen_material_list=[ChosenMaterial.METAL, ChosenMaterial.PLASTIC]
+)
+
+
+_MILITARY_CASE_5 = create_variable_definition_from_base(
+    type='military_case_5',
+    # Big enough to fit a soccer ball inside
+    size_multiplier_list=[0.6, 0.7, 0.8],
+    chosen_material_list=[ChosenMaterial.METAL, ChosenMaterial.PLASTIC]
+)
+
+
+_MILITARY_CASE_6 = create_variable_definition_from_base(
+    type='military_case_6',
+    # Big enough to fit a soccer ball inside
+    size_multiplier_list=[1.5, 1.75, 2],
     chosen_material_list=[ChosenMaterial.METAL, ChosenMaterial.PLASTIC]
 )
 
@@ -1907,6 +2185,22 @@ _TOOLBOX_6 = create_variable_definition_from_base(
     type='toolbox_6',
     # Big enough to fit a soccer ball inside
     size_multiplier_list=[4, 6],
+    chosen_material_list=[ChosenMaterial.METAL, ChosenMaterial.PLASTIC]
+)
+
+
+_TOOLBOX_7 = create_variable_definition_from_base(
+    type='toolbox_7',
+    # Big enough to fit a soccer ball inside
+    size_multiplier_list=[5, 6, 7],
+    chosen_material_list=[ChosenMaterial.METAL, ChosenMaterial.PLASTIC]
+)
+
+
+_TOOLBOX_8 = create_variable_definition_from_base(
+    type='toolbox_8',
+    # Big enough to fit a soccer ball inside
+    size_multiplier_list=[5, 6, 7],
     chosen_material_list=[ChosenMaterial.METAL, ChosenMaterial.PLASTIC]
 )
 
@@ -2104,7 +2398,16 @@ _PICKUPABLES = [
 
 _NOT_PICKUPABLES = [
     # Arbitrary division: antique furniture
-    [_ANTIQUE_ARMCHAIR_1, _ANTIQUE_CHAIR_1, _ANTIQUE_SOFA_1, _ANTIQUE_TABLE_1],
+    [
+        _ANTIQUE_ARMCHAIR_1,
+        _ANTIQUE_ARMCHAIR_2,
+        _ANTIQUE_ARMCHAIR_3,
+        _ANTIQUE_CHAIR_1,
+        _ANTIQUE_CHAIR_2,
+        _ANTIQUE_CHAIR_3,
+        _ANTIQUE_SOFA_1,
+        _ANTIQUE_TABLE_1
+    ],
     # Arbitrary division: bed occluders
     [
         _BED_1_OCCLUDER,
@@ -2114,10 +2417,12 @@ _NOT_PICKUPABLES = [
         _BED_7_OCCLUDER,
         _BED_8_OCCLUDER,
         _BED_9_OCCLUDER,
-        _BED_10_OCCLUDER
+        _BED_10_OCCLUDER,
+        _BED_11_OCCLUDER,
+        _BED_12_OCCLUDER
     ],
     # Arbitrary division: shelf occluders
-    [_BOOKCASE, _BOOKCASE_SIDELESS],
+    [_BOOKCASE, _BOOKCASE_DOUBLE, _BOOKCASE_SIDELESS],
     # Arbitrary division: shelf obstacles
     [_SHELF_1_CUBBY, _SHELF_2_TABLE_SQUARE, _SHELF_2_TABLE_RECT],
     # Arbitrary division: chairs
@@ -2135,7 +2440,9 @@ _NOT_PICKUPABLES = [
         _CHAIR_11,
         _CHAIR_12_PLASTIC,
         _CHAIR_13,
-        _CHAIR_14
+        _CHAIR_14,
+        _CHAIR_15,
+        _CHAIR_16
     ] * 2,
     # Arbitrary division: desks
     [_DESK_1, _DESK_2, _DESK_3, _DESK_4],
@@ -2150,6 +2457,8 @@ _NOT_PICKUPABLES = [
         _SOFA_7,
         _SOFA_8,
         _SOFA_9,
+        _SOFA_11,
+        _SOFA_12,
         _SOFA_BABY_SCALED
     ],
     # Arbitrary division: sofa chairs
@@ -2175,6 +2484,7 @@ _NOT_PICKUPABLES = [
         _TABLE_17_RECT,
         _TABLE_18_RECT,
         _TABLE_19_RECT,
+        _TABLE_21_RECT,
         _TABLE_26_SQUARE
     ],
     # Arbitrary division: (semi)circular obstacle tables
@@ -2185,7 +2495,10 @@ _NOT_PICKUPABLES = [
         _TABLE_13_SMALL_CIRCLE,
         _TABLE_16_CIRCLE,
         _TABLE_20_CIRCLE,
-        _TABLE_27_CIRCLE_PLASTIC
+        _TABLE_22_OVAL,
+        _TABLE_25_CIRCLE,
+        _TABLE_27_CIRCLE_PLASTIC,
+        _TABLE_28_CIRCLE_WOOD
     ],
     # Arbitrary division: occluder tables
     [_TABLE_5_RECT_ACCESSIBLE, _TABLE_11_T_LEGS, _TABLE_12_X_LEGS],
@@ -2199,14 +2512,16 @@ _NOT_PICKUPABLES = [
         _CRIB,
         _TV
     ],
-    # Eval 5 novel obstacles and occluders.
-    [_ANTIQUE_ARMCHAIR_2, _ANTIQUE_ARMCHAIR_3],
-    [_ANTIQUE_CHAIR_2, _ANTIQUE_CHAIR_3],
-    [_BED_11_OCCLUDER, _BED_12_OCCLUDER],
-    [_CHAIR_15, _CHAIR_16],
-    [_BOOKCASE_DOUBLE],
-    [_SOFA_11, _SOFA_12],
-    [_TABLE_21_RECT, _TABLE_22_OVAL, _TABLE_25_CIRCLE, _TABLE_28_CIRCLE_WOOD]
+    # Eval 7 novel obstacles.
+    [_CHAIR_17, _CHAIR_18, _FOLDING_CHAIR, _HIGH_CHAIR],
+    [_DESK_7_OBSTACLE, _DESK_8_OBSTACLE, _DESK_9_OBSTACLE, _DESK_10_OBSTACLE],
+    [_TABLE_23_RECT, _TABLE_24_RECT],
+    # Eval 7 novel occluders.
+    [_BED_13_OCCLUDER, _BED_14_OCCLUDER, _BED_15_OCCLUDER, _BED_16_OCCLUDER],
+    [_BOOKCASE_DUPLEX],
+    [_DESK_5, _DESK_6],
+    [_SOFA_10],
+    [_SOFA_CHAIR_10],
     # Don't use containers here as possible occluders or context objects
 ]
 
@@ -2223,19 +2538,21 @@ _CONTAINERS_CHESTS = [
     _CHEST_9_TRAPEZOID_LID
 ]
 _CONTAINERS_OPENABLE = [
-    [_BARREL_1, _BARREL_2],
-    [_CRATE_1, _CRATE_2],
-    [_MILITARY_CASE_1, _MILITARY_CASE_2],
-    # Twice as likely to randomly choose one of these lists.
-    [_CASE_1_SUITCASE, _CASE_2, _CASE_3, _CASE_4, _CASE_5] * 2,
-    [_TOOLBOX_1, _TOOLBOX_2, _TOOLBOX_3, _TOOLBOX_4] * 2,
-    _CONTAINERS_CHESTS * 2,
-    # Eval 6 novel containers.
-    [_BARREL_3, _BARREL_4],
-    [_CASE_6, _CASE_7],
-    [_CRATE_3, _CRATE_4],
-    [_MILITARY_CASE_1, _MILITARY_CASE_2],
-    [_TOOLBOX_5, _TOOLBOX_6]
+    [
+        _BARREL_1, _BARREL_2, _BARREL_3, _BARREL_4,
+        _CRATE_1, _CRATE_2, _CRATE_3, _CRATE_4
+    ],
+    [_MILITARY_CASE_1, _MILITARY_CASE_2, _MILITARY_CASE_3, _MILITARY_CASE_4],
+    [_CASE_1_SUITCASE, _CASE_2, _CASE_3, _CASE_4, _CASE_5, _CASE_6, _CASE_7],
+    [_TOOLBOX_1, _TOOLBOX_2, _TOOLBOX_3, _TOOLBOX_4, _TOOLBOX_5, _TOOLBOX_6],
+    _CONTAINERS_CHESTS,
+    # Eval 7 novel containers.
+    [_CASE_8, _CASE_9],
+    [_CHEST_10, _CHEST_11],
+    [_CIRCULAR_CONTAINER, _HAMPER],
+    [_CRATE_5, _CRATE_6],
+    [_MILITARY_CASE_5, _MILITARY_CASE_6],
+    [_TOOLBOX_7, _TOOLBOX_8]
 ]
 
 

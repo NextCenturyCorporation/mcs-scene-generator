@@ -94,6 +94,7 @@ TOOL_TYPES = SimpleNamespace(
     INACCESSIBLE_MISALIGNED="inaccessible_misaligned",
     ISOSCELES="isosceles",
     NO_TOOL="no_tool",
+    SECONDARY="secondary",
     SMALL="small",
     RECT="rectangular",
     TOO_BIG="too_big"
@@ -110,6 +111,13 @@ def get_tool_shape(
     """Returns the tool shape (object type) matching the given arguments, or
     None if no such tool shape exists. Both tool_length and/or tool_width can
     be None to randomly choose from any matching tool shapes."""
+    if tool_category == TOOL_TYPES.SECONDARY:
+        options = [
+            "tool_rect_0_50_x_3_00",
+            "tool_rect_0_75_x_3_00",
+            "tool_rect_1_00_x_3_00"
+        ]
+        return random.choice(options)
     if tool_category == TOOL_TYPES.NO_TOOL:
         return None
     if tool_category in [TOOL_TYPES.SMALL, TOOL_TYPES.BROKEN]:

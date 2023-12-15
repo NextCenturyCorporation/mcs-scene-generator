@@ -61,7 +61,7 @@ def test_CollisionsHypercube_default_scene_move_across():
     )
     assert hypercube.is_move_across()
     goal_template = hypercubes.initialize_goal(create_goal_template(
-        tags.SCENE.COLLISIONS
+        tags.TASKS.COLLISIONS
     ))
     scene = hypercube._create_default_scene(STARTER_SCENE, goal_template)
     verify_scene(scene, hypercube.is_move_across())
@@ -229,7 +229,7 @@ def test_ObjectPermanenceHypercube_default_scene_fall_down():
     )
     assert hypercube.is_fall_down()
     goal_template = hypercubes.initialize_goal(create_goal_template(
-        tags.SCENE.OBJECT_PERMANENCE
+        tags.TASKS.OBJECT_PERMANENCE
     ))
     scene = hypercube._create_default_scene(STARTER_SCENE, goal_template)
     verify_scene(scene, hypercube.is_move_across())
@@ -270,7 +270,7 @@ def test_ShapeConstancyHypercube_default_scene_fall_down():
     )
     assert hypercube.is_fall_down()
     goal_template = hypercubes.initialize_goal(create_goal_template(
-        tags.SCENE.SHAPE_CONSTANCY
+        tags.TASKS.SHAPE_CONSTANCY
     ))
     scene = hypercube._create_default_scene(STARTER_SCENE, goal_template)
     verify_scene(scene, hypercube.is_move_across())
@@ -314,7 +314,7 @@ def test_SpatioTemporalContinuityHypercube_default_scene_move_across():
     )
     assert hypercube.is_move_across()
     goal_template = hypercubes.initialize_goal(create_goal_template(
-        tags.SCENE.SPATIO_TEMPORAL_CONTINUITY
+        tags.TASKS.SPATIO_TEMPORAL_CONTINUITY
     ))
     scene = hypercube._create_default_scene(STARTER_SCENE, goal_template)
     verify_scene(scene, hypercube.is_move_across())
@@ -380,7 +380,7 @@ def test_GravitySupportHypercube_default_scene_fall_down():
     )
     assert hypercube.is_fall_down()
     goal_template = hypercubes.initialize_goal(create_goal_template(
-        tags.SCENE.GRAVITY_SUPPORT
+        tags.TASKS.GRAVITY_SUPPORT
     ))
     scene = hypercube._create_default_scene(STARTER_SCENE, goal_template)
     verify_scene(scene, hypercube.is_move_across(), last_step=100)
@@ -1263,7 +1263,7 @@ def test_ObjectPermanenceHypercubeEval4_default_scene_move_across():
     )
     assert hypercube.is_move_across()
     goal_template = hypercubes.initialize_goal(create_goal_template(
-        tags.SCENE.OBJECT_PERMANENCE
+        tags.TASKS.OBJECT_PERMANENCE
     ))
     scene = hypercube._create_default_scene(STARTER_SCENE, goal_template)
     verify_scene(scene, hypercube.is_move_across(), last_step=240)
@@ -1388,7 +1388,7 @@ def test_SpatioTemporalContinuityHypercubeEval4_default_scene_move_across():
     )
     assert hypercube.is_move_across()
     goal_template = hypercubes.initialize_goal(create_goal_template(
-        tags.SCENE.SPATIO_TEMPORAL_CONTINUITY
+        tags.TASKS.SPATIO_TEMPORAL_CONTINUITY
     ))
     scene = hypercube._create_default_scene(STARTER_SCENE, goal_template)
     verify_scene(scene, hypercube.is_move_across())

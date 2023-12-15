@@ -1,5 +1,8 @@
 import random
 from dataclasses import dataclass
+from typing import List
+
+from machine_common_sense.config_manager import Vector2dInt
 
 DEFAULT_LAVA_SEPARATION_FROM_WALL = 3
 # Max lava width should be 6 for rect tools, 3 for hooked.
@@ -34,6 +37,89 @@ class LavaIslandSizes():
     rear: int = 0  # negative z axis
     left: int = 0  # negative x axis
     right: int = 0  # positive x axis
+
+
+def create_square_lava_pool_points(
+    point_1: Vector2dInt,
+    point_2: Vector2dInt,
+    cells_to_ignore: List[Vector2dInt] = []
+) -> List[Vector2dInt]:
+    '''
+    Create square pool but works with points
+    '''
+
+    lava_squares = create_square_lava_pool(point_1, point_2, cells_to_ignore)
+    if type(lava_squares) is Exception:
+        new_point_1 = Vector2dInt(
+            x=min(point_1.x, point_2.x),
+            z=min(point_1.z, point_2.z)
+        )
+        new_point_2 = Vector2dInt(
+            x=max(point_1.x, point_2.x),
+            z=max(point_1.z, point_2.z)
+        )
+        lava_squares = create_square_lava_pool(
+            new_point_1, new_point_2, cells_to_ignore)
+
+    return lava_squares
+
+
+def create_square_lava_pool(
+    rear_left_corner: Vector2dInt,
+    front_right_corner: Vector2dInt,
+    cells_to_ignore: List[Vector2dInt] = []
+) -> List[Vector2dInt]:
+    """
+    Create a square of lava that is includes the corners. cells_to_ignore
+    should be an array of Vector2dInt
+    """
+    lava_squares = []
+
+    if (rear_left_corner.x > front_right_corner.x):
+        return Exception("The right side is further left than the left side.")
+    if (rear_left_corner.z > front_right_corner.z):
+        return Exception(
+            "The rear side is further forward than the front side.")
+
+    x_pos = rear_left_corner.x
+    z_pos = rear_left_corner.z
+
+    while x_pos <= front_right_corner.x:
+        while z_pos <= front_right_corner.z:
+            lava_squares.append(Vector2dInt(x=x_pos, z=z_pos))
+            z_pos = z_pos + 1
+        z_pos = rear_left_corner.z
+        x_pos = x_pos + 1
+
+    for ele in cells_to_ignore:
+        lava_squares.remove(Vector2dInt(x=ele.x, z=ele.z))
+
+    return lava_squares
+
+
+def create_L_lava_pool(
+    point1: Vector2dInt,
+    middle_point: Vector2dInt,
+    point2: Vector2dInt
+) -> List[Vector2dInt]:
+    lava_squares = []
+    lava_squares2 = []
+
+    lava_squares = create_square_lava_pool(point1, middle_point)
+    if type(lava_squares) is Exception:
+        lava_squares = create_square_lava_pool(middle_point, point1)
+
+    lava_squares2 = create_square_lava_pool(point2, middle_point)
+    if type(lava_squares2) is Exception:
+        lava_squares2 = create_square_lava_pool(middle_point, point2)
+
+    for ele in lava_squares2:
+        # Skip the extra middle cell
+        if ele.x == middle_point.x and ele.z == middle_point.z:
+            continue
+        lava_squares.append(ele)
+
+    return lava_squares
 
 
 def random_lava_island(dim_x, dim_z):

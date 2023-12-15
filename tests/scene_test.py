@@ -129,6 +129,7 @@ def test_to_dict():
             "metadata": {}},
         "holes": [],
         "isometric": False,
+        "isometricFrontRight": False,
         "lava": [],
         "name": "",
         "objects": [],
@@ -171,6 +172,7 @@ def test_to_dict():
             "z": 4
         }],
         "isometric": False,
+        "isometricFrontRight": False,
         "lava": [{
             "x": 0,
             "z": -1

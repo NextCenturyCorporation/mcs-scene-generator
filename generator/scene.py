@@ -22,6 +22,7 @@ scene_aliases = {
     "floor_properties": "floorProperties",
     "floor_textures": "floorTextures",
     "intuitive_physics": "intuitivePhysics",
+    "isometric_front_right": "isometricFrontRight",
     "partition_floor": "partitionFloor",
     "performer_start": "performerStart",
     "restrict_open_doors": "restrictOpenDoors",
@@ -54,6 +55,7 @@ class Scene:
     holes: List[Vector2dInt] = field(default_factory=list)
     intuitive_physics: bool = False
     isometric: bool = False
+    isometric_front_right: bool = False
     lava: List[Vector2dInt] = field(default_factory=list)
     name: str = ""
     objects: List[SceneObject] = field(default_factory=list)

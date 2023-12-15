@@ -22,20 +22,24 @@ AGENT_DIMENSIONS = {'x': 0.5 * AGENT_SCALE,
                     'z': 0.5 * AGENT_SCALE}
 
 # TODO MCS-1591 Update novel agent types
-NOVEL_AGENTS_FEMALE = ['agent_female_05', 'agent_female_06']
-NOVEL_AGENTS_MALE = ['agent_male_07', 'agent_male_08']
+NOVEL_AGENTS_FEMALE = ['agent_female_07', 'agent_female_08']
+NOVEL_AGENTS_MALE = ['agent_male_05', 'agent_male_06']
 NOVEL_AGENTS = NOVEL_AGENTS_FEMALE + NOVEL_AGENTS_MALE
 FAMILIAR_AGENTS_FEMALE = [
     'agent_female_01',
     'agent_female_02',
     'agent_female_03',
-    'agent_female_04'
+    'agent_female_04',
+    'agent_female_05',
+    'agent_female_06'
 ]
 FAMILIAR_AGENTS_MALE = [
     'agent_male_01',
     'agent_male_02',
     'agent_male_03',
-    'agent_male_04'
+    'agent_male_04',
+    'agent_male_07',
+    'agent_male_08'
 ]
 FAMILIAR_AGENTS = FAMILIAR_AGENTS_FEMALE + FAMILIAR_AGENTS_MALE
 AGENT_TYPES = FAMILIAR_AGENTS + NOVEL_AGENTS
@@ -89,18 +93,32 @@ class BlobInfo():
         if self.standing_y is None:
             self.standing_y = self.dimensions.y / 2.0
 
+# OG blobs just commented out in case we need them later.
+# BLOB_SHAPES = {
+#     'blob_01': BlobInfo(Vector3d(x=0.26, y=0.8, z=0.36)),
+#     'blob_02': BlobInfo(Vector3d(x=0.33, y=0.78, z=0.33)),
+#     'blob_03': BlobInfo(Vector3d(x=0.25, y=0.69, z=0.25)),
+#     'blob_04': BlobInfo(Vector3d(x=0.3, y=0.53, z=0.3), standing_y=0.225),
+#     'blob_05': BlobInfo(Vector3d(x=0.38, y=0.56, z=0.38), standing_y=0.24),
+#     'blob_06': BlobInfo(Vector3d(x=0.52, y=0.5, z=0.54)),
+#     'blob_07': BlobInfo(Vector3d(x=0.25, y=0.55, z=0.25), standing_y=0.245),
+#     'blob_08': BlobInfo(Vector3d(x=0.27, y=0.62, z=0.15)),
+#     'blob_09': BlobInfo(Vector3d(x=0.33, y=0.78, z=0.44)),
+#     'blob_10': BlobInfo(Vector3d(x=0.24, y=0.5, z=0.2))
+# }
+
 
 BLOB_SHAPES = {
-    'blob_01': BlobInfo(Vector3d(x=0.26, y=0.8, z=0.36)),
-    'blob_02': BlobInfo(Vector3d(x=0.33, y=0.78, z=0.33)),
-    'blob_03': BlobInfo(Vector3d(x=0.25, y=0.69, z=0.25)),
-    'blob_04': BlobInfo(Vector3d(x=0.3, y=0.53, z=0.3), standing_y=0.225),
-    'blob_05': BlobInfo(Vector3d(x=0.38, y=0.56, z=0.38), standing_y=0.24),
-    'blob_06': BlobInfo(Vector3d(x=0.52, y=0.5, z=0.54)),
-    'blob_07': BlobInfo(Vector3d(x=0.25, y=0.55, z=0.25), standing_y=0.245),
-    'blob_08': BlobInfo(Vector3d(x=0.27, y=0.62, z=0.15)),
-    'blob_09': BlobInfo(Vector3d(x=0.33, y=0.78, z=0.44)),
-    'blob_10': BlobInfo(Vector3d(x=0.24, y=0.5, z=0.2))
+    'blob_13': BlobInfo(Vector3d(x=0.32, y=0.71, z=0.3), standing_y=0.3704),
+    'blob_14': BlobInfo(Vector3d(x=0.52, y=0.55, z=0.3), standing_y=0.4192),
+    'blob_15': BlobInfo(Vector3d(x=0.32, y=0.41, z=0.58), standing_y=0.1724),
+    'blob_16': BlobInfo(Vector3d(x=0.46, y=0.52, z=0.54), standing_y=0.2702),
+    'blob_17': BlobInfo(Vector3d(x=0.32, y=0.78, z=0.41), standing_y=0.3848),
+    'blob_18': BlobInfo(Vector3d(x=0.32, y=0.79, z=0.39), standing_y=0.3692),
+    'blob_19': BlobInfo(Vector3d(x=0.39, y=0.8, z=0.39), standing_y=0.4520),
+    'blob_20': BlobInfo(Vector3d(x=0.21, y=0.61, z=0.27), standing_y=0.2620),
+    'blob_21': BlobInfo(Vector3d(x=0.21, y=0.72, z=0.36), standing_y=0.2650),
+    'blob_22': BlobInfo(Vector3d(x=0.19, y=0.73, z=0.37), standing_y=0.2650)
 }
 
 BLOB_TEMPLATE = {
@@ -418,6 +436,13 @@ class SkinTone(Enum):
     MEDIUM_DARK = 1
     DARK = 2
     DARKEST = 3
+
+
+def get_lightest_skin(agent_type: str) -> int:
+    """Returns the lightest skin index for the given agent type."""
+    # The adult female models have skin material options with makeup.
+    female_adult = (get_agent_group(agent_type) == AgentGroup.FEMALE_ADULT)
+    return 12 if female_adult else 4
 
 
 def get_skin_tone(agent_type: str, skin: int) -> SkinTone:
@@ -795,11 +820,12 @@ def add_agent_movement(
 def add_agent_rotate_then_point(
         agent: SceneObject,
         step_begin: int,
-        target_object: SceneObject
+        target_object: SceneObject,
+        add_final_rotation=0
 ) -> None:
     actions = agent.get('actions', [])
     _check_steps(actions, step_begin, None, True)
-    agent_angle = agent['shows'][0]['rotation']['y']
+    agent_angle = agent['shows'][0]['rotation']['y'] + add_final_rotation
 
     object_position = target_object['shows'][0]['position']
     if ('moveToPosition' in target_object['debug']):
@@ -820,15 +846,16 @@ def add_agent_rotate_then_point(
         step_end = step_begin + steps - 1
         pointing_step_begin = step_end + 1
 
-        agent['rotates'] = [{
-            'stepBegin': step_begin,
-            'stepEnd': step_end,
-            'vector': {
-                'x': 0,
-                'y': step_size,
-                'z': 0
-            }
-        }]
+        agent['rotates'] = (agent['rotates'] if 'rotates' in agent else []) + \
+            [{
+                'stepBegin': step_begin,
+                'stepEnd': step_end,
+                'vector': {
+                    'x': 0,
+                    'y': step_size,
+                    'z': 0
+                }
+            }]
 
     add_agent_pointing(agent, pointing_step_begin, set_pointing_angle(
         agent['shows'][0]['position']['y'],

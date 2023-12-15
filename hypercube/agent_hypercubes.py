@@ -24,11 +24,13 @@ class AgentHypercube(Hypercube):
         role_to_type: Dict[str, str],
         training=False,
         untrained=False,
+        toggle=False,
         occluder_mode=None
     ) -> None:
         self._filename_prefix = filename_prefix
         self._role_to_type = role_to_type
         self._untrained = untrained
+        self._toggle = toggle
         self._occluder_mode = occluder_mode
         super().__init__(
             task_type,
@@ -82,6 +84,7 @@ class AgentHypercube(Hypercube):
             self._filename_prefix,
             self._role_to_type,
             self._untrained,
+            toggle=self._toggle,
             occluder_mode=self._occluder_mode
         )
 
@@ -124,6 +127,7 @@ class AgentHypercubeFactory(HypercubeFactory):
         self._folder_name = folder_name
         self._task_type = task_type
         self._untrained = False
+        self._toggle = 0
         self._occluder_mode = OccluderMode.NONE
 
     # Override
@@ -136,6 +140,8 @@ class AgentHypercubeFactory(HypercubeFactory):
             self.training,
             # Must use only untrained shapes in 50% of scenes.
             untrained=self._untrained,
+            # Toggle to vary the room setup every 2 scenes in some tasks.
+            toggle=(self._toggle % 4 in [0, 1]),
             # For the agent/non-agent scenes.
             occluder_mode=self._occluder_mode
         )
@@ -206,6 +212,9 @@ class AgentHypercubeFactory(HypercubeFactory):
             hypercubes.append(hypercube)
             # Every other scene pair should have untrained objects.
             self._untrained = (not self._untrained)
+            # Half of the scene pairs for some tasks will have a different
+            # room setup.
+            self._toggle = int(self._toggle + 1)
             if count % 100 == 0:
                 logger.info(
                     f'Finished initialization of {count} / '
@@ -236,7 +245,7 @@ class InstrumentalActionTrainingHypercubeFactory(AgentHypercubeFactory):
         super().__init__(
             'AgentInstrumentalActionTraining',
             'agents_background_instrumental_action',
-            tags.TYPES.AGENT_BACKGROUND_INSTRUMENTAL_ACTION,
+            tags.TASKS.AGENT_BACKGROUND_INSTRUMENTAL_ACTION,
             training=True
         )
 
@@ -246,7 +255,7 @@ class MultipleAgentsTrainingHypercubeFactory(AgentHypercubeFactory):
         super().__init__(
             'AgentMultipleAgentsTraining',
             'agents_background_multiple_agents',
-            tags.TYPES.AGENT_BACKGROUND_MULTIPLE_AGENTS,
+            tags.TASKS.AGENT_BACKGROUND_MULTIPLE_AGENTS,
             training=True
         )
 
@@ -256,7 +265,7 @@ class ObjectPreferenceTrainingHypercubeFactory(AgentHypercubeFactory):
         super().__init__(
             'AgentObjectPreferenceTraining',
             'agents_background_object_preference',
-            tags.TYPES.AGENT_BACKGROUND_OBJECT_PREFERENCE,
+            tags.TASKS.AGENT_BACKGROUND_OBJECT_PREFERENCE,
             training=True
         )
 
@@ -266,7 +275,7 @@ class SingleObjectTrainingHypercubeFactory(AgentHypercubeFactory):
         super().__init__(
             'AgentSingleObjectTraining',
             'agents_background_single_object',
-            tags.TYPES.AGENT_BACKGROUND_SINGLE_OBJECT,
+            tags.TASKS.AGENT_BACKGROUND_SINGLE_OBJECT,
             training=True
         )
 
@@ -278,7 +287,7 @@ class EfficientActionIrrationalEvaluationHypercubeFactory(
         super().__init__(
             'AgentEfficientActionIrrational',
             'agents_evaluation_efficient_action_irrational',
-            tags.TYPES.AGENT_EVALUATION_EFFICIENT_IRRATIONAL,
+            tags.TASKS.AGENT_EVALUATION_EFFICIENT_IRRATIONAL,
             training=False
         )
 
@@ -288,7 +297,7 @@ class EfficientActionPathEvaluationHypercubeFactory(AgentHypercubeFactory):
         super().__init__(
             'AgentEfficientActionPath',
             'agents_evaluation_efficient_action_path',
-            tags.TYPES.AGENT_EVALUATION_EFFICIENT_PATH,
+            tags.TASKS.AGENT_EVALUATION_EFFICIENT_PATH,
             training=False
         )
 
@@ -298,9 +307,20 @@ class EfficientActionTimeEvaluationHypercubeFactory(AgentHypercubeFactory):
         super().__init__(
             'AgentEfficientActionTime',
             'agents_evaluation_efficient_action_time',
-            tags.TYPES.AGENT_EVALUATION_EFFICIENT_TIME,
+            tags.TASKS.AGENT_EVALUATION_EFFICIENT_TIME,
             training=False
         )
+
+
+class HelperHindererEvaluationHypercubeFactory(AgentHypercubeFactory):
+    def __init__(self) -> None:
+        super().__init__(
+            'AgentHelperHinderer',
+            'agents_evaluation_helper_hinderer',
+            tags.TASKS.AGENT_EVALUATION_HELPER_HINDERER,
+            training=False
+        )
+        self._occluder_mode = OccluderMode.HELPER_HINDERER
 
 
 class InaccessibleGoalEvaluationHypercubeFactory(AgentHypercubeFactory):
@@ -308,7 +328,7 @@ class InaccessibleGoalEvaluationHypercubeFactory(AgentHypercubeFactory):
         super().__init__(
             'AgentInaccessibleGoal',
             'agents_evaluation_inaccessible_goal',
-            tags.TYPES.AGENT_EVALUATION_INACCESSIBLE_GOAL,
+            tags.TASKS.AGENT_EVALUATION_INACCESSIBLE_GOAL,
             training=False
         )
 
@@ -320,7 +340,7 @@ class InstrumentalActionBlockingBarriersEvaluationHypercubeFactory(
         super().__init__(
             'AgentInstrumentalActionBlockingBarriers',
             'agents_evaluation_instrumental_action_blocking_barriers',
-            tags.TYPES.AGENT_EVALUATION_INSTRUMENTAL_BLOCKING_BARRIERS,
+            tags.TASKS.AGENT_EVALUATION_INSTRUMENTAL_BLOCKING_BARRIERS,
             training=False
         )
 
@@ -332,7 +352,7 @@ class InstrumentalActionInconsequentialBarriersEvaluationHypercubeFactory(
         super().__init__(
             'AgentInstrumentalActionInconsequentialBarriers',
             'agents_evaluation_instrumental_action_inconsequential_barriers',
-            tags.TYPES.AGENT_EVALUATION_INSTRUMENTAL_INCONSEQUENTIAL_BARRIERS,
+            tags.TASKS.AGENT_EVALUATION_INSTRUMENTAL_INCONSEQUENTIAL_BARRIERS,
             training=False
         )
 
@@ -344,7 +364,7 @@ class InstrumentalActionNoBarriersEvaluationHypercubeFactory(
         super().__init__(
             'AgentInstrumentalActionNoBarriers',
             'agents_evaluation_instrumental_action_no_barriers',
-            tags.TYPES.AGENT_EVALUATION_INSTRUMENTAL_NO_BARRIERS,
+            tags.TASKS.AGENT_EVALUATION_INSTRUMENTAL_NO_BARRIERS,
             training=False
         )
 
@@ -354,7 +374,7 @@ class MultipleAgentsEvaluationHypercubeFactory(AgentHypercubeFactory):
         super().__init__(
             'AgentMultipleAgents',
             'agents_evaluation_multiple_agents',
-            tags.TYPES.AGENT_EVALUATION_MULTIPLE_AGENTS,
+            tags.TASKS.AGENT_EVALUATION_MULTIPLE_AGENTS,
             training=False
         )
 
@@ -364,9 +384,20 @@ class ObjectPreferenceEvaluationHypercubeFactory(AgentHypercubeFactory):
         super().__init__(
             'AgentObjectPreference',
             'agents_evaluation_object_preference',
-            tags.TYPES.AGENT_EVALUATION_OBJECT_PREFERENCE,
+            tags.TASKS.AGENT_EVALUATION_OBJECT_PREFERENCE,
             training=False
         )
+
+
+class TrueFalseBeliefEvaluationHypercubeFactory(AgentHypercubeFactory):
+    def __init__(self) -> None:
+        super().__init__(
+            'AgentTrueFalseBelief',
+            'agents_evaluation_true_false_belief',
+            tags.TASKS.AGENT_EVALUATION_TRUE_FALSE_BELIEF,
+            training=False
+        )
+        self._occluder_mode = OccluderMode.TRUE_FALSE_BELIEF
 
 
 class ExamplesTrainingHypercubeFactory(AgentHypercubeFactory):
@@ -374,7 +405,7 @@ class ExamplesTrainingHypercubeFactory(AgentHypercubeFactory):
         super().__init__(
             'AgentExamplesTraining',
             'agents_examples',
-            tags.TYPES.AGENT_EXAMPLE,
+            tags.TASKS.AGENT_EXAMPLE,
             training=True
         )
 
@@ -384,7 +415,7 @@ class ExamplesEvaluationHypercubeFactory(AgentHypercubeFactory):
         super().__init__(
             'AgentExamples',
             'agents_examples',
-            tags.TYPES.AGENT_EXAMPLE,
+            tags.TASKS.AGENT_EXAMPLE,
             training=False
         )
 
@@ -394,10 +425,10 @@ class AgentOneGoalTrainingHypercubeFactory(AgentHypercubeFactory):
         super().__init__(
             'AgentOneGoal',
             'agents_background_agent_one_goal',
-            tags.TYPES.AGENT_BACKGROUND_AGENT_ONE_GOAL,
+            tags.TASKS.AGENT_BACKGROUND_AGENT_ONE_GOAL,
             training=True
         )
-        self._occluder_mode = OccluderMode.TRAINING
+        self._occluder_mode = OccluderMode.NONAGENT_TRAINING
 
 
 class AgentPreferenceTrainingHypercubeFactory(AgentHypercubeFactory):
@@ -405,10 +436,10 @@ class AgentPreferenceTrainingHypercubeFactory(AgentHypercubeFactory):
         super().__init__(
             'AgentPreference',
             'agents_background_agent_preference',
-            tags.TYPES.AGENT_BACKGROUND_AGENT_PREFERENCE,
+            tags.TASKS.AGENT_BACKGROUND_AGENT_PREFERENCE,
             training=True
         )
-        self._occluder_mode = OccluderMode.TRAINING
+        self._occluder_mode = OccluderMode.NONAGENT_TRAINING
 
 
 class CollectTrainingHypercubeFactory(AgentHypercubeFactory):
@@ -416,9 +447,20 @@ class CollectTrainingHypercubeFactory(AgentHypercubeFactory):
         super().__init__(
             'AgentCollect',
             'agents_background_collect',
-            tags.TYPES.AGENT_BACKGROUND_COLLECT,
+            tags.TASKS.AGENT_BACKGROUND_COLLECT,
             training=True
         )
+
+
+class HelperHindererTrainingHypercubeFactory(AgentHypercubeFactory):
+    def __init__(self) -> None:
+        super().__init__(
+            'AgentHelperHindererTraining',
+            'agents_background_helper_hinderer',
+            tags.TASKS.AGENT_BACKGROUND_HELPER_HINDERER,
+            training=True
+        )
+        self._occluder_mode = OccluderMode.HELPER_HINDERER
 
 
 class InstrumentalApproachTrainingHypercubeFactory(AgentHypercubeFactory):
@@ -426,7 +468,7 @@ class InstrumentalApproachTrainingHypercubeFactory(AgentHypercubeFactory):
         super().__init__(
             'AgentInstrumentalApproach',
             'agents_background_instrumental_approach',
-            tags.TYPES.AGENT_BACKGROUND_INSTRUMENTAL_APPROACH,
+            tags.TASKS.AGENT_BACKGROUND_INSTRUMENTAL_APPROACH,
             training=True
         )
 
@@ -436,7 +478,7 @@ class InstrumentalImitationTrainingHypercubeFactory(AgentHypercubeFactory):
         super().__init__(
             'AgentInstrumentalImitation',
             'agents_background_instrumental_imitation',
-            tags.TYPES.AGENT_BACKGROUND_INSTRUMENTAL_IMITATION,
+            tags.TASKS.AGENT_BACKGROUND_INSTRUMENTAL_IMITATION,
             training=True
         )
 
@@ -446,10 +488,10 @@ class NonAgentEvaluationHypercubeFactory(AgentHypercubeFactory):
         super().__init__(
             'AgentNonAgent',
             'agents_evaluation_non_agent',
-            tags.TYPES.AGENT_EVALUATION_AGENT_NON_AGENT,
+            tags.TASKS.AGENT_EVALUATION_AGENT_NON_AGENT,
             training=False
         )
-        self._occluder_mode = OccluderMode.EVAL
+        self._occluder_mode = OccluderMode.NONAGENT_EVAL
 
 
 class NonAgentOneGoalTrainingHypercubeFactory(AgentHypercubeFactory):
@@ -457,10 +499,10 @@ class NonAgentOneGoalTrainingHypercubeFactory(AgentHypercubeFactory):
         super().__init__(
             'AgentNonAgentOneGoal',
             'agents_background_non_agent_one_goal',
-            tags.TYPES.AGENT_BACKGROUND_NON_AGENT_ONE_GOAL,
+            tags.TASKS.AGENT_BACKGROUND_NON_AGENT_ONE_GOAL,
             training=True
         )
-        self._occluder_mode = OccluderMode.TRAINING
+        self._occluder_mode = OccluderMode.NONAGENT_TRAINING
 
 
 class NonAgentPreferenceTrainingHypercubeFactory(AgentHypercubeFactory):
@@ -468,10 +510,10 @@ class NonAgentPreferenceTrainingHypercubeFactory(AgentHypercubeFactory):
         super().__init__(
             'AgentNonAgentPreference',
             'agents_background_non_agent_preference',
-            tags.TYPES.AGENT_BACKGROUND_NON_AGENT_PREFERENCE,
+            tags.TASKS.AGENT_BACKGROUND_NON_AGENT_PREFERENCE,
             training=True
         )
-        self._occluder_mode = OccluderMode.TRAINING
+        self._occluder_mode = OccluderMode.NONAGENT_TRAINING
 
 
 class SocialApproachEvaluationHypercubeFactory(AgentHypercubeFactory):
@@ -479,7 +521,7 @@ class SocialApproachEvaluationHypercubeFactory(AgentHypercubeFactory):
         super().__init__(
             'AgentApproach',
             'agents_evaluation_approach',
-            tags.TYPES.AGENT_EVALUATION_APPROACH,
+            tags.TASKS.AGENT_EVALUATION_APPROACH,
             training=False
         )
 
@@ -489,7 +531,7 @@ class SocialApproachTrainingHypercubeFactory(AgentHypercubeFactory):
         super().__init__(
             'AgentSocialApproach',
             'agents_background_social_approach',
-            tags.TYPES.AGENT_BACKGROUND_SOCIAL_APPROACH,
+            tags.TASKS.AGENT_BACKGROUND_SOCIAL_APPROACH,
             training=True
         )
 
@@ -499,7 +541,7 @@ class SocialImitationEvaluationHypercubeFactory(AgentHypercubeFactory):
         super().__init__(
             'AgentImitation',
             'agents_evaluation_imitation',
-            tags.TYPES.AGENT_EVALUATION_IMITATION,
+            tags.TASKS.AGENT_EVALUATION_IMITATION,
             training=False
         )
 
@@ -509,15 +551,27 @@ class SocialImitationTrainingHypercubeFactory(AgentHypercubeFactory):
         super().__init__(
             'AgentSocialImitation',
             'agents_background_social_imitation',
-            tags.TYPES.AGENT_BACKGROUND_SOCIAL_IMITATION,
+            tags.TASKS.AGENT_BACKGROUND_SOCIAL_IMITATION,
             training=True
         )
+
+
+class TrueFalseBeliefTrainingHypercubeFactory(AgentHypercubeFactory):
+    def __init__(self) -> None:
+        super().__init__(
+            'AgentTrueFalseBeliefTraining',
+            'agents_background_true_false_belief',
+            tags.TASKS.AGENT_BACKGROUND_TRUE_FALSE_BELIEF,
+            training=True
+        )
+        self._occluder_mode = OccluderMode.TRUE_FALSE_BELIEF
 
 
 AGENT_TRAINING_HYPERCUBE_LIST = [
     AgentOneGoalTrainingHypercubeFactory(),
     AgentPreferenceTrainingHypercubeFactory(),
     CollectTrainingHypercubeFactory(),
+    HelperHindererTrainingHypercubeFactory(),
     InstrumentalActionTrainingHypercubeFactory(),
     InstrumentalApproachTrainingHypercubeFactory(),
     InstrumentalImitationTrainingHypercubeFactory(),
@@ -528,6 +582,7 @@ AGENT_TRAINING_HYPERCUBE_LIST = [
     SingleObjectTrainingHypercubeFactory(),
     SocialApproachTrainingHypercubeFactory(),
     SocialImitationTrainingHypercubeFactory(),
+    TrueFalseBeliefTrainingHypercubeFactory(),
     ExamplesTrainingHypercubeFactory()
 ]
 
@@ -536,6 +591,7 @@ AGENT_EVALUATION_HYPERCUBE_LIST = [
     EfficientActionIrrationalEvaluationHypercubeFactory(),
     EfficientActionPathEvaluationHypercubeFactory(),
     EfficientActionTimeEvaluationHypercubeFactory(),
+    HelperHindererEvaluationHypercubeFactory(),
     InaccessibleGoalEvaluationHypercubeFactory(),
     InstrumentalActionBlockingBarriersEvaluationHypercubeFactory(),
     InstrumentalActionInconsequentialBarriersEvaluationHypercubeFactory(),
@@ -545,5 +601,6 @@ AGENT_EVALUATION_HYPERCUBE_LIST = [
     ObjectPreferenceEvaluationHypercubeFactory(),
     SocialApproachEvaluationHypercubeFactory(),
     SocialImitationEvaluationHypercubeFactory(),
+    TrueFalseBeliefEvaluationHypercubeFactory(),
     ExamplesEvaluationHypercubeFactory()
 ]

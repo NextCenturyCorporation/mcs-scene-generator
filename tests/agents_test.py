@@ -181,7 +181,7 @@ def test_add_agent_pointing_fail():
 
 def test_create_blob_simple():
     blob = create_blob(
-        type='blob_02',
+        type='blob_17',
         position_x=1,
         position_z=2,
         rotation_y=0,
@@ -190,24 +190,20 @@ def test_create_blob_simple():
     )
 
     assert blob['id'].startswith('blob')
-    assert blob['type'] == 'blob_02'
+    assert blob['type'] == 'blob_17'
     assert blob['physics'] is True
     assert blob['mass']
     assert blob['materials'] == ['test_material']
     assert blob['debug']['color'] == ['test_color']
-    assert blob['shows'][0]['position'] == {'x': 1, 'y': 0.45, 'z': 2}
+    assert blob['shows'][0]['position'] == {'x': 1, 'y': 0.444, 'z': 2}
     assert blob['shows'][0]['rotation'] == {'x': 0, 'y': 0, 'z': 0}
     assert blob['shows'][0]['scale'] == {'x': 1.1538, 'y': 1.1538, 'z': 1.1538}
-    assert blob['debug']['dimensions'] == {
-        'x': 0.3808,
-        'y': 0.9,
-        'z': 0.3808
-    }
+    assert blob['debug']['dimensions'] == {'x': 0.3692, 'y': 0.9, 'z': 0.4731}
     assert blob['shows'][0]['boundingBox'].box_xz == [
-        Vector3d(x=1.1904, y=0, z=2.1904),
-        Vector3d(x=1.1904, y=0, z=1.8096),
-        Vector3d(x=0.8096, y=0, z=1.8096),
-        Vector3d(x=0.8096, y=0, z=2.1904),
+        Vector3d(x=1.1846, y=0, z=2.23655),
+        Vector3d(x=1.1846, y=0, z=1.76345),
+        Vector3d(x=0.8154, y=0, z=1.76345),
+        Vector3d(x=0.8154, y=0, z=2.23655),
     ]
     assert blob['shows'][0]['boundingBox'].min_y == 0
     assert blob['shows'][0]['boundingBox'].max_y == 0.9
@@ -215,7 +211,7 @@ def test_create_blob_simple():
 
 def test_create_blob_advanced():
     blob = create_blob(
-        type='blob_02',
+        type='blob_17',
         position_x=-1,
         position_z=-2,
         rotation_y=45,
@@ -225,24 +221,20 @@ def test_create_blob_advanced():
     )
 
     assert blob['id'].startswith('blob')
-    assert blob['type'] == 'blob_02'
+    assert blob['type'] == 'blob_17'
     assert blob['physics'] is True
     assert blob['mass']
     assert blob['materials'] == ['test_material']
     assert blob['debug']['color'] == ['test_color']
-    assert blob['shows'][0]['position'] == {'x': -1, 'y': 10.9, 'z': -2}
+    assert blob['shows'][0]['position'] == {'x': -1, 'y': 10.888, 'z': -2}
     assert blob['shows'][0]['rotation'] == {'x': 0, 'y': 45, 'z': 0}
     assert blob['shows'][0]['scale'] == {'x': 2.3077, 'y': 2.3077, 'z': 2.3077}
-    assert blob['debug']['dimensions'] == {
-        'x': 0.7615,
-        'y': 1.8,
-        'z': 0.7615
-    }
+    assert blob['debug']['dimensions'] == {'x': 0.7385, 'y': 1.8, 'z': 0.9462}
     assert blob['shows'][0]['boundingBox'].box_xz == [
-        Vector3d(x=-0.461538, y=0, z=-2.0),
-        Vector3d(x=-1.0, y=0, z=-2.538462),
-        Vector3d(x=-1.538462, y=0, z=-2.0),
-        Vector3d(x=-1.0, y=0, z=-1.461538),
+        Vector3d(x=-0.404369, y=0, z=-1.926567),
+        Vector3d(x=-1.073433, y=0, z=-2.595631),
+        Vector3d(x=-1.595631, y=0, z=-2.073433),
+        Vector3d(x=-0.926567, y=0, z=-1.404369),
     ]
     assert blob['shows'][0]['boundingBox'].min_y == 10
     assert blob['shows'][0]['boundingBox'].max_y == 11.8
@@ -250,7 +242,7 @@ def test_create_blob_advanced():
 
 def test_create_blob_type_with_standing_y():
     blob = create_blob(
-        type='blob_05',
+        type='blob_19',
         position_x=1,
         position_z=2,
         rotation_y=0,
@@ -259,24 +251,24 @@ def test_create_blob_type_with_standing_y():
     )
 
     assert blob['id'].startswith('blob')
-    assert blob['type'] == 'blob_05'
+    assert blob['type'] == 'blob_19'
     assert blob['physics'] is True
     assert blob['mass']
     assert blob['materials'] == ['test_material']
     assert blob['debug']['color'] == ['test_color']
-    assert blob['shows'][0]['position'] == {'x': 1, 'y': 0.3857, 'z': 2}
+    assert blob['shows'][0]['position'] == {'x': 1, 'y': 0.5085, 'z': 2}
     assert blob['shows'][0]['rotation'] == {'x': 0, 'y': 0, 'z': 0}
-    assert blob['shows'][0]['scale'] == {'x': 1.6071, 'y': 1.6071, 'z': 1.6071}
+    assert blob['shows'][0]['scale'] == {'x': 1.125, 'y': 1.125, 'z': 1.125}
     assert blob['debug']['dimensions'] == {
-        'x': 0.6107,
+        'x': 0.4388,
         'y': 0.9,
-        'z': 0.6107
+        'z': 0.4388
     }
     assert blob['shows'][0]['boundingBox'].box_xz == [
-        Vector3d(x=1.30535, y=0, z=2.30535),
-        Vector3d(x=1.30535, y=0, z=1.69465),
-        Vector3d(x=0.69465, y=0, z=1.69465),
-        Vector3d(x=0.69465, y=0, z=2.30535),
+        Vector3d(x=1.2194, y=0, z=2.2194),
+        Vector3d(x=1.2194, y=0, z=1.7806),
+        Vector3d(x=0.7806, y=0, z=1.7806),
+        Vector3d(x=0.7806, y=0, z=2.2194),
     ]
     assert blob['shows'][0]['boundingBox'].min_y == 0
     assert blob['shows'][0]['boundingBox'].max_y == 0.9
@@ -284,7 +276,7 @@ def test_create_blob_type_with_standing_y():
 
 def test_create_blob_with_nose():
     blob = create_blob(
-        type='blob_02',
+        type='blob_17',
         position_x=1,
         position_z=2,
         rotation_y=0,
@@ -294,24 +286,20 @@ def test_create_blob_with_nose():
     )
 
     assert blob['id'].startswith('blob')
-    assert blob['type'] == 'blob_02_nose'
+    assert blob['type'] == 'blob_17_nose'
     assert blob['physics'] is True
     assert blob['mass']
     assert blob['materials'] == ['test_material']
     assert blob['debug']['color'] == ['test_color']
-    assert blob['shows'][0]['position'] == {'x': 1, 'y': 0.45, 'z': 2}
+    assert blob['shows'][0]['position'] == {'x': 1, 'y': 0.444, 'z': 2}
     assert blob['shows'][0]['rotation'] == {'x': 0, 'y': 0, 'z': 0}
     assert blob['shows'][0]['scale'] == {'x': 1.1538, 'y': 1.1538, 'z': 1.1538}
-    assert blob['debug']['dimensions'] == {
-        'x': 0.3808,
-        'y': 0.9,
-        'z': 0.3808
-    }
+    assert blob['debug']['dimensions'] == {'x': 0.3692, 'y': 0.9, 'z': 0.4731}
     assert blob['shows'][0]['boundingBox'].box_xz == [
-        Vector3d(x=1.1904, y=0, z=2.1904),
-        Vector3d(x=1.1904, y=0, z=1.8096),
-        Vector3d(x=0.8096, y=0, z=1.8096),
-        Vector3d(x=0.8096, y=0, z=2.1904),
+        Vector3d(x=1.1846, y=0, z=2.23655),
+        Vector3d(x=1.1846, y=0, z=1.76345),
+        Vector3d(x=0.8154, y=0, z=1.76345),
+        Vector3d(x=0.8154, y=0, z=2.23655),
     ]
     assert blob['shows'][0]['boundingBox'].min_y == 0
     assert blob['shows'][0]['boundingBox'].max_y == 0.9

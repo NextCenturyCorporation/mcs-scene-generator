@@ -24,7 +24,7 @@ SIMILARITY_EXCEPTIONS = [
     'sofa_12', 'sofa_chair_4', 'sofa_chair_5', 'sofa_chair_6', 'sofa_chair_7',
     'sofa_chair_8', 'sofa_chair_9', 'skateboard', 'antique_armchair_1',
     'antique_armchair_2', 'antique_armchair_3', 'antique_chair_2',
-    'antique_chair_3'
+    'antique_chair_3', 'sofa_10', 'sofa_chair_10'
 ]
 
 

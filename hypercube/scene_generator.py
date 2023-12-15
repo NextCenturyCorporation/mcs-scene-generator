@@ -34,18 +34,30 @@ class SceneGenerator():
     def generate_starter_scene(self) -> Dict[str, Any]:
         global STARTER_SCENE
         starter_scene = copy.deepcopy(STARTER_SCENE)
-        excluded = self.excluded_materials
+        excluded = self.excluded_materials.copy()
+
+        dark_colors = ['grey', 'black']
+        dark_room = True
+
         ceiling_material_choice = self._get_material(
             materials.CEILING_MATERIALS)
-        excluded += ceiling_material_choice[0]
-        wall_material_choice = self._get_material(
-            materials.ROOM_WALL_MATERIALS, excluded)
-        excluded += wall_material_choice[0]
+        excluded.append(ceiling_material_choice.material)
+
+        while dark_room:
+            wall_material_choice = self._get_material(
+                materials.ROOM_WALL_MATERIALS, excluded)
+            excluded.append(wall_material_choice.material)
+            floor_material_choice = self._get_material(
+                materials.FLOOR_MATERIALS, excluded)
+            if not (any(map(lambda v: v in wall_material_choice.color, dark_colors)) and any(  # noqa
+                    map(lambda v: v in floor_material_choice.color, dark_colors))):  # noqa
+                dark_room = False
+            else:
+                excluded = excluded[:-1]
+
         starter_scene.ceiling_material = ceiling_material_choice[0]
         starter_scene.wall_material = wall_material_choice[0]
         starter_scene.debug['wallColors'] = wall_material_choice[1]
-        floor_material_choice = self._get_material(
-            materials.FLOOR_MATERIALS, excluded)
         starter_scene.floor_material = floor_material_choice[0]
         starter_scene.debug['floorColors'] = floor_material_choice[1]
         return starter_scene

@@ -79,6 +79,11 @@ python ile.py -c ile_config.yaml -n 10 -p scene
 
 ### Latest Release Notes
 
+#### Release 2.0
+
+Changelog:
+- Added novel objects for Eval 7.
+
 #### Release 1.12
 
 Changelog:

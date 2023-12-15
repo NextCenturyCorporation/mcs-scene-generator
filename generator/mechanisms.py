@@ -121,6 +121,7 @@ CYLINDRICAL_SHAPES = [
     'cylinder', 'double_cone', 'dumbbell_1', 'dumbbell_2',
     'rollable_1', 'rollable_2', 'rollable_3', 'rollable_4',
     'rollable_5', 'rollable_6', 'rollable_7', 'rollable_8',
+    'rollable_9', 'rollable_10', 'rollable_11', 'rollable_12',
     'tie_fighter', 'tube_narrow', 'tube_wide'
 ]
 

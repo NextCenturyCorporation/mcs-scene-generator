@@ -196,6 +196,15 @@ def test_can_contain_both():
 
 def test_containers():
     assert len(CONTAINER_DEFINITIONS) > 0
+    for container_definition in CONTAINER_DEFINITIONS:
+        assert len(container_definition.enclosedAreas)
+        for enclosed_area in container_definition.enclosedAreas:
+            dimensions = enclosed_area['dimensions']
+            position = enclosed_area['position']
+            # The position of the bottom of an object inside the enclosed area
+            # should be greater than half the enclosed area's height so it
+            # includes the base of the container itself.
+            assert (dimensions['y'] / 2.0) < position['y']
 
 
 def test_shift_lid_positions_based_on_movement():

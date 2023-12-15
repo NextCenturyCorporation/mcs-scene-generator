@@ -15,7 +15,6 @@ from hypercube import hypercubes
 from hypercube.agent_scene_pair_json_converter import (
     AGENT_OBJECT_CONFIG_LIST,
     AGENT_OBJECT_MATERIAL_LIST,
-    GOAL_OBJECT_MATERIAL_LIST,
     OBJECT_DIMENSIONS,
     AgentConfig,
     ObjectConfig,
@@ -28,18 +27,20 @@ from hypercube.agent_scene_pair_json_converter import (
     _create_agent_object_list,
     _create_fuse_wall_object_list,
     _create_goal_object_list,
+    _create_helper_hinderer_occluder_object,
     _create_home_object,
     _create_key_object,
     _create_lock_wall_object_list,
+    _create_nonagent_occluder_object,
     _create_object,
-    _create_occluder_object,
     _create_paddle_object,
     _create_scene,
     _create_show,
     _create_static_wall_object_list,
     _create_trial_frame_list,
+    _create_true_false_belief_occluder_list,
     _create_wall_object_list,
-    _fix_key_location,
+    _fix_key_triangle_rotation,
     _identify_trial_index_starting_step,
     _make_true_bounds,
     _move_agent_adjacent_to_goal,
@@ -541,6 +542,7 @@ def verify_static_wall_list_properties(
     wall_object_list,
     hidden_step=-1,
     scale_x=0.5,
+    scale_y=0.125,
     scale_z=0.5
 ):
     for _, wall_object in enumerate(wall_object_list):
@@ -557,7 +559,7 @@ def verify_static_wall_list_properties(
 
         assert len(wall_object['shows']) == 1
         assert wall_object['shows'][0]['scale']['x'] == scale_x
-        assert wall_object['shows'][0]['scale']['y'] == 0.125
+        assert wall_object['shows'][0]['scale']['y'] == scale_y
         assert wall_object['shows'][0]['scale']['z'] == scale_z
 
         if hidden_step >= 0:
@@ -586,46 +588,16 @@ def test_blobs():
 
 
 def test_materials():
-    # Multi-goal scenes must have one or more goal object colors for any
-    # possible combination of agent colors.
-    # Assume such scenes will only ever have one agent.
-    for agent_material in AGENT_OBJECT_MATERIAL_LIST:
-        goal_1_materials = materials.filter_used_colors(
-            GOAL_OBJECT_MATERIAL_LIST,
-            [agent_material]
-        )
-        for goal_1_material in goal_1_materials:
-            goal_2_materials = materials.filter_used_colors(
-                GOAL_OBJECT_MATERIAL_LIST,
-                [agent_material, goal_1_material]
-            )
-            assert len(goal_2_materials) > 1
-            for goal_2_material in goal_2_materials:
-                goal_3_materials = materials.filter_used_colors(
-                    GOAL_OBJECT_MATERIAL_LIST,
-                    [agent_material, goal_1_material, goal_2_material]
-                )
-                assert len(goal_3_materials) >= 1
-
-    # Multi-agent scenes must have one or more goal object colors for any
-    # possible combination of agent colors.
-    # Assume such scenes will only ever have one or two goal objects.
-    for agent_1_material in AGENT_OBJECT_MATERIAL_LIST:
-        agent_2_materials = materials.filter_used_colors(
-            AGENT_OBJECT_MATERIAL_LIST,
-            [agent_1_material]
-        )
-        for agent_2_material in agent_2_materials:
-            goal_1_materials = materials.filter_used_colors(
-                GOAL_OBJECT_MATERIAL_LIST,
-                [agent_1_material, agent_2_material]
-            )
-            for goal_1_material in goal_1_materials:
-                goal_2_materials = materials.filter_used_colors(
-                    GOAL_OBJECT_MATERIAL_LIST,
-                    [agent_1_material, agent_2_material, goal_1_material]
-                )
-                assert len(goal_2_materials) >= 1
+    for agent_materials in AGENT_OBJECT_MATERIAL_LIST:
+        for agent_material in agent_materials:
+            # If new agent materials are added, then remember to update the
+            # goal object materials as well.
+            assert agent_material in [
+                materials.BLUE,
+                materials.GOLDENROD,
+                materials.GREEN,
+                materials.PURPLE
+            ]
 
 
 def test_append_each_show_to_object():
@@ -884,10 +856,10 @@ def test_choose_config_list_with_agent():
         for index, object_type in enumerate(config_object_type_list)
     ]
     material_list = [
-        MaterialTuple('Custom/Materials/Cyan', ['cyan']),
-        MaterialTuple('Custom/Materials/Grey', ['grey']),
-        MaterialTuple('Custom/Materials/Magenta', ['magenta']),
-        MaterialTuple('Custom/Materials/Yellow', ['yellow'])
+        [MaterialTuple('Custom/Materials/Cyan', ['cyan'])],
+        [MaterialTuple('Custom/Materials/Grey', ['grey'])],
+        [MaterialTuple('Custom/Materials/Magenta', ['magenta'])],
+        [MaterialTuple('Custom/Materials/Yellow', ['yellow'])]
     ]
 
     trial_list = [[{
@@ -898,13 +870,13 @@ def test_choose_config_list_with_agent():
         config_list,
         [None, None, None],
         material_list,
-        'agent',
-        [],
-        []
+        'agent'
     )
     assert len(chosen_config_list) == 2
     assert chosen_config_list[0].object_type in config_object_type_list
-    assert chosen_config_list[0].material in material_list
+    assert chosen_config_list[0].material in [
+        material for materials in material_list for material in materials
+    ]
 
 
 def test_choose_config_list_with_agent_in_instrumental_action_task():
@@ -914,10 +886,10 @@ def test_choose_config_list_with_agent_in_instrumental_action_task():
         for index, object_type in enumerate(config_object_type_list)
     ]
     material_list = [
-        MaterialTuple('Custom/Materials/Cyan', ['cyan']),
-        MaterialTuple('Custom/Materials/Grey', ['grey']),
-        MaterialTuple('Custom/Materials/Magenta', ['magenta']),
-        MaterialTuple('Custom/Materials/Yellow', ['yellow'])
+        [MaterialTuple('Custom/Materials/Cyan', ['cyan'])],
+        [MaterialTuple('Custom/Materials/Grey', ['grey'])],
+        [MaterialTuple('Custom/Materials/Magenta', ['magenta'])],
+        [MaterialTuple('Custom/Materials/Yellow', ['yellow'])]
     ]
 
     trial_list = [[{
@@ -929,14 +901,14 @@ def test_choose_config_list_with_agent_in_instrumental_action_task():
         config_list,
         [None, None, None],
         material_list,
-        'agent',
-        [],
-        []
+        'agent'
     )
     assert len(chosen_config_list) == 2
     assert chosen_config_list[0].object_type != 'cone'
     assert chosen_config_list[0].object_type != 'pyramid'
-    assert chosen_config_list[0].material in material_list
+    assert chosen_config_list[0].material in [
+        material for materials in material_list for material in materials
+    ]
 
 
 def test_choose_config_list_with_objects():
@@ -946,10 +918,10 @@ def test_choose_config_list_with_objects():
         for index, object_type in enumerate(config_object_type_list)
     ]
     material_list = [
-        MaterialTuple('Custom/Materials/Cyan', ['cyan']),
-        MaterialTuple('Custom/Materials/Grey', ['grey']),
-        MaterialTuple('Custom/Materials/Magenta', ['magenta']),
-        MaterialTuple('Custom/Materials/Yellow', ['yellow'])
+        [MaterialTuple('Custom/Materials/Cyan', ['cyan'])],
+        [MaterialTuple('Custom/Materials/Grey', ['grey'])],
+        [MaterialTuple('Custom/Materials/Magenta', ['magenta'])],
+        [MaterialTuple('Custom/Materials/Yellow', ['yellow'])]
     ]
 
     trial_list_a = [[{
@@ -960,9 +932,7 @@ def test_choose_config_list_with_objects():
         config_list,
         [None, None],
         material_list,
-        'objects',
-        [],
-        []
+        'objects'
     )
     assert len(chosen_config_list_a) == 2
     assert chosen_config_list_a[0].object_type in config_object_type_list
@@ -971,8 +941,12 @@ def test_choose_config_list_with_objects():
         chosen_config_list_a[0].object_type !=
         chosen_config_list_a[1].object_type
     )
-    assert chosen_config_list_a[0].material in material_list
-    assert chosen_config_list_a[1].material in material_list
+    assert chosen_config_list_a[0].material in [
+        material for materials in material_list for material in materials
+    ]
+    assert chosen_config_list_a[1].material in [
+        material for materials in material_list for material in materials
+    ]
     assert (
         chosen_config_list_a[0].material != chosen_config_list_a[1].material
     )
@@ -985,70 +959,13 @@ def test_choose_config_list_with_objects():
         config_list,
         [None],
         material_list,
-        'objects',
-        [],
-        []
+        'objects'
     )
     assert len(chosen_config_list_b) == 1
     assert chosen_config_list_b[0].object_type in config_object_type_list
-    assert chosen_config_list_b[0].material in material_list
-
-
-def test_choose_config_list_no_types_same_as_used_types():
-    mock_config_object_type_list = ['cube', 'cylinder', 'hash', 'sphere']
-    mock_config_list = [
-        ObjectConfig(object_type, index, index)
-        for index, object_type in enumerate(mock_config_object_type_list)
+    assert chosen_config_list_b[0].material in [
+        material for materials in material_list for material in materials
     ]
-    material_list = [
-        MaterialTuple('Custom/Materials/Cyan', ['cyan']),
-        MaterialTuple('Custom/Materials/Grey', ['grey']),
-        MaterialTuple('Custom/Materials/Magenta', ['magenta']),
-        MaterialTuple('Custom/Materials/Yellow', ['yellow'])
-    ]
-
-    trial_list = [[{
-        'objects': [[]]
-    }]]
-    chosen_config_list = _choose_config_list(
-        trial_list,
-        mock_config_list,
-        [None, None],
-        material_list,
-        'objects',
-        ['cube', 'cylinder', 'hash'],
-        []
-    )
-    assert len(chosen_config_list) == 1
-    assert chosen_config_list[0].object_type == 'sphere'
-
-
-def test_choose_config_list_no_types_same_as_used_types_multiple():
-    mock_config_object_type_list = ['cube', 'cylinder', 'hash', 'sphere']
-    mock_config_list = [
-        ObjectConfig(object_type, index, index)
-        for index, object_type in enumerate(mock_config_object_type_list)
-    ]
-    material_list = [
-        MaterialTuple('Custom/Materials/Cyan', ['cyan']),
-        MaterialTuple('Custom/Materials/Grey', ['grey']),
-        MaterialTuple('Custom/Materials/Magenta', ['magenta']),
-        MaterialTuple('Custom/Materials/Yellow', ['yellow'])
-    ]
-
-    trial_list = [[{
-        'objects': [[], []]
-    }]]
-    with pytest.raises(exceptions.SceneException):
-        _choose_config_list(
-            trial_list,
-            mock_config_list,
-            [None, None],
-            material_list,
-            'objects',
-            ['cube', 'cylinder', 'hash'],
-            []
-        )
 
 
 def test_create_action_list():
@@ -2044,12 +1961,14 @@ def test_create_home_object_uses_first_frame_of_first_trial():
 
 
 def test_create_key_object():
+    mock_agents = []
+
     # negative_x
     trial_list = [[{
         'key': [[[90, 90], 10, 'triangle0.png']]
     }]]
 
-    key_object = _create_key_object(trial_list, UNIT_SIZE, 0.5)
+    key_object = _create_key_object(trial_list, UNIT_SIZE, mock_agents)
     assert len(key_object['shows']) == 1
     verify_key_properties(key_object)
     verify_show(key_object, 0, 0, 0.25, 0.05, 0)
@@ -2060,7 +1979,7 @@ def test_create_key_object():
         'key': [[[90, 90], 10, 'triangle90.png']]
     }]]
 
-    key_object = _create_key_object(trial_list, UNIT_SIZE, 0.5)
+    key_object = _create_key_object(trial_list, UNIT_SIZE, mock_agents)
     assert len(key_object['shows']) == 1
     verify_key_properties(key_object)
     verify_show(key_object, 0, 0, 0, 0.05, 0.25)
@@ -2071,7 +1990,7 @@ def test_create_key_object():
         'key': [[[90, 90], 10, 'triangle180.png']]
     }]]
 
-    key_object = _create_key_object(trial_list, UNIT_SIZE, 0.5)
+    key_object = _create_key_object(trial_list, UNIT_SIZE, mock_agents)
     assert len(key_object['shows']) == 1
     verify_key_properties(key_object)
     verify_show(key_object, 0, 0, -0.25, 0.05, 0)
@@ -2082,7 +2001,7 @@ def test_create_key_object():
         'key': [[[90, 90], 10, 'triangle270.png']]
     }]]
 
-    key_object = _create_key_object(trial_list, UNIT_SIZE, 0.5)
+    key_object = _create_key_object(trial_list, UNIT_SIZE, mock_agents)
     assert len(key_object['shows']) == 1
     verify_key_properties(key_object)
     verify_show(key_object, 0, 0, 0, 0.05, -0.25)
@@ -2090,6 +2009,20 @@ def test_create_key_object():
 
 
 def test_create_key_object_move_in_one_trial():
+    mock_agents = [{
+        'type': 'mock_agent',
+        'debug': {
+            'boundsAtStep': (
+                [create_simple_bounds(0, 0.5, 0.125, 0.625, y=0.5)] * 5 +
+                [create_simple_bounds(0, 0.5, -0.375, 0.125, y=0.5)] +
+                [create_simple_bounds(0, 0.5, -0.5, 0, y=0.5)] +
+                [create_simple_bounds(0, 0.5, -0.625, -0.125, y=0.5)] +
+                [create_simple_bounds(0, 0.5, -0.75, -0.25, y=0.5)] +
+                [create_simple_bounds(0, 0.5, -0.875, -0.375, y=0.5)]
+            )
+        }
+    }]
+
     trial_list = [[{
         'key': [[[90, 90], 10, 'triangle0.png']]
     }, {
@@ -2105,14 +2038,14 @@ def test_create_key_object_move_in_one_trial():
     }, {
         'key': [[[90, 80], 10, 'triangle0.png']]
     }, {
-        'key': [[[90, 75], 10, 'triangle0.png']]
+        'key': [[[90, 77], 10, 'triangle0.png']]
     }, {
         'key': [[[90, 70], 10, 'triangle0.png']]
     }, {
         'key': [[[90, 65], 10, 'triangle0.png']]
     }]]
 
-    key_object = _create_key_object(trial_list, UNIT_SIZE, 0.5)
+    key_object = _create_key_object(trial_list, UNIT_SIZE, mock_agents)
 
     assert len(key_object['shows']) == 10
     verify_key_properties(key_object)
@@ -2131,6 +2064,20 @@ def test_create_key_object_move_in_one_trial():
 
 
 def test_create_key_object_rotate_in_one_trial():
+    mock_agents = [{
+        'type': 'mock_agent',
+        'debug': {
+            'boundsAtStep': (
+                [create_simple_bounds(0, 0.5, 0.125, 0.625, y=0.5)] * 5 +
+                [create_simple_bounds(0, 0.5, -0.375, 0.125, y=0.5)] +
+                [create_simple_bounds(0, 0.5, -0.5, 0, y=0.5)] +
+                [create_simple_bounds(0, 0.5, -0.625, -0.125, y=0.5)] +
+                [create_simple_bounds(0, 0.5, -0.75, -0.25, y=0.5)] +
+                [create_simple_bounds(0, 0.5, -0.875, -0.375, y=0.5)]
+            )
+        }
+    }]
+
     trial_list = [[{
         'key': [[[90, 90], 10, 'triangle0.png']]
     }, {
@@ -2153,7 +2100,7 @@ def test_create_key_object_rotate_in_one_trial():
         'key': [[[90, 65], 10, 'triangle180.png']]
     }]]
 
-    key_object = _create_key_object(trial_list, UNIT_SIZE, 0.5)
+    key_object = _create_key_object(trial_list, UNIT_SIZE, mock_agents)
 
     assert len(key_object['shows']) == 10
     verify_key_properties(key_object)
@@ -2162,10 +2109,10 @@ def test_create_key_object_rotate_in_one_trial():
         verify_show(key_object, i, i, 0.25, 0.05, 0)
 
     verify_show(key_object, 5, 5, 0.25, 0.55, -0.125)
-    verify_show(key_object, 6, 6, 0, 0.55, -0.25 + 0.25)
-    verify_show(key_object, 7, 7, 0, 0.55, -0.375 + 0.25)
-    verify_show(key_object, 8, 8, -0.25, 0.55, -0.5)
-    verify_show(key_object, 9, 9, -0.25, 0.55, -0.625)
+    verify_show(key_object, 6, 6, 0.25, 0.55, -0.25)
+    verify_show(key_object, 7, 7, 0.25, 0.55, -0.375)
+    verify_show(key_object, 8, 8, 0.25, 0.55, -0.5)
+    verify_show(key_object, 9, 9, 0.25, 0.55, -0.625)
 
     for i in range(6):
         assert key_object['shows'][i]['rotation']['y'] == -135
@@ -2178,6 +2125,24 @@ def test_create_key_object_rotate_in_one_trial():
 
 
 def test_create_key_object_move_in_multiple_trials():
+    mock_agents = [{
+        'type': 'mock_agent',
+        'debug': {
+            'boundsAtStep': (
+                [create_simple_bounds(0, 0.5, 0.125, 0.625, y=0.5)] * 2 +
+                [create_simple_bounds(0, 0.5, -0.375, 0.125, y=0.5)] +
+                [create_simple_bounds(0, 0.5, -0.5, 0, y=0.5)] * 2 +
+
+                [create_simple_bounds(1.625, 2.125, -1.5, -1, y=0.5)] +
+                [create_simple_bounds(1.625, 2.125, -2, -1.5, y=0.5)] * 2 +
+
+                [create_simple_bounds(-1.875, -1.375, 1, 1.5, y=0.5)] * 2 +
+                [create_simple_bounds(-1.875, -1.375, 1.75, 2.25, y=0.5)] +
+                [create_simple_bounds(-1.75, -1.25, 1.75, 2.25, y=0.5)]
+            )
+        }
+    }]
+
     trial_list = [[{
         'key': [[[90, 90], 10, 'triangle0.png']]
     }, {
@@ -2200,7 +2165,7 @@ def test_create_key_object_move_in_multiple_trials():
         'key': [[[30, 160], 10, 'triangle90.png']]
     }]]
 
-    key_object = _create_key_object(trial_list, UNIT_SIZE, 0.5)
+    key_object = _create_key_object(trial_list, UNIT_SIZE, mock_agents)
 
     assert len(key_object['shows']) == 10
     verify_key_properties(key_object)
@@ -2209,8 +2174,10 @@ def test_create_key_object_move_in_multiple_trials():
     verify_show(key_object, 1, 1, 0.25, 0.05, 0)
     verify_show(key_object, 2, 2, 0.25, 0.55, -0.125)
     verify_show(key_object, 3, 3, 0.25, 0.55, -0.25)
+
     verify_show(key_object, 4, 5, 2, 0.05, -1.75)
     verify_show(key_object, 5, 6, 1.875, 0.55, -1.75)
+
     verify_show(key_object, 6, 8, -1.75, 0.05, 2)
     verify_show(key_object, 7, 9, -1.75, 0.05, 2)
     verify_show(key_object, 8, 10, -1.625, 0.55, 2)
@@ -2228,11 +2195,13 @@ def test_create_key_object_move_in_multiple_trials():
 
 
 def test_create_key_object_if_property_is_pin():
+    mock_agents = []
+
     trial_list = [[{
         'pin': [[[90, 90], 10, 'triangle0.png']]
     }]]
 
-    key_object = _create_key_object(trial_list, UNIT_SIZE, 0.5)
+    key_object = _create_key_object(trial_list, UNIT_SIZE, mock_agents)
     assert len(key_object['shows']) == 1
     verify_key_properties(key_object)
     verify_show(key_object, 0, 0, 0.25, 0.05, 0)
@@ -2240,6 +2209,8 @@ def test_create_key_object_if_property_is_pin():
 
 
 def test_create_key_object_no_key_some_trials():
+    mock_agents = []
+
     trial_list = [[{
         'key': [[[90, 90], 10, 'triangle0.png']]
     }, {
@@ -2250,7 +2221,7 @@ def test_create_key_object_no_key_some_trials():
         'key': [[[20, 160], 10, 'triangle90.png']]
     }]]
 
-    key_object = _create_key_object(trial_list, UNIT_SIZE, 0.5)
+    key_object = _create_key_object(trial_list, UNIT_SIZE, mock_agents)
 
     assert len(key_object['shows']) == 4
     verify_key_properties(key_object)
@@ -2471,7 +2442,7 @@ def test_create_object():
     verify_bounds(mcs_object, 0, -0.25, -3.25, 1, -3)
 
 
-def test_create_occluder_evaluation():
+def test_create_nonagent_occluder_evaluation():
     trial_list = [[{}], [{}]]
     agent_object = {
         'debug': {
@@ -2528,12 +2499,12 @@ def test_create_occluder_evaluation():
         } for index, rotation in enumerate(range(360, 5, -5))]
     }
 
-    occluder_object = _create_occluder_object(
+    occluder_object = _create_nonagent_occluder_object(
         trial_list,
         agent_object,
         paddle_object,
         [],
-        OccluderMode.EVAL,
+        OccluderMode.NONAGENT_EVAL,
         UNIT_SIZE
     )
 
@@ -2544,7 +2515,14 @@ def test_create_occluder_evaluation():
     assert occluder_object['structure']
 
     assert len(occluder_object['shows']) == 2
-    verify_show(occluder_object, 0, 0, -3.25, 0.75, -1.45)
+
+    # Needed to avoid breaking due to a weird issue caused by rounding.
+    x_position = occluder_object['shows'][0]['position']['x']
+    occluder_object['shows'][0]['position']['x'] = round(x_position, 3)
+    z_position = occluder_object['shows'][0]['position']['z']
+    occluder_object['shows'][0]['position']['z'] = round(z_position, 3)
+
+    verify_show(occluder_object, 0, 0, -3.375, 0.75, -1.975)
     assert occluder_object['shows'][0]['rotation']['y'] == 0
     assert occluder_object['shows'][0]['scale']['x'] == 0.25
     assert occluder_object['shows'][0]['scale']['y'] == 1.5
@@ -2553,7 +2531,7 @@ def test_create_occluder_evaluation():
     assert occluder_object['shows'][1]['rotation']['y'] == 45
 
 
-def test_create_occluder_training():
+def test_create_nonagent_occluder_training():
     trial_list = [[{}], [{}]]
     agent_object = {
         'debug': {
@@ -2616,12 +2594,12 @@ def test_create_occluder_training():
 
     positions = []
     for _ in range(100):
-        occluder_object = _create_occluder_object(
+        occluder_object = _create_nonagent_occluder_object(
             trial_list,
             agent_object,
             paddle_object,
             [],
-            OccluderMode.TRAINING,
+            OccluderMode.NONAGENT_TRAINING,
             UNIT_SIZE
         )
 
@@ -2632,7 +2610,14 @@ def test_create_occluder_training():
         assert occluder_object['structure']
 
         assert len(occluder_object['shows']) == 2
-        verify_show(occluder_object, 0, 0, -3.25, 0.75, -1.45)
+
+        # Needed to avoid breaking due to a weird issue caused by rounding.
+        x_position = occluder_object['shows'][0]['position']['x']
+        occluder_object['shows'][0]['position']['x'] = round(x_position, 3)
+        z_position = occluder_object['shows'][0]['position']['z']
+        occluder_object['shows'][0]['position']['z'] = round(z_position, 3)
+
+        verify_show(occluder_object, 0, 0, -3.375, 0.75, -1.975)
         assert occluder_object['shows'][0]['rotation']['y'] == 0
         assert occluder_object['shows'][0]['scale']['x'] == 0.25
         assert occluder_object['shows'][0]['scale']['y'] == 1.5
@@ -2650,74 +2635,6 @@ def test_create_occluder_training():
 
     # Verify there are a lot of random positions.
     assert len(positions) > 1
-
-
-def test_create_occluder_none():
-    trial_list = [[{}], [{}]]
-    agent_object = {
-        'debug': {
-            'boundsAtStep': (
-                [create_simple_bounds(-0.6, -0.4, -0.6, -0.4, y=0)] * 40 +
-                [create_simple_bounds(-0.5, -0.3, -0.5, -0.3, y=0)]
-            ),
-            'dimensions': {'x': 0.3, 'y': 0.5, 'z': 0.3}
-        },
-        'shows': [{
-            'stepBegin': 0,
-            'position': {'x': -0.5, 'y': 0, 'z': -0.5},
-            'boundingBox': wrap_create_bounds(
-                dimensions={'x': 0.3, 'y': 0.5, 'z': 0.3},
-                offset=None,
-                position={'x': -0.5, 'y': 0, 'z': -0.5},
-                rotation={'x': 0, 'y': 0, 'z': 0},
-                standing_y=0
-            )
-        }, {
-            'stepBegin': 2,
-            'position': {'x': -0.5, 'y': 0, 'z': -0.5},
-            'boundingBox': wrap_create_bounds(
-                dimensions={'x': 0.3, 'y': 0.5, 'z': 0.3},
-                offset=None,
-                position={'x': -0.5, 'y': 0, 'z': -0.5},
-                rotation={'x': 0, 'y': 0, 'z': 0},
-                standing_y=0
-            )
-        }, {
-            'stepBegin': 41,
-            'position': {'x': -0.4, 'y': 0, 'z': -0.4},
-            'boundingBox': wrap_create_bounds(
-                dimensions={'x': 0.3, 'y': 0.5, 'z': 0.3},
-                offset=None,
-                position={'x': -0.4, 'y': 0, 'z': -0.4},
-                rotation={'x': 0, 'y': 0, 'z': 0},
-                standing_y=0
-            )
-        }]
-    }
-    paddle_object = {
-        'shows': [{
-            'stepBegin': index,
-            'position': {'x': -1.5, 'y': 0, 'z': -1},
-            'rotation': {'x': 0, 'y': rotation, 'z': 0},
-            'boundingBox': wrap_create_bounds(
-                dimensions={'x': 0.25, 'y': 0.5, 'z': 1},
-                offset=None,
-                position={'x': -1.5, 'y': 0, 'z': -1},
-                rotation={'x': 0, 'y': rotation, 'z': 0},
-                standing_y=0
-            )
-        } for index, rotation in enumerate(range(360, 5, -5))]
-    }
-
-    occluder_object = _create_occluder_object(
-        trial_list,
-        agent_object,
-        paddle_object,
-        [],
-        OccluderMode.NONE,
-        UNIT_SIZE
-    )
-    assert occluder_object is None
 
 
 def test_create_paddle():
@@ -2987,7 +2904,7 @@ def test_create_scene_with_paddle():
     # Still a valid scene.
     for frame in trial_list[-1]:
         # Move the paddle to be near the agent, but not overlap it.
-        frame['paddle'][0] = [18, 18]
+        frame['paddle'][0] = [12, 12]
     scene = _create_scene(
         starter_scene,
         goal_template,
@@ -3003,7 +2920,7 @@ def test_create_scene_with_paddle():
     # Invalid scene.
     for frame in trial_list[-1]:
         # Move the paddle to overlap with the agent.
-        frame['paddle'][0] = [19, 19]
+        frame['paddle'][0] = [13, 13]
     with pytest.raises(exceptions.SceneException):
         _create_scene(
             starter_scene,
@@ -3149,6 +3066,7 @@ def test_create_trial_frame_list():
         {'agent': [[23, 22]]},
         {'agent': [[24, 23]]},
         {'agent': [[25, 24]]},
+        {'agent': [[25, 25]]},
         {'agent': [[25, 25]]},
         {'agent': [[25, 25]]}
     ]
@@ -3566,12 +3484,13 @@ def test_create_trial_frame_list_imitated_agents():
         {'agent': [[1, 2]], 'other_agents': [[[11, 13]], [[21, 22]]]},
         {'agent': [[1, 2]], 'other_agents': [[[11, 15]], [[21, 22]]]},
         {'agent': [[1, 2]], 'other_agents': [[[11, 15]], [[21, 22]]]},
-        {'agent': [[1, 2]], 'other_agents': [[[11, 13]], [[21, 22]]]},
+        {'agent': [[1, 2]], 'other_agents': [[[11, 14]], [[21, 22]]]},
         {'agent': [[1, 2]], 'other_agents': [[[11, 12]], [[21, 22]]]},
         {'agent': [[1, 2]], 'other_agents': [[[11, 12]], [[21, 22]]]},
         {'agent': [[1, 2]], 'other_agents': [[[11, 12]], [[21, 22]]]},
-        {'agent': [[1, 2]], 'other_agents': [[[11, 12]], [[41, 22]]]},
-        {'agent': [[1, 2]], 'other_agents': [[[11, 12]], [[61, 22]]]},
+        {'agent': [[1, 2]], 'other_agents': [[[11, 12]], [[31, 22]]]},
+        {'agent': [[1, 2]], 'other_agents': [[[11, 12]], [[51, 22]]]},
+        {'agent': [[1, 2]], 'other_agents': [[[11, 12]], [[51, 22]]]},
         {'agent': [[1, 2]], 'other_agents': [[[11, 12]], [[41, 22]]]},
         {'agent': [[1, 2]], 'other_agents': [[[11, 12]], [[21, 22]]]},
         {'agent': [[1, 2]], 'other_agents': [[[11, 12]], [[21, 22]]]},
@@ -3579,7 +3498,7 @@ def test_create_trial_frame_list_imitated_agents():
         {'agent': [[1, 3]], 'other_agents': [[[11, 12]], [[21, 22]]]},
         {'agent': [[1, 5]], 'other_agents': [[[11, 12]], [[21, 22]]]},
         {'agent': [[1, 5]], 'other_agents': [[[11, 12]], [[21, 22]]]},
-        {'agent': [[1, 3]], 'other_agents': [[[11, 12]], [[21, 22]]]},
+        {'agent': [[1, 4]], 'other_agents': [[[11, 12]], [[21, 22]]]},
         {'agent': [[1, 2]], 'other_agents': [[[11, 12]], [[21, 22]]]},
         {'agent': [[1, 2]], 'other_agents': [[[11, 12]], [[21, 22]]]},
         {'agent': [[1, 2]], 'other_agents': [[[11, 12]], [[21, 22]]]}
@@ -3736,222 +3655,137 @@ def test_create_wall_object_list_with_fuse_multiple_trials():
     verify_fuse_wall_list_trial_2(wall_object_list[9:])
 
 
-def test_fix_key_location():
+def test_create_wall_object_list_add_opening():
+    trial_list = [[{
+        'walls': create_wall_json_list()
+    }]]
+
+    # Test with rotate_room=False
+    wall_object_list = _create_wall_object_list(
+        trial_list,
+        UNIT_SIZE,
+        add_opening=True,
+        rotate_room=False
+    )
+    assert len(wall_object_list) == 10
+    verify_static_wall_list(wall_object_list[:5])
+    border_wall_list = wall_object_list[5:]
+    assert len(border_wall_list) == 5
+    verify_show(border_wall_list[0], 0, 0, 0, 0.5, 2.25)
+    verify_show(border_wall_list[1], 0, 0, 0, 0.0625, -2.25)
+    verify_show(border_wall_list[2], 0, 0, -2.25, 0.0625, 0)
+    verify_show(border_wall_list[3], 0, 0, 1.75, 0.0625, -1.5)
+    verify_show(border_wall_list[4], 0, 0, 1.75, 0.0625, 1.5)
+    verify_static_wall_list_properties(
+        border_wall_list[0:1],
+        scale_x=4,
+        scale_y=1
+    )
+    verify_static_wall_list_properties(border_wall_list[1:2], scale_x=4)
+    verify_static_wall_list_properties(border_wall_list[2:3], scale_z=5)
+    verify_static_wall_list_properties(border_wall_list[3:4], scale_z=1)
+    verify_static_wall_list_properties(border_wall_list[4:5], scale_z=1)
+
+    # Test with rotate_room=True
+    wall_object_list = _create_wall_object_list(
+        trial_list,
+        UNIT_SIZE,
+        add_opening=True,
+        rotate_room=True
+    )
+    assert len(wall_object_list) == 10
+    verify_static_wall_list(wall_object_list[:5])
+    border_wall_list = wall_object_list[5:]
+    assert len(border_wall_list) == 5
+    verify_show(border_wall_list[0], 0, 0, 0, 0.0625, 2.25)
+    verify_show(border_wall_list[1], 0, 0, 0, 0.5, -2.25)
+    verify_show(border_wall_list[2], 0, 0, -2.25, 0.0625, 0)
+    verify_show(border_wall_list[3], 0, 0, 1.75, 0.0625, -1.5)
+    verify_show(border_wall_list[4], 0, 0, 1.75, 0.0625, 1.5)
+    verify_static_wall_list_properties(border_wall_list[0:1], scale_x=4)
+    verify_static_wall_list_properties(
+        border_wall_list[1:2],
+        scale_x=4,
+        scale_y=1
+    )
+    verify_static_wall_list_properties(border_wall_list[2:3], scale_z=5)
+    verify_static_wall_list_properties(border_wall_list[3:4], scale_z=1)
+    verify_static_wall_list_properties(border_wall_list[4:5], scale_z=1)
+
+
+def test_fix_key_triangle_rotation():
     # negative_x
     json_key = [[90, 90], 10, 'triangle0.png']
-    input_key_object = {'debug': {'agentHeight': 0.5}, 'shows': [{
+    input_key = {'debug': {'agentHeight': 0.5}, 'shows': [{
         'stepBegin': 0,
         'position': {'x': 0, 'y': 0, 'z': 0},
         'rotation': {'x': 0, 'y': 0, 'z': 0},
         'scale': {'x': 0.1, 'y': 0.35, 'z': 0.35}
     }]}
-    fixed_key_object = _fix_key_location(0, json_key, input_key_object)
-    assert len(fixed_key_object['shows']) == 1
-    verify_key_show(fixed_key_object)
-    verify_show(fixed_key_object, 0, 0, 0.25, 0, 0)
-    assert fixed_key_object['shows'][0]['rotation']['y'] == -135
-    assert fixed_key_object['shows'][0]['rotationProperty'] == 'negative_x'
+    fixed_key = _fix_key_triangle_rotation(0, json_key, input_key)
+    assert len(fixed_key['shows']) == 1
+    verify_key_show(fixed_key)
+    verify_show(fixed_key, 0, 0, 0.25, 0, 0)
+    assert fixed_key['shows'][0]['rotation']['y'] == -135
+    assert fixed_key['shows'][0]['rotationProperty'] == 'negative_x'
 
     # negative_z
     json_key = [[90, 90], 10, 'triangle90.png']
-    input_key_object = {'debug': {'agentHeight': 0.5}, 'shows': [{
+    input_key = {'debug': {'agentHeight': 0.5}, 'shows': [{
         'stepBegin': 0,
         'position': {'x': 0, 'y': 0, 'z': 0},
         'rotation': {'x': 0, 'y': 0, 'z': 0},
         'scale': {'x': 0.1, 'y': 0.35, 'z': 0.35}
     }]}
-    fixed_key_object = _fix_key_location(0, json_key, input_key_object)
-    assert len(fixed_key_object['shows']) == 1
-    verify_key_show(fixed_key_object)
-    verify_show(fixed_key_object, 0, 0, 0, 0, 0.25)
-    assert fixed_key_object['shows'][0]['rotation']['y'] == 135
-    assert fixed_key_object['shows'][0]['rotationProperty'] == 'negative_z'
+    fixed_key = _fix_key_triangle_rotation(0, json_key, input_key)
+    assert len(fixed_key['shows']) == 1
+    verify_key_show(fixed_key)
+    verify_show(fixed_key, 0, 0, 0, 0, 0.25)
+    assert fixed_key['shows'][0]['rotation']['y'] == 135
+    assert fixed_key['shows'][0]['rotationProperty'] == 'negative_z'
 
     # positive_x
     json_key = [[90, 90], 10, 'triangle180.png']
-    input_key_object = {'debug': {'agentHeight': 0.5}, 'shows': [{
+    input_key = {'debug': {'agentHeight': 0.5}, 'shows': [{
         'stepBegin': 0,
         'position': {'x': 0, 'y': 0, 'z': 0},
         'rotation': {'x': 0, 'y': 0, 'z': 0},
         'scale': {'x': 0.1, 'y': 0.35, 'z': 0.35}
     }]}
-    fixed_key_object = _fix_key_location(0, json_key, input_key_object)
-    assert len(fixed_key_object['shows']) == 1
-    verify_key_show(fixed_key_object)
-    verify_show(fixed_key_object, 0, 0, -0.25, 0, 0)
-    assert fixed_key_object['shows'][0]['rotation']['y'] == 45
-    assert fixed_key_object['shows'][0]['rotationProperty'] == 'positive_x'
+    fixed_key = _fix_key_triangle_rotation(0, json_key, input_key)
+    assert len(fixed_key['shows']) == 1
+    verify_key_show(fixed_key)
+    verify_show(fixed_key, 0, 0, -0.25, 0, 0)
+    assert fixed_key['shows'][0]['rotation']['y'] == 45
+    assert fixed_key['shows'][0]['rotationProperty'] == 'positive_x'
 
     # positive_z
     json_key = [[90, 90], 10, 'triangle270.png']
-    input_key_object = {'debug': {'agentHeight': 0.5}, 'shows': [{
+    input_key = {'debug': {'agentHeight': 0.5}, 'shows': [{
         'stepBegin': 0,
         'position': {'x': 0, 'y': 0, 'z': 0},
         'rotation': {'x': 0, 'y': 0, 'z': 0},
         'scale': {'x': 0.1, 'y': 0.35, 'z': 0.35}
     }]}
-    fixed_key_object = _fix_key_location(0, json_key, input_key_object)
-    assert len(fixed_key_object['shows']) == 1
-    verify_key_show(fixed_key_object)
-    verify_show(fixed_key_object, 0, 0, 0, 0, -0.25)
-    assert fixed_key_object['shows'][0]['rotation']['y'] == -45
-    assert fixed_key_object['shows'][0]['rotationProperty'] == 'positive_z'
+    fixed_key = _fix_key_triangle_rotation(0, json_key, input_key)
+    assert len(fixed_key['shows']) == 1
+    verify_key_show(fixed_key)
+    verify_show(fixed_key, 0, 0, 0, 0, -0.25)
+    assert fixed_key['shows'][0]['rotation']['y'] == -45
+    assert fixed_key['shows'][0]['rotationProperty'] == 'positive_z'
 
 
-def test_fix_key_location_nondefault_position():
-    # negative_x
-    json_key = [[90, 90], 10, 'triangle0.png']
-    input_key_object = {'debug': {'agentHeight': 0.5}, 'shows': [{
+def test_fix_key_triangle_rotation_exception():
+    # Not a triangle icon
+    json_key = [[90, 90], 10, 'circle.png']
+    input_key = {'debug': {'agentHeight': 0.5}, 'shows': [{
         'stepBegin': 0,
         'position': {'x': 1, 'y': 0.1, 'z': -1},
         'rotation': {'x': 0, 'y': 0, 'z': 0},
         'scale': {'x': 0.1, 'y': 0.35, 'z': 0.35}
     }]}
-    fixed_key_object = _fix_key_location(0, json_key, input_key_object)
-    assert len(fixed_key_object['shows']) == 1
-    verify_key_show(fixed_key_object)
-    verify_show(fixed_key_object, 0, 0, 1.25, 0.1, -1)
-    assert fixed_key_object['shows'][0]['rotation']['y'] == -135
-
-
-def test_fix_key_location_multiple_show_no_movement():
-    json_key = [[90, 90], 10, 'triangle0.png']
-    input_key_object = {'debug': {'agentHeight': 0.5}, 'shows': [{
-        'stepBegin': 0,
-        'position': {'x': 1.25, 'y': 0.1, 'z': -1},
-        'rotation': {'x': 0, 'y': -135, 'z': 90},
-        'scale': {'x': 0.1, 'y': 0.35, 'z': 0.35}
-    }, {
-        'stepBegin': 1,
-        'position': {'x': 1, 'y': 0.1, 'z': -1},
-        'rotation': {'x': 0, 'y': 0, 'z': 0}
-    }]}
-    fixed_key_object = _fix_key_location(0, json_key, input_key_object)
-    assert len(fixed_key_object['shows']) == 2
-    verify_key_show(fixed_key_object)
-    verify_show(fixed_key_object, 0, 0, 1.25, 0.1, -1)
-    assert fixed_key_object['shows'][0]['rotation']['y'] == -135
-    verify_show(fixed_key_object, 1, 1, 1.25, 0.1, -1)
-    assert fixed_key_object['shows'][1]['rotation']['y'] == -135
-
-
-def test_fix_key_location_multiple_show_movement_during_first_trial():
-    json_key = [[90, 90], 10, 'triangle0.png']
-    input_key_object = {'debug': {'agentHeight': 0.5}, 'shows': [{
-        'stepBegin': 0,
-        'position': {'x': 1.25, 'y': 0.1, 'z': -1},
-        'rotation': {'x': 0, 'y': -135, 'z': 90},
-        'scale': {'x': 0.1, 'y': 0.35, 'z': 0.35}
-    }, {
-        'stepBegin': 1,
-        'position': {'x': 1.25, 'y': 0.1, 'z': -1},
-        'rotation': {'x': 0, 'y': 0, 'z': 0}
-    }]}
-    fixed_key_object = _fix_key_location(0, json_key, input_key_object)
-    assert len(fixed_key_object['shows']) == 2
-    verify_key_show(fixed_key_object)
-    verify_show(fixed_key_object, 0, 0, 1.25, 0.1, -1)
-    assert fixed_key_object['shows'][0]['rotation']['y'] == -135
-    verify_show(fixed_key_object, 1, 1, 1.5, 0.6, -1)
-    assert fixed_key_object['shows'][1]['rotation']['y'] == -135
-
-
-def test_fix_key_location_multiple_show_reset_between_two_trials():
-    json_key = [[90, 90], 10, 'triangle0.png']
-    input_key_object = {'debug': {'agentHeight': 0.5}, 'shows': [{
-        'stepBegin': 0,
-        'position': {'x': 1.25, 'y': 0.1, 'z': -1},
-        'rotation': {'x': 0, 'y': -135, 'z': 90},
-        'scale': {'x': 0.1, 'y': 0.35, 'z': 0.35}
-    }, {
-        'stepBegin': 1,
-        'position': {'x': 1.25, 'y': 0.1, 'z': -1},
-        'rotation': {'x': 0, 'y': 0, 'z': 0}
-    }]}
-    fixed_key_object = _fix_key_location(1, json_key, input_key_object)
-    assert len(fixed_key_object['shows']) == 2
-    verify_key_show(fixed_key_object)
-    verify_show(fixed_key_object, 0, 0, 1.25, 0.1, -1)
-    assert fixed_key_object['shows'][0]['rotation']['y'] == -135
-    verify_show(fixed_key_object, 1, 1, 1.5, 0.1, -1)
-    assert fixed_key_object['shows'][1]['rotation']['y'] == -135
-
-
-def test_fix_key_location_multiple_show_movement_during_later_trial():
-    json_key = [[90, 90], 10, 'triangle0.png']
-    input_key_object = {'debug': {'agentHeight': 0.5}, 'shows': [{
-        'stepBegin': 0,
-        'position': {'x': 1.25, 'y': 0.1, 'z': -1},
-        'rotation': {'x': 0, 'y': -135, 'z': 90},
-        'scale': {'x': 0.1, 'y': 0.35, 'z': 0.35}
-    }, {
-        'stepBegin': 1,
-        'position': {'x': 1.25, 'y': 0.6, 'z': -1},
-        'rotation': {'x': 0, 'y': -135, 'z': 90}
-    }, {
-        'stepBegin': 2,
-        'position': {'x': 1.5, 'y': 0.6, 'z': -1},
-        'rotation': {'x': 0, 'y': -135, 'z': 90}
-    }, {
-        'stepBegin': 3,
-        'position': {'x': -0.75, 'y': 0.1, 'z': 1},
-        'rotation': {'x': 0, 'y': -135, 'z': 90}
-    }, {
-        'stepBegin': 4,
-        'position': {'x': -0.75, 'y': 0.6, 'z': 0.75},
-        'rotation': {'x': 0, 'y': -135, 'z': 90}
-    }, {
-        'stepBegin': 5,
-        'position': {'x': -1, 'y': 0.1, 'z': 0.5},
-        'rotation': {'x': 0, 'y': -135, 'z': 90}
-    }]}
-    fixed_key_object = _fix_key_location(3, json_key, input_key_object)
-    assert len(fixed_key_object['shows']) == 6
-    verify_key_show(fixed_key_object)
-    verify_show(fixed_key_object, 5, 5, -0.75, 0.6, 0.5)
-    assert fixed_key_object['shows'][5]['rotation']['y'] == -135
-
-
-def test_fix_key_location_multiple_show_rotate_during_first_trial():
-    json_key = [[90, 90], 10, 'triangle90.png']
-    input_key_object = {'debug': {'agentHeight': 0.5}, 'shows': [{
-        'stepBegin': 0,
-        'position': {'x': 1.25, 'y': 0.1, 'z': -1},
-        'rotation': {'x': 0, 'y': -135, 'z': 90},
-        'scale': {'x': 0.1, 'y': 0.35, 'z': 0.35}
-    }, {
-        'stepBegin': 1,
-        'position': {'x': 1, 'y': 0.1, 'z': -1},
-        'rotation': {'x': 0, 'y': 0, 'z': 0}
-    }]}
-    fixed_key_object = _fix_key_location(0, json_key, input_key_object)
-    assert len(fixed_key_object['shows']) == 2
-    verify_key_show(fixed_key_object)
-    verify_show(fixed_key_object, 0, 0, 1.25, 0.1, -1)
-    assert fixed_key_object['shows'][0]['rotation']['y'] == -135
-    verify_show(fixed_key_object, 1, 1, 1, 0.6, -0.75)
-    assert fixed_key_object['shows'][1]['rotation']['y'] == 135
-
-
-def test_fix_key_location_multiple_show_rotate_between_two_trials():
-    json_key = [[90, 90], 10, 'triangle90.png']
-    input_key_object = {'debug': {'agentHeight': 0.5}, 'shows': [{
-        'stepBegin': 0,
-        'position': {'x': 1.25, 'y': 0.1, 'z': -1},
-        'rotation': {'x': 0, 'y': -135, 'z': 90},
-        'scale': {'x': 0.1, 'y': 0.35, 'z': 0.35}
-    }, {
-        'stepBegin': 1,
-        'position': {'x': 1, 'y': 0.1, 'z': -1},
-        'rotation': {'x': 0, 'y': 0, 'z': 0}
-    }]}
-    fixed_key_object = _fix_key_location(1, json_key, input_key_object)
-    assert len(fixed_key_object['shows']) == 2
-    verify_key_show(fixed_key_object)
-    verify_show(fixed_key_object, 0, 0, 1.25, 0.1, -1)
-    assert fixed_key_object['shows'][0]['rotation']['y'] == -135
-    verify_show(fixed_key_object, 1, 1, 1, 0.1, -0.75)
-    assert fixed_key_object['shows'][1]['rotation']['y'] == 135
+    with pytest.raises(exceptions.SceneException):
+        _fix_key_triangle_rotation(0, json_key, input_key)
 
 
 def test_identify_trial_index_starting_step():
@@ -5285,6 +5119,54 @@ def test_remove_intersecting_agent_steps_with_intersection():
     assert agent_object_list[0]['shows'][4]['stepBegin'] == 11
 
 
+def test_remove_intersecting_agent_steps_with_intersection_y_rounding():
+    bounds_a = create_simple_bounds(1, -1, 1, -1)
+    bounds_b = create_simple_bounds(2, 0, 2, 0)
+    bounds_c = create_simple_bounds(3, 1, 3, 1)
+    bounds_d = create_simple_bounds(1, -1, 1, -1)
+    bounds_e = create_simple_bounds(0, -2, 0, -2)
+    bounds_f = create_simple_bounds(-1, -3, -1, -3)
+    agent_object_list = [{
+        'id': 'agent_1',
+        'debug': {
+            'boundsAtStep': [
+                bounds_a, bounds_a, bounds_a, bounds_b, bounds_c,
+                bounds_c, bounds_c, bounds_d, bounds_d, bounds_d,
+                bounds_e, bounds_f, bounds_f, bounds_f
+            ],
+            'trialToSteps': {
+                0: (0, 13)
+            }
+        },
+        'shows': [
+            {'stepBegin': 0, 'boundingBox': bounds_a},
+            {'stepBegin': 3, 'boundingBox': bounds_b},
+            {'stepBegin': 4, 'boundingBox': bounds_c},
+            {'stepBegin': 7, 'boundingBox': bounds_d},
+            {'stepBegin': 10, 'boundingBox': bounds_e},
+            {'stepBegin': 11, 'boundingBox': bounds_f}
+        ]
+    }]
+
+    goal_bounds = create_simple_bounds(3.9, 2.9, 3.9, 2.9)
+    goal_bounds.min_y = 0.0001
+    goal_object_list = [{
+        'id': 'goal_1',
+        'debug': {
+            'boundsAtStep': [goal_bounds] * 14
+        }
+    }]
+
+    _remove_intersecting_agent_steps(agent_object_list, goal_object_list)
+
+    assert len(agent_object_list[0]['shows']) == 5
+    assert agent_object_list[0]['shows'][0]['stepBegin'] == 0
+    assert agent_object_list[0]['shows'][1]['stepBegin'] == 3
+    assert agent_object_list[0]['shows'][2]['stepBegin'] == 7
+    assert agent_object_list[0]['shows'][3]['stepBegin'] == 10
+    assert agent_object_list[0]['shows'][4]['stepBegin'] == 11
+
+
 def test_remove_intersecting_agent_steps_with_multiple_agents():
     bounds_a = create_simple_bounds(1, -1, 1, -1)
     bounds_b = create_simple_bounds(2, 0, 2, 0)
@@ -5694,3 +5576,100 @@ def test_reposition_agents_away_from_paddle_no_paddle():
 def test_retrieve_unit_size():
     assert _retrieve_unit_size([[{'size': [200, 200]}]]) == UNIT_SIZE
     assert _retrieve_unit_size([[{'size': [100, 400]}]]) == [0.05, 0.0125]
+
+
+def test_create_helper_hinderer_occluder_object():
+    trial_list = [[
+        {}, {}, {}, {}, {}, {}, {}, {}, {}
+    ], [
+        {'door': [[90, 80], [10, 40]]},
+        {'door': [[90, 80], [10, 40]]},
+        {'door': [[90, 80], [10, 40]]},
+        {'door': [[90, 80], [10, 40]]},
+        {'door': [[90, 80], [10, 40]]},
+        {'door': [[85, 80], [10, 40]]},
+        {'door': [[80, 80], [10, 40]]},
+        {'door': [[75, 80], [10, 40]]},
+        {'door': [[70, 80], [10, 40]]}
+    ], [
+        {}, {}, {}, {}, {}, {}, {}, {}, {}
+    ], [
+        {'door': [[30, 80], [10, 40]]},
+        {'door': [[30, 80], [10, 40]]},
+        {'door': [[30, 80], [10, 40]]},
+        {'door': [[30, 80], [10, 40]]},
+        {'door': [[30, 80], [10, 40]]},
+        {'door': [[35, 80], [10, 40]]},
+        {'door': [[40, 80], [10, 40]]},
+        {'door': [[45, 80], [10, 40]]},
+        {'door': [[50, 80], [10, 40]]}
+    ], [
+        {}, {}, {}, {}, {}, {}, {}, {}, {}
+    ]]
+
+    occluder = _create_helper_hinderer_occluder_object(trial_list, UNIT_SIZE)
+
+    assert occluder['id'].startswith('occluder_')
+    assert occluder['type'] == 'cube'
+    assert occluder['materials'] == ['Custom/Materials/Cyan']
+    assert occluder['kinematic']
+    assert occluder['structure']
+
+    assert len(occluder['shows']) == 10
+    verify_show(occluder, 0, 10, 0, 0.25, 0)
+    verify_show(occluder, 1, 15, -0.125, 0.25, 0)
+    verify_show(occluder, 2, 16, -0.25, 0.25, 0)
+    verify_show(occluder, 3, 17, -0.375, 0.25, 0)
+    verify_show(occluder, 4, 18, -0.5, 0.25, 0)
+    verify_show(occluder, 5, 30, -1.5, 0.25, 0)
+    verify_show(occluder, 6, 35, -1.375, 0.25, 0)
+    verify_show(occluder, 7, 36, -1.25, 0.25, 0)
+    verify_show(occluder, 8, 37, -1.125, 0.25, 0)
+    verify_show(occluder, 9, 38, -1, 0.25, 0)
+
+    assert len(occluder['hides']) == 2
+    assert occluder['hides'][0]['stepBegin'] == 20
+    assert occluder['hides'][1]['stepBegin'] == 40
+
+    for show in occluder['shows']:
+        assert occluder['shows'][0]['rotation']['y'] == 0
+
+    assert occluder['shows'][0]['scale']['x'] == 0.5
+    assert occluder['shows'][0]['scale']['y'] == 0.5
+    assert occluder['shows'][0]['scale']['z'] == 1
+
+
+def test_create_true_false_belief_occluder_list():
+    trial_list = [[
+        {'occluder': [[[0, 30], [10, 40]], [[0, 130], [10, 40]]]},
+        {'occluder': [[[0, 30], [10, 40]], [[0, 130], [10, 40]]]},
+        {'occluder': [[[0, 30], [10, 40]], [[0, 130], [10, 40]]]},
+        {'occluder': [[[0, 30], [10, 40]], [[0, 130], [10, 40]]]}
+    ], [
+        {'occluder': [[[90, 30], [10, 40]], [[90, 130], [10, 40]]]},
+        {'occluder': [[[90, 30], [10, 40]], [[90, 130], [10, 40]]]},
+        {'occluder': [[[90, 30], [10, 40]], [[90, 130], [10, 40]]]},
+        {'occluder': [[[90, 30], [10, 40]], [[90, 130], [10, 40]]]}
+    ]]
+
+    occluders = _create_true_false_belief_occluder_list(trial_list, UNIT_SIZE)
+
+    for occluder in occluders:
+        assert occluder['id'].startswith('occluder_')
+        assert occluder['type'] == 'cube'
+        assert occluder['materials'] == ['Custom/Materials/White']
+        assert occluder['kinematic']
+        assert occluder['structure']
+
+        assert len(occluder['shows']) == 2
+        for show in occluder['shows']:
+            assert occluder['shows'][0]['rotation']['y'] == 0
+
+        assert occluder['shows'][0]['scale']['x'] == 0.25
+        assert occluder['shows'][0]['scale']['y'] == 1
+        assert occluder['shows'][0]['scale']['z'] == 0.85
+
+    verify_show(occluders[0], 0, 0, -3.25, 0.5, -1.25)
+    verify_show(occluders[0], 1, 5, -0.125, 0.5, -1.25)
+    verify_show(occluders[1], 0, 0, -3.25, 0.5, 1.25)
+    verify_show(occluders[1], 1, 5, -0.125, 0.5, 1.25)
