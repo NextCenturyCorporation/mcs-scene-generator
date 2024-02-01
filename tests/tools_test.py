@@ -61,6 +61,16 @@ def test_get_tool_shape():
         'tool_rect_1_00_x_4_00'
     ]
 
+    shape = tools.get_tool_shape(6, tools.TOOL_TYPES.T_SHAPED)
+    assert shape in [
+        'tool_t_5_00_x_6_00'
+    ]
+
+    shape = tools.get_tool_shape(6, tools.TOOL_TYPES.I_SHAPED)
+    assert shape in [
+        'tool_i_5_00_x_6_00'
+    ]
+
     # No matching tool shapes
     shape = tools.get_tool_shape(20, tools.TOOL_TYPES.RECT)
     assert shape is None
@@ -81,6 +91,8 @@ def test_get_tool_width_from_type():
     assert tools.get_tool_width_from_type('tool_isosceles_0_50_x_4_00') == 0.5
     assert tools.get_tool_width_from_type('tool_isosceles_0_75_x_4_00') == 0.75
     assert tools.get_tool_width_from_type('tool_isosceles_1_00_x_4_00') == 1
+    assert tools.get_tool_width_from_type('tool_t_5_00_x_6_00') == 5
+    assert tools.get_tool_width_from_type('tool_i_5_00_x_6_00') == 5
 
 
 def test_create_tool():

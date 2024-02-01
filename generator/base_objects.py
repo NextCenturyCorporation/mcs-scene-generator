@@ -6704,7 +6704,9 @@ LARGE_BLOCK_TOOLS_TO_DIMENSIONS = {
     'tool_rect_1_00_x_6_00': (1, 6),
     'tool_rect_1_00_x_7_00': (1, 7),
     'tool_rect_1_00_x_8_00': (1, 8),
-    'tool_rect_1_00_x_9_00': (1, 9)
+    'tool_rect_1_00_x_9_00': (1, 9),
+    'tool_t_5_00_x_6_00': (5, 6),
+    'tool_i_5_00_x_6_00': (5, 6),
 }
 
 LARGE_BLOCK_NOVEL_TOOLS_TO_DIMENSIONS = {

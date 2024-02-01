@@ -1,0 +1,62 @@
+goal:
+    category: retrieval
+    target:
+        shape: soccer_ball
+        scale: 1.0
+        position:
+            x: 0
+            y: 0
+            z: -2
+room_dimensions:
+    x: 6
+    y: 5
+    z: 9
+performer_start_position:
+    x: 0
+    y: 0
+    z: -4
+performer_start_rotation:
+    x: 0
+    y: 0
+specific_interactable_objects:
+    - num: 1
+      labels: left_container
+      scale: 0.4
+      shape: separate_container
+      position:
+          x: -2.0
+          y: 0
+          z: 0
+      rotation:
+          x: 0
+          y: 0
+          z: 0
+    - num: 1
+      labels: right_container
+      scale: 0.4
+      shape: separate_container
+      position:
+          x: 2.0
+          y: 0
+          z: 0
+      rotation:
+          x: 0
+          y: 0
+          z: 0
+knowledgeable_agent_pair:
+    position_1:
+        - x: 1.5
+          y: 0.01
+          z: 1
+    position_2:
+        - x: -1.5
+          y: 0.01
+          z: 1
+    pointing_step: [1, 6]
+    target_labels: target
+    non_target_labels: [left_container, right_container]
+# Override the defaults to avoid randomly generating any other objects.
+random_structural_objects:
+    - num: 0
+keyword_objects:
+    - num: 0

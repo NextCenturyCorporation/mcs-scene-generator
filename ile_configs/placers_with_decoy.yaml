@@ -1,0 +1,43 @@
+goal:
+    category: retrieval
+    target:
+        shape: soccer_ball
+        scale: 1.0
+        position:
+            x: 0
+            y: 0.501
+            z: 0
+
+room_dimensions:
+    x: 6
+    y: 5
+    z: 9
+
+shortcut_bisecting_platform:
+    has_blocking_wall: false
+    is_short: true
+    is_thin: true
+
+placers_with_decoy:
+    activation_step: [13, 59]
+    object_end_position_x: [2.0, -2.0]
+    labels: target_placers
+    move_object_y: 0
+    move_object_z: 0
+    placed_object_labels: target
+    placed_object_position:
+        x: 0
+        y: 0.501
+        z: 0
+    placed_object_rotation: 0
+    # The height of a scale 1 soccer ball.
+    decoy_y_modifier: 0.22
+
+freeze_while_moving: [placers]
+
+# Override the defaults to avoid randomly generating any other objects.
+random_structural_objects:
+    - num: 0
+keyword_objects:
+    - num: 0
+    

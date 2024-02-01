@@ -97,7 +97,9 @@ TOOL_TYPES = SimpleNamespace(
     SECONDARY="secondary",
     SMALL="small",
     RECT="rectangular",
-    TOO_BIG="too_big"
+    TOO_BIG="too_big",
+    T_SHAPED="t_shaped",
+    I_SHAPED="i_shaped"
 )
 
 L_SHAPED_TOOLS = [TOOL_TYPES.HOOKED, TOOL_TYPES.ISOSCELES]
@@ -118,6 +120,10 @@ def get_tool_shape(
             "tool_rect_1_00_x_3_00"
         ]
         return random.choice(options)
+    if tool_category == TOOL_TYPES.T_SHAPED:
+        return "tool_t_5_00_x_6_00"
+    if tool_category == TOOL_TYPES.I_SHAPED:
+        return "tool_i_5_00_x_6_00"
     if tool_category == TOOL_TYPES.NO_TOOL:
         return None
     if tool_category in [TOOL_TYPES.SMALL, TOOL_TYPES.BROKEN]:
